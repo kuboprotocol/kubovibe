@@ -90,7 +90,7 @@ export default function CanvasPage() {
   }
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-canvas-bg overflow-hidden">
+    <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
       {/* Header */}
       <motion.header
         initial={{ y: -20, opacity: 0 }}
@@ -143,10 +143,10 @@ export default function CanvasPage() {
             <span className="hidden sm:inline">Compartilhar</span>
           </Button>
           <Button
+            variant="hero"
             size="sm"
             onClick={handleQuickSave}
             disabled={saving}
-            className="gradient-primary text-primary-foreground shadow-glow"
           >
             {saving ? (
               <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
