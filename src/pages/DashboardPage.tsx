@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Plus, FileText, Trash2 } from 'lucide-react'
+import { Plus, FileText, Trash2, ArrowLeft } from 'lucide-react'
 import { motion } from 'framer-motion'
 
 interface CanvasEntry {
@@ -30,19 +30,21 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card">
-        <div className="container max-w-5xl mx-auto px-6 py-5 flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-foreground">🎨 Meus Canvas</h1>
-          <Button
-            onClick={() => navigate('/canvas')}
-            className="gradient-primary text-primary-foreground shadow-glow"
-          >
+        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <h1 className="text-xl font-bold text-foreground">My Projects</h1>
+          </div>
+          <Button variant="hero" onClick={() => navigate('/canvas')}>
             <Plus className="h-4 w-4 mr-2" />
-            Novo Canvas
+            New Project
           </Button>
         </div>
       </header>
 
-      <main className="container max-w-5xl mx-auto px-6 py-8">
+      <main className="max-w-5xl mx-auto px-6 py-8">
         {canvasList.length === 0 ? (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -52,14 +54,11 @@ export default function DashboardPage() {
             <div className="inline-flex p-4 rounded-2xl bg-accent mb-4">
               <FileText className="h-10 w-10 text-accent-foreground" />
             </div>
-            <h2 className="text-xl font-semibold text-foreground mb-2">Nenhum canvas ainda</h2>
-            <p className="text-muted-foreground mb-6">Crie seu primeiro canvas para começar</p>
-            <Button
-              onClick={() => navigate('/canvas')}
-              className="gradient-primary text-primary-foreground shadow-glow"
-            >
+            <h2 className="text-xl font-semibold text-foreground mb-2">No projects yet</h2>
+            <p className="text-muted-foreground mb-6">Create your first project to get started</p>
+            <Button variant="hero" onClick={() => navigate('/canvas')}>
               <Plus className="h-4 w-4 mr-2" />
-              Criar Canvas
+              Create Project
             </Button>
           </motion.div>
         ) : (

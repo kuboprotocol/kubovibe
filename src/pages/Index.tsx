@@ -1,14 +1,24 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import Navbar from '@/components/landing/Navbar'
+import HeroSection from '@/components/landing/HeroSection'
+import CommunitySection from '@/components/landing/CommunitySection'
+import HowItWorksSection from '@/components/landing/HowItWorksSection'
+import FAQSection from '@/components/landing/FAQSection'
 
 const Index = () => {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
-      </div>
+    <div className="min-h-screen bg-background">
+      <Navbar />
+      <HeroSection />
+      <CommunitySection />
+      <HowItWorksSection />
+      <FAQSection />
+      <footer className="py-10 px-6 border-t border-border text-center">
+        <p className="text-sm text-muted-foreground">
+          © 2026 idealane. All rights reserved.
+        </p>
+      </footer>
     </div>
-  );
-};
+  )
+}
 
-export default Index;
+export default Index
