@@ -12,7 +12,7 @@ const faqs = [
     a: 'Yes! Whether you run a restaurant, consulting firm, e-commerce store, or anything else, idealane adapts to your needs.',
   },
   {
-    q: 'What if I don\'t know exactly what I want?',
+    q: "What if I don't know exactly what I want?",
     a: 'No problem! Just describe your idea in a few words and our AI will suggest designs, layouts, and features to get you started.',
   },
   {
@@ -33,24 +33,19 @@ export default function FAQSection() {
   const [open, setOpen] = useState<number | null>(null)
 
   return (
-    <section className="py-20 px-6">
+    <section className="py-24 px-6">
       <div className="max-w-2xl mx-auto">
-        <motion.h2
+        <motion.div
           initial={{ opacity: 0, y: 15 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="text-2xl md:text-3xl font-bold text-foreground text-center mb-3"
+          className="text-center mb-14"
         >
-          Frequently asked questions
-        </motion.h2>
-        <motion.p
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          className="text-muted-foreground text-center mb-12"
-        >
-          Find answers to common questions
-        </motion.p>
+          <span className="text-xs font-medium text-primary uppercase tracking-widest mb-3 block">FAQ</span>
+          <h2 className="text-3xl md:text-4xl font-display font-bold text-foreground">
+            Questions & answers
+          </h2>
+        </motion.div>
 
         <div className="space-y-2">
           {faqs.map((faq, index) => (
@@ -60,7 +55,7 @@ export default function FAQSection() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: index * 0.05 }}
-              className="border border-border rounded-xl overflow-hidden"
+              className="border border-border rounded-xl overflow-hidden bg-card"
             >
               <button
                 onClick={() => setOpen(open === index ? null : index)}
