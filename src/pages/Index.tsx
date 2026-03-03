@@ -35,7 +35,7 @@ const Index = () => {
             </p>
             <Button
               size="lg"
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigate('/builder')}
               className="bg-background text-foreground hover:bg-background/90 rounded-xl px-8 font-semibold gap-2"
             >
               Start building for free

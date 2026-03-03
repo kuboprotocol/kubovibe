@@ -30,10 +30,10 @@ export default function Navbar() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" className="text-muted-foreground font-medium" onClick={() => navigate('/dashboard')}>
+          <Button variant="ghost" size="sm" className="text-muted-foreground font-medium" onClick={() => navigate('/builder')}>
             Log in
           </Button>
-          <Button variant="hero" size="sm" onClick={() => navigate('/dashboard')} className="rounded-xl">
+          <Button variant="hero" size="sm" onClick={() => navigate('/builder')} className="rounded-xl">
             Get started
           </Button>
         </div>

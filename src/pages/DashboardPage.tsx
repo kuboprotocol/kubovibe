@@ -37,7 +37,7 @@ export default function DashboardPage() {
             </Button>
             <h1 className="text-xl font-bold text-foreground">My Projects</h1>
           </div>
-          <Button variant="hero" onClick={() => navigate('/canvas')}>
+          <Button variant="hero" onClick={() => navigate('/builder')}>
             <Plus className="h-4 w-4 mr-2" />
             New Project
           </Button>
@@ -56,7 +56,7 @@ export default function DashboardPage() {
             </div>
             <h2 className="text-xl font-semibold text-foreground mb-2">No projects yet</h2>
             <p className="text-muted-foreground mb-6">Create your first project to get started</p>
-            <Button variant="hero" onClick={() => navigate('/canvas')}>
+            <Button variant="hero" onClick={() => navigate('/builder')}>
               <Plus className="h-4 w-4 mr-2" />
               Create Project
             </Button>

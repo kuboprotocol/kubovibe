@@ -16,7 +16,7 @@ export default function HeroSection() {
 
   const handleGenerate = () => {
     if (prompt.trim()) {
-      navigate('/canvas')
+      navigate('/builder')
     }
   }
 
