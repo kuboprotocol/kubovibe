@@ -2,29 +2,57 @@ import { useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Plus, FileText, Trash2, ArrowLeft } from 'lucide-react'
+import { Plus, FileText, Trash2, ArrowLeft, LogOut, Code } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { supabase } from '@/integrations/supabase/client'
+import { useAuth } from '@/hooks/useAuth'
+import { toast } from 'sonner'
 
-interface CanvasEntry {
+interface Project {
   id: string
-  name: string
-  updatedAt: string
+  title: string
+  description: string | null
+  generated_code: string | null
+  updated_at: string
 }
 
 export default function DashboardPage() {
   const navigate = useNavigate()
-  const [canvasList, setCanvasList] = useState<CanvasEntry[]>([])
+  const { user, signOut } = useAuth()
+  const [projects, setProjects] = useState<Project[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const list = JSON.parse(localStorage.getItem('canvas-list') || '[]')
-    setCanvasList(list)
+    loadProjects()
   }, [])
 
-  const handleDelete = (id: string) => {
-    const updated = canvasList.filter((c) => c.id !== id)
-    setCanvasList(updated)
-    localStorage.setItem('canvas-list', JSON.stringify(updated))
-    localStorage.removeItem(`canvas-${id}`)
+  const loadProjects = async () => {
+    const { data, error } = await supabase
+      .from('projects')
+      .select('id, title, description, generated_code, updated_at')
+      .order('updated_at', { ascending: false })
+
+    if (error) {
+      toast.error('Erro ao carregar projetos')
+      console.error(error)
+    } else {
+      setProjects(data || [])
+    }
+    setLoading(false)
+  }
+
+  const handleDelete = async (id: string) => {
+    const { error } = await supabase.from('projects').delete().eq('id', id)
+    if (error) {
+      toast.error('Erro ao deletar projeto')
+    } else {
+      setProjects((prev) => prev.filter((p) => p.id !== id))
+    }
+  }
+
+  const handleSignOut = async () => {
+    await signOut()
+    navigate('/')
   }
 
   return (
@@ -37,15 +65,22 @@ export default function DashboardPage() {
             </Button>
             <h1 className="text-xl font-bold text-foreground">My Projects</h1>
           </div>
-          <Button variant="hero" onClick={() => navigate('/builder')}>
-            <Plus className="h-4 w-4 mr-2" />
-            New Project
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="hero" onClick={() => navigate('/builder')}>
+              <Plus className="h-4 w-4 mr-2" />
+              New Project
+            </Button>
+            <Button variant="ghost" size="icon" onClick={handleSignOut} title="Sair">
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-8">
-        {canvasList.length === 0 ? (
+        {loading ? (
+          <div className="text-center py-20 text-muted-foreground">Carregando...</div>
+        ) : projects.length === 0 ? (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -63,29 +98,36 @@ export default function DashboardPage() {
           </motion.div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {canvasList.map((canvas, index) => (
+            {projects.map((project, index) => (
               <motion.div
-                key={canvas.id}
+                key={project.id}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
               >
                 <Card
                   className="group cursor-pointer p-5 hover:border-primary hover:shadow-lg transition-all duration-200"
-                  onClick={() => navigate(`/canvas/${canvas.id}`)}
+                  onClick={() => navigate(`/builder/${project.id}`)}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-foreground truncate">{canvas.name}</h3>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {new Date(canvas.updatedAt).toLocaleDateString('pt-BR', {
-                          day: '2-digit',
-                          month: 'short',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </p>
+                      <h3 className="font-semibold text-foreground truncate">{project.title}</h3>
+                      {project.description && (
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">{project.description}</p>
+                      )}
+                      <div className="flex items-center gap-2 mt-2">
+                        {project.generated_code && (
+                          <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-accent text-accent-foreground">
+                            <Code className="h-2.5 w-2.5" />
+                            Has code
+                          </span>
+                        )}
+                        <span className="text-[10px] text-muted-foreground">
+                          {new Date(project.updated_at).toLocaleDateString('pt-BR', {
+                            day: '2-digit', month: 'short', year: 'numeric',
+                          })}
+                        </span>
+                      </div>
                     </div>
                     <Button
                       variant="ghost"
@@ -93,7 +135,7 @@ export default function DashboardPage() {
                       className="h-8 w-8 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
                       onClick={(e) => {
                         e.stopPropagation()
-                        handleDelete(canvas.id)
+                        handleDelete(project.id)
                       }}
                     >
                       <Trash2 className="h-4 w-4" />
