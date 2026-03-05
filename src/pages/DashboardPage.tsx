@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Plus, FileText, Trash2, ArrowLeft, LogOut, Code, Pencil } from 'lucide-react'
+import { Plus, FileText, Trash2, ArrowLeft, LogOut, Code, Pencil, UserCircle } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import {
   Dialog,
@@ -107,6 +107,9 @@ export default function DashboardPage() {
             <Button variant="hero" onClick={() => navigate('/builder')}>
               <Plus className="h-4 w-4 mr-2" />
               New Project
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => navigate('/profile')} title="Perfil">
+              <UserCircle className="h-4 w-4" />
             </Button>
             <Button variant="ghost" size="icon" onClick={handleSignOut} title="Sair">
               <LogOut className="h-4 w-4" />
