@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, Send, Code, Eye, Loader2, Sparkles, Copy, Check, Save } from 'lucide-react'
+import { ArrowLeft, Send, Code, Eye, Loader2, Sparkles, Copy, Check, Save, Download } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { streamChat, type Msg } from '@/lib/streamChat'
 import { supabase } from '@/integrations/supabase/client'
@@ -175,6 +175,16 @@ export default function BuilderPage() {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  const handleDownload = () => {
+    const blob = new Blob([generatedCode], { type: 'text/html' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${projectTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.html`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   const suggestions = [
     'A task management app with drag & drop',
     'A weather dashboard with live data',
@@ -233,16 +243,27 @@ export default function BuilderPage() {
           </div>
 
           {generatedCode && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => saveProject(generatedCode, messages)}
-              disabled={saving}
-              className="text-xs"
-            >
-              {saving ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Save className="h-3 w-3 mr-1" />}
-              Save
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownload}
+                className="text-xs"
+              >
+                <Download className="h-3 w-3 mr-1" />
+                Download
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => saveProject(generatedCode, messages)}
+                disabled={saving}
+                className="text-xs"
+              >
+                {saving ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Save className="h-3 w-3 mr-1" />}
+                Save
+              </Button>
+            </>
           )}
         </div>
       </header>
