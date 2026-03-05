@@ -40,7 +40,8 @@ export default function AuthPage() {
           },
         })
         if (error) throw error
-        toast.success('Verifique seu email para confirmar o cadastro!')
+        toast.success('Conta criada com sucesso!')
+        navigate('/dashboard')
       }
     } catch (err: any) {
       const msg = err.message || 'Erro na autenticação'
