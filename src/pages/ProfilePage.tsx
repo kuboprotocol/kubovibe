@@ -4,8 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
-import { Card } from '@/components/ui/card'
-import { ArrowLeft, Camera, Loader2, User } from 'lucide-react'
+import { ArrowLeft, Camera, Loader2, Mail, User, Shield, Sparkles } from 'lucide-react'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/hooks/useAuth'
 import { toast } from 'sonner'
@@ -118,82 +117,121 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card">
-        <div className="max-w-2xl mx-auto px-6 py-4 flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
+    <div className="min-h-screen bg-background gradient-mesh">
+      {/* Header */}
+      <header className="glass glass-border sticky top-0 z-10">
+        <div className="max-w-3xl mx-auto px-6 py-4 flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} className="hover:bg-accent">
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h1 className="text-xl font-bold text-foreground">Meu Perfil</h1>
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-primary" />
+            <h1 className="text-xl font-bold text-foreground">Meu Perfil</h1>
+          </div>
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-6 py-8">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <Card className="p-8">
-            {/* Avatar */}
-            <div className="flex flex-col items-center mb-8">
-              <div className="relative group">
-                <Avatar className="h-24 w-24 text-lg">
-                  {avatarUrl ? (
-                    <AvatarImage src={avatarUrl} alt="Avatar" />
-                  ) : null}
-                  <AvatarFallback className="bg-accent text-accent-foreground text-xl">
-                    {initials}
-                  </AvatarFallback>
-                </Avatar>
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading}
-                  className="absolute inset-0 flex items-center justify-center rounded-full bg-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                >
-                  {uploading ? (
-                    <Loader2 className="h-6 w-6 animate-spin text-background" />
-                  ) : (
-                    <Camera className="h-6 w-6 text-background" />
-                  )}
-                </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleAvatarUpload}
-                />
-              </div>
-              <p className="text-sm text-muted-foreground mt-2">
-                Clique para alterar o avatar
+      <main className="max-w-3xl mx-auto px-6 py-10">
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+          className="space-y-6"
+        >
+          {/* Avatar Section */}
+          <div className="glass glass-border rounded-2xl p-8 flex flex-col sm:flex-row items-center gap-6">
+            <div className="relative group shrink-0">
+              <div className="absolute -inset-1.5 rounded-full bg-gradient-to-br from-primary/40 to-primary/10 blur-sm group-hover:blur-md transition-all" />
+              <Avatar className="h-28 w-28 text-lg ring-2 ring-border relative">
+                {avatarUrl ? (
+                  <AvatarImage src={avatarUrl} alt="Avatar" className="object-cover" />
+                ) : null}
+                <AvatarFallback className="bg-accent text-accent-foreground text-2xl font-semibold">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="absolute inset-0 flex items-center justify-center rounded-full bg-foreground/60 opacity-0 group-hover:opacity-100 transition-all duration-300 cursor-pointer"
+              >
+                {uploading ? (
+                  <Loader2 className="h-6 w-6 animate-spin text-background" />
+                ) : (
+                  <Camera className="h-6 w-6 text-background" />
+                )}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleAvatarUpload}
+              />
+            </div>
+            <div className="text-center sm:text-left">
+              <h2 className="text-2xl font-bold text-foreground">
+                {displayName || 'Sem nome'}
+              </h2>
+              <p className="text-muted-foreground text-sm mt-1 flex items-center gap-1.5 justify-center sm:justify-start">
+                <Mail className="h-3.5 w-3.5" />
+                {user?.email}
+              </p>
+              <p className="text-xs text-muted-foreground/60 mt-2">
+                Clique na foto para alterar o avatar
               </p>
             </div>
+          </div>
 
-            {/* Info */}
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" value={user?.email || ''} disabled className="opacity-60" />
+          {/* Form Section */}
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
+            className="glass glass-border rounded-2xl p-8 space-y-6"
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <Shield className="h-4 w-4 text-primary" />
+              <h3 className="font-semibold text-foreground">Informações da conta</h3>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-muted-foreground text-sm">Email</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
+                <Input
+                  id="email"
+                  value={user?.email || ''}
+                  disabled
+                  className="pl-10 opacity-60 bg-muted/30"
+                />
               </div>
+            </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="displayName">Nome de exibição</Label>
+            <div className="space-y-2">
+              <Label htmlFor="displayName" className="text-muted-foreground text-sm">Nome de exibição</Label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
                 <Input
                   id="displayName"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
                   placeholder="Seu nome"
+                  className="pl-10"
                 />
               </div>
-
-              <Button
-                onClick={handleSave}
-                disabled={saving || !displayName.trim()}
-                className="w-full mt-4"
-                variant="hero"
-              >
-                {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                Salvar alterações
-              </Button>
             </div>
-          </Card>
+
+            <Button
+              onClick={handleSave}
+              disabled={saving || !displayName.trim()}
+              className="w-full gradient-primary text-primary-foreground shadow-glow hover:shadow-glow-lg transition-all duration-300"
+              size="lg"
+            >
+              {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Salvar alterações
+            </Button>
+          </motion.div>
         </motion.div>
       </main>
     </div>
