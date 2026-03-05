@@ -43,7 +43,16 @@ export default function AuthPage() {
         toast.success('Verifique seu email para confirmar o cadastro!')
       }
     } catch (err: any) {
-      toast.error(err.message || 'Erro na autenticação')
+      const msg = err.message || 'Erro na autenticação'
+      if (msg.includes('Invalid login credentials')) {
+        toast.error('Email ou senha incorretos. Verifique seus dados ou crie uma conta.')
+      } else if (msg.includes('User already registered')) {
+        toast.error('Este email já está cadastrado. Tente fazer login.')
+      } else if (msg.includes('security purposes')) {
+        toast.error('Aguarde alguns segundos antes de tentar novamente.')
+      } else {
+        toast.error(msg)
+      }
     } finally {
       setSubmitting(false)
     }
