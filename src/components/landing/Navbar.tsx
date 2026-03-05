@@ -13,7 +13,7 @@ export default function Navbar() {
             <Sparkles className="h-4 w-4 text-primary-foreground" />
           </div>
           <span className="text-lg font-display font-bold text-foreground tracking-tight">
-            idealane
+            KUBO VIBE
           </span>
         </Link>
 

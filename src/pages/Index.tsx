@@ -31,7 +31,7 @@ const Index = () => {
               Ready to build something amazing?
             </h2>
             <p className="text-primary-foreground/80 mb-8 max-w-md mx-auto">
-              Join thousands of creators who ship apps every day with idealane.
+              Join thousands of creators who ship apps every day with KUBO VIBE.
             </p>
             <Button
               size="lg"
@@ -50,7 +50,7 @@ const Index = () => {
       <footer className="py-12 px-6 border-t border-border">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-sm text-muted-foreground">
-            © 2026 idealane. All rights reserved.
+            © 2026 KUBO VIBE. All rights reserved.
           </p>
           <div className="flex items-center gap-6 text-sm text-muted-foreground">
             <a href="#" className="hover:text-foreground transition-colors">Privacy</a>
