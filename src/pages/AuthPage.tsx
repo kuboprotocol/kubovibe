@@ -1,12 +1,12 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/integrations/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Sparkles, Loader2 } from 'lucide-react'
+import { Sparkles, Loader2, Mail, Lock, User, ArrowRight, KeyRound } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/useAuth'
-import { useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 
 export default function AuthPage() {
   const navigate = useNavigate()
@@ -80,106 +80,187 @@ export default function AuthPage() {
 
   if (loading) return null
 
-  if (forgotPassword) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="w-full max-w-sm">
-          <div className="text-center mb-8">
-            <div className="h-12 w-12 rounded-2xl gradient-primary flex items-center justify-center mx-auto mb-4 shadow-glow">
-              <Sparkles className="h-6 w-6 text-primary-foreground" />
-            </div>
-            <h1 className="text-2xl font-display font-bold text-foreground">Recuperar senha</h1>
-            <p className="text-sm text-muted-foreground mt-1">Enviaremos um link para redefinir sua senha</p>
-          </div>
-          <form onSubmit={handleForgotPassword} className="space-y-4">
-            <Input
-              type="email"
-              placeholder="Seu email"
-              value={resetEmail}
-              onChange={(e) => setResetEmail(e.target.value)}
-              required
-            />
-            <Button type="submit" variant="hero" className="w-full" disabled={submitting}>
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Enviar link
-            </Button>
-          </form>
-          <p className="text-center text-sm text-muted-foreground mt-6">
-            <button onClick={() => setForgotPassword(false)} className="text-primary hover:underline font-medium">
-              Voltar ao login
-            </button>
-          </p>
-        </div>
-      </div>
-    )
-  }
+  const inputClasses = "h-12 pl-11 rounded-xl bg-secondary/50 border-border/50 text-foreground placeholder:text-muted-foreground focus-visible:ring-primary/30 focus-visible:border-primary/50 transition-all duration-200"
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="w-full max-w-sm">
-        <div className="text-center mb-8">
-          <div className="h-12 w-12 rounded-2xl gradient-primary flex items-center justify-center mx-auto mb-4 shadow-glow">
-            <Sparkles className="h-6 w-6 text-primary-foreground" />
-          </div>
-          <h1 className="text-2xl font-display font-bold text-foreground">
-            {isLogin ? 'Entrar' : 'Criar conta'}
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {isLogin ? 'Acesse seus projetos' : 'Comece a criar seus apps'}
-          </p>
-        </div>
+    <div className="min-h-screen bg-background flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Background effects */}
+      <div className="absolute inset-0 gradient-mesh pointer-events-none" />
+      <div className="absolute inset-0 dot-pattern opacity-30 pointer-events-none" />
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {!isLogin && (
-            <Input
-              placeholder="Seu nome"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              required
-            />
-          )}
-          <Input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-          <Input
-            type="password"
-            placeholder="Senha"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={6}
-          />
-          <Button type="submit" variant="hero" className="w-full" disabled={submitting}>
-            {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-            {isLogin ? 'Entrar' : 'Criar conta'}
-          </Button>
-        </form>
-
-        {isLogin && (
-          <p className="text-center text-sm text-muted-foreground mt-4">
-            <button
-              onClick={() => setForgotPassword(true)}
-              className="text-primary hover:underline font-medium"
-            >
-              Esqueci minha senha
-            </button>
-          </p>
-        )}
-
-        <p className="text-center text-sm text-muted-foreground mt-4">
-          {isLogin ? 'Não tem conta?' : 'Já tem conta?'}{' '}
-          <button
-            onClick={() => setIsLogin(!isLogin)}
-            className="text-primary hover:underline font-medium"
+      <AnimatePresence mode="wait">
+        {forgotPassword ? (
+          <motion.div
+            key="forgot"
+            initial={{ opacity: 0, y: 20, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.98 }}
+            transition={{ duration: 0.3 }}
+            className="w-full max-w-md relative z-10"
           >
-            {isLogin ? 'Criar conta' : 'Entrar'}
-          </button>
-        </p>
-      </div>
+            <div className="glass glass-border rounded-3xl p-8 shadow-glow-lg">
+              <div className="text-center mb-8">
+                <div className="h-14 w-14 rounded-2xl gradient-primary flex items-center justify-center mx-auto mb-5 shadow-glow">
+                  <KeyRound className="h-7 w-7 text-primary-foreground" />
+                </div>
+                <h1 className="text-2xl font-display font-bold text-foreground">Recuperar senha</h1>
+                <p className="text-sm text-muted-foreground mt-2">Enviaremos um link para redefinir sua senha</p>
+              </div>
+              <form onSubmit={handleForgotPassword} className="space-y-5">
+                <div className="relative">
+                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="email"
+                    placeholder="Seu email"
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                    required
+                    className={inputClasses}
+                  />
+                </div>
+                <Button type="submit" variant="hero" className="w-full h-12 rounded-xl text-sm font-semibold gap-2" disabled={submitting}>
+                  {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
+                  Enviar link de recuperação
+                </Button>
+              </form>
+              <p className="text-center text-sm text-muted-foreground mt-6">
+                <button onClick={() => setForgotPassword(false)} className="text-primary hover:text-primary/80 font-semibold transition-colors">
+                  ← Voltar ao login
+                </button>
+              </p>
+            </div>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="auth"
+            initial={{ opacity: 0, y: 20, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.98 }}
+            transition={{ duration: 0.3 }}
+            className="w-full max-w-md relative z-10"
+          >
+            <div className="glass glass-border rounded-3xl p-8 shadow-glow-lg">
+              <div className="text-center mb-8">
+                <div className="h-14 w-14 rounded-2xl gradient-primary flex items-center justify-center mx-auto mb-5 shadow-glow">
+                  <Sparkles className="h-7 w-7 text-primary-foreground" />
+                </div>
+                <h1 className="text-2xl font-display font-bold text-foreground">
+                  {isLogin ? 'Bem-vindo de volta' : 'Criar sua conta'}
+                </h1>
+                <p className="text-sm text-muted-foreground mt-2">
+                  {isLogin ? 'Acesse seus projetos no KUBO VIBE' : 'Comece a criar apps incríveis'}
+                </p>
+              </div>
+
+              {/* Tab switcher */}
+              <div className="flex items-center bg-secondary/50 rounded-xl p-1 mb-6">
+                <button
+                  onClick={() => setIsLogin(true)}
+                  className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
+                    isLogin ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Entrar
+                </button>
+                <button
+                  onClick={() => setIsLogin(false)}
+                  className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
+                    !isLogin ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Criar conta
+                </button>
+              </div>
+
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <AnimatePresence mode="wait">
+                  {!isLogin && (
+                    <motion.div
+                      key="name"
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="relative overflow-hidden"
+                    >
+                      <div className="relative pb-1">
+                        <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Seu nome"
+                          value={displayName}
+                          onChange={(e) => setDisplayName(e.target.value)}
+                          required
+                          className={inputClasses}
+                        />
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+                <div className="relative">
+                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="email"
+                    placeholder="Email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className={inputClasses}
+                  />
+                </div>
+                <div className="relative">
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="password"
+                    placeholder="Senha"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    minLength={6}
+                    className={inputClasses}
+                  />
+                </div>
+
+                {isLogin && (
+                  <div className="text-right">
+                    <button
+                      type="button"
+                      onClick={() => setForgotPassword(true)}
+                      className="text-xs text-primary hover:text-primary/80 font-medium transition-colors"
+                    >
+                      Esqueci minha senha
+                    </button>
+                  </div>
+                )}
+
+                <Button type="submit" variant="hero" className="w-full h-12 rounded-xl text-sm font-semibold gap-2" disabled={submitting}>
+                  {submitting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ArrowRight className="h-4 w-4" />
+                  )}
+                  {isLogin ? 'Entrar na conta' : 'Criar minha conta'}
+                </Button>
+              </form>
+
+              <div className="mt-6 flex items-center gap-3">
+                <div className="h-px flex-1 bg-border/50" />
+                <span className="text-xs text-muted-foreground">ou</span>
+                <div className="h-px flex-1 bg-border/50" />
+              </div>
+
+              <p className="text-center text-sm text-muted-foreground mt-4">
+                {isLogin ? 'Novo por aqui?' : 'Já tem conta?'}{' '}
+                <button
+                  onClick={() => setIsLogin(!isLogin)}
+                  className="text-primary hover:text-primary/80 font-semibold transition-colors"
+                >
+                  {isLogin ? 'Crie sua conta grátis' : 'Faça login'}
+                </button>
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

@@ -195,19 +195,19 @@ export default function BuilderPage() {
   return (
     <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
       {/* Header */}
-      <header className="flex items-center justify-between px-4 py-2.5 bg-card border-b border-border z-20">
+      <header className="flex items-center justify-between px-4 py-2.5 glass glass-border z-20">
         <div className="flex items-center gap-3">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => navigate('/dashboard')}
-            className="text-muted-foreground hover:text-foreground"
+            className="text-muted-foreground hover:text-foreground rounded-xl"
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div className="h-5 w-px bg-border" />
+          <div className="h-5 w-px bg-border/50" />
           <div className="flex items-center gap-2">
-            <div className="h-7 w-7 rounded-lg gradient-primary flex items-center justify-center">
+            <div className="h-7 w-7 rounded-lg gradient-primary flex items-center justify-center shadow-glow">
               <Sparkles className="h-3.5 w-3.5 text-primary-foreground" />
             </div>
             <span className="text-sm font-display font-bold text-foreground truncate max-w-[200px]">
@@ -217,10 +217,10 @@ export default function BuilderPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5">
+          <div className="flex items-center gap-1 bg-secondary/50 rounded-xl p-0.5">
             <button
               onClick={() => setActiveTab('preview')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
                 activeTab === 'preview'
                   ? 'bg-background text-foreground shadow-sm'
                   : 'text-muted-foreground hover:text-foreground'
@@ -231,7 +231,7 @@ export default function BuilderPage() {
             </button>
             <button
               onClick={() => setActiveTab('code')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
                 activeTab === 'code'
                   ? 'bg-background text-foreground shadow-sm'
                   : 'text-muted-foreground hover:text-foreground'
@@ -248,17 +248,17 @@ export default function BuilderPage() {
                 variant="outline"
                 size="sm"
                 onClick={handleDownload}
-                className="text-xs"
+                className="text-xs rounded-xl"
               >
                 <Download className="h-3 w-3 mr-1" />
                 Download
               </Button>
               <Button
-                variant="outline"
+                variant="hero"
                 size="sm"
                 onClick={() => saveProject(generatedCode, messages)}
                 disabled={saving}
-                className="text-xs"
+                className="text-xs rounded-xl"
               >
                 {saving ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Save className="h-3 w-3 mr-1" />}
                 Save
@@ -271,7 +271,7 @@ export default function BuilderPage() {
       {/* Main content */}
       <div className="flex-1 flex min-h-0">
         {/* Chat panel */}
-        <div className="w-[380px] flex flex-col border-r border-border bg-card">
+        <div className="w-[380px] flex flex-col border-r border-border/50 bg-card/50 backdrop-blur-sm">
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {messages.length === 0 && (
               <motion.div
