@@ -2,7 +2,15 @@ import { useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Plus, FileText, Trash2, ArrowLeft, LogOut, Code } from 'lucide-react'
+import { Plus, FileText, Trash2, ArrowLeft, LogOut, Code, Pencil } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
 import { motion } from 'framer-motion'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/hooks/useAuth'
@@ -32,6 +40,8 @@ export default function DashboardPage() {
   const { user, signOut } = useAuth()
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
+  const [renameProject, setRenameProject] = useState<Project | null>(null)
+  const [newTitle, setNewTitle] = useState('')
 
   useEffect(() => {
     loadProjects()
@@ -61,6 +71,23 @@ export default function DashboardPage() {
     }
   }
 
+  const handleRename = async () => {
+    if (!renameProject || !newTitle.trim()) return
+    const { error } = await supabase
+      .from('projects')
+      .update({ title: newTitle.trim() })
+      .eq('id', renameProject.id)
+    if (error) {
+      toast.error('Erro ao renomear projeto')
+    } else {
+      setProjects((prev) =>
+        prev.map((p) => (p.id === renameProject.id ? { ...p, title: newTitle.trim() } : p))
+      )
+      toast.success('Projeto renomeado!')
+    }
+    setRenameProject(null)
+  }
+
   const handleSignOut = async () => {
     await signOut()
     navigate('/')
@@ -74,7 +101,7 @@ export default function DashboardPage() {
             <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <h1 className="text-xl font-bold text-foreground">My Projects</h1>
+            <h1 className="text-xl font-bold text-foreground">KUBO VIBE</h1>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="hero" onClick={() => navigate('/builder')}>
@@ -140,38 +167,52 @@ export default function DashboardPage() {
                         </span>
                       </div>
                     </div>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent onClick={(e) => e.stopPropagation()}>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Deletar projeto?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Essa ação não pode ser desfeita. O projeto "{project.title}" será permanentemente removido.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleDelete(project.id)
-                            }}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-primary transition-opacity"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setRenameProject(project)
+                          setNewTitle(project.title)
+                        }}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
+                            onClick={(e) => e.stopPropagation()}
                           >
-                            Deletar
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Deletar projeto?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Essa ação não pode ser desfeita. O projeto "{project.title}" será permanentemente removido.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleDelete(project.id)
+                              }}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Deletar
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                   </div>
                 </Card>
               </motion.div>
@@ -179,6 +220,24 @@ export default function DashboardPage() {
           </div>
         )}
       </main>
+
+      <Dialog open={!!renameProject} onOpenChange={(open) => !open && setRenameProject(null)}>
+        <DialogContent onClick={(e) => e.stopPropagation()}>
+          <DialogHeader>
+            <DialogTitle>Renomear projeto</DialogTitle>
+          </DialogHeader>
+          <Input
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            placeholder="Novo nome do projeto"
+            onKeyDown={(e) => e.key === 'Enter' && handleRename()}
+          />
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setRenameProject(null)}>Cancelar</Button>
+            <Button onClick={handleRename} disabled={!newTitle.trim()}>Salvar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
