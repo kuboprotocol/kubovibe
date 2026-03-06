@@ -1,13 +1,14 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, Send, Code, Eye, Loader2, Sparkles, Copy, Check, Save, Download } from 'lucide-react'
+import { ArrowLeft, Send, Code, Eye, Loader2, Sparkles, Copy, Check, Save, Download, LayoutTemplate } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { streamChat, type Msg } from '@/lib/streamChat'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/hooks/useAuth'
 import { toast } from 'sonner'
 import ReactMarkdown from 'react-markdown'
+import TemplateGallery, { type Template } from '@/components/builder/TemplateGallery'
 
 export default function BuilderPage() {
   const navigate = useNavigate()
@@ -23,6 +24,7 @@ export default function BuilderPage() {
   const [projectTitle, setProjectTitle] = useState('Untitled Project')
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(projectId || null)
   const [saving, setSaving] = useState(false)
+  const [showTemplates, setShowTemplates] = useState(false)
 
   const chatEndRef = useRef<HTMLDivElement>(null)
 
@@ -185,6 +187,11 @@ export default function BuilderPage() {
     URL.revokeObjectURL(url)
   }
 
+  const handleTemplateSelect = (template: Template) => {
+    setShowTemplates(false)
+    setInput(template.prompt)
+  }
+
   const suggestions = [
     'A task management app with drag & drop',
     'A weather dashboard with live data',
@@ -217,6 +224,15 @@ export default function BuilderPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowTemplates(true)}
+            className="text-xs rounded-xl gap-1.5 text-muted-foreground"
+          >
+            <LayoutTemplate className="h-3.5 w-3.5" />
+            Templates
+          </Button>
           <div className="flex items-center gap-1 bg-secondary/50 rounded-xl p-0.5">
             <button
               onClick={() => setActiveTab('preview')}
@@ -413,6 +429,12 @@ export default function BuilderPage() {
           )}
         </div>
       </div>
+
+      <AnimatePresence>
+        {showTemplates && (
+          <TemplateGallery onSelect={handleTemplateSelect} onClose={() => setShowTemplates(false)} />
+        )}
+      </AnimatePresence>
     </div>
   )
 }
