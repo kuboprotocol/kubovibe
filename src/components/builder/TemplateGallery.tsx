@@ -382,7 +382,7 @@ export default function TemplateGallery({ onSelect, onClose }: TemplateGalleryPr
   const [search, setSearch] = useState('')
 
   const filtered = templates.filter(t => {
-    const matchCategory = activeCategory === 'all' || t.category === activeCategory
+    const matchCategory = activeCategory === 'all' || !search && t.category === activeCategory
     const matchSearch = !search || 
       t.name.toLowerCase().includes(search.toLowerCase()) ||
       t.description.toLowerCase().includes(search.toLowerCase()) ||
