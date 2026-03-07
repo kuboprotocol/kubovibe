@@ -499,6 +499,8 @@ export default function TemplateGallery({ onSelect, onClose }: TemplateGalleryPr
 
 function TemplateCard({ template, index, onSelect }: { template: Template; index: number; onSelect: (t: Template) => void }) {
   const Icon = template.icon
+  const previewHtml = templatePreviews[template.id]
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -509,13 +511,26 @@ function TemplateCard({ template, index, onSelect }: { template: Template; index
         onClick={() => onSelect(template)}
         className="w-full text-left group rounded-2xl border border-border/50 bg-card/50 hover:bg-card hover:border-primary/30 hover:shadow-glow transition-all duration-300 overflow-hidden"
       >
-        {/* Color preview bar */}
-        <div className={`h-24 bg-gradient-to-br ${template.color} opacity-80 group-hover:opacity-100 transition-opacity flex items-center justify-center relative overflow-hidden`}>
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(255,255,255,0.15),transparent)]" />
-          <Icon className="h-10 w-10 text-white/90 drop-shadow-lg" />
+        {/* Visual preview */}
+        <div className="h-32 relative overflow-hidden bg-muted">
+          {previewHtml ? (
+            <iframe
+              srcDoc={previewHtml}
+              className="w-[400%] h-[400%] origin-top-left pointer-events-none border-0"
+              style={{ transform: 'scale(0.25)' }}
+              title={template.name}
+              sandbox=""
+              tabIndex={-1}
+            />
+          ) : (
+            <div className={`h-full bg-gradient-to-br ${template.color} opacity-80 group-hover:opacity-100 transition-opacity flex items-center justify-center`}>
+              <Icon className="h-10 w-10 text-white/90 drop-shadow-lg" />
+            </div>
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-card/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
           {template.popular && (
-            <Badge className="absolute top-2 right-2 bg-white/20 backdrop-blur-sm text-white border-white/20 text-[10px] px-1.5 py-0">
-              <Star className="h-2.5 w-2.5 mr-0.5 fill-current" />
+            <Badge className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm text-foreground border-border/50 text-[10px] px-1.5 py-0">
+              <Star className="h-2.5 w-2.5 mr-0.5 fill-current text-amber-500" />
               Popular
             </Badge>
           )}
