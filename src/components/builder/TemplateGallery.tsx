@@ -588,6 +588,8 @@ const templates: Template[] = [
     color: 'from-teal-400 to-cyan-600',
   },
 ]
+
+interface TemplateGalleryProps {
   onSelect: (template: Template) => void
   onClose: () => void
 }
