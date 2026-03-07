@@ -9,6 +9,7 @@ import {
   Wallet, Landmark, LayoutGrid, Sparkles, ArrowRight, Star, Zap,
   MessageSquare, Users, Heart, TrendingUp, Shield, Smartphone, Monitor,
 } from 'lucide-react'
+import { templatePreviews } from './templatePreviews'
 
 export interface Template {
   id: string
