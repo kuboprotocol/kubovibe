@@ -30,12 +30,15 @@ const categories = [
   { id: 'dashboard', label: 'Dashboards', icon: BarChart3 },
   { id: 'portfolio', label: 'Portfólios', icon: Briefcase },
   { id: 'casino', label: 'Cassinos', icon: Gamepad2 },
+  { id: 'games2d', label: 'Jogos 2D', icon: Smartphone },
+  { id: 'games3d', label: 'Jogos 3D', icon: Monitor },
   { id: 'faucet', label: 'Faucets', icon: Coins },
   { id: 'social', label: 'Redes Sociais', icon: Share2 },
   { id: 'blog', label: 'Blog & CMS', icon: PenLine },
   { id: 'saas', label: 'SaaS', icon: Rocket },
   { id: 'crypto', label: 'Crypto Wallets', icon: Wallet },
   { id: 'bank', label: 'Banks & Fintech', icon: Landmark },
+  { id: 'canvas', label: 'Canvas & Design', icon: LayoutGrid },
 ]
 
 const templates: Template[] = [
