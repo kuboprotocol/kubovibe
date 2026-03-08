@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/integrations/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Sparkles, Loader2, Mail, Lock, User, ArrowRight, KeyRound } from 'lucide-react'
+import { Loader2, Mail, Lock, User, ArrowRight, KeyRound } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/useAuth'
 import { motion, AnimatePresence } from 'framer-motion'
+import logoImg from '@/assets/logo-kubovibe.png'
 
 export default function AuthPage() {
   const navigate = useNavigate()
@@ -87,6 +88,7 @@ export default function AuthPage() {
       {/* Background effects */}
       <div className="absolute inset-0 gradient-mesh pointer-events-none" />
       <div className="absolute inset-0 dot-pattern opacity-30 pointer-events-none" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-primary/[0.03] blur-3xl pointer-events-none" />
 
       <AnimatePresence mode="wait">
         {forgotPassword ? (
@@ -98,7 +100,7 @@ export default function AuthPage() {
             transition={{ duration: 0.3 }}
             className="w-full max-w-md relative z-10"
           >
-            <div className="glass glass-border rounded-3xl p-8 shadow-glow-lg">
+            <div className="glass glass-border rounded-3xl p-8 shadow-gold">
               <div className="text-center mb-8">
                 <div className="h-14 w-14 rounded-2xl gradient-primary flex items-center justify-center mx-auto mb-5 shadow-glow">
                   <KeyRound className="h-7 w-7 text-primary-foreground" />
@@ -139,10 +141,10 @@ export default function AuthPage() {
             transition={{ duration: 0.3 }}
             className="w-full max-w-md relative z-10"
           >
-            <div className="glass glass-border rounded-3xl p-8 shadow-glow-lg">
+            <div className="glass glass-border rounded-3xl p-8 shadow-gold">
               <div className="text-center mb-8">
-                <div className="h-14 w-14 rounded-2xl gradient-primary flex items-center justify-center mx-auto mb-5 shadow-glow">
-                  <Sparkles className="h-7 w-7 text-primary-foreground" />
+                <div className="flex justify-center mb-5">
+                  <img src={logoImg} alt="KUBO VIBE" className="h-12" />
                 </div>
                 <h1 className="text-2xl font-display font-bold text-foreground">
                   {isLogin ? 'Bem-vindo de volta' : 'Criar sua conta'}

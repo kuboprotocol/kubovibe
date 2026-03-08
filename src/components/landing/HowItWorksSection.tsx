@@ -14,14 +14,14 @@ const steps = [
     icon: MessageSquare,
     title: 'Iterate with AI',
     description: 'Chat with the AI to refine layouts, add pages, change styles — just like talking to a designer.',
-    accent: 'from-blue-100/50 to-indigo-100/50',
+    accent: 'from-blue-900/30 to-indigo-900/20',
   },
   {
     number: '03',
     icon: Rocket,
     title: 'Ship it',
     description: 'One click to publish. Get a shareable link, custom domain, or export the code.',
-    accent: 'from-violet-100/50 to-purple-100/50',
+    accent: 'from-violet-900/30 to-purple-900/20',
   },
 ]
 
@@ -57,11 +57,11 @@ export default function HowItWorksSection() {
                 transition={{ delay: index * 0.12 }}
                 className="group relative"
               >
-                <div className="p-6 rounded-2xl border border-border bg-card hover:shadow-glow-lg transition-all duration-300 h-full">
+                <div className="p-6 rounded-2xl border border-border bg-card hover:shadow-gold transition-all duration-300 h-full hover:border-primary/30">
                   <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${step.accent} flex items-center justify-center mb-5`}>
                     <Icon className="h-5 w-5 text-foreground" />
                   </div>
-                  <span className="text-xs font-mono text-muted-foreground">{step.number}</span>
+                  <span className="text-xs font-mono text-primary/60">{step.number}</span>
                   <h3 className="text-lg font-display font-semibold text-foreground mt-1 mb-2">{step.title}</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">{step.description}</p>
                 </div>
