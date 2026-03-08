@@ -15,6 +15,10 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       <Navbar />
       <HeroSection />
+
+      {/* Gold divider */}
+      <div className="max-w-xl mx-auto gold-line" />
+
       <CommunitySection />
       <HowItWorksSection />
 
@@ -26,17 +30,18 @@ const Index = () => {
         className="py-24 px-6"
       >
         <div className="max-w-3xl mx-auto text-center">
-          <div className="p-12 rounded-3xl gradient-primary shadow-glow-lg">
-            <h2 className="text-3xl md:text-4xl font-display font-bold text-primary-foreground mb-4">
+          <div className="p-12 rounded-3xl gradient-primary shadow-gold relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
+            <h2 className="text-3xl md:text-4xl font-display font-bold text-primary-foreground mb-4 relative z-10">
               Ready to build something amazing?
             </h2>
-            <p className="text-primary-foreground/80 mb-8 max-w-md mx-auto">
+            <p className="text-primary-foreground/70 mb-8 max-w-md mx-auto relative z-10">
               Join thousands of creators who ship apps every day with KUBO VIBE.
             </p>
             <Button
               size="lg"
               onClick={() => navigate('/builder')}
-              className="bg-background text-foreground hover:bg-background/90 rounded-xl px-8 font-semibold gap-2"
+              className="bg-background text-foreground hover:bg-background/90 rounded-xl px-8 font-semibold gap-2 relative z-10"
             >
               Start building for free
               <ArrowRight className="h-4 w-4" />
@@ -53,9 +58,9 @@ const Index = () => {
             © 2026 KUBO VIBE. All rights reserved.
           </p>
           <div className="flex items-center gap-6 text-sm text-muted-foreground">
-            <a href="#" className="hover:text-foreground transition-colors">Privacy</a>
-            <a href="#" className="hover:text-foreground transition-colors">Terms</a>
-            <a href="#" className="hover:text-foreground transition-colors">Twitter</a>
+            <a href="#" className="hover:text-primary transition-colors">Privacy</a>
+            <a href="#" className="hover:text-primary transition-colors">Terms</a>
+            <a href="#" className="hover:text-primary transition-colors">Twitter</a>
           </div>
         </div>
       </footer>

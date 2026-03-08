@@ -3,13 +3,13 @@ import { ExternalLink } from 'lucide-react'
 
 const projects = [
   { name: 'Void Studio', desc: 'Creative agency landing', color: 'from-primary/20 to-accent' },
-  { name: 'Ember & Oak', desc: 'E-commerce storefront', color: 'from-amber-100 to-orange-50' },
-  { name: 'Fintech Pro', desc: 'Financial dashboard', color: 'from-blue-50 to-indigo-50' },
+  { name: 'Ember & Oak', desc: 'E-commerce storefront', color: 'from-amber-900/30 to-orange-900/20' },
+  { name: 'Fintech Pro', desc: 'Financial dashboard', color: 'from-blue-900/30 to-indigo-900/20' },
   { name: 'IdeaChat', desc: 'AI chatbot interface', color: 'from-primary/10 to-primary/5' },
-  { name: 'CloudSync', desc: 'SaaS landing page', color: 'from-violet-50 to-blue-50' },
-  { name: 'MedConnect', desc: 'Healthcare portal', color: 'from-cyan-50 to-teal-50' },
-  { name: 'FitTrack', desc: 'Fitness tracker app', color: 'from-lime-50 to-green-50' },
-  { name: 'TravelBali', desc: 'Travel booking site', color: 'from-amber-50 to-yellow-50' },
+  { name: 'CloudSync', desc: 'SaaS landing page', color: 'from-violet-900/30 to-blue-900/20' },
+  { name: 'MedConnect', desc: 'Healthcare portal', color: 'from-cyan-900/30 to-teal-900/20' },
+  { name: 'FitTrack', desc: 'Fitness tracker app', color: 'from-lime-900/30 to-green-900/20' },
+  { name: 'TravelBali', desc: 'Travel booking site', color: 'from-amber-900/20 to-yellow-900/20' },
 ]
 
 export default function CommunitySection() {
@@ -39,10 +39,10 @@ export default function CommunitySection() {
           {doubled.map((project, i) => (
             <div
               key={i}
-              className="flex-shrink-0 w-72 rounded-2xl border border-border bg-card overflow-hidden hover:shadow-glow-lg transition-all duration-300 cursor-pointer group"
+              className="flex-shrink-0 w-72 rounded-2xl border border-border bg-card overflow-hidden hover:shadow-gold transition-all duration-300 cursor-pointer group"
             >
               <div className={`h-40 bg-gradient-to-br ${project.color} flex items-center justify-center relative`}>
-                <div className="w-48 h-28 bg-background/60 rounded-lg shadow-sm backdrop-blur-sm" />
+                <div className="w-48 h-28 bg-background/40 rounded-lg shadow-sm backdrop-blur-sm border border-border/30" />
                 <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
                   <div className="p-1.5 rounded-lg bg-background/80 backdrop-blur-sm">
                     <ExternalLink className="h-3.5 w-3.5 text-foreground" />

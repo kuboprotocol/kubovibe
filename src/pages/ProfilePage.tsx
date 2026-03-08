@@ -4,11 +4,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
-import { ArrowLeft, Camera, Loader2, Mail, User, Shield, Sparkles } from 'lucide-react'
+import { ArrowLeft, Camera, Loader2, Mail, User, Shield } from 'lucide-react'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/hooks/useAuth'
 import { toast } from 'sonner'
 import { motion } from 'framer-motion'
+import logoImg from '@/assets/logo-kubovibe.png'
 
 export default function ProfilePage() {
   const navigate = useNavigate()
@@ -125,8 +126,8 @@ export default function ProfilePage() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" />
-            <h1 className="text-xl font-bold text-foreground">Meu Perfil</h1>
+            <img src={logoImg} alt="KUBO VIBE" className="h-6" />
+            <h1 className="text-xl font-bold text-foreground font-display">Meu Perfil</h1>
           </div>
         </div>
       </header>
@@ -170,7 +171,7 @@ export default function ProfilePage() {
               />
             </div>
             <div className="text-center sm:text-left">
-              <h2 className="text-2xl font-bold text-foreground">
+              <h2 className="text-2xl font-bold text-foreground font-display">
                 {displayName || 'Sem nome'}
               </h2>
               <p className="text-muted-foreground text-sm mt-1 flex items-center gap-1.5 justify-center sm:justify-start">
@@ -187,12 +188,12 @@ export default function ProfilePage() {
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ duration: 0.5, delay: 0.15 }}
             className="glass glass-border rounded-2xl p-8 space-y-6"
           >
             <div className="flex items-center gap-2 mb-2">
               <Shield className="h-4 w-4 text-primary" />
-              <h3 className="font-semibold text-foreground">Informações da conta</h3>
+              <h3 className="font-semibold text-foreground font-display">Informações da conta</h3>
             </div>
 
             <div className="space-y-2">

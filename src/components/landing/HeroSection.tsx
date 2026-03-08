@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Paperclip, ArrowRight, Zap, Globe, Palette } from 'lucide-react'
 import { motion } from 'framer-motion'
+import logoImg from '@/assets/logo-kubovibe.png'
 
 const suggestions = [
   'A food delivery app with live tracking',
@@ -25,6 +26,8 @@ export default function HeroSection() {
       {/* Background effects */}
       <div className="absolute inset-0 gradient-mesh pointer-events-none" />
       <div className="absolute inset-0 dot-pattern opacity-40 pointer-events-none" />
+      {/* Subtle gold radial */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full bg-primary/[0.03] blur-3xl pointer-events-none" />
 
       <div className="max-w-3xl mx-auto text-center relative z-10">
         {/* Badge */}
@@ -38,11 +41,21 @@ export default function HeroSection() {
           AI-powered app builder
         </motion.div>
 
+        {/* Logo */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.6, delay: 0.05 }}
+          className="flex justify-center mb-8"
+        >
+          <img src={logoImg} alt="KUBO VIBE" className="h-16 md:h-20 drop-shadow-2xl" />
+        </motion.div>
+
         <motion.h1
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.1 }}
-          className="text-5xl md:text-7xl font-display font-bold text-foreground leading-[1.1] tracking-tight"
+          className="text-4xl md:text-6xl font-display font-bold text-foreground leading-[1.1] tracking-tight"
         >
           Turn ideas into
           <br />
@@ -65,7 +78,7 @@ export default function HeroSection() {
           transition={{ duration: 0.5, delay: 0.35 }}
           className="mt-10 max-w-2xl mx-auto"
         >
-          <div className="relative glass glass-border rounded-2xl shadow-glow-lg overflow-hidden">
+          <div className="relative glass glass-border rounded-2xl shadow-gold overflow-hidden">
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
@@ -103,7 +116,7 @@ export default function HeroSection() {
               <button
                 key={s}
                 onClick={() => setPrompt(s)}
-                className="text-xs px-3 py-1.5 rounded-full bg-secondary text-secondary-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                className="text-xs px-3 py-1.5 rounded-full bg-secondary text-secondary-foreground hover:bg-accent hover:text-accent-foreground transition-colors border border-border/50"
               >
                 {s}
               </button>
@@ -124,7 +137,7 @@ export default function HeroSection() {
             { icon: Zap, label: '< 30s to generate' },
           ].map(({ icon: Icon, label }) => (
             <div key={label} className="flex items-center gap-2 text-muted-foreground">
-              <Icon className="h-4 w-4" />
+              <Icon className="h-4 w-4 text-primary/70" />
               <span className="text-xs font-medium">{label}</span>
             </div>
           ))}
