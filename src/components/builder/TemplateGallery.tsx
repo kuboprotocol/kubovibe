@@ -39,6 +39,7 @@ const categories = [
   { id: 'crypto', label: 'Crypto Wallets', icon: Wallet },
   { id: 'bank', label: 'Banks & Fintech', icon: Landmark },
   { id: 'canvas', label: 'Canvas & Design', icon: LayoutGrid },
+  { id: 'metaverse', label: 'Metaverso & VR', icon: Globe },
 ]
 
 const templates: Template[] = [
