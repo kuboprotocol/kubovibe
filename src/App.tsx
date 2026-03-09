@@ -11,6 +11,7 @@ import ResetPasswordPage from "./pages/ResetPasswordPage";
 import DashboardPage from "./pages/DashboardPage";
 import BuilderPage from "./pages/BuilderPage";
 import ProfilePage from "./pages/ProfilePage";
+import TermsPage from "./pages/TermsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
