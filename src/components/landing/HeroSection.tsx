@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import { Paperclip, ArrowRight, Zap, Globe, Palette } from 'lucide-react'
+import { ArrowRight, Zap, Globe, Palette } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { toast } from 'sonner'
 import logoImg from '@/assets/logo-kubovibe.png'
+import PromptAttachMenu from './PromptAttachMenu'
 
 const suggestions = [
   'A food delivery app with live tracking',
@@ -13,7 +15,48 @@ const suggestions = [
 
 export default function HeroSection() {
   const [prompt, setPrompt] = useState('')
+  const [attachedFile, setAttachedFile] = useState<File | null>(null)
+  const [references, setReferences] = useState<string[]>([])
   const navigate = useNavigate()
+
+  const handleAttachFile = (file: File) => {
+    setAttachedFile(file)
+    toast.success(`Arquivo anexado: ${file.name}`)
+  }
+
+  const handleScreenshot = async () => {
+    try {
+      // Request screen capture
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true })
+      const video = document.createElement('video')
+      video.srcObject = stream
+      await video.play()
+      
+      const canvas = document.createElement('canvas')
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+      canvas.getContext('2d')?.drawImage(video, 0, 0)
+      
+      // Stop the stream
+      stream.getTracks().forEach(track => track.stop())
+      
+      // Convert to blob and create file
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const file = new File([blob], `screenshot-${Date.now()}.png`, { type: 'image/png' })
+          setAttachedFile(file)
+          toast.success('Screenshot capturado!')
+        }
+      }, 'image/png')
+    } catch (err) {
+      toast.error('Não foi possível capturar a tela')
+    }
+  }
+
+  const handleAddReference = (url: string) => {
+    setReferences(prev => [...prev, url])
+    toast.success('Referência adicionada!')
+  }
 
   const handleGenerate = () => {
     if (prompt.trim()) {
@@ -92,11 +135,22 @@ export default function HeroSection() {
               }}
             />
             <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <button className="p-2 text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-muted">
-                  <Paperclip className="h-4 w-4" />
-                </button>
-                <span className="text-xs text-muted-foreground">Attach files</span>
+              <div className="flex items-center gap-3">
+                <PromptAttachMenu 
+                  onAttachFile={handleAttachFile}
+                  onScreenshot={handleScreenshot}
+                  onAddReference={handleAddReference}
+                />
+                {attachedFile && (
+                  <span className="text-xs text-primary bg-primary/10 px-2 py-1 rounded-lg">
+                    📎 {attachedFile.name}
+                  </span>
+                )}
+                {references.length > 0 && (
+                  <span className="text-xs text-primary bg-primary/10 px-2 py-1 rounded-lg">
+                    🔗 {references.length} ref{references.length > 1 ? 's' : ''}
+                  </span>
+                )}
               </div>
               <Button
                 variant="hero"
