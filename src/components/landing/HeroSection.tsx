@@ -135,11 +135,22 @@ export default function HeroSection() {
               }}
             />
             <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <button className="p-2 text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-muted">
-                  <Paperclip className="h-4 w-4" />
-                </button>
-                <span className="text-xs text-muted-foreground">Attach files</span>
+              <div className="flex items-center gap-3">
+                <PromptAttachMenu 
+                  onAttachFile={handleAttachFile}
+                  onScreenshot={handleScreenshot}
+                  onAddReference={handleAddReference}
+                />
+                {attachedFile && (
+                  <span className="text-xs text-primary bg-primary/10 px-2 py-1 rounded-lg">
+                    📎 {attachedFile.name}
+                  </span>
+                )}
+                {references.length > 0 && (
+                  <span className="text-xs text-primary bg-primary/10 px-2 py-1 rounded-lg">
+                    🔗 {references.length} ref{references.length > 1 ? 's' : ''}
+                  </span>
+                )}
               </div>
               <Button
                 variant="hero"
