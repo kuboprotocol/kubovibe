@@ -5,7 +5,7 @@ import { ArrowRight, Zap, Globe, Palette } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import logoImg from '@/assets/logo-kubovibe.png'
-import PromptAttachMenu from './PromptAttachMenu'
+import PromptAttachMenu from '@/components/landing/PromptAttachMenu'
 
 const suggestions = [
   'A food delivery app with live tracking',
