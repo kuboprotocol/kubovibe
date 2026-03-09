@@ -61,6 +61,7 @@ const Index = () => {
             <a href="/privacy" className="hover:text-primary transition-colors">Privacy</a>
             <a href="/terms" className="hover:text-primary transition-colors">Terms</a>
             <a href="https://x.com/KUBOPROTOCOL" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">Twitter</a>
+            <a href="https://github.com/kuboprotocol/kubovibe" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">GitHub</a>
           </div>
         </div>
       </footer>
