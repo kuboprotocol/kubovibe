@@ -18,6 +18,38 @@ Rules:
 - The HTML must be complete and runnable in an iframe.
 - Start with <!DOCTYPE html> and end with </html>.`;
 
+async function callDeepSeek(messages: any[], apiKey: string) {
+  const response = await fetch("https://api.deepseek.com/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "deepseek-chat",
+      messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
+      stream: true,
+    }),
+  });
+  return response;
+}
+
+async function callLovableAI(messages: any[], apiKey: string) {
+  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "google/gemini-3-flash-preview",
+      messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
+      stream: true,
+    }),
+  });
+  return response;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -25,27 +57,37 @@ serve(async (req) => {
 
   try {
     const { messages } = await req.json();
+    const DEEPSEEK_API_KEY = Deno.env.get("DEEPSEEK_API_KEY");
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const response = await fetch(
-      "https://ai.gateway.lovable.dev/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
-          messages: [
-            { role: "system", content: SYSTEM_PROMPT },
-            ...messages,
-          ],
-          stream: true,
-        }),
+    let response: Response | null = null;
+    let usedProvider = "";
+
+    // Try DeepSeek first
+    if (DEEPSEEK_API_KEY) {
+      try {
+        response = await callDeepSeek(messages, DEEPSEEK_API_KEY);
+        if (response.ok) {
+          usedProvider = "deepseek";
+        } else {
+          console.error("DeepSeek error:", response.status, await response.text());
+          response = null;
+        }
+      } catch (e) {
+        console.error("DeepSeek failed:", e);
+        response = null;
       }
-    );
+    }
+
+    // Fallback to Lovable AI
+    if (!response && LOVABLE_API_KEY) {
+      response = await callLovableAI(messages, LOVABLE_API_KEY);
+      usedProvider = "lovable";
+    }
+
+    if (!response) {
+      throw new Error("No AI provider available");
+    }
 
     if (!response.ok) {
       if (response.status === 429) {
@@ -61,7 +103,7 @@ serve(async (req) => {
         );
       }
       const t = await response.text();
-      console.error("AI gateway error:", response.status, t);
+      console.error(`${usedProvider} error:`, response.status, t);
       return new Response(
         JSON.stringify({ error: "AI gateway error" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
