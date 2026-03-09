@@ -535,4 +535,105 @@ export const templatePreviews: Record<string, string> = {
       </div>
     </div>
   `, '#fff', '#333'),
+
+  // Metaverse & VR
+  'metaverse-social': base(`
+    <div style="height:200px;background:#0a0014;position:relative;overflow:hidden">
+      <div style="position:absolute;inset:0;background:linear-gradient(180deg,#0a0014 0%,#1a0030 100%)"></div>
+      <div style="position:absolute;bottom:0;width:100%;height:60px;background:repeating-linear-gradient(90deg,transparent,transparent 18px,#8b5cf640 19px,transparent 20px),repeating-linear-gradient(0deg,transparent,transparent 18px,#8b5cf640 19px,transparent 20px);opacity:.4;transform:perspective(200px) rotateX(50deg);transform-origin:bottom"></div>
+      ${[{x:30,y:60,c:'#a855f7'},{x:70,y:70,c:'#06b6d4'},{x:110,y:55,c:'#f43f5e'},{x:50,y:90,c:'#22c55e'},{x:90,y:85,c:'#f59e0b'}].map(a => `<div style="position:absolute;top:${a.y}px;left:${a.x}px"><div style="width:8px;height:14px;background:${a.c};border-radius:4px 4px 2px 2px;box-shadow:0 0 8px ${a.c}80"></div><div style="width:20px;font-size:4px;color:${a.c};text-align:center;margin-top:1px">User</div></div>`).join('')}
+      <div style="position:absolute;top:30px;left:50%;transform:translateX(-50%);width:30px;height:30px;border:2px solid #8b5cf680;border-radius:50%;box-shadow:0 0 20px #8b5cf640"></div>
+      <div style="position:absolute;bottom:6px;left:6px;background:#00000080;padding:2px 4px;border-radius:3px;font-size:5px;color:#a855f7">💬 Chat</div>
+      <div style="position:absolute;top:6px;right:6px;font-size:5px;color:#06b6d4">👥 42 online</div>
+      <div style="position:absolute;top:6px;left:6px;font-size:7px;font-weight:700;background:linear-gradient(135deg,#a855f7,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent">METAVERSE</div>
+    </div>
+  `, '#0a0014', '#e2e8f0'),
+
+  'metaverse-gallery': base(`
+    <div style="height:200px;background:#f5f0eb;position:relative;overflow:hidden">
+      <div style="position:absolute;bottom:0;width:100%;height:30px;background:linear-gradient(135deg,#d4c5b5,#c9baa8)"></div>
+      <div style="position:absolute;left:0;width:100%;height:140px;top:30px;background:#fff;border-bottom:1px solid #e0d5c5"></div>
+      <div style="position:absolute;top:45px;display:flex;gap:16px;left:12px">
+        ${[{c:'linear-gradient(135deg,#e74c3c,#f39c12)'},{c:'linear-gradient(135deg,#3498db,#2ecc71)'},{c:'linear-gradient(135deg,#9b59b6,#e91e63)'},{c:'linear-gradient(135deg,#1abc9c,#3498db)'}].map(p => `<div><div style="width:28px;height:36px;background:${p.c};border:2px solid #d4a853;box-shadow:0 2px 8px rgba(0,0,0,.2)"></div><div style="width:4px;height:10px;background:#ffd700;margin:-2px auto 0;opacity:.6"></div></div>`).join('')}
+      </div>
+      <div style="position:absolute;top:8px;left:50%;transform:translateX(-50%);font-size:8px;font-weight:300;letter-spacing:3px;color:#555">GALLERY</div>
+    </div>
+  `, '#f5f0eb', '#333'),
+
+  'metaverse-concert': base(`
+    <div style="height:200px;background:#050005;position:relative;overflow:hidden">
+      <div style="position:absolute;bottom:40px;left:50%;transform:translateX(-50%);width:80px;height:30px;background:#1a1a2e;border-radius:2px 2px 0 0;border-top:2px solid #333"></div>
+      ${[{x:20,r:-20,c:'#ff00ff'},{x:50,r:0,c:'#00ffff'},{x:80,r:15,c:'#ffff00'}].map(l => `<div style="position:absolute;bottom:70px;left:${l.x}%;width:3px;height:80px;background:linear-gradient(0deg,${l.c},transparent);transform:rotate(${l.r}deg);opacity:.4"></div>`).join('')}
+      <div style="position:absolute;bottom:0;width:100%;height:40px;display:flex;justify-content:center;gap:3px;align-items:flex-end">
+        ${Array.from({length:20}).map(() => `<div style="width:4px;height:${8+Math.random()*12}px;background:#ffffff30;border-radius:2px 2px 0 0"></div>`).join('')}
+      </div>
+      <div style="position:absolute;bottom:72px;left:50%;transform:translateX(-50%);font-size:10px">🎤</div>
+      <div style="position:absolute;top:8px;left:50%;transform:translateX(-50%);font-size:6px;color:#ff00ff;font-weight:700">🎵 LIVE CONCERT</div>
+      <div style="position:absolute;bottom:45px;left:20px;font-size:6px">❤️</div>
+      <div style="position:absolute;bottom:50px;right:25px;font-size:6px">🔥</div>
+    </div>
+  `, '#050005', '#fff'),
+
+  'metaverse-classroom': base(`
+    <div style="height:200px;background:#f0ebe3;position:relative;overflow:hidden">
+      <div style="position:absolute;top:20px;left:50%;transform:translateX(-50%);width:80px;height:40px;background:#fff;border:2px solid #333;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:5px;color:#333;font-weight:600">📐 Welcome to Class</div>
+      <div style="position:absolute;bottom:0;width:100%;height:60px;background:#d4c5b5"></div>
+      <div style="display:flex;gap:12px;justify-content:center;position:absolute;bottom:30px;left:50%;transform:translateX(-50%)">
+        ${[1,2,3,4].map(i => `<div><div style="width:18px;height:12px;background:#8b7355;border-radius:1px"></div><div style="width:6px;height:10px;background:hsl(${i*80},60%,50%);border-radius:3px 3px 1px 1px;margin:-2px auto 0"></div></div>`).join('')}
+      </div>
+      <div style="position:absolute;top:70px;left:50%;transform:translateX(-50%)"><div style="width:8px;height:14px;background:#e74c3c;border-radius:4px 4px 1px 1px"></div><div style="font-size:4px;color:#555;text-align:center">Teacher</div></div>
+      <div style="position:absolute;top:6px;right:6px;font-size:5px;color:#666">✋ Raise Hand</div>
+    </div>
+  `, '#f0ebe3', '#333'),
+
+  'metaverse-city': base(`
+    <div style="height:200px;background:#05000a;position:relative;overflow:hidden">
+      <div style="position:absolute;inset:0;background:linear-gradient(180deg,#0a0015 0%,#05000a 100%)"></div>
+      ${[{x:10,h:120,w:20,c:'#ff00ff'},{x:35,h:90,w:16,c:'#00ffff'},{x:55,h:140,w:22,c:'#8b5cf6'},{x:80,h:100,w:18,c:'#06b6d4'},{x:100,h:80,w:14,c:'#f43f5e'},{x:120,h:110,w:20,c:'#a855f7'}].map(b => `<div style="position:absolute;bottom:20px;left:${b.x}px;width:${b.w}px;height:${b.h}px;background:#0a0a1a;border:1px solid ${b.c}30;box-shadow:0 0 10px ${b.c}20">${Array.from({length:Math.floor(b.h/10)}).map((_,i) => `<div style="display:flex;gap:1px;padding:1px">${Array.from({length:Math.floor(b.w/5)}).map(() => `<div style="width:3px;height:3px;background:${Math.random()>.5?b.c+'60':'transparent'}"></div>`).join('')}</div>`).join('')}</div>`).join('')}
+      <div style="position:absolute;bottom:0;width:100%;height:20px;background:#0a0a1a;border-top:1px solid #ffffff10"></div>
+      <div style="position:absolute;bottom:20px;width:100%;height:2px;background:linear-gradient(90deg,#ff00ff40,#00ffff40,#ff00ff40)"></div>
+      ${[1,2,3].map(() => `<div style="position:absolute;top:${10+Math.random()*30}px;left:${Math.random()*100}%;width:8px;height:2px;background:#ff000060;box-shadow:0 0 4px #ff000040"></div>`).join('')}
+      <div style="position:absolute;top:6px;left:6px;font-size:6px;font-weight:700;color:#ff00ff;text-shadow:0 0 6px #ff00ff80">CYBER CITY</div>
+    </div>
+  `, '#05000a', '#e2e8f0'),
+
+  'metaverse-office': base(`
+    <div style="height:200px;background:#f8f6f0;position:relative;overflow:hidden">
+      <div style="position:absolute;bottom:0;width:100%;height:40px;background:#e8e0d0"></div>
+      <div style="position:absolute;top:30px;left:10px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+        ${[{s:'🟢',n:'Alice'},{s:'🔴',n:'Bob'},{s:'🟢',n:'Carol'}].map(d => `<div><div style="width:24px;height:14px;background:#8b7355;border-radius:1px;position:relative"><div style="position:absolute;top:-3px;right:-3px;font-size:5px">${d.s}</div></div><div style="font-size:4px;color:#666;text-align:center">${d.n}</div></div>`).join('')}
+      </div>
+      <div style="position:absolute;top:30px;right:10px;width:40px;height:50px;background:#e0f0ff;border:1px solid #b0d0f0;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:4px;color:#336">📋 Meeting<br>Room</div>
+      <div style="position:absolute;bottom:45px;right:60px;font-size:8px">🪴</div>
+      <div style="position:absolute;top:6px;left:50%;transform:translateX(-50%);font-size:7px;font-weight:600;color:#555">🏢 Virtual Office</div>
+    </div>
+  `, '#f8f6f0', '#333'),
+
+  'metaverse-game-world': base(`
+    <div style="height:200px;background:linear-gradient(180deg,#ff8c42 0%,#ffd700 20%,#87ceeb 40%,#87ceeb 60%,#4a7a2e 85%,#2d5016 100%);position:relative;overflow:hidden">
+      <div style="position:absolute;bottom:30px;right:20px;width:30px;height:50px;background:#8b7355;position:relative"><div style="position:absolute;top:-10px;left:-5px;width:40px;height:12px;background:#6b5335;border-radius:2px"></div><div style="position:absolute;top:-20px;left:5px;width:10px;height:20px;background:#8b7355"></div><div style="position:absolute;top:-30px;left:2px;width:16px;height:12px;background:#6b5335;border-radius:2px"></div></div>
+      <div style="position:absolute;bottom:30px;left:20px"><div style="width:6px;height:20px;background:#5a3a1a"></div><div style="width:20px;height:16px;background:#2d5016;border-radius:50%;margin-top:-8px;margin-left:-7px"></div></div>
+      <div style="position:absolute;top:40px;left:60px;width:20px;height:14px;background:#4a7a2e40;border-radius:50%;box-shadow:0 4px 10px #00000020"></div>
+      <div style="position:absolute;top:30px;right:60px;font-size:12px;animation:none">🐉</div>
+      <div style="position:absolute;bottom:32px;left:80px;font-size:8px">💎</div>
+      <div style="position:absolute;bottom:32px;left:55px;font-size:8px">📦</div>
+      <div style="position:absolute;top:6px;left:6px;font-size:5px;color:#fff;text-shadow:1px 1px 2px #000">⚔️ QUEST: Find the Dragon</div>
+      <div style="position:absolute;top:6px;right:6px;font-size:5px;color:#ffd700;text-shadow:1px 1px 2px #000">💰 120 Gold</div>
+    </div>
+  `),
+
+  'metaverse-space-station': base(`
+    <div style="height:200px;background:#050510;position:relative;overflow:hidden">
+      ${Array.from({length:20}).map(() => `<div style="position:absolute;top:${Math.random()*200}px;left:${Math.random()*100}%;width:1px;height:1px;background:#fff;border-radius:50%;opacity:${.3+Math.random()*.7}"></div>`).join('')}
+      <div style="position:absolute;top:20px;right:15px;width:30px;height:30px;border-radius:50%;background:radial-gradient(circle at 40% 40%,#4a90d9,#1a3a6a,#0a1a3a);box-shadow:0 0 15px #4a90d940"></div>
+      <div style="position:absolute;inset:20px;border:1px solid #33335550;border-radius:4px;background:#0a0a1a80"></div>
+      <div style="position:absolute;top:30px;left:30px;display:flex;gap:4px">
+        ${[{c:'#3b82f6',t:'NAV'},{c:'#22c55e',t:'SYS'},{c:'#f59e0b',t:'O2'}].map(s => `<div style="width:24px;height:16px;background:#111;border:1px solid ${s.c}60;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:4px;color:${s.c}">${s.t}</div>`).join('')}
+      </div>
+      <div style="position:absolute;left:30px;top:55px;width:50px;height:25px;background:#0a0a20;border:1px solid #33335550;border-radius:2px;overflow:hidden"><div style="width:100%;height:100%;background:linear-gradient(90deg,#3b82f620 0%,#3b82f640 30%,#3b82f620 100%)"></div></div>
+      <div style="position:absolute;bottom:30px;left:50%;transform:translateX(-50%);width:30px;height:20px;border:1px solid #ffffff20;border-radius:2px;background:#0a0a1a;display:flex;align-items:center;justify-content:center;font-size:6px">🚪</div>
+      <div style="position:absolute;top:6px;left:6px;font-size:6px;font-weight:600;color:#3b82f6">🛸 STATION ALPHA</div>
+      <div style="position:absolute;bottom:8px;right:8px;font-size:5px;color:#22c55e">O₂: 98%</div>
+    </div>
+  `, '#050510', '#e2e8f0'),
 }
