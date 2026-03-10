@@ -52,7 +52,6 @@ serve(async (req) => {
     const body = await req.json();
     const rawMessages = body?.messages;
 
-    // Validate messages payload
     if (!Array.isArray(rawMessages) || rawMessages.length === 0 || rawMessages.length > 20) {
       return new Response(
         JSON.stringify({ error: "Invalid messages: must be an array of 1-20 items." }),
@@ -60,7 +59,6 @@ serve(async (req) => {
       );
     }
 
-    // Sanitize: only allow user/assistant roles, cap content length, strip system messages
     const messages = rawMessages
       .filter((m: any) => m && typeof m === "object" && ["user", "assistant"].includes(m.role) && typeof m.content === "string")
       .map((m: any) => ({ role: m.role as string, content: m.content.slice(0, 4000) }));
@@ -73,37 +71,81 @@ serve(async (req) => {
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
 
-    if (!LOVABLE_API_KEY) {
+    const fullMessages = [{ role: "system", content: SYSTEM_PROMPT }, ...messages];
+
+    // Try Lovable AI Gateway first
+    if (LOVABLE_API_KEY) {
+      console.log("Trying Lovable AI Gateway...");
+      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-3-flash-preview",
+          messages: fullMessages,
+          stream: true,
+        }),
+      });
+
+      if (response.ok) {
+        console.log("Using Lovable AI Gateway ✓");
+        return new Response(response.body, {
+          headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+        });
+      }
+
+      console.warn("Lovable AI failed with status:", response.status);
+
+      // Only fallback on 402 (no credits) or 429 (rate limit)
+      if (response.status !== 402 && response.status !== 429) {
+        const errorText = await response.text().catch(() => "Unknown error");
+        console.error("Lovable AI error:", errorText);
+        return new Response(
+          JSON.stringify({ error: "AI service temporarily unavailable. Please try again." }),
+          { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      console.log("Lovable AI returned", response.status, "- falling back to OpenRouter...");
+    }
+
+    // Fallback to OpenRouter
+    if (!OPENROUTER_API_KEY) {
       return new Response(
         JSON.stringify({ error: "AI service not configured." }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    console.log("Using OpenRouter fallback...");
+    const fallbackResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
+        model: "google/gemini-2.5-flash",
+        messages: fullMessages,
         stream: true,
       }),
     });
 
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => "Unknown error");
-      console.error("Lovable AI error:", response.status, errorText);
+    if (!fallbackResponse.ok) {
+      const errorText = await fallbackResponse.text().catch(() => "Unknown error");
+      console.error("OpenRouter error:", fallbackResponse.status, errorText);
       return new Response(
         JSON.stringify({ error: "AI service temporarily unavailable. Please try again." }),
         { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    return new Response(response.body, {
+    console.log("Using OpenRouter ✓");
+    return new Response(fallbackResponse.body, {
       headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
     });
   } catch (e) {
