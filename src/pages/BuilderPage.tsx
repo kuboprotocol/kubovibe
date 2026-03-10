@@ -223,7 +223,7 @@ export default function BuilderPage() {
             {activeTab === 'preview' ? (
               <motion.div key="preview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0">
                 {generatedCode ? (
-                  <iframe srcDoc={generatedCode} className="w-full h-full border-0 bg-background" sandbox="allow-scripts allow-forms allow-modals" title="App Preview" />
+                  <iframe srcDoc={generatedCode} className="w-full h-full border-0 bg-background" sandbox="allow-scripts" title="App Preview" />
                 ) : (
                   <div className="flex items-center justify-center h-full">
                     <div className="text-center">
