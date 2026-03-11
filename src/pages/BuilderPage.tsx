@@ -9,6 +9,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { toast } from 'sonner'
 import ReactMarkdown from 'react-markdown'
 import TemplateGallery, { type Template } from '@/components/builder/TemplateGallery'
+import PromptAttachMenu from '@/components/landing/PromptAttachMenu'
 import logoImg from '@/assets/logo-kubovibe.png'
 
 export default function BuilderPage() {
@@ -206,13 +207,26 @@ export default function BuilderPage() {
           </div>
 
           <div className="p-3 border-t border-border">
-            <div className="relative">
-              <textarea value={input} onChange={(e) => setInput(e.target.value)} placeholder="Describe your app..." rows={2}
-                className="w-full resize-none bg-secondary rounded-xl px-4 py-3 pr-12 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }} />
-              <Button size="icon" variant="hero" className="absolute right-2 bottom-2 h-8 w-8 rounded-lg" onClick={send} disabled={isLoading || !input.trim()}>
-                {isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-              </Button>
+            <div className="flex items-end gap-2">
+              <PromptAttachMenu
+                onAttachFile={(file) => {
+                  setInput(prev => prev + `\n[Attached: ${file.name}]`)
+                  toast.success(`Arquivo "${file.name}" anexado`)
+                }}
+                onScreenshot={() => toast.info('Screenshot functionality coming soon')}
+                onAddReference={(url) => {
+                  setInput(prev => prev + `\n[Reference: ${url}]`)
+                  toast.success('Referência adicionada')
+                }}
+              />
+              <div className="relative flex-1">
+                <textarea value={input} onChange={(e) => setInput(e.target.value)} placeholder="Describe your app..." rows={2}
+                  className="w-full resize-none bg-secondary rounded-xl px-4 py-3 pr-12 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }} />
+                <Button size="icon" variant="hero" className="absolute right-2 bottom-2 h-8 w-8 rounded-lg" onClick={send} disabled={isLoading || !input.trim()}>
+                  {isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
