@@ -9,6 +9,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { toast } from 'sonner'
 import ReactMarkdown from 'react-markdown'
 import TemplateGallery, { type Template } from '@/components/builder/TemplateGallery'
+import PromptAttachMenu from '@/components/landing/PromptAttachMenu'
 import logoImg from '@/assets/logo-kubovibe.png'
 
 export default function BuilderPage() {
