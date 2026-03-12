@@ -15,7 +15,10 @@ export async function streamChat({
   onDone: () => void;
   onError?: (error: string) => void;
 }) {
-  const { data: { session } } = await supabase.auth.getSession();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
   if (!session?.access_token) {
     onError?.("You must be logged in to use the builder.");
     return;
@@ -32,8 +35,29 @@ export async function streamChat({
   });
 
   if (!resp.ok) {
-    const errorData = await resp.json().catch(() => ({ error: "Request failed" }));
-    onError?.(errorData.error || `Error ${resp.status}`);
+    let errorMessage = `Error ${resp.status}`;
+
+    try {
+      const errorData = await resp.json();
+      if (typeof errorData?.error === "string" && errorData.error.trim()) {
+        errorMessage = errorData.error;
+      }
+    } catch {
+      const fallbackText = await resp.text().catch(() => "");
+      if (fallbackText.trim()) {
+        errorMessage = fallbackText;
+      }
+    }
+
+    if (resp.status === 402 && errorMessage === `Error ${resp.status}`) {
+      errorMessage = "Sem créditos suficientes no serviço de IA. Tente um prompt menor ou recarregue os créditos.";
+    }
+
+    if (resp.status === 429 && errorMessage === `Error ${resp.status}`) {
+      errorMessage = "Muitas requisições em sequência. Aguarde alguns segundos e tente novamente.";
+    }
+
+    onError?.(errorMessage);
     return;
   }
 
@@ -78,7 +102,6 @@ export async function streamChat({
     }
   }
 
-  // Final flush
   if (textBuffer.trim()) {
     for (let raw of textBuffer.split("\n")) {
       if (!raw) continue;
@@ -91,7 +114,9 @@ export async function streamChat({
         const parsed = JSON.parse(jsonStr);
         const content = parsed.choices?.[0]?.delta?.content as string | undefined;
         if (content) onDelta(content);
-      } catch { /* ignore */ }
+      } catch {
+        // ignore final partial leftovers
+      }
     }
   }
 

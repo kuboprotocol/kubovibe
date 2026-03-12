@@ -19,36 +19,75 @@ Rules:
 - The HTML must be complete and runnable in an iframe.
 - Start with <!DOCTYPE html> and end with </html>.`;
 
+const OPENROUTER_DEFAULT_MAX_TOKENS = 8000;
+const OPENROUTER_MIN_MAX_TOKENS = 512;
+
+const jsonResponse = (status: number, error: string) =>
+  new Response(JSON.stringify({ error }), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+
+const parseAffordableTokens = (errorText: string): number | null => {
+  const fromMessage = errorText.match(/can only afford\s+(\d+)/i);
+  if (fromMessage) return Number(fromMessage[1]);
+
+  try {
+    const parsed = JSON.parse(errorText);
+    const message = parsed?.error?.message;
+    if (typeof message === "string") {
+      const fromJsonMessage = message.match(/can only afford\s+(\d+)/i);
+      if (fromJsonMessage) return Number(fromJsonMessage[1]);
+    }
+  } catch {
+    // ignore parsing errors
+  }
+
+  return null;
+};
+
+const callOpenRouter = async (
+  apiKey: string,
+  messages: Array<{ role: string; content: string }>,
+  maxTokens: number
+) =>
+  fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": "https://kubovibe.lovable.app",
+      "X-Title": "KUBO VIBE Builder",
+    },
+    body: JSON.stringify({
+      model: "google/gemini-2.5-flash",
+      messages,
+      stream: true,
+      max_tokens: maxTokens,
+    }),
+  });
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Authenticate the request
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       console.error("No auth header found");
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse(401, "Unauthorized");
     }
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
+    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: authHeader } },
+    });
 
     const token = authHeader.replace("Bearer ", "");
     const { data, error: authError } = await supabase.auth.getUser(token);
     if (authError || !data?.user) {
       console.error("Auth error:", authError?.message);
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse(401, "Unauthorized");
     }
 
     console.log("User authenticated:", data.user.id);
@@ -57,10 +96,7 @@ serve(async (req) => {
     const rawMessages = body?.messages;
 
     if (!Array.isArray(rawMessages) || rawMessages.length === 0 || rawMessages.length > 20) {
-      return new Response(
-        JSON.stringify({ error: "Invalid messages: must be an array of 1-20 items." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse(400, "Invalid messages: must be an array of 1-20 items.");
     }
 
     const messages = rawMessages
@@ -68,10 +104,7 @@ serve(async (req) => {
       .map((m: any) => ({ role: m.role as string, content: m.content.slice(0, 4000) }));
 
     if (messages.length === 0) {
-      return new Response(
-        JSON.stringify({ error: "No valid messages provided." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse(400, "No valid messages provided.");
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -82,7 +115,6 @@ serve(async (req) => {
 
     const fullMessages = [{ role: "system", content: SYSTEM_PROMPT }, ...messages];
 
-    // Try Lovable AI Gateway first
     if (LOVABLE_API_KEY) {
       console.log("Trying Lovable AI Gateway...");
       try {
@@ -109,13 +141,8 @@ serve(async (req) => {
         const errorText = await response.text().catch(() => "Unknown error");
         console.warn("Lovable AI failed:", response.status, errorText);
 
-        // Only fallback on 402 (no credits) or 429 (rate limit)
         if (response.status !== 402 && response.status !== 429) {
-          console.error("Lovable AI non-recoverable error, not falling back");
-          return new Response(
-            JSON.stringify({ error: "AI service temporarily unavailable. Please try again." }),
-            { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
+          return jsonResponse(503, "AI service temporarily unavailable. Please try again.");
         }
 
         console.log("Falling back to OpenRouter...");
@@ -125,39 +152,47 @@ serve(async (req) => {
       }
     }
 
-    // Fallback to OpenRouter
     if (!OPENROUTER_API_KEY) {
       console.error("No OPENROUTER_API_KEY configured for fallback");
-      return new Response(
-        JSON.stringify({ error: "AI service not configured. Please contact support." }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse(500, "AI service not configured. Please contact support.");
     }
 
     console.log("Using OpenRouter fallback...");
-    const fallbackResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://kubovibe.lovable.app",
-        "X-Title": "KUBO VIBE Builder",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: fullMessages,
-        stream: true,
-        max_tokens: 10000,
-      }),
-    });
+    let maxTokens = OPENROUTER_DEFAULT_MAX_TOKENS;
+    let fallbackResponse = await callOpenRouter(OPENROUTER_API_KEY, fullMessages, maxTokens);
+
+    if (!fallbackResponse.ok && fallbackResponse.status === 402) {
+      const errorText = await fallbackResponse.text().catch(() => "Unknown error");
+      console.warn("OpenRouter 402 on first attempt:", errorText);
+
+      const affordableTokens = parseAffordableTokens(errorText);
+      if (
+        affordableTokens &&
+        Number.isFinite(affordableTokens) &&
+        affordableTokens >= OPENROUTER_MIN_MAX_TOKENS &&
+        affordableTokens < maxTokens
+      ) {
+        maxTokens = affordableTokens;
+        console.log(`Retrying OpenRouter with reduced max_tokens=${maxTokens}...`);
+        fallbackResponse = await callOpenRouter(OPENROUTER_API_KEY, fullMessages, maxTokens);
+      } else {
+        return jsonResponse(402, "Serviço de IA sem créditos suficientes. Tente um prompt menor ou adicione créditos.");
+      }
+    }
 
     if (!fallbackResponse.ok) {
       const errorText = await fallbackResponse.text().catch(() => "Unknown error");
       console.error("OpenRouter error:", fallbackResponse.status, errorText);
-      return new Response(
-        JSON.stringify({ error: `AI service error (${fallbackResponse.status}). Please try again later.` }),
-        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+
+      if (fallbackResponse.status === 402) {
+        return jsonResponse(402, "Serviço de IA sem créditos suficientes. Tente um prompt menor ou adicione créditos.");
+      }
+
+      if (fallbackResponse.status === 429) {
+        return jsonResponse(429, "Muitas requisições agora. Aguarde alguns segundos e tente novamente.");
+      }
+
+      return jsonResponse(503, `AI service error (${fallbackResponse.status}). Please try again later.`);
     }
 
     console.log("Using OpenRouter ✓");
@@ -166,9 +201,6 @@ serve(async (req) => {
     });
   } catch (e) {
     console.error("generate-code error:", e);
-    return new Response(
-      JSON.stringify({ error: "Something went wrong. Please try again." }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return jsonResponse(500, "Something went wrong. Please try again.");
   }
 });
