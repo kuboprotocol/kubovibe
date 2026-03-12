@@ -28,6 +28,7 @@ serve(async (req) => {
     // Authenticate the request
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
+      console.error("No auth header found");
       return new Response(
         JSON.stringify({ error: "Unauthorized" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -41,13 +42,16 @@ serve(async (req) => {
     );
 
     const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) {
+    const { data, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !data?.user) {
+      console.error("Auth error:", authError?.message);
       return new Response(
         JSON.stringify({ error: "Unauthorized" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    console.log("User authenticated:", data.user.id);
 
     const body = await req.json();
     const rawMessages = body?.messages;
@@ -73,50 +77,59 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
 
+    console.log("LOVABLE_API_KEY present:", !!LOVABLE_API_KEY);
+    console.log("OPENROUTER_API_KEY present:", !!OPENROUTER_API_KEY);
+
     const fullMessages = [{ role: "system", content: SYSTEM_PROMPT }, ...messages];
 
     // Try Lovable AI Gateway first
     if (LOVABLE_API_KEY) {
       console.log("Trying Lovable AI Gateway...");
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
-          messages: fullMessages,
-          stream: true,
-        }),
-      });
-
-      if (response.ok) {
-        console.log("Using Lovable AI Gateway ✓");
-        return new Response(response.body, {
-          headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+      try {
+        const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash",
+            messages: fullMessages,
+            stream: true,
+          }),
         });
-      }
 
-      console.warn("Lovable AI failed with status:", response.status);
+        if (response.ok) {
+          console.log("Using Lovable AI Gateway ✓");
+          return new Response(response.body, {
+            headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+          });
+        }
 
-      // Only fallback on 402 (no credits) or 429 (rate limit)
-      if (response.status !== 402 && response.status !== 429) {
         const errorText = await response.text().catch(() => "Unknown error");
-        console.error("Lovable AI error:", errorText);
-        return new Response(
-          JSON.stringify({ error: "AI service temporarily unavailable. Please try again." }),
-          { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
+        console.warn("Lovable AI failed:", response.status, errorText);
 
-      console.log("Lovable AI returned", response.status, "- falling back to OpenRouter...");
+        // Only fallback on 402 (no credits) or 429 (rate limit)
+        if (response.status !== 402 && response.status !== 429) {
+          console.error("Lovable AI non-recoverable error, not falling back");
+          return new Response(
+            JSON.stringify({ error: "AI service temporarily unavailable. Please try again." }),
+            { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        console.log("Falling back to OpenRouter...");
+      } catch (lovableError) {
+        console.error("Lovable AI Gateway fetch error:", lovableError);
+        console.log("Falling back to OpenRouter...");
+      }
     }
 
     // Fallback to OpenRouter
     if (!OPENROUTER_API_KEY) {
+      console.error("No OPENROUTER_API_KEY configured for fallback");
       return new Response(
-        JSON.stringify({ error: "AI service not configured." }),
+        JSON.stringify({ error: "AI service not configured. Please contact support." }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -127,6 +140,8 @@ serve(async (req) => {
       headers: {
         Authorization: `Bearer ${OPENROUTER_API_KEY}`,
         "Content-Type": "application/json",
+        "HTTP-Referer": "https://kubovibe.lovable.app",
+        "X-Title": "KUBO VIBE Builder",
       },
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
@@ -140,7 +155,7 @@ serve(async (req) => {
       const errorText = await fallbackResponse.text().catch(() => "Unknown error");
       console.error("OpenRouter error:", fallbackResponse.status, errorText);
       return new Response(
-        JSON.stringify({ error: "AI service temporarily unavailable. Please try again." }),
+        JSON.stringify({ error: `AI service error (${fallbackResponse.status}). Please try again later.` }),
         { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
