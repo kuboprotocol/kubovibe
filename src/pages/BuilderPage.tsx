@@ -121,6 +121,20 @@ export default function BuilderPage() {
 
   const send = async () => {
     if (!input.trim() || isLoading) return
+    if (!subscription?.is_active) {
+      toast.error('Você precisa de um plano ativo para editar.', {
+        action: { label: 'Ver planos', onClick: () => navigate('/pricing') },
+      })
+      return
+    }
+    if (!canEdit) {
+      toast('Suas 20 edições acabaram! 🔄', {
+        description: 'Recarregue quando quiser para continuar criando.',
+        action: { label: 'Recarregar', onClick: () => navigate('/pricing') },
+      })
+      return
+    }
+    await incrementEdit()
     const userMsg: Msg = { role: 'user', content: input }
     const newMessages = [...messages, userMsg]
     setMessages(newMessages); setInput(''); setIsLoading(true)
