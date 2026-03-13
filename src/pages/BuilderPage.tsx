@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, Send, Code, Eye, Loader2, Copy, Check, Save, Download, LayoutTemplate } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
