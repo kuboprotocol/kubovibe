@@ -15,7 +15,9 @@ import logoImg from '@/assets/logo-kubovibe.png'
 export default function BuilderPage() {
   const navigate = useNavigate()
   const { projectId } = useParams<{ projectId?: string }>()
+  const location = useLocation()
   const { user } = useAuth()
+  const initialPrompt = (location.state as any)?.initialPrompt as string | undefined
 
   const [messages, setMessages] = useState<Msg[]>([])
   const [input, setInput] = useState('')
