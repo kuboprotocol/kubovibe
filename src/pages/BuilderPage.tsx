@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, Send, Code, Eye, Loader2, Copy, Check, Save, Download, LayoutTemplate } from 'lucide-react'
+import { ArrowLeft, Send, Code, Eye, Loader2, Copy, Check, Save, Download, LayoutTemplate, Zap } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { streamChat, type Msg } from '@/lib/streamChat'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/hooks/useAuth'
+import { useSubscription } from '@/hooks/useSubscription'
 import { toast } from 'sonner'
 import ReactMarkdown from 'react-markdown'
 import TemplateGallery, { type Template } from '@/components/builder/TemplateGallery'
@@ -17,6 +18,7 @@ export default function BuilderPage() {
   const { projectId } = useParams<{ projectId?: string }>()
   const location = useLocation()
   const { user } = useAuth()
+  const { subscription, canEdit, editsRemaining, incrementEdit } = useSubscription()
   const initialPrompt = (location.state as any)?.initialPrompt as string | undefined
 
   const [messages, setMessages] = useState<Msg[]>([])
@@ -119,6 +121,20 @@ export default function BuilderPage() {
 
   const send = async () => {
     if (!input.trim() || isLoading) return
+    if (!subscription?.is_active) {
+      toast.error('Você precisa de um plano ativo para editar.', {
+        action: { label: 'Ver planos', onClick: () => navigate('/pricing') },
+      })
+      return
+    }
+    if (!canEdit) {
+      toast('Suas 20 edições acabaram! 🔄', {
+        description: 'Recarregue quando quiser para continuar criando.',
+        action: { label: 'Recarregar', onClick: () => navigate('/pricing') },
+      })
+      return
+    }
+    await incrementEdit()
     const userMsg: Msg = { role: 'user', content: input }
     const newMessages = [...messages, userMsg]
     setMessages(newMessages); setInput(''); setIsLoading(true)
@@ -183,6 +199,12 @@ export default function BuilderPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          {subscription?.is_active && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/10 border border-primary/20 text-xs font-medium text-primary">
+              <Zap className="h-3 w-3" />
+              {editsRemaining} edições
+            </div>
+          )}
           <Button variant="ghost" size="sm" onClick={() => setShowTemplates(true)} className="text-xs rounded-xl gap-1.5 text-muted-foreground">
             <LayoutTemplate className="h-3.5 w-3.5" /> Templates
           </Button>
