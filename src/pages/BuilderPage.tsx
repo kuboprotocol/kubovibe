@@ -18,6 +18,7 @@ export default function BuilderPage() {
   const { projectId } = useParams<{ projectId?: string }>()
   const location = useLocation()
   const { user } = useAuth()
+  const { subscription, canEdit, editsRemaining, incrementEdit } = useSubscription()
   const initialPrompt = (location.state as any)?.initialPrompt as string | undefined
 
   const [messages, setMessages] = useState<Msg[]>([])
