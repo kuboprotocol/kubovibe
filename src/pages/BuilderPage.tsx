@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, Send, Code, Eye, Loader2, Copy, Check, Save, Download, LayoutTemplate } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -15,7 +15,9 @@ import logoImg from '@/assets/logo-kubovibe.png'
 export default function BuilderPage() {
   const navigate = useNavigate()
   const { projectId } = useParams<{ projectId?: string }>()
+  const location = useLocation()
   const { user } = useAuth()
+  const initialPrompt = (location.state as any)?.initialPrompt as string | undefined
 
   const [messages, setMessages] = useState<Msg[]>([])
   const [input, setInput] = useState('')
@@ -33,6 +35,47 @@ export default function BuilderPage() {
   useEffect(() => {
     if (projectId) loadProject(projectId)
   }, [projectId])
+
+  // Auto-send prompt from landing page
+  const hasSentInitialPrompt = useRef(false)
+  useEffect(() => {
+    if (initialPrompt && !hasSentInitialPrompt.current && !projectId && user) {
+      hasSentInitialPrompt.current = true
+      setInput(initialPrompt)
+      // Small delay to let state settle, then send
+      setTimeout(() => {
+        const userMsg: Msg = { role: 'user', content: initialPrompt }
+        setMessages([userMsg])
+        setIsLoading(true)
+        let assistantSoFar = ''
+        let finalMessages = [userMsg]
+
+        const upsertAssistant = (chunk: string) => {
+          assistantSoFar += chunk
+          setMessages(prev => {
+            const last = prev[prev.length - 1]
+            if (last?.role === 'assistant') {
+              const updated = prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: assistantSoFar } : m))
+              finalMessages = updated; return updated
+            }
+            const updated = [...prev, { role: 'assistant' as const, content: assistantSoFar }]
+            finalMessages = updated; return updated
+          })
+          const html = extractHtml(assistantSoFar)
+          if (html.includes('<')) setGeneratedCode(html)
+        }
+
+        streamChat({
+          messages: [userMsg],
+          onDelta: (chunk) => upsertAssistant(chunk),
+          onDone: () => { setIsLoading(false); const html = extractHtml(assistantSoFar); if (html.includes('<')) saveProject(html, finalMessages) },
+          onError: (error) => { toast.error(error); setIsLoading(false) },
+        }).catch((e) => { console.error(e); toast.error('Failed to generate'); setIsLoading(false) })
+
+        setInput('')
+      }, 100)
+    }
+  }, [initialPrompt, projectId, user])
 
   const loadProject = async (id: string) => {
     const { data, error } = await supabase.from('projects').select('*').eq('id', id).single()

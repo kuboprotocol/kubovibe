@@ -60,7 +60,7 @@ export default function HeroSection() {
 
   const handleGenerate = () => {
     if (prompt.trim()) {
-      navigate('/builder')
+      navigate('/builder', { state: { initialPrompt: prompt.trim() } })
     }
   }
 
