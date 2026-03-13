@@ -199,6 +199,12 @@ export default function BuilderPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          {subscription?.is_active && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/10 border border-primary/20 text-xs font-medium text-primary">
+              <Zap className="h-3 w-3" />
+              {editsRemaining} edições
+            </div>
+          )}
           <Button variant="ghost" size="sm" onClick={() => setShowTemplates(true)} className="text-xs rounded-xl gap-1.5 text-muted-foreground">
             <LayoutTemplate className="h-3.5 w-3.5" /> Templates
           </Button>
