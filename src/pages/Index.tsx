@@ -1,15 +1,15 @@
-import Navbar from '@/components/landing/Navbar'
-import HeroSection from '@/components/landing/HeroSection'
-import CommunitySection from '@/components/landing/CommunitySection'
-import HowItWorksSection from '@/components/landing/HowItWorksSection'
-import FAQSection from '@/components/landing/FAQSection'
-import { Button } from '@/components/ui/button'
-import { ArrowRight } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
+import Navbar from "@/components/landing/Navbar";
+import HeroSection from "@/components/landing/HeroSection";
+import CommunitySection from "@/components/landing/CommunitySection";
+import HowItWorksSection from "@/components/landing/HowItWorksSection";
+import FAQSection from "@/components/landing/FAQSection";
+import { Button } from "@/components/ui/button";
+import { ArrowRight } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 
 const Index = () => {
-  const navigate = useNavigate()
+  const navigate = useNavigate();
 
   return (
     <div className="min-h-screen bg-background">
@@ -40,7 +40,7 @@ const Index = () => {
             </p>
             <Button
               size="lg"
-              onClick={() => navigate('/builder')}
+              onClick={() => navigate("/builder")}
               className="bg-background text-foreground hover:bg-background/90 rounded-xl px-8 font-semibold gap-2 relative z-10"
             >
               Start building for free
@@ -54,20 +54,43 @@ const Index = () => {
 
       <footer className="py-12 px-6 border-t border-border">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-sm text-muted-foreground">
-            © 2026 KUBO VIBE. All rights reserved.
-          </p>
+          <p className="text-sm text-muted-foreground">© 2026 KUBO VIBE. All rights reserved.</p>
           <div className="flex items-center gap-6 text-sm text-muted-foreground">
-            <a href="/privacy" className="hover:text-primary transition-colors">Privacy</a>
-            <a href="/terms" className="hover:text-primary transition-colors">Terms</a>
-            <a href="https://x.com/KUBOPROTOCOL" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">Twitter</a>
-            <a href="https://t.me/+WoYG4tMTuJY5ZjNh" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">Telegram</a>
-            <a href="https://github.com/kuboprotocol/kubovibe" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">GitHub</a>
+            <a href="/privacy" className="hover:text-primary transition-colors">
+              Privacy
+            </a>
+            <a href="/terms" className="hover:text-primary transition-colors">
+              Terms
+            </a>
+            <a
+              href="https://x.com/KUBOPROTOCOL"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-primary transition-colors"
+            >
+              Twitter
+            </a>
+            <a
+              href="https://t.me/+WoYG4tMTuJY5ZjNh"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-primary transition-colors"
+            >
+              Telegram
+            </a>
+            <a
+              href="https://github.com/kuboprotocol/kubovibe"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-primary transition-colors"
+            >
+              GitHub
+            </a>
           </div>
         </div>
       </footer>
     </div>
-  )
-}
+  );
+};
 
-export default Index
+export default Index;
