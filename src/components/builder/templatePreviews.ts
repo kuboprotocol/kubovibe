@@ -636,4 +636,381 @@ export const templatePreviews: Record<string, string> = {
       <div style="position:absolute;bottom:8px;right:8px;font-size:5px;color:#22c55e">O₂: 98%</div>
     </div>
   `, '#050510', '#e2e8f0'),
+
+  // ═══════════════════════════════════════════
+  // CASINO — Additional Previews
+  // ═══════════════════════════════════════════
+  'casino-crash': base(`
+    <div style="padding:8px;background:#0a0a0a;height:200px;position:relative">
+      <div style="font-size:7px;color:#888;margin-bottom:4px">CRASH</div>
+      <div style="position:relative;height:100px;border-left:1px solid #333;border-bottom:1px solid #333;margin-bottom:6px">
+        <svg viewBox="0 0 120 80" style="width:100%;height:100%"><path d="M0,80 Q30,75 50,60 T90,20 L90,20" fill="none" stroke="#22c55e" stroke-width="2"/><circle cx="90" cy="20" r="3" fill="#22c55e"/></svg>
+        <div style="position:absolute;top:10px;left:50%;transform:translateX(-50%);font-size:20px;font-weight:800;color:#22c55e">2.47x</div>
+      </div>
+      <div style="display:flex;gap:4px;justify-content:center"><div style="background:#22c55e;padding:3px 12px;border-radius:4px;font-size:7px;font-weight:700;color:#000">CASH OUT</div></div>
+      <div style="display:flex;gap:2px;position:absolute;bottom:6px;left:8px">${[1.2,3.5,1.8,12.4,2.1,1.0].map(v => `<span style="font-size:5px;padding:1px 3px;border-radius:2px;background:${v>=2?'#22c55e20':'#ef444420'};color:${v>=2?'#22c55e':'#ef4444'}">${v}x</span>`).join('')}</div>
+    </div>
+  `, '#0a0a0a', '#fff'),
+
+  'casino-mines': base(`
+    <div style="padding:10px;background:#0a0a0a">
+      <div style="font-size:7px;color:#888;margin-bottom:6px">MINES — <span style="color:#22c55e">3.24x</span></div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:3px;margin-bottom:6px">
+        ${Array.from({length:25}).map((_,i) => {
+          if(i===3||i===11||i===18) return `<div style="width:100%;aspect-ratio:1;background:#22c55e20;border:1px solid #22c55e;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:10px">💎</div>`
+          if(i===7) return `<div style="width:100%;aspect-ratio:1;background:#ef444420;border:1px solid #ef4444;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:10px">💣</div>`
+          return `<div style="width:100%;aspect-ratio:1;background:#1a1a1a;border:1px solid #333;border-radius:3px"></div>`
+        }).join('')}
+      </div>
+      <div style="display:flex;gap:4px;justify-content:center"><div style="background:#22c55e;padding:3px 10px;border-radius:4px;font-size:6px;font-weight:700;color:#000">CASH OUT $32.40</div></div>
+    </div>
+  `, '#0a0a0a', '#fff'),
+
+  'casino-plinko': base(`
+    <div style="padding:6px;background:#0a0a0a;text-align:center">
+      <div style="font-size:7px;color:#888;margin-bottom:4px">PLINKO</div>
+      <div style="position:relative;height:120px;width:100px;margin:0 auto">
+        ${Array.from({length:8}).map((_,row) => Array.from({length:row+3}).map((_,col) => `<div style="position:absolute;top:${row*14+4}px;left:${50-(row+3)*5+col*10}px;width:4px;height:4px;border-radius:50%;background:#334155"></div>`).join('')).join('')}
+        <div style="position:absolute;top:20px;left:48px;width:6px;height:6px;border-radius:50%;background:#f59e0b;box-shadow:0 0 6px #f59e0b"></div>
+      </div>
+      <div style="display:flex;gap:1px;justify-content:center;margin-top:2px">${['0.2','0.5','1','2','5','10','5','2','1','0.5','0.2'].map((v,i) => `<div style="font-size:4px;padding:2px 2px;background:${Number(v)>=5?'#f59e0b':Number(v)>=2?'#eab308':'#334155'};color:${Number(v)>=2?'#000':'#999'};border-radius:1px;font-weight:600">${v}x</div>`).join('')}</div>
+    </div>
+  `, '#0a0a0a', '#fff'),
+
+  'casino-wheel': base(`
+    <div style="padding:8px;background:#0a0a0a;text-align:center">
+      <div style="font-size:8px;font-weight:700;color:#fbbf24;margin-bottom:4px">🎡 WHEEL OF FORTUNE</div>
+      <div style="width:90px;height:90px;border-radius:50%;background:conic-gradient(#ef4444 0deg,#f59e0b 30deg,#22c55e 60deg,#3b82f6 90deg,#8b5cf6 120deg,#ec4899 150deg,#ef4444 180deg,#f59e0b 210deg,#22c55e 240deg,#3b82f6 270deg,#8b5cf6 300deg,#ec4899 330deg,#ef4444 360deg);margin:0 auto;border:3px solid #fbbf24;display:flex;align-items:center;justify-content:center;box-shadow:0 0 20px #fbbf2440"><div style="width:20px;height:20px;border-radius:50%;background:#0a0a0a;border:2px solid #fbbf24;display:flex;align-items:center;justify-content:center;font-size:6px;color:#fbbf24;font-weight:700">▶</div></div>
+      <div style="font-size:5px;color:#888;margin-top:4px">Click to spin • Balance: $500</div>
+    </div>
+  `, '#0a0a0a', '#fff'),
+
+  'casino-baccarat': base(`
+    <div style="padding:8px;background:#0a3d0a">
+      <div style="text-align:center;font-size:7px;color:#d4a853;margin-bottom:6px">BACCARAT</div>
+      <div style="display:flex;justify-content:space-around;margin-bottom:6px">
+        <div style="text-align:center"><div style="font-size:5px;color:#999">PLAYER (8)</div><div style="display:flex;gap:2px;margin-top:2px">${['9♠','K♣'].map(c => `<div style="width:16px;height:22px;background:#fff;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:5px;font-weight:700">${c}</div>`).join('')}</div></div>
+        <div style="text-align:center"><div style="font-size:5px;color:#999">BANKER (6)</div><div style="display:flex;gap:2px;margin-top:2px">${['J♥','6♦'].map(c => `<div style="width:16px;height:22px;background:#fff;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:5px;font-weight:700;color:#c0392b">${c}</div>`).join('')}</div></div>
+      </div>
+      <div style="display:flex;gap:3px;justify-content:center">${['PLAYER','TIE','BANKER'].map((b,i) => `<div style="padding:3px 8px;border-radius:3px;font-size:5px;font-weight:600;${i===0?'background:#2563eb;color:#fff':i===1?'background:#22c55e;color:#fff':'background:#dc2626;color:#fff'}">${b}</div>`).join('')}</div>
+    </div>
+  `, '#0a3d0a', '#fff'),
+
+  'casino-keno': base(`
+    <div style="padding:6px;background:#0a0a2e">
+      <div style="font-size:7px;color:#fbbf24;text-align:center;margin-bottom:4px">KENO</div>
+      <div style="display:grid;grid-template-columns:repeat(10,1fr);gap:1px;margin-bottom:4px">
+        ${Array.from({length:40}).map((_,i) => {
+          const n = i+1; const sel = [3,7,15,22,28,33,37].includes(n); const hit = [7,22,33].includes(n)
+          return `<div style="text-align:center;font-size:4px;padding:2px;border-radius:2px;font-weight:600;${hit?'background:#22c55e;color:#000':sel?'background:#3b82f6;color:#fff':'background:#1a1a3e;color:#666'}">${n}</div>`
+        }).join('')}
+      </div>
+      <div style="text-align:center;font-size:5px;color:#888">Hits: 3/7 — Win: $45.00</div>
+    </div>
+  `, '#0a0a2e', '#e2e8f0'),
+
+  'casino-video-poker': base(`
+    <div style="padding:8px;background:#0a0a2e">
+      <div style="font-size:7px;color:#fbbf24;text-align:center;margin-bottom:4px">VIDEO POKER — Jacks or Better</div>
+      <div style="display:flex;gap:3px;justify-content:center;margin-bottom:6px">
+        ${['J♥','Q♠','7♦','J♣','3♠'].map((c,i) => `<div style="position:relative"><div style="width:22px;height:32px;background:#fff;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:700;color:${c.includes('♥')||c.includes('♦')?'#c0392b':'#111'};${i===0||i===3?'border:2px solid #fbbf24':''}">${c}</div>${i===0||i===3?'<div style="font-size:4px;color:#fbbf24;text-align:center">HOLD</div>':''}</div>`).join('')}
+      </div>
+      <div style="text-align:center;font-size:6px;color:#22c55e;font-weight:700;margin-bottom:4px">PAIR OF JACKS!</div>
+      <div style="display:flex;gap:3px;justify-content:center"><div style="background:#fbbf24;padding:2px 10px;border-radius:3px;font-size:6px;font-weight:700;color:#000">DRAW</div></div>
+    </div>
+  `, '#0a0a2e', '#e2e8f0'),
+
+  'casino-hilo': base(`
+    <div style="padding:10px;background:#0a0a0a;text-align:center">
+      <div style="font-size:7px;color:#888;margin-bottom:6px">HI-LO • <span style="color:#22c55e">1.86x</span></div>
+      <div style="width:40px;height:56px;background:#fff;border-radius:4px;margin:0 auto 8px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#c0392b;border:2px solid #d4a853">8♥</div>
+      <div style="display:flex;gap:4px;justify-content:center;margin-bottom:6px"><div style="background:#22c55e;padding:3px 10px;border-radius:3px;font-size:6px;font-weight:700;color:#000">▲ HIGH</div><div style="background:#ef4444;padding:3px 10px;border-radius:3px;font-size:6px;font-weight:700;color:#fff">▼ LOW</div></div>
+      <div style="display:flex;gap:2px;justify-content:center">${['3♣','J♠','5♦','K♥','8♣'].map(c => `<div style="width:14px;height:20px;background:#1a1a1a;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:5px;color:#888">${c}</div>`).join('')}</div>
+    </div>
+  `, '#0a0a0a', '#fff'),
+
+  'casino-aviator': base(`
+    <div style="padding:8px;background:#1a0a0a;height:200px;position:relative">
+      <div style="font-size:7px;color:#ef4444;margin-bottom:4px">AVIATOR</div>
+      <div style="position:relative;height:100px;border-left:1px solid #333;border-bottom:1px solid #333">
+        <svg viewBox="0 0 120 80" style="width:100%;height:100%"><path d="M0,78 Q20,76 40,70 T80,30 L100,5" fill="none" stroke="#ef4444" stroke-width="2"/></svg>
+        <div style="position:absolute;top:5px;right:10px;font-size:16px">✈️</div>
+        <div style="position:absolute;top:30px;left:50%;transform:translateX(-50%);font-size:18px;font-weight:800;color:#ef4444">5.23x</div>
+      </div>
+      <div style="display:flex;gap:4px;justify-content:center;margin-top:6px"><div style="background:#ef4444;padding:3px 12px;border-radius:4px;font-size:7px;font-weight:700;color:#fff">BET $10</div><div style="background:#22c55e;padding:3px 12px;border-radius:4px;font-size:7px;font-weight:700;color:#000">CASH OUT</div></div>
+    </div>
+  `, '#1a0a0a', '#fff'),
+
+  'casino-sports': base(`
+    <div style="display:flex;height:200px;background:#0a0a0a">
+      <div style="width:30px;background:#111;padding:4px 2px;font-size:6px">${['⚽','🏀','🎾','🥊','🎮'].map(e => `<div style="text-align:center;margin:6px 0">${e}</div>`).join('')}</div>
+      <div style="flex:1;padding:6px">
+        <div style="font-size:8px;font-weight:700;color:#fff;margin-bottom:6px">⚽ Football</div>
+        ${[{t1:'Barcelona',t2:'Real Madrid',o:['1.85','3.50','4.20']},{t1:'Liverpool',t2:'Man City',o:['2.10','3.30','3.40']}].map(m => `<div style="background:#111;border-radius:4px;padding:4px;margin-bottom:4px;border:1px solid #222"><div style="display:flex;justify-content:space-between;font-size:6px;margin-bottom:3px"><span style="color:#fff">${m.t1} vs ${m.t2}</span><span style="color:#22c55e;font-size:5px">LIVE</span></div><div style="display:flex;gap:2px">${m.o.map((o,i) => `<div style="flex:1;text-align:center;padding:2px;background:#1a1a2e;border-radius:2px;font-size:6px;font-weight:600;color:#3b82f6">${['1','X','2'][i]} ${o}</div>`).join('')}</div></div>`).join('')}
+      </div>
+    </div>
+  `, '#0a0a0a', '#fff'),
+
+  'casino-dice-game': base(`
+    <div style="padding:10px;background:#0a0a0a;text-align:center">
+      <div style="font-size:7px;color:#888;margin-bottom:6px">DICE — Roll Over</div>
+      <div style="background:#111;border-radius:6px;padding:8px;margin-bottom:6px">
+        <div style="width:100%;height:6px;background:#1a1a2e;border-radius:3px;position:relative;margin-bottom:4px"><div style="width:55%;height:100%;background:linear-gradient(90deg,#ef4444,#f59e0b);border-radius:3px"></div><div style="position:absolute;left:55%;top:-3px;width:8px;height:12px;background:#fff;border-radius:2px;transform:translateX(-50%)"></div></div>
+        <div style="display:flex;justify-content:space-between;font-size:5px;color:#888"><span>0</span><span style="color:#22c55e;font-weight:700">55.00</span><span>100</span></div>
+      </div>
+      <div style="font-size:14px;font-weight:800;color:#22c55e;margin-bottom:4px">72.41</div>
+      <div style="font-size:5px;color:#888">Win Chance: 45% • Multiplier: 2.18x</div>
+    </div>
+  `, '#0a0a0a', '#fff'),
+
+  'casino-scratch': base(`
+    <div style="padding:10px;background:#1a1a2e;text-align:center">
+      <div style="font-size:8px;font-weight:700;color:#fbbf24;margin-bottom:6px">🎫 SCRATCH & WIN</div>
+      <div style="background:linear-gradient(135deg,#c0a060,#d4a853);border-radius:8px;padding:8px;display:inline-block;margin-bottom:4px">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px">
+          ${['💎','⭐','💎','⭐','💎','🍒','💎','⭐','💎'].map((e,i) => `<div style="width:22px;height:22px;background:${i<5?'#ffffff20':'linear-gradient(135deg,#c8b080,#b09060)'};border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:10px">${i<5?e:''}</div>`).join('')}
+        </div>
+      </div>
+      <div style="font-size:6px;color:#22c55e;font-weight:700">3x 💎 = $500!</div>
+    </div>
+  `, '#1a1a2e', '#e2e8f0'),
+
+  'casino-bingo': base(`
+    <div style="padding:8px;background:#1a0030">
+      <div style="font-size:8px;font-weight:700;color:#ec4899;text-align:center;margin-bottom:4px">🎱 BINGO</div>
+      <div style="display:flex;gap:6px;justify-content:center">
+        <div><div style="display:grid;grid-template-columns:repeat(5,1fr);gap:1px">
+          <div style="grid-column:1/-1;display:grid;grid-template-columns:repeat(5,1fr);gap:1px">${['B','I','N','G','O'].map(l => `<div style="text-align:center;font-size:6px;font-weight:700;color:#ec4899;padding:1px">${l}</div>`).join('')}</div>
+          ${Array.from({length:25}).map((_,i) => {const n=i+1;const hit=[3,8,12,17,22].includes(n);return `<div style="width:14px;height:14px;font-size:5px;display:flex;align-items:center;justify-content:center;border-radius:2px;${hit?'background:#ec4899;color:#fff;font-weight:700':'background:#1a1a3e;color:#888'}">${n}</div>`}).join('')}
+        </div></div>
+        <div style="text-align:center"><div style="font-size:16px;margin-bottom:2px">🎱</div><div style="font-size:12px;font-weight:800;color:#fbbf24">42</div><div style="font-size:5px;color:#888">Called</div></div>
+      </div>
+    </div>
+  `, '#1a0030', '#e2e8f0'),
+
+  'casino-coin-flip': base(`
+    <div style="padding:12px;background:#0a0a0a;text-align:center">
+      <div style="font-size:7px;color:#888;margin-bottom:8px">COIN FLIP</div>
+      <div style="width:50px;height:50px;border-radius:50%;background:linear-gradient(135deg,#fbbf24,#f59e0b);margin:0 auto 8px;display:flex;align-items:center;justify-content:center;border:3px solid #d4a853;box-shadow:0 0 20px #fbbf2440"><span style="font-size:16px;font-weight:800;color:#7c2d12">H</span></div>
+      <div style="display:flex;gap:6px;justify-content:center"><div style="background:#3b82f6;padding:4px 12px;border-radius:4px;font-size:7px;font-weight:700;color:#fff">HEADS</div><div style="background:#ef4444;padding:4px 12px;border-radius:4px;font-size:7px;font-weight:700;color:#fff">TAILS</div></div>
+      <div style="font-size:5px;color:#888;margin-top:6px">Streak: 3 🔥 • Balance: $250</div>
+    </div>
+  `, '#0a0a0a', '#fff'),
+
+  'casino-lottery': base(`
+    <div style="padding:8px;background:#0a0a2e;text-align:center">
+      <div style="font-size:8px;font-weight:700;color:#fbbf24;margin-bottom:4px">🎰 MEGA LOTTERY</div>
+      <div style="font-size:14px;font-weight:800;color:#22c55e;margin-bottom:4px">$2,450,000</div>
+      <div style="font-size:5px;color:#888;margin-bottom:6px">Next draw in 04:32:18</div>
+      <div style="display:flex;gap:3px;justify-content:center;margin-bottom:6px">${[7,14,22,35,41,9].map((n,i) => `<div style="width:20px;height:20px;border-radius:50%;background:${i===5?'#fbbf24':'#3b82f6'};display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:700;color:#fff">${n}</div>`).join('')}</div>
+      <div style="background:#22c55e;padding:3px 14px;border-radius:4px;font-size:7px;font-weight:700;color:#000;display:inline-block">BUY TICKET — $5</div>
+    </div>
+  `, '#0a0a2e', '#e2e8f0'),
+
+  // ═══════════════════════════════════════════
+  // SOCIAL — Additional Previews
+  // ═══════════════════════════════════════════
+  'social-tiktok': base(`
+    <div style="height:200px;background:#000;position:relative">
+      <div style="position:absolute;inset:0;background:linear-gradient(180deg,transparent 60%,#00000090 100%)"></div>
+      <div style="position:absolute;top:8px;left:50%;transform:translateX(-50%);display:flex;gap:12px"><span style="font-size:7px;opacity:.5;color:#fff">Following</span><span style="font-size:7px;font-weight:700;color:#fff;border-bottom:1px solid #fff">For You</span></div>
+      <div style="position:absolute;right:8px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:10px;align-items:center">
+        <div style="width:18px;height:18px;border-radius:50%;background:#333"></div>
+        ${['❤️','💬','↗️','🎵'].map(e => `<div style="text-align:center"><div style="font-size:10px">${e}</div><div style="font-size:4px;color:#fff">12.3K</div></div>`).join('')}
+      </div>
+      <div style="position:absolute;bottom:8px;left:8px"><div style="font-size:7px;font-weight:700;color:#fff">@creator_name</div><div style="font-size:5px;color:#fff;opacity:.8;margin-top:2px">Check out this amazing video! 🔥 #viral</div><div style="font-size:5px;color:#fff;opacity:.6;margin-top:2px;display:flex;align-items:center;gap:2px">🎵 Original Sound — creator</div></div>
+    </div>
+  `, '#000', '#fff'),
+
+  'social-youtube': base(`
+    <div style="background:#0f0f0f">
+      <nav style="background:#0f0f0f;padding:4px 6px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #272727"><div style="display:flex;gap:4px;align-items:center"><span style="font-size:9px;font-weight:700;color:#ff0000">▶</span><span style="font-size:8px;font-weight:700;color:#fff">YouTube</span></div><div style="width:50px;height:12px;background:#121212;border:1px solid #333;border-radius:10px"></div></nav>
+      <div style="padding:6px;display:grid;grid-template-columns:repeat(2,1fr);gap:4px">
+        ${[1,2,3,4].map(i => `<div><div style="height:34px;background:#${['272727','1a1a2e','2a1a0a','0a2a1a'][i-1]};border-radius:4px;position:relative"><div style="position:absolute;bottom:2px;right:2px;background:#000;padding:0 2px;border-radius:1px;font-size:4px;color:#fff">${[3,12,8,5][i-1]}:${[42,8,15,30][i-1]}${i>1?'':''}</div></div><div style="display:flex;gap:3px;margin-top:3px"><div style="width:12px;height:12px;border-radius:50%;background:#333;flex-shrink:0"></div><div><div style="font-size:5px;color:#fff;font-weight:600">Video Title ${i}</div><div style="font-size:4px;color:#aaa">Channel • ${i}K views</div></div></div></div>`).join('')}
+      </div>
+    </div>
+  `, '#0f0f0f', '#fff'),
+
+  'social-discord': base(`
+    <div style="display:flex;height:200px">
+      <div style="width:22px;background:#1e1f22;padding:4px 2px;display:flex;flex-direction:column;gap:4px;align-items:center">
+        ${['🎮','🎵','💻','🌐'].map(e => `<div style="width:16px;height:16px;border-radius:8px;background:#5865f2;display:flex;align-items:center;justify-content:center;font-size:7px">${e}</div>`).join('')}
+      </div>
+      <div style="width:50px;background:#2b2d31;padding:4px">
+        <div style="font-size:6px;font-weight:700;color:#fff;margin-bottom:4px">Server</div>
+        <div style="font-size:5px;color:#949ba4;margin-bottom:2px">TEXT CHANNELS</div>
+        ${['# general','# memes','# dev'].map((c,i) => `<div style="font-size:5px;padding:2px;border-radius:2px;${i===0?'background:#35373c;color:#fff':'color:#949ba4'}">${c}</div>`).join('')}
+      </div>
+      <div style="flex:1;background:#313338;padding:4px;display:flex;flex-direction:column">
+        <div style="flex:1;overflow:hidden">
+          ${[{u:'Alice',c:'Hey everyone! 👋',cl:'#e74c3c'},{u:'Bob',c:'Working on the new feature',cl:'#3498db'}].map(m => `<div style="display:flex;gap:3px;margin-bottom:4px"><div style="width:12px;height:12px;border-radius:50%;background:${m.cl};flex-shrink:0"></div><div><span style="font-size:5px;font-weight:600;color:${m.cl}">${m.u}</span><div style="font-size:5px;color:#dbdee1">${m.c}</div></div></div>`).join('')}
+        </div>
+        <div style="height:14px;background:#383a40;border-radius:4px"></div>
+      </div>
+    </div>
+  `, '#1e1f22', '#dbdee1'),
+
+  'social-whatsapp': base(`
+    <div style="display:flex;height:200px">
+      <div style="width:60px;background:#111b21;border-right:1px solid #222d34;padding:4px">
+        <div style="height:12px;background:#222d34;border-radius:6px;margin-bottom:4px"></div>
+        ${[{n:'Mom',m:'See you tomorrow! ❤️',t:'10:30'},{n:'Work Group',m:'Meeting at 3pm',t:'09:45'},{n:'John',m:'Thanks!',t:'Yesterday'}].map((c,i) => `<div style="display:flex;gap:3px;padding:3px 0;border-bottom:1px solid #222d34;${i===0?'background:#222d3440':''}"><div style="width:14px;height:14px;border-radius:50%;background:#2a3942;flex-shrink:0"></div><div style="flex:1;min-width:0"><div style="display:flex;justify-content:space-between"><span style="font-size:5px;color:#e9edef;font-weight:600">${c.n}</span><span style="font-size:4px;color:#8696a0">${c.t}</span></div><div style="font-size:4px;color:#8696a0;white-space:nowrap;overflow:hidden">${c.m}</div></div></div>`).join('')}
+      </div>
+      <div style="flex:1;background:#0b141a;display:flex;flex-direction:column">
+        <div style="background:#202c33;padding:4px 6px;display:flex;align-items:center;gap:4px"><div style="width:14px;height:14px;border-radius:50%;background:#2a3942"></div><span style="font-size:6px;color:#e9edef;font-weight:600">Mom</span></div>
+        <div style="flex:1;padding:6px">
+          <div style="background:#005c4b;padding:4px 6px;border-radius:4px 4px 0 4px;font-size:5px;color:#e9edef;max-width:70%;margin-left:auto;margin-bottom:3px">Hi mom! Coming for dinner 🍕<span style="font-size:3px;color:#8696a0;margin-left:4px">10:28 ✓✓</span></div>
+          <div style="background:#202c33;padding:4px 6px;border-radius:4px 4px 4px 0;font-size:5px;color:#e9edef;max-width:70%;margin-bottom:3px">See you tomorrow! ❤️<span style="font-size:3px;color:#8696a0;margin-left:4px">10:30</span></div>
+        </div>
+        <div style="background:#202c33;padding:4px 6px;display:flex;gap:3px"><div style="flex:1;height:14px;background:#2a3942;border-radius:10px"></div><div style="width:14px;height:14px;border-radius:50%;background:#00a884;display:flex;align-items:center;justify-content:center;font-size:6px">🎤</div></div>
+      </div>
+    </div>
+  `, '#0b141a', '#e9edef'),
+
+  'social-reddit': base(`
+    <div style="background:#1a1a1b">
+      <nav style="background:#1a1a1b;padding:3px 6px;border-bottom:1px solid #343536;display:flex;align-items:center;gap:6px"><span style="font-size:9px;font-weight:700;color:#ff4500">reddit</span><div style="flex:1;height:12px;background:#272729;border:1px solid #343536;border-radius:4px"></div></nav>
+      <div style="padding:4px">
+        ${[{t:'TIL that bees can recognize human faces',v:12400,c:342,s:'r/todayilearned'},{t:'My cat doing something weird again',v:8900,c:156,s:'r/cats'}].map(p => `<div style="background:#1a1a1b;border:1px solid #343536;border-radius:4px;padding:4px;margin-bottom:3px;display:flex;gap:4px"><div style="display:flex;flex-direction:column;align-items:center;gap:1px"><div style="font-size:6px;color:#ff4500">▲</div><div style="font-size:6px;font-weight:600;color:#d7dadc">${(p.v/1000).toFixed(1)}k</div><div style="font-size:6px;color:#818384">▼</div></div><div><div style="font-size:4px;color:#818384">${p.s} • 5h</div><div style="font-size:6px;color:#d7dadc;font-weight:600;margin:1px 0">${p.t}</div><div style="font-size:4px;color:#818384">💬 ${p.c} comments</div></div></div>`).join('')}
+      </div>
+    </div>
+  `, '#1a1a1b', '#d7dadc'),
+
+  'social-telegram': base(`
+    <div style="display:flex;height:200px">
+      <div style="width:60px;background:#17212b;border-right:1px solid #0e1621;padding:4px">
+        <div style="height:12px;background:#242f3d;border-radius:6px;margin-bottom:4px"></div>
+        ${[{n:'Crypto News',e:'📰',m:'BTC hits $70K!',b:'42'},{n:'Dev Team',e:'👥',m:'Deploy ready',b:''},{n:'Alice',e:'👩',m:'See the docs',b:'3'}].map(c => `<div style="display:flex;gap:3px;padding:3px 0;align-items:center"><div style="width:14px;height:14px;border-radius:50%;background:#5288c1;display:flex;align-items:center;justify-content:center;font-size:6px">${c.e}</div><div style="flex:1;min-width:0"><div style="font-size:5px;color:#fff;font-weight:600">${c.n}</div><div style="font-size:4px;color:#6c7883">${c.m}</div></div>${c.b?`<div style="background:#5288c1;border-radius:6px;padding:0 3px;font-size:4px;color:#fff">${c.b}</div>`:''}</div>`).join('')}
+      </div>
+      <div style="flex:1;background:#0e1621;display:flex;flex-direction:column">
+        <div style="background:#17212b;padding:4px 6px"><span style="font-size:6px;color:#fff;font-weight:600">Crypto News</span><div style="font-size:4px;color:#6c7883">1.2K subscribers</div></div>
+        <div style="flex:1;padding:6px">
+          <div style="background:#182533;padding:4px 6px;border-radius:4px;margin-bottom:3px"><div style="font-size:5px;color:#fff">🚀 Bitcoin breaks $70K! New ATH</div><div style="font-size:3px;color:#6c7883;margin-top:1px">12:30 • 👁 2.4K</div></div>
+        </div>
+        <div style="background:#17212b;padding:4px 6px;display:flex;gap:3px"><div style="flex:1;height:14px;background:#242f3d;border-radius:10px"></div></div>
+      </div>
+    </div>
+  `, '#0e1621', '#fff'),
+
+  'social-spotify': base(`
+    <div style="display:flex;height:200px;background:#000">
+      <div style="width:50px;background:#000;padding:6px 4px;border-right:1px solid #282828">
+        <div style="font-size:8px;color:#1db954;font-weight:700;margin-bottom:6px">●</div>
+        ${['🏠','🔍','📚'].map(e => `<div style="font-size:8px;margin:6px 0;text-align:center">${e}</div>`).join('')}
+        <div style="font-size:5px;color:#b3b3b3;margin-top:8px">Playlists</div>
+        ${['Liked Songs','Chill Vibes','Workout'].map(p => `<div style="font-size:4px;color:#b3b3b3;padding:2px 0">${p}</div>`).join('')}
+      </div>
+      <div style="flex:1;background:#121212;padding:6px">
+        <div style="font-size:8px;font-weight:700;color:#fff;margin-bottom:6px">Good evening</div>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:3px">
+          ${['Liked Songs','Daily Mix 1','Release Radar','Chill Hits'].map((t,i) => `<div style="display:flex;align-items:center;gap:3px;background:#2a2a2a;border-radius:3px;overflow:hidden;height:22px"><div style="width:22px;height:22px;background:${['linear-gradient(135deg,#4c1d95,#7c3aed)','#1a3a1a','#2a1a3a','#1a2a3a'][i]};flex-shrink:0"></div><span style="font-size:5px;color:#fff;font-weight:600">${t}</span></div>`).join('')}
+        </div>
+      </div>
+    </div>
+  `, '#000', '#fff'),
+
+  'social-linkedin': base(`
+    <div style="background:#000">
+      <nav style="background:#1b1f23;padding:3px 8px;display:flex;align-items:center;gap:6px"><span style="font-size:10px;font-weight:700;color:#0a66c2">in</span><div style="flex:1;height:12px;background:#38434f;border-radius:3px"></div>${['🏠','👥','💼','💬','🔔'].map(e => `<span style="font-size:7px">${e}</span>`).join('')}</nav>
+      <div style="display:flex;gap:4px;padding:6px">
+        <div style="width:50px;background:#1b1f23;border-radius:4px;padding:6px;text-align:center"><div style="width:24px;height:24px;border-radius:50%;background:#38434f;margin:0 auto 3px"></div><div style="font-size:5px;color:#fff;font-weight:600">John Doe</div><div style="font-size:4px;color:#ffffffb3">Software Eng</div></div>
+        <div style="flex:1">
+          <div style="background:#1b1f23;border-radius:4px;padding:4px;margin-bottom:3px"><div style="display:flex;gap:3px;margin-bottom:3px"><div style="width:14px;height:14px;border-radius:50%;background:#38434f"></div><div><div style="font-size:5px;color:#fff;font-weight:600">Jane Smith</div><div style="font-size:4px;color:#ffffffb3">PM at Google • 2h</div></div></div><div style="font-size:5px;color:#ffffffb3">Excited to share that I've joined...</div><div style="display:flex;gap:8px;margin-top:3px;border-top:1px solid #38434f;padding-top:2px"><span style="font-size:4px;color:#ffffffb3">👍 Like</span><span style="font-size:4px;color:#ffffffb3">💬 Comment</span></div></div>
+        </div>
+      </div>
+    </div>
+  `, '#000', '#fff'),
+
+  'social-pinterest': base(`
+    <div style="background:#fff;padding:4px">
+      <nav style="display:flex;align-items:center;gap:4px;margin-bottom:6px;padding:2px 0"><div style="width:14px;height:14px;border-radius:50%;background:#e60023;display:flex;align-items:center;justify-content:center;font-size:7px;color:#fff;font-weight:700">P</div><div style="flex:1;height:14px;background:#efefef;border-radius:20px"></div></nav>
+      <div style="columns:3;gap:3px">
+        ${[{h:50,c:'#fde68a'},{h:70,c:'#c4b5fd'},{h:40,c:'#fca5a5'},{h:60,c:'#86efac'},{h:45,c:'#93c5fd'},{h:55,c:'#fda4af'}].map(p => `<div style="break-inside:avoid;margin-bottom:3px"><div style="height:${p.h}px;background:${p.c};border-radius:6px;margin-bottom:1px"></div><div style="font-size:4px;color:#333;font-weight:500">Pin title</div></div>`).join('')}
+      </div>
+    </div>
+  `, '#fff', '#333'),
+
+  'social-snapchat': base(`
+    <div style="height:200px;background:#000;position:relative">
+      <div style="position:absolute;inset:0;background:linear-gradient(180deg,#333 0%,#1a1a1a 100%)"></div>
+      <div style="position:absolute;top:6px;left:6px;display:flex;gap:4px"><div style="width:14px;height:14px;border-radius:50%;background:#fffc00;display:flex;align-items:center;justify-content:center;font-size:7px">👻</div></div>
+      <div style="position:absolute;top:6px;right:6px;display:flex;gap:4px">${['🔍','👤'].map(e => `<span style="font-size:10px">${e}</span>`).join('')}</div>
+      <div style="position:absolute;bottom:40px;left:50%;transform:translateX(-50%);width:36px;height:36px;border-radius:50%;border:3px solid #fff"></div>
+      <div style="position:absolute;bottom:8px;display:flex;justify-content:space-around;width:100%;padding:0 20px">
+        ${['🗺','💬','📷','📖','🎯'].map((e,i) => `<span style="font-size:10px;${i===2?'opacity:0':''}">${e}</span>`).join('')}
+      </div>
+    </div>
+  `, '#000', '#fff'),
+
+  // ═══════════════════════════════════════════
+  // CRYPTO & BANK — Additional Previews
+  // ═══════════════════════════════════════════
+  'crypto-portfolio': base(`
+    <div style="padding:8px">
+      <div style="font-size:8px;font-weight:600;margin-bottom:6px">📊 Crypto Portfolio</div>
+      <div style="background:linear-gradient(135deg,#1e293b,#334155);border-radius:8px;padding:8px;margin-bottom:6px;text-align:center">
+        <div style="font-size:5px;opacity:.5">Total Value</div>
+        <div style="font-size:16px;font-weight:800">$142,580</div>
+        <div style="font-size:6px;color:#22c55e">↑ +$3,240 (2.3%)</div>
+      </div>
+      <div style="display:flex;gap:3px;margin-bottom:4px">
+        <div style="flex:3;height:8px;background:#f7931a;border-radius:2px 0 0 2px"></div>
+        <div style="flex:2;height:8px;background:#627eea"></div>
+        <div style="flex:1;height:8px;background:#9945ff"></div>
+        <div style="flex:1;height:8px;background:#26a17b;border-radius:0 2px 2px 0"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:4px;color:#888"><span>BTC 45%</span><span>ETH 28%</span><span>SOL 14%</span><span>USDT 13%</span></div>
+    </div>
+  `),
+
+  'crypto-nft': base(`
+    <div style="padding:8px;background:#0a0a0a">
+      <div style="font-size:8px;font-weight:700;color:#fff;margin-bottom:6px">🖼 NFT Marketplace</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px">
+        ${[{c:'linear-gradient(135deg,#f43f5e,#8b5cf6)',p:'2.5 ETH'},{c:'linear-gradient(135deg,#06b6d4,#3b82f6)',p:'1.2 ETH'},{c:'linear-gradient(135deg,#f59e0b,#ef4444)',p:'0.8 ETH'}].map(n => `<div style="border-radius:6px;overflow:hidden;background:#111"><div style="height:40px;background:${n.c}"></div><div style="padding:3px"><div style="font-size:5px;color:#fff;font-weight:600">NFT #${Math.floor(Math.random()*9999)}</div><div style="font-size:5px;color:#8b5cf6;font-weight:600">${n.p}</div></div></div>`).join('')}
+      </div>
+    </div>
+  `, '#0a0a0a', '#fff'),
+
+  'crypto-staking': base(`
+    <div style="padding:10px;background:linear-gradient(135deg,#0f0720,#1a0a3e)">
+      <div style="font-size:8px;font-weight:700;color:#a855f7;margin-bottom:6px">💰 Staking Dashboard</div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:4px;margin-bottom:6px">
+        ${[{t:'Staked',v:'32.5 ETH',c:'#627eea'},{t:'APY',v:'5.2%',c:'#22c55e'},{t:'Rewards',v:'1.69 ETH',c:'#f59e0b'},{t:'Time',v:'142 days',c:'#8b5cf6'}].map(s => `<div style="background:#ffffff08;border:1px solid #ffffff10;border-radius:6px;padding:6px"><div style="font-size:4px;color:#888">${s.t}</div><div style="font-size:9px;font-weight:700;color:${s.c}">${s.v}</div></div>`).join('')}
+      </div>
+      <div style="background:#a855f7;text-align:center;padding:4px;border-radius:4px;font-size:6px;font-weight:600;color:#fff">Stake More</div>
+    </div>
+  `, '#0f0720', '#e2e8f0'),
+
+  'bank-digital': base(`
+    <div style="padding:10px;background:#050505">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-size:9px;font-weight:700;color:#fff">DigiBank</span><div style="width:16px;height:16px;border-radius:50%;background:#333"></div></div>
+      <div style="background:linear-gradient(135deg,#1a1a2e,#2d1b4e);border-radius:8px;padding:8px;margin-bottom:8px"><div style="font-size:5px;color:#888">Checking Account</div><div style="font-size:14px;font-weight:800;color:#fff">$12,458.90</div><div style="display:flex;gap:4px;margin-top:4px"><span style="font-size:5px;color:#888">•••• 4242</span></div></div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:3px;margin-bottom:6px">${['Send','Request','Pay','More'].map((a,i) => `<div style="text-align:center;background:#111;border-radius:6px;padding:4px"><div style="font-size:10px">${['💸','📥','📱','⋯'][i]}</div><div style="font-size:4px;color:#888;margin-top:1px">${a}</div></div>`).join('')}</div>
+      <div style="font-size:6px;color:#888;margin-bottom:3px">Transactions</div>
+      ${[{n:'Amazon',a:'-$42.99',e:'🛒'},{n:'Direct Deposit',a:'+$2,800',e:'💰'}].map(t => `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid #111"><div style="display:flex;gap:3px;align-items:center"><span style="font-size:8px">${t.e}</span><span style="font-size:5px;color:#fff">${t.n}</span></div><span style="font-size:5px;font-weight:600;color:${t.a.startsWith('+')?'#22c55e':'#ef4444'}">${t.a}</span></div>`).join('')}
+    </div>
+  `, '#050505', '#fff'),
+
+  'bank-crypto': base(`
+    <div style="padding:8px;background:linear-gradient(180deg,#0a0a1a,#0f172a)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-size:9px;font-weight:700;color:#fbbf24">₿ CryptoBank</span><div style="font-size:5px;color:#22c55e">● Online</div></div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:3px;margin-bottom:6px">
+        <div style="background:#111827;border-radius:6px;padding:6px"><div style="font-size:4px;color:#888">Fiat Balance</div><div style="font-size:10px;font-weight:800;color:#fff">$8,240</div></div>
+        <div style="background:#111827;border-radius:6px;padding:6px"><div style="font-size:4px;color:#888">Crypto Value</div><div style="font-size:10px;font-weight:800;color:#fbbf24">$34,120</div></div>
+      </div>
+      <div style="display:flex;gap:3px;margin-bottom:6px">${['Buy','Sell','Swap','Earn'].map((a,i) => `<div style="flex:1;text-align:center;padding:3px;background:${i===0?'#22c55e':'#111827'};border-radius:4px;font-size:5px;font-weight:600;color:${i===0?'#000':'#fff'}">${a}</div>`).join('')}</div>
+      ${[{n:'Bitcoin',s:'BTC',v:'0.42 BTC',p:'$28,140',c:'+2.1%'},{n:'Ethereum',s:'ETH',v:'2.8 ETH',p:'$5,980',c:'+4.3%'}].map(a => `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid #111827"><div style="display:flex;gap:3px;align-items:center"><div style="width:12px;height:12px;border-radius:50%;background:${a.s==='BTC'?'#f7931a':'#627eea'}"></div><div><div style="font-size:5px;color:#fff">${a.n}</div><div style="font-size:4px;color:#888">${a.v}</div></div></div><div style="text-align:right"><div style="font-size:5px;color:#fff">${a.p}</div><div style="font-size:4px;color:#22c55e">${a.c}</div></div></div>`).join('')}
+    </div>
+  `, '#0a0a1a', '#fff'),
+
+  'bank-neobank': base(`
+    <div style="padding:10px;background:#000;text-align:center">
+      <div style="font-size:10px;font-weight:800;background:linear-gradient(135deg,#8b5cf6,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px">NeoBank</div>
+      <div style="width:80px;height:50px;background:linear-gradient(135deg,#8b5cf6,#3b82f6);border-radius:8px;margin:0 auto 8px;padding:6px;position:relative"><div style="font-size:4px;color:#fff;opacity:.7;text-align:left">NeoBank</div><div style="position:absolute;bottom:6px;left:6px;font-size:6px;color:#fff;letter-spacing:2px">•••• 8834</div><div style="position:absolute;bottom:6px;right:6px;font-size:5px;color:#fff;opacity:.7">VISA</div></div>
+      <div style="font-size:5px;color:#888;margin-bottom:2px">Available Balance</div>
+      <div style="font-size:18px;font-weight:800;color:#fff">$24,850</div>
+      <div style="display:flex;gap:4px;justify-content:center;margin-top:6px">${['Send','Request','Top Up'].map((a,i) => `<div style="padding:3px 8px;background:${i===0?'linear-gradient(135deg,#8b5cf6,#3b82f6)':'#111'};border-radius:4px;font-size:5px;font-weight:600;color:#fff">${a}</div>`).join('')}</div>
+    </div>
+  `, '#000', '#fff'),
 }
