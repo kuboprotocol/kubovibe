@@ -115,8 +115,50 @@ serve(async (req) => {
 
     const fullMessages = [{ role: "system", content: SYSTEM_PROMPT }, ...messages];
 
+    // PRIMARY: OpenRouter
+    if (OPENROUTER_API_KEY) {
+      console.log("Trying OpenRouter (primary)...");
+      let maxTokens = OPENROUTER_DEFAULT_MAX_TOKENS;
+      let orResponse = await callOpenRouter(OPENROUTER_API_KEY, fullMessages, maxTokens);
+
+      if (!orResponse.ok && orResponse.status === 402) {
+        const errorText = await orResponse.text().catch(() => "Unknown error");
+        console.warn("OpenRouter 402 on first attempt:", errorText);
+
+        const affordableTokens = parseAffordableTokens(errorText);
+        if (
+          affordableTokens &&
+          Number.isFinite(affordableTokens) &&
+          affordableTokens >= OPENROUTER_MIN_MAX_TOKENS &&
+          affordableTokens < maxTokens
+        ) {
+          maxTokens = affordableTokens;
+          console.log(`Retrying OpenRouter with reduced max_tokens=${maxTokens}...`);
+          orResponse = await callOpenRouter(OPENROUTER_API_KEY, fullMessages, maxTokens);
+        }
+      }
+
+      if (orResponse.ok) {
+        console.log("Using OpenRouter ✓");
+        return new Response(orResponse.body, {
+          headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+        });
+      }
+
+      const orError = await orResponse.text().catch(() => "Unknown error");
+      console.warn("OpenRouter failed:", orResponse.status, orError);
+
+      if (orResponse.status !== 402 && orResponse.status !== 429) {
+        // Non-recoverable OpenRouter error, fall through to Lovable AI
+        console.log("Falling back to Lovable AI Gateway...");
+      } else {
+        console.log("OpenRouter rate/credit limit, falling back to Lovable AI...");
+      }
+    }
+
+    // FALLBACK: Lovable AI Gateway
     if (LOVABLE_API_KEY) {
-      console.log("Trying Lovable AI Gateway...");
+      console.log("Trying Lovable AI Gateway (fallback)...");
       try {
         const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
           method: "POST",
@@ -139,66 +181,13 @@ serve(async (req) => {
         }
 
         const errorText = await response.text().catch(() => "Unknown error");
-        console.warn("Lovable AI failed:", response.status, errorText);
-
-        if (response.status !== 402 && response.status !== 429) {
-          return jsonResponse(503, "AI service temporarily unavailable. Please try again.");
-        }
-
-        console.log("Falling back to OpenRouter...");
+        console.error("Lovable AI also failed:", response.status, errorText);
       } catch (lovableError) {
         console.error("Lovable AI Gateway fetch error:", lovableError);
-        console.log("Falling back to OpenRouter...");
       }
     }
 
-    if (!OPENROUTER_API_KEY) {
-      console.error("No OPENROUTER_API_KEY configured for fallback");
-      return jsonResponse(500, "AI service not configured. Please contact support.");
-    }
-
-    console.log("Using OpenRouter fallback...");
-    let maxTokens = OPENROUTER_DEFAULT_MAX_TOKENS;
-    let fallbackResponse = await callOpenRouter(OPENROUTER_API_KEY, fullMessages, maxTokens);
-
-    if (!fallbackResponse.ok && fallbackResponse.status === 402) {
-      const errorText = await fallbackResponse.text().catch(() => "Unknown error");
-      console.warn("OpenRouter 402 on first attempt:", errorText);
-
-      const affordableTokens = parseAffordableTokens(errorText);
-      if (
-        affordableTokens &&
-        Number.isFinite(affordableTokens) &&
-        affordableTokens >= OPENROUTER_MIN_MAX_TOKENS &&
-        affordableTokens < maxTokens
-      ) {
-        maxTokens = affordableTokens;
-        console.log(`Retrying OpenRouter with reduced max_tokens=${maxTokens}...`);
-        fallbackResponse = await callOpenRouter(OPENROUTER_API_KEY, fullMessages, maxTokens);
-      } else {
-        return jsonResponse(402, "Serviço de IA sem créditos suficientes. Tente um prompt menor ou adicione créditos.");
-      }
-    }
-
-    if (!fallbackResponse.ok) {
-      const errorText = await fallbackResponse.text().catch(() => "Unknown error");
-      console.error("OpenRouter error:", fallbackResponse.status, errorText);
-
-      if (fallbackResponse.status === 402) {
-        return jsonResponse(402, "Serviço de IA sem créditos suficientes. Tente um prompt menor ou adicione créditos.");
-      }
-
-      if (fallbackResponse.status === 429) {
-        return jsonResponse(429, "Muitas requisições agora. Aguarde alguns segundos e tente novamente.");
-      }
-
-      return jsonResponse(503, `AI service error (${fallbackResponse.status}). Please try again later.`);
-    }
-
-    console.log("Using OpenRouter ✓");
-    return new Response(fallbackResponse.body, {
-      headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
-    });
+    return jsonResponse(503, "Nenhum serviço de IA disponível no momento. Tente novamente mais tarde.");
   } catch (e) {
     console.error("generate-code error:", e);
     return jsonResponse(500, "Something went wrong. Please try again.");
