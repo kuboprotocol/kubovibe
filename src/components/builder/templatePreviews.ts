@@ -1013,4 +1013,1307 @@ export const templatePreviews: Record<string, string> = {
       <div style="display:flex;gap:4px;justify-content:center;margin-top:6px">${['Send','Request','Top Up'].map((a,i) => `<div style="padding:3px 8px;background:${i===0?'linear-gradient(135deg,#8b5cf6,#3b82f6)':'#111'};border-radius:4px;font-size:5px;font-weight:600;color:#fff">${a}</div>`).join('')}</div>
     </div>
   `, '#000', '#fff'),
+
+  // ═══════════════════════════════════════════
+  // LANDING PAGES — Additional Previews
+  // ═══════════════════════════════════════════
+  'landing-saas-ai': base(`
+    <div style="padding:12px;background:#0a0a1a">
+      <nav style="display:flex;justify-content:space-between;margin-bottom:10px"><span style="font-size:9px;font-weight:700;background:linear-gradient(135deg,#06b6d4,#a855f7);-webkit-background-clip:text;-webkit-text-fill-color:transparent">AI Studio</span><div style="background:#06b6d4;padding:2px 6px;border-radius:4px;font-size:6px;color:#000">Try Free</div></nav>
+      <div style="text-align:center;padding:6px 0"><div style="font-size:14px;font-weight:800;color:#fff">AI That <span style="color:#06b6d4">Thinks</span></div><div style="font-size:6px;color:#888;margin-top:4px">Powered by next-gen intelligence</div></div>
+      <div style="background:#111;border:1px solid #06b6d420;border-radius:6px;padding:6px;margin-top:6px"><div style="font-size:5px;color:#06b6d4;margin-bottom:2px">✨ Try it</div><div style="height:4px;background:#1e293b;border-radius:2px;overflow:hidden"><div style="width:60%;height:100%;background:linear-gradient(90deg,#06b6d4,#a855f7)"></div></div></div>
+    </div>
+  `, '#0a0a1a', '#fff'),
+
+  'landing-restaurant': base(`
+    <div style="padding:12px;background:#0a0a0a">
+      <div style="text-align:center;margin-bottom:8px"><span style="font-size:12px;font-weight:300;letter-spacing:3px;color:#d4a853">RESTAURANT</span></div>
+      <div style="height:40px;background:linear-gradient(135deg,#7c2d12,#451a03);border-radius:6px;display:flex;align-items:center;justify-content:center;margin-bottom:6px"><span style="font-size:7px;color:#d4a853;font-weight:600">🍽️ Reserve a Table</span></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px">${['🥩 Mains','🍰 Desserts','🍷 Drinks'].map(m => `<div style="background:#111;border:1px solid #222;border-radius:3px;padding:4px;text-align:center;font-size:5px;color:#d4a853">${m}</div>`).join('')}</div>
+    </div>
+  `, '#0a0a0a', '#fff'),
+
+  'landing-fitness': base(`
+    <div style="padding:12px;background:#0a0a0a">
+      <div style="font-size:14px;font-weight:800;color:#fff;text-align:center">TRANSFORM<br><span style="color:#ef4444">YOUR BODY</span></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px;margin-top:8px">${['$29 Basic','$49 Pro','$79 VIP'].map((p,i) => `<div style="background:#111;border:1px solid ${i===1?'#ef4444':'#222'};border-radius:4px;padding:5px;text-align:center"><div style="font-size:7px;font-weight:700;color:${i===1?'#ef4444':'#888'}">${p.split(' ')[0]}</div><div style="font-size:5px;color:#666">${p.split(' ')[1]}</div></div>`).join('')}</div>
+    </div>
+  `, '#0a0a0a', '#fff'),
+
+  'landing-real-estate': base(`
+    <div style="padding:12px">
+      <div style="font-size:12px;font-weight:700;margin-bottom:6px">Find Your <span style="color:#3b82f6">Home</span></div>
+      <div style="display:flex;gap:3px;margin-bottom:8px"><div style="flex:1;height:14px;background:#1e293b;border-radius:4px"></div><div style="background:#3b82f6;padding:2px 8px;border-radius:4px;font-size:6px;color:#fff">Search</div></div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:4px">${[1,2].map(i => `<div style="background:#1e293b;border-radius:4px;overflow:hidden"><div style="height:28px;background:linear-gradient(${i*90}deg,#1e293b,#334155)"></div><div style="padding:4px"><div style="font-size:8px;font-weight:700;color:#3b82f6">$${i*250}K</div><div style="font-size:5px;opacity:.5">${i+1} bed · ${i} bath</div></div></div>`).join('')}</div>
+    </div>
+  `),
+
+  'landing-wedding': base(`
+    <div style="padding:16px;background:#faf5ef;text-align:center">
+      <div style="font-size:14px;font-weight:300;font-style:italic;color:#8b6f47">Emma & James</div>
+      <div style="font-size:7px;color:#b89a6a;margin:4px 0">June 15, 2025 · Tuscany</div>
+      <div style="display:flex;gap:4px;justify-content:center;margin:8px 0">${['120','06','30','45'].map((v,i) => `<div style="background:#fff;border:1px solid #e0d5c5;border-radius:4px;padding:4px 6px"><div style="font-size:10px;font-weight:700;color:#8b6f47">${v}</div><div style="font-size:4px;color:#b89a6a">${['DAYS','HRS','MIN','SEC'][i]}</div></div>`).join('')}</div>
+      <div style="background:#8b6f47;color:#fff;padding:3px 12px;border-radius:4px;font-size:6px;display:inline-block">RSVP</div>
+    </div>
+  `, '#faf5ef', '#333'),
+
+  'landing-education': base(`
+    <div style="padding:12px">
+      <div style="font-size:12px;font-weight:700">Learn to <span style="color:#3b82f6">Code</span></div>
+      <div style="font-size:6px;opacity:.5;margin:4px 0">Master web development in 12 weeks</div>
+      <div style="background:#1e293b;border-radius:6px;padding:6px;margin-top:6px">${['✅ HTML/CSS','✅ JavaScript','✅ React','⬜ Node.js'].map(m => `<div style="font-size:5px;padding:2px 0;border-bottom:1px solid #0f172a">${m}</div>`).join('')}</div>
+      <div style="background:#3b82f6;text-align:center;padding:4px;border-radius:4px;font-size:7px;font-weight:600;color:#fff;margin-top:6px">Enroll Now — $499</div>
+    </div>
+  `),
+
+  'landing-event': base(`
+    <div style="padding:12px;background:#0a0a1a">
+      <div style="text-align:center"><div style="font-size:14px;font-weight:800;color:#fff">TECH<span style="color:#8b5cf6">CONF</span> 2025</div><div style="font-size:6px;color:#888;margin:4px 0">March 15-17 · San Francisco</div></div>
+      <div style="display:flex;gap:3px;justify-content:center;margin:8px 0">${[1,2,3].map(() => `<div style="width:24px;height:24px;border-radius:50%;background:#1e293b;border:1px solid #334155"></div>`).join('')}</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px">${['$99 Early','$149 Regular','$299 VIP'].map((t,i) => `<div style="background:#111;border:1px solid ${i===2?'#8b5cf6':'#222'};border-radius:4px;padding:4px;text-align:center;font-size:5px;color:${i===2?'#8b5cf6':'#888'}">${t}</div>`).join('')}</div>
+    </div>
+  `, '#0a0a1a', '#fff'),
+
+  'landing-nft': base(`
+    <div style="padding:12px;background:#0a0a14">
+      <div style="text-align:center;font-size:10px;font-weight:700;color:#a855f7;margin-bottom:6px">🎨 CryptoApes</div>
+      <div style="height:50px;background:linear-gradient(135deg,#7c3aed,#ec4899);border-radius:8px;margin-bottom:6px;display:flex;align-items:center;justify-content:center;font-size:18px">🐵</div>
+      <div style="display:flex;gap:6px;justify-content:center;font-size:6px;margin-bottom:6px">${[['10K','Items'],['2.1K','Owners'],['0.5','Floor']].map(([v,l]) => `<div style="text-align:center"><div style="font-weight:700;color:#fff">${v}</div><div style="color:#888">${l}</div></div>`).join('')}</div>
+      <div style="background:#a855f7;text-align:center;padding:4px;border-radius:4px;font-size:7px;font-weight:600;color:#fff">MINT NOW</div>
+    </div>
+  `, '#0a0a14', '#fff'),
+
+  'landing-crypto-ico': base(`
+    <div style="padding:12px;background:#050510">
+      <div style="text-align:center;font-size:10px;font-weight:700;color:#fbbf24;margin-bottom:6px">🪙 TOKEN SALE</div>
+      <div style="background:#111;border:1px solid #fbbf2430;border-radius:6px;padding:6px;margin-bottom:6px"><div style="font-size:5px;color:#888;margin-bottom:2px">Progress: 68%</div><div style="height:6px;background:#1a1a2e;border-radius:3px;overflow:hidden"><div style="width:68%;height:100%;background:linear-gradient(90deg,#fbbf24,#f59e0b)"></div></div><div style="display:flex;justify-content:space-between;font-size:5px;color:#888;margin-top:2px"><span>$6.8M raised</span><span>$10M goal</span></div></div>
+    </div>
+  `, '#050510', '#fff'),
+
+  'landing-podcast': base(`
+    <div style="padding:12px;background:#0a0a0a">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><div style="width:36px;height:36px;background:linear-gradient(135deg,#22c55e,#16a34a);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px">🎙️</div><div><div style="font-size:10px;font-weight:700;color:#fff">The Daily Pod</div><div style="font-size:5px;color:#888">Tech & Culture</div></div></div>
+      ${[1,2].map(i => `<div style="display:flex;gap:4px;padding:4px 0;border-bottom:1px solid #1a1a1a;align-items:center"><div style="font-size:8px">▶️</div><div style="flex:1"><div style="font-size:6px;font-weight:600;color:#fff">Episode ${i+10}</div><div style="font-size:5px;color:#888">42 min</div></div></div>`).join('')}
+    </div>
+  `, '#0a0a0a', '#fff'),
+
+  'landing-saas-crm': base(`
+    <div style="padding:12px">
+      <div style="font-size:12px;font-weight:700">Manage Clients <span style="color:#3b82f6">Smarter</span></div>
+      <div style="height:40px;background:#1e293b;border-radius:6px;margin:8px 0;border:1px solid #334155;display:flex;align-items:center;justify-content:center;font-size:6px;opacity:.4">Dashboard Preview</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px">${['$9/mo','$29/mo','Custom'].map((p,i) => `<div style="background:#1e293b;border:1px solid ${i===1?'#3b82f6':'#334155'};border-radius:4px;padding:4px;text-align:center;font-size:6px;${i===1?'color:#3b82f6':'opacity:.6'}">${p}</div>`).join('')}</div>
+    </div>
+  `),
+
+  'landing-vpn': base(`
+    <div style="padding:12px;background:#0a1a0a">
+      <div style="text-align:center"><div style="font-size:18px;margin-bottom:4px">🛡️</div><div style="font-size:12px;font-weight:700;color:#22c55e">Protect Your Privacy</div><div style="font-size:6px;color:#888;margin-top:2px">Military-grade encryption</div></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px;margin-top:8px">${['$12.99 1mo','$4.99 1yr','$2.99 2yr'].map((p,i) => `<div style="background:#111;border:1px solid ${i===2?'#22c55e':'#222'};border-radius:4px;padding:4px;text-align:center;font-size:5px;color:${i===2?'#22c55e':'#888'}">${p}</div>`).join('')}</div>
+    </div>
+  `, '#0a1a0a', '#fff'),
+
+  'landing-travel': base(`
+    <div style="padding:12px">
+      <div style="font-size:12px;font-weight:700">Explore the <span style="color:#0ea5e9">World</span></div>
+      <div style="display:flex;gap:3px;margin:6px 0"><div style="flex:1;height:14px;background:#1e293b;border-radius:4px"></div><div style="background:#0ea5e9;padding:2px 8px;border-radius:4px;font-size:6px;color:#fff">Search</div></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px">${['🗼 Paris','🏖️ Bali','🗽 NYC'].map(d => `<div style="height:36px;background:#1e293b;border-radius:4px;display:flex;align-items:end;padding:3px"><span style="font-size:5px;font-weight:600">${d}</span></div>`).join('')}</div>
+    </div>
+  `),
+
+  'landing-law-firm': base(`
+    <div style="padding:12px;background:#0a0a1a">
+      <div style="font-size:12px;font-weight:700;color:#d4a853">SMITH & ASSOCIATES</div>
+      <div style="font-size:6px;color:#888;margin:4px 0">Attorneys at Law</div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:3px;margin-top:6px">${['Corporate','Criminal','Family','Immigration'].map(a => `<div style="background:#111;border:1px solid #222;border-radius:3px;padding:4px;font-size:5px;color:#d4a853;text-align:center">${a}</div>`).join('')}</div>
+    </div>
+  `, '#0a0a1a', '#fff'),
+
+  'landing-dental': base(`
+    <div style="padding:12px;background:#f0fdf4">
+      <div style="text-align:center"><div style="font-size:14px;margin-bottom:4px">😁</div><div style="font-size:12px;font-weight:700;color:#0d9488">Bright Smile Dental</div></div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:3px;margin-top:8px">${['Cleaning','Whitening','Implants','Orthodontics'].map(s => `<div style="background:#fff;border:1px solid #e0f2e9;border-radius:4px;padding:4px;text-align:center;font-size:5px;color:#0d9488">${s}</div>`).join('')}</div>
+      <div style="background:#0d9488;text-align:center;padding:4px;border-radius:4px;font-size:6px;color:#fff;margin-top:6px">Book Appointment</div>
+    </div>
+  `, '#f0fdf4', '#333'),
+
+  'landing-pet': base(`
+    <div style="padding:12px;background:#fff8f0">
+      <div style="text-align:center;font-size:14px;margin-bottom:4px">🐾</div>
+      <div style="text-align:center;font-size:12px;font-weight:700;color:#ea580c">Happy Paws</div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:3px;margin-top:8px">${['🐕 Grooming','🏠 Boarding','🎓 Training','☀️ Daycare'].map(s => `<div style="background:#fff;border:1px solid #fed7aa;border-radius:8px;padding:6px;text-align:center;font-size:5px;color:#ea580c">${s}</div>`).join('')}</div>
+    </div>
+  `, '#fff8f0', '#333'),
+
+  'landing-music': base(`
+    <div style="padding:12px;background:#0a0a0a">
+      <div style="height:50px;background:linear-gradient(135deg,#ec4899,#8b5cf6);border-radius:6px;display:flex;align-items:center;justify-content:center;margin-bottom:6px"><span style="font-size:16px">🎵</span></div>
+      <div style="text-align:center;font-size:12px;font-weight:800;color:#fff">NEW ALBUM</div>
+      <div style="text-align:center;font-size:6px;color:#ec4899;margin-top:2px">OUT NOW • Stream everywhere</div>
+      <div style="display:flex;gap:4px;justify-content:center;margin-top:6px">${['▶ Listen','🎫 Tour'].map(b => `<div style="background:#1a1a1a;border:1px solid #333;padding:3px 8px;border-radius:4px;font-size:6px;color:#fff">${b}</div>`).join('')}</div>
+    </div>
+  `, '#0a0a0a', '#fff'),
+
+  'landing-charity': base(`
+    <div style="padding:12px;background:#fffbeb">
+      <div style="text-align:center;font-size:12px;font-weight:700;color:#b45309">Making a Difference</div>
+      <div style="display:flex;gap:6px;justify-content:center;margin:8px 0">${[['12K','Lives'],['45','Countries'],['200','Projects']].map(([v,l]) => `<div style="text-align:center"><div style="font-size:10px;font-weight:800;color:#b45309">${v}</div><div style="font-size:5px;color:#92400e">${l}</div></div>`).join('')}</div>
+      <div style="display:flex;gap:2px;justify-content:center">${['$10','$25','$50','$100'].map(a => `<div style="background:#b45309;padding:3px 6px;border-radius:3px;font-size:6px;color:#fff">${a}</div>`).join('')}</div>
+    </div>
+  `, '#fffbeb', '#333'),
+
+  'landing-construction': base(`
+    <div style="padding:12px;background:#1a1a1a">
+      <div style="font-size:12px;font-weight:800;color:#fbbf24">BUILD CO.</div>
+      <div style="font-size:6px;color:#888;margin:4px 0">Construction & Engineering</div>
+      <div style="height:40px;background:linear-gradient(135deg,#78350f,#451a03);border-radius:4px;margin-top:6px;display:flex;align-items:center;justify-content:center"><span style="font-size:7px;color:#fbbf24">🏗️ 200+ Projects Completed</span></div>
+    </div>
+  `, '#1a1a1a', '#fff'),
+
+  'landing-car-dealer': base(`
+    <div style="padding:12px;background:#0a0a0a">
+      <div style="font-size:10px;font-weight:700;color:#ef4444">🚗 AUTO MOTORS</div>
+      <div style="height:40px;background:linear-gradient(135deg,#1e293b,#334155);border-radius:6px;margin:6px 0;display:flex;align-items:center;justify-content:center;font-size:16px">🏎️</div>
+      <div style="display:flex;gap:3px">${[1,2,3].map(i => `<div style="flex:1;background:#111;border-radius:3px;padding:3px;font-size:5px;text-align:center;color:#888">$${i*15}K</div>`).join('')}</div>
+    </div>
+  `, '#0a0a0a', '#fff'),
+
+  'landing-hotel': base(`
+    <div style="padding:12px;background:#0a0a0a">
+      <div style="text-align:center;font-size:12px;font-weight:300;letter-spacing:3px;color:#d4a853">GRAND HOTEL</div>
+      <div style="height:40px;background:linear-gradient(135deg,#1a1a2e,#0f172a);border-radius:6px;margin:8px 0;border:1px solid #d4a85330;display:flex;align-items:center;justify-content:center"><span style="font-size:7px;color:#d4a853">⭐⭐⭐⭐⭐</span></div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:3px">${['Standard $199','Suite $499'].map(r => `<div style="background:#111;border:1px solid #222;border-radius:3px;padding:4px;text-align:center;font-size:5px;color:#d4a853">${r}</div>`).join('')}</div>
+    </div>
+  `, '#0a0a0a', '#fff'),
+
+  'landing-gaming': base(`
+    <div style="padding:12px;background:#0a0014">
+      <div style="text-align:center;font-size:14px;font-weight:800;background:linear-gradient(135deg,#a855f7,#ec4899);-webkit-background-clip:text;-webkit-text-fill-color:transparent">JOIN THE BATTLE</div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:3px;margin-top:8px">${['🎮 FPS','⚔️ MOBA','🔫 BR','🧙 RPG'].map(g => `<div style="background:#1a1a2e;border:1px solid #a855f720;border-radius:4px;padding:6px;text-align:center;font-size:6px;color:#a855f7">${g}</div>`).join('')}</div>
+    </div>
+  `, '#0a0014', '#fff'),
+
+  'landing-portfolio-agency': base(`
+    <div style="padding:16px;background:#000">
+      <div style="font-size:16px;font-weight:800;color:#fff;line-height:1.1">We<br>Design<br><span style="color:#888">Things.</span></div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:3px;margin-top:10px">${[1,2,3,4].map(i => `<div style="height:24px;background:#${i%2?'111':'1a1a1a'};border-radius:2px"></div>`).join('')}</div>
+    </div>
+  `, '#000', '#fff'),
+
+  'landing-fintech-app': base(`
+    <div style="padding:12px;background:#050510">
+      <div style="display:flex;gap:8px;align-items:center"><div style="flex:1"><div style="font-size:10px;font-weight:700;color:#22c55e">FinApp</div><div style="font-size:6px;color:#888;margin-top:2px">2M+ Users</div></div><div style="width:30px;height:50px;background:#111;border-radius:6px;border:1px solid #333"></div></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px;margin-top:8px">${['⚡ Instant','💰 Cashback','🔒 Secure'].map(f => `<div style="background:#0a1a0a;border:1px solid #22c55e20;border-radius:3px;padding:4px;text-align:center;font-size:5px;color:#22c55e">${f}</div>`).join('')}</div>
+    </div>
+  `, '#050510', '#fff'),
+
+  'landing-blockchain': base(`
+    <div style="padding:12px;background:#050510">
+      <div style="text-align:center;font-size:10px;font-weight:700;background:linear-gradient(135deg,#3b82f6,#8b5cf6);-webkit-background-clip:text;-webkit-text-fill-color:transparent">CHAINCORE</div>
+      <div style="display:flex;gap:6px;justify-content:center;margin:8px 0">${[['100K','TPS'],['500','Validators'],['1K+','dApps']].map(([v,l]) => `<div style="text-align:center"><div style="font-size:8px;font-weight:700;color:#3b82f6">${v}</div><div style="font-size:4px;color:#888">${l}</div></div>`).join('')}</div>
+    </div>
+  `, '#050510', '#fff'),
+
+  'landing-fashion-brand': base(`
+    <div style="padding:12px;background:#faf9f6">
+      <div style="text-align:center;font-size:14px;font-weight:300;letter-spacing:4px;color:#222;margin-bottom:6px">LUXE</div>
+      <div style="height:60px;background:linear-gradient(135deg,#d4a7b0,#c9a9ca);border-radius:2px;display:flex;align-items:end;padding:6px"><span style="font-size:8px;color:#fff;font-weight:600">New Collection</span></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px;margin-top:6px">${[1,2,3].map(i => `<div style="height:32px;background:hsl(${i*40+300},20%,85%);border-radius:2px"></div>`).join('')}</div>
+    </div>
+  `, '#faf9f6', '#222'),
+
+  'landing-crypto-exchange': base(`
+    <div style="padding:12px;background:#050510">
+      <div style="font-size:10px;font-weight:700;color:#22c55e">CryptoX Exchange</div>
+      <div style="display:flex;gap:4px;margin:6px 0;font-size:5px">${[{s:'BTC',p:'$67K',c:'↑1.2%'},{s:'ETH',p:'$3.4K',c:'↑3.1%'}].map(t => `<div style="background:#111;border-radius:3px;padding:3px;flex:1"><span style="color:#fff">${t.s}</span> <span style="color:#888">${t.p}</span> <span style="color:#22c55e">${t.c}</span></div>`).join('')}</div>
+      <div style="background:#22c55e;text-align:center;padding:4px;border-radius:4px;font-size:7px;font-weight:600;color:#000">Start Trading</div>
+    </div>
+  `, '#050510', '#fff'),
+
+  'landing-delivery': base(`
+    <div style="padding:12px;background:#fff">
+      <div style="font-size:12px;font-weight:700;color:#ea580c">🍔 FoodDash</div>
+      <div style="display:flex;gap:3px;margin:6px 0">${['🍕','🍣','🌮','🍜'].map(f => `<div style="flex:1;background:#fff7ed;border-radius:8px;padding:6px;text-align:center;font-size:14px">${f}</div>`).join('')}</div>
+      <div style="background:#ea580c;text-align:center;padding:4px;border-radius:8px;font-size:6px;color:#fff">Order Now</div>
+    </div>
+  `, '#fff', '#222'),
+
+  'landing-coworking': base(`
+    <div style="padding:12px;background:#f0fdf4">
+      <div style="font-size:10px;font-weight:700;color:#16a34a">🏢 CoWork Hub</div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:3px;margin-top:6px">${['Hot Desk $99','Dedicated $199','Private $399','Virtual $49'].map(p => `<div style="background:#fff;border:1px solid #e0f2e9;border-radius:4px;padding:4px;font-size:5px;color:#16a34a;text-align:center">${p}</div>`).join('')}</div>
+    </div>
+  `, '#f0fdf4', '#333'),
+
+  'landing-saas-analytics': base(`
+    <div style="padding:12px">
+      <div style="font-size:10px;font-weight:700">📊 AnalyticsPro</div>
+      <div style="background:#1e293b;border-radius:6px;padding:6px;margin:6px 0;height:40px;display:flex;align-items:end;gap:2px">${[30,50,35,65,45,70,55,80].map(h => `<div style="flex:1;background:#3b82f6;border-radius:2px 2px 0 0;height:${h}%"></div>`).join('')}</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px">${['$9','$29','$79'].map((p,i) => `<div style="background:#1e293b;border:1px solid ${i===1?'#3b82f6':'#334155'};border-radius:4px;padding:3px;text-align:center;font-size:7px;${i===1?'color:#3b82f6':''}">${p}</div>`).join('')}</div>
+    </div>
+  `),
+
+  'landing-insurance': base(`
+    <div style="padding:12px;background:#eff6ff">
+      <div style="font-size:10px;font-weight:700;color:#1d4ed8">🛡️ SecureLife Insurance</div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:3px;margin-top:6px">${['🚗 Auto','🏠 Home','❤️ Life','🏥 Health'].map(t => `<div style="background:#fff;border:1px solid #bfdbfe;border-radius:4px;padding:6px;text-align:center;font-size:5px;color:#1d4ed8">${t}</div>`).join('')}</div>
+      <div style="background:#1d4ed8;text-align:center;padding:4px;border-radius:4px;font-size:6px;color:#fff;margin-top:6px">Get Quote</div>
+    </div>
+  `, '#eff6ff', '#1d4ed8'),
+
+  'landing-marketplace': base(`
+    <div style="padding:12px;background:#fff">
+      <div style="font-size:10px;font-weight:700;color:#ea580c">🏪 MarketPlace</div>
+      <div style="display:flex;gap:3px;margin:6px 0"><div style="flex:1;height:14px;background:#f3f4f6;border-radius:4px"></div><div style="background:#ea580c;padding:2px 6px;border-radius:4px;font-size:6px;color:#fff">🔍</div></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px">${[1,2,3].map(i => `<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:4px;padding:3px;text-align:center"><div style="font-size:6px;font-weight:600;color:#333">Item ${i}</div><div style="font-size:5px;color:#ea580c">$${i*12}</div></div>`).join('')}</div>
+    </div>
+  `, '#fff', '#222'),
+
+  'landing-cybersecurity': base(`
+    <div style="padding:12px;background:#001a00">
+      <div style="font-size:10px;font-weight:700;color:#22c55e">🔒 CyberShield</div>
+      <div style="background:#002200;border:1px solid #22c55e20;border-radius:6px;padding:8px;margin:6px 0;font-family:monospace;font-size:5px;color:#22c55e40">$ scanning network...<br>$ threats detected: 0<br>$ status: SECURE ✓</div>
+    </div>
+  `, '#001a00', '#22c55e'),
+
+  // ═══════════════════════════════════════════
+  // E-COMMERCE — Additional Previews
+  // ═══════════════════════════════════════════
+  'ecommerce-electronics': base(`
+    <div style="padding:12px;background:#111">
+      <div style="font-size:9px;font-weight:700;color:#3b82f6">⚡ TechShop</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:6px">${['📱','💻','🎧'].map((e,i) => `<div style="background:#1a1a1a;border-radius:4px;padding:6px;text-align:center"><div style="font-size:16px">${e}</div><div style="font-size:5px;color:#888;margin-top:2px">$${(i+1)*299}</div></div>`).join('')}</div>
+    </div>
+  `, '#111', '#fff'),
+
+  'ecommerce-marketplace': base(`
+    <div style="padding:12px;background:#fff">
+      <div style="display:flex;gap:3px;margin-bottom:6px"><div style="flex:1;height:14px;background:#f3f4f6;border-radius:6px"></div><div style="background:#ef4444;padding:2px 6px;border-radius:4px;font-size:6px;color:#fff">Sell</div></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px">${[1,2,3,4,5,6].map(i => `<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:4px;overflow:hidden"><div style="height:20px;background:hsl(${i*50},40%,90%)"></div><div style="padding:3px"><div style="font-size:5px;font-weight:600;color:#333">Product</div><div style="font-size:5px;color:#ef4444">$${i*8}</div></div></div>`).join('')}</div>
+    </div>
+  `, '#fff', '#222'),
+
+  'ecommerce-food': base(`
+    <div style="padding:12px;background:#fffbeb">
+      <div style="font-size:10px;font-weight:700;color:#b45309">🥗 FreshMart</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px;margin-top:6px">${['🥑','🍎','🥖','🧀','🥩','🍫'].map((f,i) => `<div style="background:#fff;border:1px solid #fde68a;border-radius:4px;padding:4px;text-align:center"><div style="font-size:12px">${f}</div><div style="font-size:5px;color:#b45309">$${(i+1)*2.5}</div></div>`).join('')}</div>
+    </div>
+  `, '#fffbeb', '#333'),
+
+  'ecommerce-digital': base(`
+    <div style="padding:12px;background:#0a0a1a">
+      <div style="font-size:9px;font-weight:700;color:#a855f7">📦 DigiStore</div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:3px;margin-top:6px">${['📱 App','📄 Template','🎨 Design','📚 Course'].map(p => `<div style="background:#111;border:1px solid #a855f720;border-radius:4px;padding:6px;text-align:center;font-size:6px;color:#a855f7">${p}</div>`).join('')}</div>
+    </div>
+  `, '#0a0a1a', '#fff'),
+
+  'ecommerce-dropshipping': base(`
+    <div style="padding:12px;background:#fff">
+      <div style="font-size:9px;font-weight:700;color:#10b981">🚚 DropShip Pro</div>
+      <div style="display:flex;gap:3px;margin:6px 0">${['Hot','Trending','New'].map((t,i) => `<div style="font-size:5px;padding:2px 6px;border-radius:8px;${i===0?'background:#10b981;color:#fff':'background:#f3f4f6;color:#666'}">${t}</div>`).join('')}</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px">${[1,2,3].map(i => `<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:4px;padding:3px;text-align:center"><div style="height:18px;background:#e5e7eb;border-radius:2px;margin-bottom:2px"></div><div style="font-size:5px;color:#10b981">$${i*15}</div></div>`).join('')}</div>
+    </div>
+  `, '#fff', '#222'),
+
+  'ecommerce-booking': base(`
+    <div style="padding:12px">
+      <div style="font-size:9px;font-weight:700">🎫 BookItNow</div>
+      <div style="background:#1e293b;border-radius:6px;padding:6px;margin-top:6px">${['📅 Select Date','👥 Guests','🏨 Room Type'].map(f => `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #334155;font-size:5px"><span>${f}</span><span style="opacity:.4">Select</span></div>`).join('')}<div style="background:#3b82f6;text-align:center;padding:4px;border-radius:4px;font-size:6px;color:#fff;margin-top:4px">Search</div></div>
+    </div>
+  `),
+
+  'ecommerce-subscription': base(`
+    <div style="padding:12px">
+      <div style="font-size:9px;font-weight:700">📦 SubBox</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px;margin-top:6px">${['$19 Basic','$39 Premium','$59 Ultimate'].map((b,i) => `<div style="background:#1e293b;border:1px solid ${i===1?'#8b5cf6':'#334155'};border-radius:6px;padding:6px;text-align:center"><div style="font-size:8px;font-weight:700;color:#8b5cf6">${b.split(' ')[0]}</div><div style="font-size:5px;opacity:.5;margin-top:2px">${b.split(' ')[1]}</div></div>`).join('')}</div>
+    </div>
+  `),
+
+  'ecommerce-auction': base(`
+    <div style="padding:12px;background:#0a0a0a">
+      <div style="font-size:9px;font-weight:700;color:#fbbf24">🔨 AuctionHub</div>
+      <div style="background:#111;border:1px solid #fbbf2420;border-radius:6px;padding:6px;margin-top:6px"><div style="font-size:6px;color:#888">Current Bid</div><div style="font-size:14px;font-weight:800;color:#fbbf24">$1,250</div><div style="font-size:5px;color:#ef4444;margin-top:2px">⏱ Ends in 02:34:18</div><div style="background:#fbbf24;text-align:center;padding:3px;border-radius:3px;font-size:6px;color:#000;font-weight:600;margin-top:4px">Place Bid</div></div>
+    </div>
+  `, '#0a0a0a', '#fff'),
+
+  'ecommerce-grocery': base(`
+    <div style="padding:12px;background:#fff">
+      <div style="font-size:9px;font-weight:700;color:#16a34a">🛒 FreshGrocer</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin-top:6px">${['🍎','🥦','🍞','🥛','🍗','🧅','🍌','🥕'].map((f,i) => `<div style="background:#f0fdf4;border-radius:4px;padding:4px;text-align:center"><div style="font-size:10px">${f}</div><div style="font-size:4px;color:#16a34a">$${(i+1)*0.99}</div></div>`).join('')}</div>
+    </div>
+  `, '#fff', '#222'),
+
+  'ecommerce-pet-shop': base(`
+    <div style="padding:12px;background:#fff8f0">
+      <div style="font-size:9px;font-weight:700;color:#ea580c">🐾 PetWorld</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px;margin-top:6px">${['🦴 Toys','🥩 Food','🛁 Care'].map(c => `<div style="background:#fff;border:1px solid #fed7aa;border-radius:4px;padding:5px;text-align:center;font-size:5px;color:#ea580c">${c}</div>`).join('')}</div>
+    </div>
+  `, '#fff8f0', '#333'),
+
+  'ecommerce-jewelry': base(`
+    <div style="padding:12px;background:#0a0a0a">
+      <div style="text-align:center;font-size:12px;font-weight:300;letter-spacing:4px;color:#d4a853">JEWELS</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px;margin-top:8px">${['💍','📿','⌚'].map(j => `<div style="height:36px;background:#111;border:1px solid #d4a85320;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:14px">${j}</div>`).join('')}</div>
+    </div>
+  `, '#0a0a0a', '#fff'),
+
+  'ecommerce-furniture': base(`
+    <div style="padding:12px;background:#fafaf5">
+      <div style="font-size:10px;font-weight:300;letter-spacing:2px;color:#555">HOMESTYLE</div>
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:4px;margin-top:6px"><div style="height:50px;background:#e8e0d0;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:16px">🛋️</div><div style="display:flex;flex-direction:column;gap:4px">${[1,2].map(() => `<div style="flex:1;background:#e8e0d0;border-radius:3px"></div>`).join('')}</div></div>
+    </div>
+  `, '#fafaf5', '#333'),
+
+  'ecommerce-sports': base(`
+    <div style="padding:12px;background:#111">
+      <div style="font-size:10px;font-weight:800;color:#fff">SPORT<span style="color:#ef4444">X</span></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px;margin-top:6px">${['👟','⚽','🏋️'].map((s,i) => `<div style="background:#1a1a1a;border-radius:4px;padding:6px;text-align:center"><div style="font-size:14px">${s}</div><div style="font-size:5px;color:#ef4444;margin-top:2px">$${(i+1)*49}</div></div>`).join('')}</div>
+    </div>
+  `, '#111', '#fff'),
+
+  // ═══════════════════════════════════════════
+  // DASHBOARDS — Additional Previews
+  // ═══════════════════════════════════════════
+  'dashboard-crm': base(`
+    <div style="display:flex;height:200px"><div style="width:36px;background:#1e293b;padding:4px">${['📊','👤','📧','⚙️'].map(e => `<div style="text-align:center;margin:6px 0;font-size:7px">${e}</div>`).join('')}</div><div style="flex:1;padding:6px"><div style="font-size:7px;font-weight:600;margin-bottom:4px">Sales Pipeline</div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:2px">${['Lead','Qualified','Proposal','Won'].map((s,i) => `<div style="background:#1e293b;border-radius:3px;padding:3px"><div style="font-size:4px;font-weight:600;color:${['#f59e0b','#3b82f6','#8b5cf6','#22c55e'][i]}">${s}</div><div style="font-size:8px;font-weight:700;color:${['#f59e0b','#3b82f6','#8b5cf6','#22c55e'][i]}">${[12,8,5,3][i]}</div></div>`).join('')}</div></div></div>
+  `),
+
+  'dashboard-ecommerce': base(`
+    <div style="display:flex;height:200px"><div style="width:36px;background:#1e293b;padding:4px">${['📊','📦','👥','⚙️'].map(e => `<div style="text-align:center;margin:6px 0;font-size:7px">${e}</div>`).join('')}</div><div style="flex:1;padding:6px"><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px;margin-bottom:4px">${[{l:'Revenue',v:'$24K',c:'#22c55e'},{l:'Orders',v:'342',c:'#3b82f6'},{l:'Customers',v:'1.2K',c:'#8b5cf6'}].map(m => `<div style="background:#1e293b;padding:4px;border-radius:3px"><div style="font-size:4px;opacity:.5">${m.l}</div><div style="font-size:8px;font-weight:700;color:${m.c}">${m.v}</div></div>`).join('')}</div><div style="background:#1e293b;border-radius:3px;padding:3px;font-size:5px"><div style="opacity:.4;margin-bottom:2px">Recent Orders</div>${['#4521 $89','#4520 $245'].map(o => `<div style="padding:2px 0;border-bottom:1px solid #0f172a">${o}</div>`).join('')}</div></div></div>
+  `),
+
+  'dashboard-social-media': base(`
+    <div style="display:flex;height:200px"><div style="width:36px;background:#1e293b;padding:4px">${['📊','📱','📅','⚙️'].map(e => `<div style="text-align:center;margin:6px 0;font-size:7px">${e}</div>`).join('')}</div><div style="flex:1;padding:6px"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin-bottom:6px">${[{n:'IG',v:'45K',c:'#e1306c'},{n:'X',v:'12K',c:'#fff'},{n:'FB',v:'30K',c:'#1877f2'},{n:'TT',v:'89K',c:'#ff0050'}].map(s => `<div style="background:#1e293b;padding:3px;border-radius:3px;text-align:center"><div style="font-size:4px;color:${s.c}">${s.n}</div><div style="font-size:7px;font-weight:700">${s.v}</div></div>`).join('')}</div></div></div>
+  `),
+
+  'dashboard-finance': base(`
+    <div style="display:flex;height:200px"><div style="width:36px;background:#1e293b;padding:4px">${['💰','📊','📄','⚙️'].map(e => `<div style="text-align:center;margin:6px 0;font-size:7px">${e}</div>`).join('')}</div><div style="flex:1;padding:6px"><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px;margin-bottom:4px">${[{l:'Revenue',v:'$84K',c:'#22c55e'},{l:'Expenses',v:'$62K',c:'#ef4444'},{l:'Profit',v:'$22K',c:'#3b82f6'}].map(m => `<div style="background:#1e293b;padding:4px;border-radius:3px"><div style="font-size:4px;opacity:.5">${m.l}</div><div style="font-size:8px;font-weight:700;color:${m.c}">${m.v}</div></div>`).join('')}</div></div></div>
+  `),
+
+  'dashboard-healthcare': base(`
+    <div style="display:flex;height:200px"><div style="width:36px;background:#eff6ff;padding:4px">${['🏥','👥','📅','⚙️'].map(e => `<div style="text-align:center;margin:6px 0;font-size:7px">${e}</div>`).join('')}</div><div style="flex:1;padding:6px;background:#f8fafc"><div style="font-size:7px;font-weight:600;color:#1d4ed8;margin-bottom:4px">Today's Schedule</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px">${[{l:'Patients',v:'24',c:'#3b82f6'},{l:'Beds',v:'85%',c:'#22c55e'},{l:'Critical',v:'3',c:'#ef4444'}].map(m => `<div style="background:#fff;padding:4px;border-radius:4px;border:1px solid #e2e8f0"><div style="font-size:4px;color:#666">${m.l}</div><div style="font-size:9px;font-weight:700;color:${m.c}">${m.v}</div></div>`).join('')}</div></div></div>
+  `, '#f8fafc', '#333'),
+
+  'dashboard-hr': base(`
+    <div style="display:flex;height:200px"><div style="width:36px;background:#1e293b;padding:4px">${['👥','📊','📅','⚙️'].map(e => `<div style="text-align:center;margin:6px 0;font-size:7px">${e}</div>`).join('')}</div><div style="flex:1;padding:6px"><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px;margin-bottom:4px">${[{l:'Employees',v:'248',c:'#8b5cf6'},{l:'Open Roles',v:'12',c:'#f59e0b'},{l:'Attendance',v:'96%',c:'#22c55e'}].map(m => `<div style="background:#1e293b;padding:4px;border-radius:3px"><div style="font-size:4px;opacity:.5">${m.l}</div><div style="font-size:8px;font-weight:700;color:${m.c}">${m.v}</div></div>`).join('')}</div></div></div>
+  `),
+
+  'dashboard-logistics': base(`
+    <div style="display:flex;height:200px"><div style="width:36px;background:#1e293b;padding:4px">${['🚚','📦','🗺️','⚙️'].map(e => `<div style="text-align:center;margin:6px 0;font-size:7px">${e}</div>`).join('')}</div><div style="flex:1;padding:6px"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin-bottom:4px">${[{l:'On Time',v:'89%',c:'#22c55e'},{l:'Transit',v:'124',c:'#3b82f6'},{l:'Delayed',v:'8',c:'#ef4444'},{l:'Done',v:'456',c:'#8b5cf6'}].map(m => `<div style="background:#1e293b;padding:3px;border-radius:3px"><div style="font-size:3px;opacity:.5">${m.l}</div><div style="font-size:7px;font-weight:700;color:${m.c}">${m.v}</div></div>`).join('')}</div></div></div>
+  `),
+
+  'dashboard-school': base(`
+    <div style="display:flex;height:200px"><div style="width:36px;background:#1e293b;padding:4px">${['🎓','📚','👥','⚙️'].map(e => `<div style="text-align:center;margin:6px 0;font-size:7px">${e}</div>`).join('')}</div><div style="flex:1;padding:6px"><div style="font-size:7px;font-weight:600;margin-bottom:4px">📚 School Dashboard</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px">${[{l:'Students',v:'1.2K',c:'#3b82f6'},{l:'Teachers',v:'86',c:'#22c55e'},{l:'Avg Grade',v:'B+',c:'#f59e0b'}].map(m => `<div style="background:#1e293b;padding:4px;border-radius:3px;text-align:center"><div style="font-size:4px;opacity:.5">${m.l}</div><div style="font-size:9px;font-weight:700;color:${m.c}">${m.v}</div></div>`).join('')}</div></div></div>
+  `),
+
+  'dashboard-iot': base(`
+    <div style="display:flex;height:200px"><div style="width:36px;background:#0a1a2e;padding:4px">${['📡','🌡️','💡','⚙️'].map(e => `<div style="text-align:center;margin:6px 0;font-size:7px">${e}</div>`).join('')}</div><div style="flex:1;padding:6px;background:#0a0a1a"><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px">${[{l:'Temp',v:'24°C',c:'#06b6d4'},{l:'Humidity',v:'62%',c:'#22c55e'},{l:'Devices',v:'48',c:'#f59e0b'}].map(m => `<div style="background:#111;border:1px solid ${m.c}30;border-radius:4px;padding:4px;text-align:center"><div style="font-size:4px;color:${m.c}">${m.l}</div><div style="font-size:9px;font-weight:700;color:${m.c}">${m.v}</div></div>`).join('')}</div></div></div>
+  `, '#0a0a1a', '#fff'),
+
+  'dashboard-marketing': base(`
+    <div style="display:flex;height:200px"><div style="width:36px;background:#1e293b;padding:4px">${['📈','🎯','📧','⚙️'].map(e => `<div style="text-align:center;margin:6px 0;font-size:7px">${e}</div>`).join('')}</div><div style="flex:1;padding:6px"><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px;margin-bottom:4px">${[{l:'ROI',v:'245%',c:'#22c55e'},{l:'Leads',v:'1.8K',c:'#3b82f6'},{l:'Cost',v:'$4.2K',c:'#f59e0b'}].map(m => `<div style="background:#1e293b;padding:4px;border-radius:3px"><div style="font-size:4px;opacity:.5">${m.l}</div><div style="font-size:8px;font-weight:700;color:${m.c}">${m.v}</div></div>`).join('')}</div></div></div>
+  `),
+
+  'dashboard-crypto-trading': base(`
+    <div style="display:flex;height:200px"><div style="width:36px;background:#0a0a0a;padding:4px">${['📊','💰','🔔','⚙️'].map(e => `<div style="text-align:center;margin:6px 0;font-size:7px">${e}</div>`).join('')}</div><div style="flex:1;padding:6px;background:#050505"><div style="font-size:6px;opacity:.5;margin-bottom:2px">Portfolio Value</div><div style="font-size:14px;font-weight:800;color:#22c55e;margin-bottom:4px">$142,580</div><div style="height:40px;display:flex;align-items:end;gap:1px;margin-bottom:4px">${[30,45,35,60,40,55,70,50,65,80,55,75].map(h => `<div style="flex:1;background:#22c55e40;border-radius:1px 1px 0 0;height:${h}%"></div>`).join('')}</div></div></div>
+  `, '#050505', '#fff'),
+
+  // ═══════════════════════════════════════════
+  // PORTFOLIOS — Additional Previews
+  // ═══════════════════════════════════════════
+  'portfolio-photographer': base(`
+    <div style="padding:12px;background:#0a0a0a">
+      <div style="text-align:center;font-size:10px;font-weight:300;letter-spacing:3px;color:#fff;margin-bottom:8px">JOHN LENS</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px">${[1,2,3,4,5,6].map(i => `<div style="height:${i%2?28:36}px;background:hsl(${i*40},30%,${25+i*5}%);border-radius:1px"></div>`).join('')}</div>
+    </div>
+  `, '#0a0a0a', '#fff'),
+
+  'portfolio-freelancer': base(`
+    <div style="padding:12px">
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px"><div style="width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#8b5cf6)"></div><div><div style="font-size:8px;font-weight:700">Alex Dev</div><div style="font-size:5px;color:#22c55e">Available for Hire</div></div></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px">${['Web Dev $100/hr','Design $80/hr','Consult $120/hr'].map(s => `<div style="background:#1e293b;border-radius:4px;padding:4px;text-align:center;font-size:4px">${s}</div>`).join('')}</div>
+    </div>
+  `),
+
+  'portfolio-architect': base(`
+    <div style="padding:12px;background:#f5f0eb">
+      <div style="font-size:12px;font-weight:300;letter-spacing:3px;color:#555">ARCH STUDIO</div>
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:4px;margin-top:8px"><div style="height:50px;background:#d4c5b5;border-radius:2px"></div><div style="height:50px;background:#c9baa8;border-radius:2px"></div></div>
+    </div>
+  `, '#f5f0eb', '#333'),
+
+  'portfolio-3d-artist': base(`
+    <div style="padding:12px;background:#0a0a14">
+      <div style="font-size:10px;font-weight:700;background:linear-gradient(135deg,#a855f7,#3b82f6);-webkit-background-clip:text;-webkit-text-fill-color:transparent">3D ARTIST</div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:3px;margin-top:6px">${[1,2,3,4].map(i => `<div style="height:30px;background:linear-gradient(${i*90}deg,#1a1a2e,#2a1a3e);border-radius:4px"></div>`).join('')}</div>
+    </div>
+  `, '#0a0a14', '#fff'),
+
+  'portfolio-musician': base(`
+    <div style="padding:12px;background:#0a0a0a">
+      <div style="height:50px;background:linear-gradient(135deg,#dc2626,#991b1b);border-radius:6px;display:flex;align-items:center;justify-content:center;margin-bottom:6px"><span style="font-size:18px">🎸</span></div>
+      <div style="font-size:10px;font-weight:700;color:#fff;text-align:center">ROCK BAND</div>
+      <div style="display:flex;gap:4px;justify-content:center;margin-top:4px">${['▶ Play','🎫 Tour'].map(b => `<div style="background:#1a1a1a;border:1px solid #333;padding:2px 6px;border-radius:3px;font-size:5px;color:#fff">${b}</div>`).join('')}</div>
+    </div>
+  `, '#0a0a0a', '#fff'),
+
+  'portfolio-writer': base(`
+    <div style="padding:16px;background:#faf8f5">
+      <div style="text-align:center;font-family:serif;font-size:14px;font-weight:400;color:#333">Sarah Writer</div>
+      <div style="text-align:center;font-size:6px;color:#888;margin-top:2px">Author & Journalist</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:8px">${[1,2,3].map(() => `<div style="height:40px;background:#e8e0d0;border-radius:2px"></div>`).join('')}</div>
+    </div>
+  `, '#faf8f5', '#333'),
+
+  'portfolio-video': base(`
+    <div style="padding:12px;background:#0a0a0a">
+      <div style="font-size:10px;font-weight:300;letter-spacing:2px;color:#fff">FILMWORKS</div>
+      <div style="height:60px;background:#111;border-radius:4px;margin:6px 0;display:flex;align-items:center;justify-content:center;border:1px solid #222"><div style="width:24px;height:24px;border-radius:50%;background:#fff20;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:10px">▶</div></div>
+    </div>
+  `, '#0a0a0a', '#fff'),
+
+  // ═══════════════════════════════════════════
+  // FAUCETS — Additional Previews
+  // ═══════════════════════════════════════════
+  'faucet-btc': base(`
+    <div style="padding:12px;background:#0a0a0a">
+      <div style="text-align:center;font-size:10px;font-weight:700;color:#f7931a;margin-bottom:6px">₿ Bitcoin Faucet</div>
+      <div style="background:#111;border:1px solid #f7931a30;border-radius:6px;padding:8px;text-align:center"><div style="font-size:12px;font-weight:800;color:#f7931a">500 satoshis</div><div style="font-size:5px;color:#888;margin:4px 0">⏱ Claim every 60 min</div><div style="background:#f7931a;padding:3px 12px;border-radius:4px;font-size:6px;color:#000;font-weight:600;display:inline-block">CLAIM</div></div>
+    </div>
+  `, '#0a0a0a', '#fff'),
+
+  'faucet-eth': base(`
+    <div style="padding:12px;background:#0a0a1a">
+      <div style="text-align:center;font-size:10px;font-weight:700;color:#627eea;margin-bottom:6px">Ξ Ethereum Faucet</div>
+      <div style="background:#111;border:1px solid #627eea30;border-radius:6px;padding:8px;text-align:center"><div style="font-size:12px;font-weight:800;color:#627eea">0.001 ETH</div><div style="background:#627eea;padding:3px 12px;border-radius:4px;font-size:6px;color:#fff;font-weight:600;display:inline-block;margin-top:6px">CLAIM</div></div>
+    </div>
+  `, '#0a0a1a', '#fff'),
+
+  'faucet-sol': base(`
+    <div style="padding:12px;background:#0a0014">
+      <div style="text-align:center;font-size:10px;font-weight:700;background:linear-gradient(135deg,#9945ff,#14f195);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px">◎ Solana Faucet</div>
+      <div style="background:#111;border:1px solid #9945ff30;border-radius:6px;padding:8px;text-align:center"><div style="font-size:12px;font-weight:800;color:#14f195">0.01 SOL</div><div style="background:linear-gradient(135deg,#9945ff,#14f195);padding:3px 12px;border-radius:4px;font-size:6px;color:#fff;font-weight:600;display:inline-block;margin-top:6px">CLAIM NOW</div></div>
+    </div>
+  `, '#0a0014', '#fff'),
+
+  'faucet-doge': base(`
+    <div style="padding:12px;background:#1a1500">
+      <div style="text-align:center;font-size:10px;font-weight:700;color:#c2a633;margin-bottom:6px">🐕 Dogecoin Faucet</div>
+      <div style="background:#111;border:1px solid #c2a63330;border-radius:6px;padding:8px;text-align:center"><div style="font-size:12px;font-weight:800;color:#c2a633">10 DOGE</div><div style="font-size:5px;color:#888;margin:2px 0">Much wow! Very crypto!</div><div style="background:#c2a633;padding:3px 12px;border-radius:4px;font-size:6px;color:#000;font-weight:600;display:inline-block;margin-top:4px">CLAIM</div></div>
+    </div>
+  `, '#1a1500', '#fff'),
+
+  'faucet-bnb': base(`
+    <div style="padding:12px;background:#0a0a00">
+      <div style="text-align:center;font-size:10px;font-weight:700;color:#f0b90b;margin-bottom:6px">🔶 BNB Faucet</div>
+      <div style="background:#111;border:1px solid #f0b90b30;border-radius:6px;padding:8px;text-align:center"><div style="font-size:12px;font-weight:800;color:#f0b90b">0.005 BNB</div><div style="background:#f0b90b;padding:3px 12px;border-radius:4px;font-size:6px;color:#000;font-weight:600;display:inline-block;margin-top:6px">CLAIM</div></div>
+    </div>
+  `, '#0a0a00', '#fff'),
+
+  'faucet-tron': base(`
+    <div style="padding:12px;background:#0a0000">
+      <div style="text-align:center;font-size:10px;font-weight:700;color:#ef0027;margin-bottom:6px">TRON Faucet</div>
+      <div style="background:#111;border:1px solid #ef002730;border-radius:6px;padding:8px;text-align:center"><div style="font-size:12px;font-weight:800;color:#ef0027">5 TRX</div><div style="background:#ef0027;padding:3px 12px;border-radius:4px;font-size:6px;color:#fff;font-weight:600;display:inline-block;margin-top:6px">CLAIM</div></div>
+    </div>
+  `, '#0a0000', '#fff'),
+
+  'faucet-matic': base(`
+    <div style="padding:12px;background:#0a001a">
+      <div style="text-align:center;font-size:10px;font-weight:700;color:#8247e5;margin-bottom:6px">🟣 Polygon Faucet</div>
+      <div style="background:#111;border:1px solid #8247e530;border-radius:6px;padding:8px;text-align:center"><div style="font-size:12px;font-weight:800;color:#8247e5">0.1 MATIC</div><div style="background:#8247e5;padding:3px 12px;border-radius:4px;font-size:6px;color:#fff;font-weight:600;display:inline-block;margin-top:6px">CLAIM</div></div>
+    </div>
+  `, '#0a001a', '#fff'),
+
+  'faucet-avax': base(`
+    <div style="padding:12px;background:#0a0000">
+      <div style="text-align:center;font-size:10px;font-weight:700;color:#e84142;margin-bottom:6px">🔺 Avalanche Faucet</div>
+      <div style="background:#111;border:1px solid #e8414230;border-radius:6px;padding:8px;text-align:center"><div style="font-size:12px;font-weight:800;color:#e84142">0.05 AVAX</div><div style="background:#e84142;padding:3px 12px;border-radius:4px;font-size:6px;color:#fff;font-weight:600;display:inline-block;margin-top:6px">CLAIM</div></div>
+    </div>
+  `, '#0a0000', '#fff'),
+
+  'faucet-ada': base(`
+    <div style="padding:12px;background:#001a2e">
+      <div style="text-align:center;font-size:10px;font-weight:700;color:#0033ad;margin-bottom:6px">♦️ Cardano Faucet</div>
+      <div style="background:#0a1a2e;border:1px solid #0033ad30;border-radius:6px;padding:8px;text-align:center"><div style="font-size:12px;font-weight:800;color:#3b82f6">2 ADA</div><div style="background:#0033ad;padding:3px 12px;border-radius:4px;font-size:6px;color:#fff;font-weight:600;display:inline-block;margin-top:6px">CLAIM</div></div>
+    </div>
+  `, '#001a2e', '#fff'),
+
+  'faucet-xrp': base(`
+    <div style="padding:12px;background:#001020">
+      <div style="text-align:center;font-size:10px;font-weight:700;color:#23292f;margin-bottom:6px">XRP Faucet</div>
+      <div style="background:#0a1a2e;border:1px solid #ffffff20;border-radius:6px;padding:8px;text-align:center"><div style="font-size:12px;font-weight:800;color:#fff">1 XRP</div><div style="font-size:5px;color:#888;margin:2px 0">3-5 second settlement</div><div style="background:#3b82f6;padding:3px 12px;border-radius:4px;font-size:6px;color:#fff;font-weight:600;display:inline-block;margin-top:4px">CLAIM</div></div>
+    </div>
+  `, '#001020', '#fff'),
+
+  'faucet-gaming': base(`
+    <div style="padding:12px;background:#0a0014">
+      <div style="text-align:center;font-size:10px;font-weight:700;background:linear-gradient(135deg,#a855f7,#ec4899);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px">🎮 Gaming Faucet</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px">${['🎲 Dice','🔢 Guess','🪙 Flip'].map(g => `<div style="background:#111;border:1px solid #a855f720;border-radius:4px;padding:6px;text-align:center;font-size:5px;color:#a855f7">${g}</div>`).join('')}</div>
+      <div style="text-align:center;font-size:5px;color:#888;margin-top:4px">Level 5 · 2,400 XP</div>
+    </div>
+  `, '#0a0014', '#fff'),
+
+  'faucet-survey': base(`
+    <div style="padding:12px">
+      <div style="font-size:9px;font-weight:700;color:#22c55e">💰 Survey Faucet</div>
+      <div style="margin-top:6px">${['📝 Quick Survey — $0.50','📱 App Install — $1.00','🎥 Watch Video — $0.25'].map(t => `<div style="background:#1e293b;border-radius:4px;padding:4px;margin-bottom:2px;font-size:5px;display:flex;justify-content:space-between"><span>${t.split('—')[0]}</span><span style="color:#22c55e">${t.split('—')[1]}</span></div>`).join('')}</div>
+    </div>
+  `),
+
+  'faucet-testnet': base(`
+    <div style="padding:12px;background:#111">
+      <div style="font-size:9px;font-weight:700;color:#888">🔧 Testnet Faucet</div>
+      <div style="margin-top:6px"><div style="display:flex;gap:2px;margin-bottom:4px">${['Goerli','Sepolia','Mumbai'].map((n,i) => `<div style="font-size:5px;padding:2px 4px;border-radius:3px;${i===0?'background:#3b82f6;color:#fff':'background:#1e293b;color:#888'}">${n}</div>`).join('')}</div><div style="height:14px;background:#1e293b;border-radius:4px;margin-bottom:4px"></div><div style="background:#3b82f6;text-align:center;padding:3px;border-radius:3px;font-size:6px;color:#fff">Request Tokens</div></div>
+    </div>
+  `, '#111', '#fff'),
+
+  // ═══════════════════════════════════════════
+  // SOCIAL — More Previews
+  // ═══════════════════════════════════════════
+  'social-snapchat': base(`
+    <div style="height:200px;background:#fffc00;position:relative">
+      <div style="position:absolute;inset:10px;background:#000;border-radius:12px;display:flex;align-items:center;justify-content:center"><span style="font-size:24px">👻</span></div>
+      <div style="position:absolute;bottom:0;width:100%;display:flex;justify-content:space-around;padding:4px;background:#00000020">${['🗺️','💬','📸','📰','🔦'].map(e => `<span style="font-size:10px">${e}</span>`).join('')}</div>
+    </div>
+  `, '#fffc00', '#000'),
+
+  'social-pinterest': base(`
+    <div style="padding:8px;background:#fff">
+      <div style="text-align:center;font-size:10px;font-weight:700;color:#e60023;margin-bottom:6px">Pinterest</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px">${[50,35,45,30,55,40].map((h,i) => `<div style="height:${h}px;background:hsl(${i*55},60%,80%);border-radius:6px"></div>`).join('')}</div>
+    </div>
+  `, '#fff', '#222'),
+
+  'social-linkedin': base(`
+    <div style="background:#000">
+      <nav style="background:#1b1f23;padding:4px 8px;display:flex;justify-content:space-between"><span style="font-size:9px;font-weight:700;color:#0a66c2">in</span><div style="display:flex;gap:6px">${['🏠','👥','💼','💬'].map(e => `<span style="font-size:7px">${e}</span>`).join('')}</div></nav>
+      <div style="padding:6px"><div style="background:#1b1f23;border-radius:6px;padding:6px;margin-bottom:4px"><div style="display:flex;gap:4px;align-items:center"><div style="width:16px;height:16px;border-radius:50%;background:#334155"></div><div><div style="font-size:6px;font-weight:600;color:#fff">Professional User</div><div style="font-size:4px;color:#888">Sr. Engineer at Tech Co</div></div></div><div style="font-size:5px;color:#b0b0b0;margin-top:4px">Excited to announce my new role...</div></div></div>
+    </div>
+  `, '#000', '#fff'),
+
+  'social-spotify': base(`
+    <div style="display:flex;height:200px;background:#121212">
+      <div style="width:40px;background:#000;padding:6px 4px">${['🏠','🔍','📚'].map(e => `<div style="text-align:center;margin:6px 0;font-size:8px">${e}</div>`).join('')}</div>
+      <div style="flex:1;padding:6px"><div style="font-size:8px;font-weight:700;color:#fff;margin-bottom:6px">Good Evening</div><div style="display:grid;grid-template-columns:repeat(2,1fr);gap:3px">${[{c:'#e91e63'},{c:'#1db954'},{c:'#ff5722'},{c:'#2196f3'}].map(p => `<div style="display:flex;gap:3px;background:#1a1a1a;border-radius:4px;overflow:hidden"><div style="width:18px;height:18px;background:${p.c}"></div><div style="font-size:5px;padding:3px;color:#fff">Playlist</div></div>`).join('')}</div></div>
+      <div style="position:absolute;bottom:0;left:0;right:0;height:24px;background:#1a1a1a;display:flex;align-items:center;padding:0 8px;gap:4px"><div style="width:12px;height:12px;background:#333;border-radius:2px"></div><div style="flex:1"><div style="font-size:5px;color:#fff">Song Title</div><div style="height:2px;background:#333;border-radius:1px;margin-top:2px"><div style="width:40%;height:100%;background:#1db954;border-radius:1px"></div></div></div><span style="font-size:8px">▶</span></div>
+    </div>
+  `, '#121212', '#fff'),
+
+  'social-twitch': base(`
+    <div style="display:flex;height:200px;background:#0e0e10">
+      <div style="width:30px;background:#1f1f23;padding:4px">${[1,2,3].map(() => `<div style="width:16px;height:16px;border-radius:50%;background:#333;margin:4px auto"></div>`).join('')}</div>
+      <div style="flex:1;padding:6px"><div style="height:80px;background:#18181b;border-radius:4px;display:flex;align-items:center;justify-content:center;margin-bottom:4px"><span style="font-size:7px;color:#9146ff">LIVE</span></div><div style="font-size:6px;font-weight:600;color:#fff">Streamer playing Game</div><div style="font-size:5px;color:#888">🔴 12.4K viewers</div></div>
+      <div style="width:50px;background:#18181b;padding:4px"><div style="font-size:5px;color:#fff;margin-bottom:2px">Chat</div>${[1,2,3].map(() => `<div style="font-size:4px;color:#888;margin-bottom:2px"><span style="color:#9146ff">user</span>: msg</div>`).join('')}</div>
+    </div>
+  `, '#0e0e10', '#fff'),
+
+  'social-threads': base(`
+    <div style="padding:12px;background:#101010">
+      <div style="text-align:center;font-size:12px;font-weight:700;color:#fff;margin-bottom:8px">@</div>
+      ${[1,2].map(() => `<div style="border-bottom:1px solid #222;padding:6px 0"><div style="display:flex;gap:4px;align-items:center"><div style="width:16px;height:16px;border-radius:50%;background:#333"></div><div><span style="font-size:6px;font-weight:600;color:#fff">user</span><span style="font-size:5px;color:#888"> · 2h</span></div></div><div style="font-size:5px;color:#ccc;margin:3px 0 0 20px">Just shared my thoughts on...</div><div style="display:flex;gap:8px;margin:3px 0 0 20px">${['❤️','💬','🔄','↗️'].map(e => `<span style="font-size:6px;opacity:.4">${e}</span>`).join('')}</div></div>`).join('')}
+    </div>
+  `, '#101010', '#fff'),
+
+  'social-mastodon': base(`
+    <div style="display:flex;height:200px;background:#191b22">
+      <div style="width:40px;background:#282c37;padding:4px">${['🏠','🔍','🔔','📧'].map(e => `<div style="text-align:center;margin:6px 0;font-size:7px">${e}</div>`).join('')}</div>
+      <div style="flex:1;padding:6px"><div style="font-size:8px;font-weight:600;color:#fff;margin-bottom:4px">Home</div>${[1,2].map(() => `<div style="background:#313543;border-radius:4px;padding:4px;margin-bottom:3px"><div style="display:flex;gap:3px"><div style="width:14px;height:14px;border-radius:4px;background:#6364ff"></div><div style="font-size:5px;color:#fff">user@mastodon</div></div><div style="font-size:5px;color:#9baec8;margin-top:2px">A toot about federation...</div></div>`).join('')}</div>
+    </div>
+  `, '#191b22', '#9baec8'),
+
+  'social-bereal': base(`
+    <div style="padding:12px;background:#000;text-align:center">
+      <div style="font-size:10px;font-weight:700;color:#fff;margin-bottom:6px">BeReal.</div>
+      <div style="height:80px;background:#1a1a1a;border-radius:10px;position:relative;margin-bottom:6px"><div style="position:absolute;top:4px;left:4px;width:24px;height:32px;background:#333;border-radius:6px;border:2px solid #000"></div></div>
+      <div style="font-size:5px;color:#888">⏱ You're 2h late</div>
+    </div>
+  `, '#000', '#fff'),
+
+  'social-clubhouse': base(`
+    <div style="padding:12px;background:#f0ebe3">
+      <div style="font-size:10px;font-weight:700;color:#553b08;margin-bottom:6px">🎙️ Clubhouse</div>
+      <div style="background:#fff;border-radius:10px;padding:8px;margin-bottom:4px"><div style="font-size:7px;font-weight:600;color:#333">Tech Talk Room</div><div style="font-size:5px;color:#888;margin:2px 0">🟢 Live · 142 listeners</div><div style="display:flex;gap:3px;margin-top:4px">${[1,2,3].map(() => `<div style="width:16px;height:16px;border-radius:50%;background:#e8e0d0"></div>`).join('')}</div></div>
+    </div>
+  `, '#f0ebe3', '#333'),
+
+  'social-medium': base(`
+    <div style="padding:12px;background:#fff">
+      <div style="text-align:center;font-size:14px;font-weight:400;font-family:serif;color:#222;margin-bottom:8px">Medium</div>
+      ${[1,2].map(() => `<div style="border-bottom:1px solid #eee;padding:6px 0"><div style="display:flex;gap:6px"><div style="flex:1"><div style="font-size:7px;font-weight:700;color:#222;font-family:serif">Article Title Here</div><div style="font-size:5px;color:#888;margin-top:2px">A brief description of this piece...</div><div style="font-size:4px;color:#888;margin-top:2px">5 min read · 👏 234</div></div><div style="width:24px;height:24px;background:#f3f4f6;border-radius:2px"></div></div></div>`).join('')}
+    </div>
+  `, '#fff', '#222'),
+
+  'social-quora': base(`
+    <div style="padding:12px;background:#fff">
+      <div style="font-size:10px;font-weight:700;color:#b92b27;margin-bottom:8px">Quora</div>
+      ${[1,2].map(i => `<div style="border-bottom:1px solid #eee;padding:4px 0"><div style="font-size:7px;font-weight:600;color:#222">Question ${i}?</div><div style="font-size:5px;color:#888;margin:2px 0">An expert answer with detailed explanation...</div><div style="display:flex;gap:6px;font-size:5px;color:#888"><span>▲ 42</span><span>💬 8</span></div></div>`).join('')}
+    </div>
+  `, '#fff', '#222'),
+
+  'social-tumblr': base(`
+    <div style="padding:12px;background:#001935">
+      <div style="font-size:10px;font-weight:700;color:#fff;margin-bottom:6px">tumblr</div>
+      <div style="background:#00264d;border-radius:4px;overflow:hidden;margin-bottom:4px"><div style="height:40px;background:linear-gradient(135deg,#e74c3c,#9b59b6)"></div><div style="padding:4px"><div style="font-size:6px;font-weight:600;color:#fff">blog-name</div><div style="font-size:5px;color:#8899a6">♻️ reblogged · ❤️ 1,234</div></div></div>
+    </div>
+  `, '#001935', '#fff'),
+
+  'social-wechat': base(`
+    <div style="display:flex;height:200px;background:#ebebeb">
+      <div style="width:60px;background:#fff;border-right:1px solid #e0e0e0;padding:4px">${['Mom','Group','John'].map(n => `<div style="display:flex;gap:3px;padding:3px 0;border-bottom:1px solid #f0f0f0"><div style="width:14px;height:14px;border-radius:4px;background:#07c160"></div><div style="font-size:5px;color:#333">${n}</div></div>`).join('')}</div>
+      <div style="flex:1;background:#ebebeb;padding:6px"><div style="background:#fff;border-radius:6px;padding:4px;margin-bottom:3px;font-size:5px;color:#333;max-width:70%">Hello! 👋</div><div style="background:#95ec69;border-radius:6px;padding:4px;font-size:5px;color:#333;max-width:70%;margin-left:auto">Hi there!</div></div>
+    </div>
+  `, '#ebebeb', '#333'),
+
+  'social-signal': base(`
+    <div style="display:flex;height:200px;background:#1b1b1b">
+      <div style="width:60px;background:#1b1b1b;border-right:1px solid #333;padding:4px">${['🔒 Alice','🔒 Bob','🔒 Group'].map(n => `<div style="padding:3px 0;border-bottom:1px solid #333;font-size:5px;color:#fff">${n}</div>`).join('')}</div>
+      <div style="flex:1;padding:6px"><div style="background:#2c6bed;border-radius:6px;padding:4px;margin-bottom:3px;font-size:5px;color:#fff;max-width:70%;margin-left:auto">Encrypted message 🔐</div><div style="background:#333;border-radius:6px;padding:4px;font-size:5px;color:#fff;max-width:70%">Secure reply</div></div>
+    </div>
+  `, '#1b1b1b', '#fff'),
+
+  'social-kick': base(`
+    <div style="display:flex;height:200px;background:#0e0e10">
+      <div style="flex:1;padding:6px"><div style="height:90px;background:#141414;border-radius:4px;display:flex;align-items:center;justify-content:center;margin-bottom:4px"><span style="font-size:10px;font-weight:700;color:#53fc18">🔴 LIVE</span></div><div style="font-size:6px;font-weight:600;color:#fff">Streamer Name</div><div style="font-size:5px;color:#53fc18">Gaming · 5.2K viewers</div></div>
+      <div style="width:50px;background:#141414;padding:4px"><div style="font-size:5px;color:#53fc18;margin-bottom:2px">Chat</div>${[1,2,3].map(() => `<div style="font-size:4px;color:#888;margin-bottom:2px"><span style="color:#53fc18">user</span>: GG</div>`).join('')}</div>
+    </div>
+  `, '#0e0e10', '#fff'),
+
+  'social-bluesky': base(`
+    <div style="padding:12px;background:#fff">
+      <div style="text-align:center;font-size:10px;font-weight:700;color:#0085ff;margin-bottom:8px">🦋 Bluesky</div>
+      ${[1,2].map(() => `<div style="border-bottom:1px solid #eee;padding:6px 0"><div style="display:flex;gap:4px"><div style="width:16px;height:16px;border-radius:50%;background:#e0f0ff"></div><div><div style="font-size:6px;font-weight:600;color:#222">user.bsky.social</div><div style="font-size:5px;color:#666;margin-top:2px">A post about decentralized social...</div></div></div></div>`).join('')}
+    </div>
+  `, '#fff', '#222'),
+
+  'social-lemon8': base(`
+    <div style="padding:12px;background:#fff">
+      <div style="text-align:center;font-size:10px;font-weight:700;color:#8bc34a;margin-bottom:6px">🍋 Lemon8</div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:3px">${[1,2,3,4].map(i => `<div style="height:${i%2?40:32}px;background:hsl(${60+i*20},70%,85%);border-radius:6px"></div>`).join('')}</div>
+    </div>
+  `, '#fff', '#222'),
+
+  'social-letterboxd': base(`
+    <div style="padding:12px;background:#14181c">
+      <div style="font-size:9px;font-weight:700;color:#fff;margin-bottom:6px">Letterboxd</div>
+      <div style="display:flex;gap:3px">${[1,2,3,4,5].map(i => `<div style="width:24px;height:36px;background:hsl(${i*70},50%,30%);border-radius:2px"></div>`).join('')}</div>
+      <div style="font-size:5px;color:#9ab;margin-top:4px">★★★★☆ · Reviewed 2 days ago</div>
+    </div>
+  `, '#14181c', '#9ab'),
+
+  'social-goodreads': base(`
+    <div style="padding:12px;background:#f4f1ea">
+      <div style="font-size:10px;font-weight:400;font-family:serif;color:#382110;margin-bottom:6px">goodreads</div>
+      <div style="display:flex;gap:4px">${[1,2,3].map(i => `<div style="width:24px;height:36px;background:hsl(${30+i*20},40%,60%);border-radius:2px;border:1px solid #d5c8a8"></div>`).join('')}</div>
+      <div style="font-size:5px;color:#999;margin-top:4px">📚 Reading Challenge: 12/24 books</div>
+    </div>
+  `, '#f4f1ea', '#382110'),
+
+  'social-strava': base(`
+    <div style="padding:12px;background:#fff">
+      <div style="font-size:10px;font-weight:700;color:#fc4c02;margin-bottom:6px">STRAVA</div>
+      <div style="background:#f7f7f7;border-radius:6px;padding:6px"><div style="font-size:7px;font-weight:600;color:#333">Morning Run 🏃</div><div style="display:flex;gap:6px;margin-top:4px;font-size:5px">${[['5.2 km','Distance'],['25:30','Time'],["4'54\"", 'Pace']].map(([v,l]) => `<div><div style="font-weight:700;color:#333">${v}</div><div style="color:#999">${l}</div></div>`).join('')}</div></div>
+    </div>
+  `, '#fff', '#333'),
+
+  'social-nextdoor': base(`
+    <div style="padding:12px;background:#fff">
+      <div style="font-size:10px;font-weight:700;color:#8ed500;margin-bottom:6px">nextdoor</div>
+      ${['🔒 Safety Alert — Car break-ins on Oak St','🆓 Free Items — Moving sale this weekend'].map(p => `<div style="background:#f7f7f7;border-radius:4px;padding:4px;margin-bottom:3px;font-size:5px;color:#333">${p}</div>`).join('')}
+    </div>
+  `, '#fff', '#333'),
+
+  // ═══════════════════════════════════════════
+  // BLOG — Additional Previews
+  // ═══════════════════════════════════════════
+  'blog-personal': base(`
+    <div style="padding:16px;background:#faf8f5;text-align:center">
+      <div style="font-size:14px;font-weight:400;font-family:serif;color:#333">thoughts.</div>
+      <div style="font-size:6px;color:#888;margin:6px 0">A personal blog about life and code</div>
+      ${[1,2].map(() => `<div style="text-align:left;border-bottom:1px solid #e8e0d0;padding:6px 0"><div style="font-size:7px;font-weight:600;color:#333;font-family:serif">Post Title</div><div style="font-size:5px;color:#888">Jan 2025 · 3 min read</div></div>`).join('')}
+    </div>
+  `, '#faf8f5', '#333'),
+
+  'blog-tech': base(`
+    <div style="padding:12px;background:#0a0a0a">
+      <div style="font-size:10px;font-weight:700;color:#06b6d4;margin-bottom:6px">{'<'} TechBlog {'>'}</div>
+      <div style="background:#111;border:1px solid #06b6d420;border-radius:6px;padding:6px;margin-bottom:4px"><div style="font-size:6px;font-weight:600;color:#fff">Building a REST API</div><div style="font-size:5px;color:#06b6d4;margin-top:2px">Advanced · 12 min read</div><div style="background:#1a1a2e;border-radius:3px;padding:3px;margin-top:3px;font-family:monospace;font-size:4px;color:#22c55e">const api = express();</div></div>
+    </div>
+  `, '#0a0a0a', '#fff'),
+
+  'blog-travel': base(`
+    <div style="padding:12px;background:#fff">
+      <div style="font-size:10px;font-weight:700;color:#0ea5e9">🌍 Wanderlust</div>
+      <div style="height:50px;background:linear-gradient(135deg,#0ea5e9,#06b6d4);border-radius:6px;margin:6px 0;display:flex;align-items:end;padding:6px"><span style="font-size:7px;color:#fff;font-weight:600">📍 Exploring Japan</span></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px">${[1,2,3].map(i => `<div style="height:24px;background:hsl(${180+i*20},60%,80%);border-radius:3px"></div>`).join('')}</div>
+    </div>
+  `, '#fff', '#222'),
+
+  'blog-food': base(`
+    <div style="padding:12px;background:#fffbf0">
+      <div style="font-size:10px;font-weight:700;color:#b45309">🍳 Kitchen Stories</div>
+      <div style="height:50px;background:linear-gradient(135deg,#f59e0b,#ea580c);border-radius:6px;margin:6px 0;display:flex;align-items:center;justify-content:center;font-size:18px">🍝</div>
+      <div style="font-size:6px;color:#333;font-weight:600">Classic Pasta Recipe</div>
+      <div style="font-size:5px;color:#888">⏱ 30 min · 🍽️ 4 servings · ⭐ 4.8</div>
+    </div>
+  `, '#fffbf0', '#333'),
+
+  'blog-news-portal': base(`
+    <div style="background:#fff">
+      <div style="background:#dc2626;text-align:center;padding:2px;font-size:5px;color:#fff;font-weight:700">⚡ BREAKING NEWS</div>
+      <div style="padding:8px"><div style="font-size:12px;font-weight:800;color:#111;text-align:center;margin-bottom:6px">NEWS24</div><div style="display:grid;grid-template-columns:2fr 1fr;gap:4px"><div style="height:50px;background:#111;border-radius:3px;display:flex;align-items:end;padding:4px"><span style="font-size:6px;color:#fff;font-weight:600">Top Story</span></div><div style="display:flex;flex-direction:column;gap:3px">${[1,2].map(() => `<div style="flex:1;background:#f3f4f6;border-radius:2px;padding:2px"><div style="font-size:4px;font-weight:600;color:#333">Headline</div></div>`).join('')}</div></div></div>
+    </div>
+  `, '#fff', '#111'),
+
+  // ═══════════════════════════════════════════
+  // SAAS — Additional Previews
+  // ═══════════════════════════════════════════
+  'saas-email-marketing': base(`
+    <div style="display:flex;height:200px"><div style="width:40px;background:#1e293b;padding:4px">${['📧','📊','👥','⚙️'].map(e => `<div style="text-align:center;margin:6px 0;font-size:7px">${e}</div>`).join('')}</div><div style="flex:1;padding:6px"><div style="font-size:7px;font-weight:600;margin-bottom:4px">Campaigns</div>${['Newsletter #12 — Sent','Welcome Series — Active','Promo Q1 — Draft'].map((c,i) => `<div style="background:#1e293b;border-radius:3px;padding:3px;margin-bottom:2px;font-size:5px;display:flex;justify-content:space-between"><span>${c.split('—')[0]}</span><span style="color:${['#22c55e','#3b82f6','#888'][i]}">${c.split('—')[1]}</span></div>`).join('')}</div></div>
+  `),
+
+  'saas-helpdesk': base(`
+    <div style="display:flex;height:200px"><div style="width:40px;background:#1e293b;padding:4px">${['🎫','📊','📚','⚙️'].map(e => `<div style="text-align:center;margin:6px 0;font-size:7px">${e}</div>`).join('')}</div><div style="flex:1;padding:6px"><div style="font-size:7px;font-weight:600;margin-bottom:4px">Tickets</div>${[{t:'Login issue',p:'🔴',s:'Open'},{t:'Feature request',p:'🟡',s:'In Progress'},{t:'Bug report',p:'🟢',s:'Resolved'}].map(tk => `<div style="background:#1e293b;border-radius:3px;padding:3px;margin-bottom:2px;font-size:5px;display:flex;justify-content:space-between"><span>${tk.p} ${tk.t}</span><span style="color:#888">${tk.s}</span></div>`).join('')}</div></div>
+  `),
+
+  'saas-invoicing': base(`
+    <div style="display:flex;height:200px"><div style="width:40px;background:#1e293b;padding:4px">${['📄','👥','💳','⚙️'].map(e => `<div style="text-align:center;margin:6px 0;font-size:7px">${e}</div>`).join('')}</div><div style="flex:1;padding:6px"><div style="font-size:7px;font-weight:600;margin-bottom:4px">Invoices</div>${[{id:'#001',a:'$1,200',s:'Paid',c:'#22c55e'},{id:'#002',a:'$850',s:'Sent',c:'#3b82f6'},{id:'#003',a:'$2,400',s:'Overdue',c:'#ef4444'}].map(inv => `<div style="background:#1e293b;border-radius:3px;padding:3px;margin-bottom:2px;font-size:5px;display:flex;justify-content:space-between"><span>${inv.id} — ${inv.a}</span><span style="color:${inv.c}">${inv.s}</span></div>`).join('')}</div></div>
+  `),
+
+  'saas-scheduling': base(`
+    <div style="padding:12px;background:#f8f5ff">
+      <div style="font-size:10px;font-weight:700;color:#7c3aed">📅 ScheduleMe</div>
+      <div style="background:#fff;border:1px solid #e9d5ff;border-radius:6px;padding:8px;margin-top:6px"><div style="font-size:7px;font-weight:600;color:#333;margin-bottom:4px">Select a time</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px">${['9:00','9:30','10:00','10:30','11:00','11:30'].map(t => `<div style="background:#f3e8ff;border-radius:3px;padding:3px;text-align:center;font-size:5px;color:#7c3aed">${t}</div>`).join('')}</div></div>
+    </div>
+  `, '#f8f5ff', '#333'),
+
+  'saas-form-builder': base(`
+    <div style="display:flex;height:200px"><div style="width:40px;background:#1e293b;padding:4px"><div style="font-size:5px;color:#888;margin-bottom:4px">Fields</div>${['Aa','📧','☑️','⭐'].map(f => `<div style="background:#111;border-radius:3px;padding:3px;margin-bottom:2px;text-align:center;font-size:6px">${f}</div>`).join('')}</div><div style="flex:1;padding:8px"><div style="font-size:7px;font-weight:600;margin-bottom:6px">Form Preview</div><div style="background:#1e293b;border-radius:4px;padding:4px;margin-bottom:3px"><div style="font-size:5px;opacity:.5;margin-bottom:2px">Name</div><div style="height:10px;background:#111;border-radius:2px"></div></div><div style="background:#1e293b;border-radius:4px;padding:4px"><div style="font-size:5px;opacity:.5;margin-bottom:2px">Email</div><div style="height:10px;background:#111;border-radius:2px"></div></div></div></div>
+  `),
+
+  // ═══════════════════════════════════════════
+  // CRYPTO — Additional Previews
+  // ═══════════════════════════════════════════
+  'crypto-metamask': base(`
+    <div style="padding:10px;background:#1a1a1a;max-width:120px;margin:0 auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-size:6px;color:#e2761b">🦊 MetaMask</span><span style="font-size:4px;color:#888;background:#222;padding:1px 4px;border-radius:4px">Ethereum</span></div>
+      <div style="text-align:center;margin-bottom:6px"><div style="font-size:12px;font-weight:800;color:#fff">2.45 ETH</div><div style="font-size:5px;color:#888">$8,330.00</div></div>
+      <div style="display:flex;gap:3px">${['Send','Swap','Bridge'].map(a => `<div style="flex:1;background:#e2761b;border-radius:12px;padding:3px;text-align:center;font-size:5px;color:#fff">${a}</div>`).join('')}</div>
+    </div>
+  `, '#1a1a1a', '#fff'),
+
+  'crypto-phantom': base(`
+    <div style="padding:10px;background:#1a0a2e;max-width:120px;margin:0 auto">
+      <div style="text-align:center;margin-bottom:6px"><div style="font-size:6px;color:#ab9ff2">👻 Phantom</div><div style="font-size:12px;font-weight:800;color:#fff;margin-top:4px">42.5 SOL</div><div style="font-size:5px;color:#888">$4,250.00</div></div>
+      <div style="display:flex;gap:3px">${['Send','Receive','Swap'].map(a => `<div style="flex:1;background:#ab9ff2;border-radius:12px;padding:3px;text-align:center;font-size:5px;color:#000">${a}</div>`).join('')}</div>
+    </div>
+  `, '#1a0a2e', '#fff'),
+
+  'crypto-trust': base(`
+    <div style="padding:10px;background:#1a2035">
+      <div style="text-align:center;font-size:6px;color:#3375bb;margin-bottom:4px">Trust Wallet</div>
+      <div style="text-align:center;font-size:14px;font-weight:800;color:#fff;margin-bottom:6px">$12,450</div>
+      <div style="display:flex;gap:3px;justify-content:center;margin-bottom:6px">${['Send','Receive','Buy'].map(a => `<div style="background:#3375bb;padding:3px 8px;border-radius:12px;font-size:5px;color:#fff">${a}</div>`).join('')}</div>
+    </div>
+  `, '#1a2035', '#fff'),
+
+  'crypto-ledger': base(`
+    <div style="padding:10px;background:#0a0a0a">
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-size:7px;font-weight:700;color:#fff">Ledger Live</span><span style="font-size:5px;color:#22c55e">● Connected</span></div>
+      <div style="font-size:12px;font-weight:800;color:#fff;margin-bottom:6px">$34,120</div>
+      ${[{n:'Bitcoin',v:'$22K'},{n:'Ethereum',v:'$8K'}].map(a => `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #1a1a1a;font-size:5px"><span style="color:#fff">${a.n}</span><span style="color:#888">${a.v}</span></div>`).join('')}
+    </div>
+  `, '#0a0a0a', '#fff'),
+
+  'crypto-nft-marketplace': base(`
+    <div style="padding:10px;background:#0a0a14">
+      <div style="font-size:9px;font-weight:700;color:#fff;margin-bottom:6px">🖼️ NFT Market</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px">${[1,2,3].map(i => `<div style="border-radius:6px;overflow:hidden"><div style="height:30px;background:linear-gradient(${i*90+45}deg,hsl(${i*100},60%,40%),hsl(${i*100+60},60%,60%))"></div><div style="background:#1a1a2e;padding:3px"><div style="font-size:4px;color:#fff">NFT #${i*111}</div><div style="font-size:4px;color:#3b82f6">◎ ${(i*0.5).toFixed(1)}</div></div></div>`).join('')}</div>
+    </div>
+  `, '#0a0a14', '#fff'),
+
+  'crypto-dex': base(`
+    <div style="padding:12px;background:#0f0720">
+      <div style="text-align:center;font-size:8px;font-weight:700;color:#ec4899;margin-bottom:6px">🦄 DEX Swap</div>
+      <div style="background:#ffffff08;border:1px solid #ffffff15;border-radius:8px;padding:6px;margin-bottom:3px"><div style="font-size:5px;opacity:.4">From</div><div style="display:flex;justify-content:space-between"><span style="font-size:9px;font-weight:600;color:#fff">1.0</span><span style="font-size:6px;background:#ec489920;color:#ec4899;padding:2px 6px;border-radius:4px">ETH</span></div></div>
+      <div style="text-align:center;font-size:8px;color:#888;margin:2px 0">↕</div>
+      <div style="background:#ffffff08;border:1px solid #ffffff15;border-radius:8px;padding:6px"><div style="font-size:5px;opacity:.4">To</div><div style="display:flex;justify-content:space-between"><span style="font-size:9px;font-weight:600;color:#fff">3,420</span><span style="font-size:6px;background:#3b82f620;color:#3b82f6;padding:2px 6px;border-radius:4px">USDC</span></div></div>
+    </div>
+  `, '#0f0720', '#fff'),
+
+  'crypto-launchpad': base(`
+    <div style="padding:12px;background:#0a0a0a">
+      <div style="font-size:9px;font-weight:700;color:#fbbf24;margin-bottom:6px">🚀 LaunchPad</div>
+      <div style="background:#111;border:1px solid #fbbf2420;border-radius:6px;padding:6px"><div style="font-size:7px;font-weight:700;color:#fff">ProjectX Token</div><div style="font-size:5px;color:#888;margin:2px 0">IDO starts in 2d 14h</div><div style="height:4px;background:#1a1a1a;border-radius:2px;overflow:hidden"><div style="width:35%;height:100%;background:#fbbf24"></div></div><div style="font-size:4px;color:#888;margin-top:2px">$350K / $1M</div></div>
+    </div>
+  `, '#0a0a0a', '#fff'),
+
+  'crypto-bridge': base(`
+    <div style="padding:12px;background:#0a0a1a">
+      <div style="text-align:center;font-size:8px;font-weight:700;color:#3b82f6;margin-bottom:6px">🌉 Bridge</div>
+      <div style="display:flex;gap:4px;align-items:center;justify-content:center;margin-bottom:6px"><div style="background:#627eea20;padding:3px 8px;border-radius:4px;font-size:6px;color:#627eea">Ethereum</div><span style="font-size:8px;color:#888">→</span><div style="background:#8247e520;padding:3px 8px;border-radius:4px;font-size:6px;color:#8247e5">Polygon</div></div>
+      <div style="background:#111;border-radius:6px;padding:6px;text-align:center"><div style="font-size:10px;font-weight:700;color:#fff">1.0 ETH</div><div style="font-size:5px;color:#888;margin-top:2px">~2 min · Fee: $2.50</div></div>
+    </div>
+  `, '#0a0a1a', '#fff'),
+
+  'crypto-portfolio-tracker': base(`
+    <div style="padding:10px;background:#050505">
+      <div style="font-size:7px;font-weight:600;margin-bottom:4px">📈 Portfolio</div>
+      <div style="font-size:14px;font-weight:800;color:#22c55e;margin-bottom:4px">$142,580 <span style="font-size:6px">↑ 12.4%</span></div>
+      ${[{n:'BTC',v:'$98K',p:'+2.1%'},{n:'ETH',v:'$32K',p:'+5.3%'},{n:'SOL',v:'$12K',p:'-1.2%'}].map(a => `<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #1a1a1a;font-size:5px"><span>${a.n}</span><span>${a.v}</span><span style="color:${a.p.startsWith('+')?'#22c55e':'#ef4444'}">${a.p}</span></div>`).join('')}
+    </div>
+  `, '#050505', '#fff'),
+
+  'crypto-staking': base(`
+    <div style="padding:12px;background:#0a1a0a">
+      <div style="font-size:9px;font-weight:700;color:#22c55e;margin-bottom:6px">🥩 Staking</div>
+      ${[{n:'ETH',apy:'4.2%',tvl:'$2.1B'},{n:'SOL',apy:'6.8%',tvl:'$890M'}].map(p => `<div style="background:#111;border:1px solid #22c55e20;border-radius:4px;padding:4px;margin-bottom:3px;display:flex;justify-content:space-between;font-size:5px"><span style="color:#fff">${p.n}</span><span style="color:#22c55e">APY ${p.apy}</span><span style="color:#888">TVL ${p.tvl}</span></div>`).join('')}
+    </div>
+  `, '#0a1a0a', '#fff'),
+
+  'crypto-lending': base(`
+    <div style="padding:12px;background:#0f0720">
+      <div style="font-size:9px;font-weight:700;color:#a855f7;margin-bottom:6px">🏦 Lending</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">${[{t:'Supply',items:[{n:'USDC',r:'3.2%'},{n:'ETH',r:'1.8%'}]},{t:'Borrow',items:[{n:'USDC',r:'5.1%'},{n:'ETH',r:'3.4%'}]}].map(s => `<div><div style="font-size:5px;color:#888;margin-bottom:2px">${s.t}</div>${s.items.map(i => `<div style="background:#111;border-radius:3px;padding:3px;margin-bottom:2px;font-size:5px;display:flex;justify-content:space-between"><span style="color:#fff">${i.n}</span><span style="color:#a855f7">${i.r}</span></div>`).join('')}</div>`).join('')}</div>
+    </div>
+  `, '#0f0720', '#fff'),
+
+  'crypto-dao': base(`
+    <div style="padding:12px;background:#0f0720">
+      <div style="font-size:9px;font-weight:700;color:#7c3aed;margin-bottom:6px">🏛️ DAO</div>
+      ${['Proposal #42 — Increase treasury','Proposal #41 — New partnership'].map((p,i) => `<div style="background:#111;border-radius:4px;padding:4px;margin-bottom:3px"><div style="font-size:5px;color:#fff">${p}</div><div style="height:3px;background:#1a1a1a;border-radius:2px;margin-top:2px"><div style="width:${i===0?'68':'92'}%;height:100%;background:${i===0?'#22c55e':'#22c55e'};border-radius:2px"></div></div><div style="font-size:4px;color:#888;margin-top:1px">${i===0?'68% For':'92% For'} · ${i===0?'2d left':'Passed'}</div></div>`).join('')}
+    </div>
+  `, '#0f0720', '#fff'),
+
+  'crypto-mining': base(`
+    <div style="padding:12px;background:#0a0a0a">
+      <div style="font-size:9px;font-weight:700;color:#f59e0b;margin-bottom:6px">⛏️ Mining</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px;margin-bottom:4px">${[{l:'Hashrate',v:'120 MH/s',c:'#f59e0b'},{l:'Daily',v:'$12.40',c:'#22c55e'},{l:'Workers',v:'3/3',c:'#3b82f6'}].map(m => `<div style="background:#111;border-radius:3px;padding:3px;text-align:center"><div style="font-size:4px;color:#888">${m.l}</div><div style="font-size:6px;font-weight:700;color:${m.c}">${m.v}</div></div>`).join('')}</div>
+    </div>
+  `, '#0a0a0a', '#fff'),
+
+  'crypto-payment-gateway': base(`
+    <div style="padding:12px;background:#0a0a1a">
+      <div style="font-size:9px;font-weight:700;color:#3b82f6;margin-bottom:6px">💳 CryptoPay</div>
+      <div style="background:#111;border-radius:6px;padding:6px"><div style="font-size:6px;color:#fff;margin-bottom:2px">Payment Link</div><div style="background:#1a1a2e;border-radius:3px;padding:3px;font-size:5px;color:#888;margin-bottom:4px">pay.crypto/inv-4521</div><div style="display:flex;gap:2px">${['BTC','ETH','USDC','SOL'].map(c => `<span style="font-size:4px;padding:1px 4px;background:#1e293b;border-radius:2px;color:#3b82f6">${c}</span>`).join('')}</div></div>
+    </div>
+  `, '#0a0a1a', '#fff'),
+
+  'crypto-airdrop': base(`
+    <div style="padding:12px;background:#0a0a14">
+      <div style="font-size:9px;font-weight:700;background:linear-gradient(135deg,#ec4899,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px">🪂 Airdrops</div>
+      ${['✅ Follow on X','✅ Join Discord','⬜ Use Protocol 3x','⬜ Hold 100+ tokens'].map(t => `<div style="font-size:5px;padding:2px 0;color:#888">${t}</div>`).join('')}
+      <div style="font-size:5px;color:#22c55e;margin-top:4px">Est. value: $500-$2,000</div>
+    </div>
+  `, '#0a0a14', '#fff'),
+
+  // ═══════════════════════════════════════════
+  // BANKS — Additional Previews
+  // ═══════════════════════════════════════════
+  'bank-trading-app': base(`
+    <div style="padding:10px;background:#050505">
+      <div style="font-size:7px;font-weight:600;color:#22c55e;margin-bottom:4px">📈 Stocks</div>
+      <div style="font-size:14px;font-weight:800;color:#fff;margin-bottom:4px">$24,580</div>
+      <div style="height:40px;display:flex;align-items:end;gap:1px;margin-bottom:4px">${[30,45,40,60,55,70,65,80,75,85].map(h => `<div style="flex:1;background:#22c55e40;border-radius:1px 1px 0 0;height:${h}%"></div>`).join('')}</div>
+      ${[{t:'AAPL',p:'$178',c:'+1.2%'},{t:'TSLA',p:'$248',c:'+2.8%'}].map(s => `<div style="display:flex;justify-content:space-between;padding:2px 0;font-size:5px;border-bottom:1px solid #1a1a1a"><span style="color:#fff">${s.t}</span><span>${s.p}</span><span style="color:#22c55e">${s.c}</span></div>`).join('')}
+    </div>
+  `, '#050505', '#fff'),
+
+  'bank-insurance': base(`
+    <div style="padding:12px;background:#eff6ff">
+      <div style="font-size:9px;font-weight:700;color:#1d4ed8">🛡️ InsurTech</div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:3px;margin-top:6px">${['🚗 Auto','🏠 Home','❤️ Life','🏥 Health'].map(p => `<div style="background:#fff;border:1px solid #bfdbfe;border-radius:6px;padding:6px;text-align:center;font-size:5px;color:#1d4ed8">${p}</div>`).join('')}</div>
+    </div>
+  `, '#eff6ff', '#1d4ed8'),
+
+  'bank-budget': base(`
+    <div style="padding:12px;background:#f0fdf4">
+      <div style="font-size:9px;font-weight:700;color:#16a34a">💰 Budget Tracker</div>
+      <div style="background:#fff;border-radius:6px;padding:6px;margin-top:6px">${[{c:'Housing',p:45,cl:'#3b82f6'},{c:'Food',p:25,cl:'#22c55e'},{c:'Transport',p:15,cl:'#f59e0b'},{c:'Fun',p:15,cl:'#ec4899'}].map(b => `<div style="display:flex;align-items:center;gap:4px;margin-bottom:3px"><div style="width:6px;height:6px;border-radius:1px;background:${b.cl}"></div><div style="flex:1;font-size:5px;color:#333">${b.c}</div><div style="width:50px;height:4px;background:#e5e7eb;border-radius:2px"><div style="width:${b.p}%;height:100%;background:${b.cl};border-radius:2px"></div></div></div>`).join('')}</div>
+    </div>
+  `, '#f0fdf4', '#333'),
+
+  'bank-p2p-lending': base(`
+    <div style="padding:12px">
+      <div style="font-size:9px;font-weight:700;color:#3b82f6">🤝 P2P Lending</div>
+      ${[{a:'$5,000',r:'8.5%',g:'A'},{a:'$12,000',r:'12%',g:'C'}].map(l => `<div style="background:#1e293b;border-radius:4px;padding:4px;margin-top:3px;display:flex;justify-content:space-between;font-size:5px"><span>${l.a}</span><span style="color:#22c55e">${l.r} APR</span><span style="color:${l.g==='A'?'#22c55e':'#f59e0b'}">Grade ${l.g}</span></div>`).join('')}
+    </div>
+  `),
+
+  'bank-payment-app': base(`
+    <div style="padding:12px;background:#0a0a1a">
+      <div style="text-align:center;font-size:10px;font-weight:700;color:#3b82f6;margin-bottom:6px">💸 PayApp</div>
+      <div style="text-align:center;font-size:16px;font-weight:800;color:#fff;margin-bottom:6px">$2,450.00</div>
+      <div style="display:flex;gap:4px;justify-content:center">${['Send','Request','QR'].map(a => `<div style="background:#3b82f6;padding:4px 10px;border-radius:12px;font-size:5px;color:#fff">${a}</div>`).join('')}</div>
+    </div>
+  `, '#0a0a1a', '#fff'),
+
+  'bank-wealth': base(`
+    <div style="padding:12px;background:#0a0a0a">
+      <div style="font-size:9px;font-weight:300;letter-spacing:2px;color:#d4a853">WEALTH</div>
+      <div style="font-size:14px;font-weight:800;color:#fff;margin:4px 0">$1.2M</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px">${[{l:'Stocks',v:'45%'},{l:'Real Est.',v:'30%'},{l:'Bonds',v:'25%'}].map(a => `<div style="background:#111;border:1px solid #d4a85320;border-radius:3px;padding:3px;text-align:center;font-size:5px;color:#d4a853"><div>${a.l}</div><div style="font-weight:700">${a.v}</div></div>`).join('')}</div>
+    </div>
+  `, '#0a0a0a', '#fff'),
+
+  'bank-remittance': base(`
+    <div style="padding:12px;background:#f0fdf4">
+      <div style="font-size:9px;font-weight:700;color:#16a34a">🌍 Money Transfer</div>
+      <div style="background:#fff;border-radius:6px;padding:6px;margin-top:6px"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><div style="font-size:6px"><div style="font-weight:600;color:#333">You send</div><div style="font-size:10px;font-weight:700;color:#333">$1,000 USD</div></div><div style="font-size:8px;color:#888">→</div><div style="font-size:6px;text-align:right"><div style="font-weight:600;color:#333">They get</div><div style="font-size:10px;font-weight:700;color:#22c55e">€920 EUR</div></div></div></div>
+    </div>
+  `, '#f0fdf4', '#333'),
+
+  'bank-mortgage': base(`
+    <div style="padding:12px">
+      <div style="font-size:9px;font-weight:700">🏠 Mortgage Calculator</div>
+      <div style="background:#1e293b;border-radius:6px;padding:6px;margin-top:6px">${[{l:'Loan Amount',v:'$350,000'},{l:'Rate',v:'6.5%'},{l:'Monthly',v:'$2,212'}].map(f => `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #334155;font-size:5px"><span style="opacity:.5">${f.l}</span><span style="font-weight:600">${f.v}</span></div>`).join('')}</div>
+    </div>
+  `),
+
+  'bank-expense': base(`
+    <div style="padding:12px">
+      <div style="font-size:9px;font-weight:700">📋 Expenses</div>
+      ${[{n:'Flight to NYC',a:'$420',s:'Pending'},{n:'Client Dinner',a:'$185',s:'Approved'}].map(e => `<div style="background:#1e293b;border-radius:3px;padding:4px;margin-top:3px;display:flex;justify-content:space-between;font-size:5px"><span>${e.n}</span><span>${e.a}</span><span style="color:${e.s==='Approved'?'#22c55e':'#f59e0b'}">${e.s}</span></div>`).join('')}
+    </div>
+  `),
+
+  'bank-crypto-bank': base(`
+    <div style="padding:12px;background:#0a0a1a">
+      <div style="font-size:9px;font-weight:700;background:linear-gradient(135deg,#8b5cf6,#3b82f6);-webkit-background-clip:text;-webkit-text-fill-color:transparent">🏦 CryptoBank</div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:3px;margin-top:6px">${[{c:'USD',v:'$5,200',r:'5.2% APY'},{c:'BTC',v:'0.15',r:'2.1% APY'},{c:'ETH',v:'2.4',r:'3.8% APY'},{c:'USDC',v:'$8,000',r:'8.5% APY'}].map(a => `<div style="background:#111;border:1px solid #8b5cf620;border-radius:4px;padding:4px"><div style="font-size:5px;color:#fff">${a.c}</div><div style="font-size:7px;font-weight:700;color:#fff">${a.v}</div><div style="font-size:4px;color:#22c55e">${a.r}</div></div>`).join('')}</div>
+    </div>
+  `, '#0a0a1a', '#fff'),
+
+  'bank-payroll': base(`
+    <div style="display:flex;height:200px"><div style="width:36px;background:#1e293b;padding:4px">${['👥','💰','📊','⚙️'].map(e => `<div style="text-align:center;margin:6px 0;font-size:7px">${e}</div>`).join('')}</div><div style="flex:1;padding:6px"><div style="font-size:7px;font-weight:600;margin-bottom:4px">Payroll Run</div>${[{n:'Alice',s:'$4,500'},{n:'Bob',s:'$3,800'},{n:'Carol',s:'$5,200'}].map(e => `<div style="background:#1e293b;border-radius:3px;padding:3px;margin-bottom:2px;display:flex;justify-content:space-between;font-size:5px"><span>${e.n}</span><span style="color:#22c55e">${e.s}</span></div>`).join('')}</div></div>
+  `),
+
+  'bank-robo-advisor': base(`
+    <div style="padding:12px">
+      <div style="font-size:9px;font-weight:700;color:#3b82f6">🤖 Robo-Advisor</div>
+      <div style="background:#1e293b;border-radius:6px;padding:6px;margin-top:6px"><div style="font-size:5px;opacity:.5;margin-bottom:2px">Recommended Portfolio</div><div style="display:flex;gap:2px;height:12px;margin-bottom:4px"><div style="width:40%;background:#3b82f6;border-radius:2px"></div><div style="width:30%;background:#22c55e;border-radius:2px"></div><div style="width:20%;background:#f59e0b;border-radius:2px"></div><div style="width:10%;background:#ef4444;border-radius:2px"></div></div><div style="display:flex;gap:4px;font-size:4px">${['Stocks 40%','Bonds 30%','Real Est 20%','Cash 10%'].map(l => `<span style="opacity:.6">${l}</span>`).join('')}</div></div>
+    </div>
+  `),
+
+  'bank-open-banking': base(`
+    <div style="padding:12px">
+      <div style="font-size:9px;font-weight:700;color:#06b6d4">🔗 Open Banking</div>
+      ${['🏦 Chase — $12,400','🏦 BofA — $8,200','🏦 Wells — $3,100'].map(b => `<div style="background:#1e293b;border-radius:4px;padding:4px;margin-top:3px;font-size:5px">${b}</div>`).join('')}
+      <div style="font-size:6px;font-weight:700;color:#06b6d4;margin-top:4px;text-align:right">Total: $23,700</div>
+    </div>
+  `),
+
+  'bank-islamic': base(`
+    <div style="padding:12px;background:#0a1a0a">
+      <div style="font-size:9px;font-weight:700;color:#22c55e">☪️ Islamic Bank</div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:3px;margin-top:6px">${['Murabaha','Ijara','Sukuk','Zakat'].map(p => `<div style="background:#111;border:1px solid #22c55e20;border-radius:4px;padding:5px;text-align:center;font-size:5px;color:#22c55e">${p}</div>`).join('')}</div>
+    </div>
+  `, '#0a1a0a', '#fff'),
+
+  'bank-kids': base(`
+    <div style="padding:12px;background:#fef0ff">
+      <div style="text-align:center;font-size:14px;margin-bottom:4px">🐷</div>
+      <div style="text-align:center;font-size:10px;font-weight:700;color:#d946ef">Kids Bank!</div>
+      <div style="text-align:center;font-size:14px;font-weight:800;color:#d946ef;margin:4px 0">$42.50</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px">${['🎮 Game $30','✈️ Trip $100','📚 Book $15'].map(g => `<div style="background:#fff;border:1px solid #f0abfc;border-radius:8px;padding:4px;text-align:center;font-size:4px;color:#d946ef">${g}</div>`).join('')}</div>
+    </div>
+  `, '#fef0ff', '#333'),
+
+  // ═══════════════════════════════════════════
+  // GAMES 2D — Additional Previews
+  // ═══════════════════════════════════════════
+  'game2d-racing': base(`
+    <div style="height:200px;background:#333;position:relative;overflow:hidden">
+      <div style="position:absolute;inset:0;background:linear-gradient(180deg,#1a1a1a 0%,#333 100%)"></div>
+      <div style="position:absolute;left:50%;top:0;bottom:0;width:2px;background:repeating-linear-gradient(180deg,#fff 0px,#fff 10px,transparent 10px,transparent 20px)"></div>
+      <div style="position:absolute;bottom:40px;left:50%;transform:translateX(-50%);font-size:16px">🏎️</div>
+      <div style="position:absolute;top:60px;left:30%;font-size:12px">🚗</div>
+      <div style="position:absolute;top:30px;right:30%;font-size:12px">🚙</div>
+      <div style="position:absolute;top:6px;right:6px;font-size:6px;color:#fff">🏁 Lap 2/3</div>
+      <div style="position:absolute;top:6px;left:6px;font-size:6px;color:#22c55e">⚡ 120 mph</div>
+    </div>
+  `, '#333', '#fff'),
+
+  'game2d-breakout': base(`
+    <div style="height:200px;background:#0a0a0a;position:relative;overflow:hidden;padding:6px">
+      <div style="display:grid;grid-template-columns:repeat(8,1fr);gap:2px;margin-bottom:10px">${Array.from({length:24}).map((_,i) => `<div style="height:6px;background:hsl(${i*15},80%,50%);border-radius:1px"></div>`).join('')}</div>
+      <div style="position:absolute;top:50%;left:50%;width:6px;height:6px;border-radius:50%;background:#fff;box-shadow:0 0 6px #fff"></div>
+      <div style="position:absolute;bottom:20px;left:50%;transform:translateX(-50%);width:36px;height:6px;background:linear-gradient(90deg,#06b6d4,#3b82f6);border-radius:3px"></div>
+      <div style="position:absolute;top:6px;right:6px;font-size:6px;color:#fff">Score: 1200</div>
+    </div>
+  `, '#0a0a0a', '#fff'),
+
+  'game2d-pong': base(`
+    <div style="height:200px;background:#000;position:relative;overflow:hidden">
+      <div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:repeating-linear-gradient(180deg,#fff 0px,#fff 6px,transparent 6px,transparent 12px)"></div>
+      <div style="position:absolute;left:10px;top:50%;transform:translateY(-50%);width:4px;height:30px;background:#fff;border-radius:2px;box-shadow:0 0 8px #ec489980"></div>
+      <div style="position:absolute;right:10px;top:40%;transform:translateY(-50%);width:4px;height:30px;background:#fff;border-radius:2px;box-shadow:0 0 8px #06b6d480"></div>
+      <div style="position:absolute;top:50%;left:55%;width:5px;height:5px;border-radius:50%;background:#fff;box-shadow:0 0 10px #fff"></div>
+      <div style="position:absolute;top:10px;left:30%;font-size:16px;font-weight:800;color:#ec4899">3</div>
+      <div style="position:absolute;top:10px;right:30%;font-size:16px;font-weight:800;color:#06b6d4">5</div>
+    </div>
+  `, '#000', '#fff'),
+
+  'game2d-tower-defense': base(`
+    <div style="height:200px;background:#2d5016;position:relative;overflow:hidden">
+      <div style="position:absolute;top:40px;left:0;width:60px;height:16px;background:#8b7355;border-radius:0 8px 8px 0"></div>
+      <div style="position:absolute;top:40px;left:60px;width:16px;height:60px;background:#8b7355"></div>
+      <div style="position:absolute;top:84px;left:60px;width:60px;height:16px;background:#8b7355"></div>
+      <div style="position:absolute;top:84px;right:0;width:40px;height:16px;background:#8b7355;border-radius:8px 0 0 8px"></div>
+      <div style="position:absolute;top:30px;left:80px;font-size:12px">🏰</div>
+      <div style="position:absolute;top:32px;left:20px;width:8px;height:8px;border-radius:50%;background:#ef4444"></div>
+      <div style="position:absolute;top:6px;left:6px;font-size:5px;color:#fff">Wave 5 · Gold: 250</div>
+    </div>
+  `, '#2d5016', '#fff'),
+
+  'game2d-match3': base(`
+    <div style="padding:6px;background:#1a0030;text-align:center">
+      <div style="font-size:8px;font-weight:700;color:#ec4899;margin-bottom:4px">💎 MATCH</div>
+      <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:2px;width:90px;margin:0 auto">${Array.from({length:36}).map((_,i) => `<div style="width:100%;aspect-ratio:1;background:hsl(${(i*37)%360},70%,50%);border-radius:3px;font-size:6px;display:flex;align-items:center;justify-content:center">${['💎','⭐','🔥','💜','🟢','🔵'][i%6]}</div>`).join('')}</div>
+      <div style="font-size:5px;color:#888;margin-top:4px">Score: 4,200 · Moves: 12</div>
+    </div>
+  `, '#1a0030', '#fff'),
+
+  'game2d-maze': base(`
+    <div style="height:200px;background:#0a0a14;position:relative;overflow:hidden">
+      <div style="position:absolute;inset:10px;border:2px solid #334155;border-radius:4px">
+        <div style="position:absolute;top:20px;left:20px;right:40%;height:2px;background:#334155"></div>
+        <div style="position:absolute;top:50px;right:20px;left:40%;height:2px;background:#334155"></div>
+        <div style="position:absolute;top:80px;left:20px;right:30%;height:2px;background:#334155"></div>
+        <div style="position:absolute;top:20px;left:50%;width:2px;height:30px;background:#334155"></div>
+        <div style="position:absolute;top:50px;left:30%;width:2px;height:30px;background:#334155"></div>
+      </div>
+      <div style="position:absolute;top:30px;left:30px;width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 8px #22c55e"></div>
+      <div style="position:absolute;bottom:20px;right:20px;font-size:8px">🔑</div>
+      <div style="position:absolute;top:6px;left:6px;font-size:5px;color:#888">⏱ 01:24</div>
+    </div>
+  `, '#0a0a14', '#fff'),
+
+  // ═══════════════════════════════════════════
+  // GAMES 3D — Previews
+  // ═══════════════════════════════════════════
+  'game3d-fps': base(`
+    <div style="height:200px;background:linear-gradient(180deg,#1a1a2e 0%,#2a2a3e 100%);position:relative;overflow:hidden">
+      <div style="position:absolute;bottom:0;width:100%;height:60px;background:#2d2d4e;border-top:1px solid #3a3a5e"></div>
+      ${[{x:30,h:80,w:20},{x:70,h:60,w:16},{x:120,h:70,w:18}].map(b => `<div style="position:absolute;bottom:60px;left:${b.x}px;width:${b.w}px;height:${b.h}px;background:#333358;border:1px solid #3a3a6e"></div>`).join('')}
+      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)"><div style="width:2px;height:12px;background:#22c55e;position:absolute;top:-6px;left:-1px"></div><div style="width:12px;height:2px;background:#22c55e;position:absolute;top:-1px;left:-6px"></div></div>
+      <div style="position:absolute;bottom:6px;left:6px;font-size:5px;color:#fff">HP: 100 | Ammo: 30/90</div>
+      <div style="position:absolute;top:6px;right:6px;font-size:6px;color:#ef4444">Score: 450</div>
+    </div>
+  `, '#1a1a2e', '#fff'),
+
+  'game3d-racing': base(`
+    <div style="height:200px;background:linear-gradient(180deg,#87ceeb 0%,#87ceeb 50%,#4a7a2e 70%,#333 85%,#333 100%);position:relative;overflow:hidden">
+      <div style="position:absolute;bottom:30px;left:50%;transform:translateX(-50%);width:80px;height:8px;background:#555;border-radius:2px;transform:perspective(100px) rotateX(20deg)"></div>
+      <div style="position:absolute;bottom:35px;left:50%;transform:translateX(-50%);font-size:16px">🏎️</div>
+      <div style="position:absolute;top:6px;left:6px;font-size:6px;color:#fff;text-shadow:1px 1px 2px #000">LAP 2/3 · 120 mph</div>
+    </div>
+  `),
+
+  'game3d-minecraft': base(`
+    <div style="height:200px;background:linear-gradient(180deg,#87ceeb 0%,#87ceeb 40%,#4a7a2e 60%,#8b6f47 80%,#555 100%);position:relative;overflow:hidden">
+      <div style="position:absolute;top:20px;left:60px;width:20px;height:20px;background:#8b6f47;border:1px solid #6b5335"></div>
+      <div style="position:absolute;top:0;left:60px;width:20px;height:20px;background:#2d5016;border:1px solid #1a3a0a"></div>
+      <div style="position:absolute;top:20px;left:80px;width:20px;height:20px;background:#2d5016;border:1px solid #1a3a0a"></div>
+      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)"><div style="width:1px;height:10px;background:#fff;position:absolute;top:-5px;left:0"></div><div style="width:10px;height:1px;background:#fff;position:absolute;top:0;left:-5px"></div></div>
+      <div style="position:absolute;bottom:6px;left:50%;transform:translateX(-50%);display:flex;gap:2px">${['🟫','🟩','⬜','💎'].map((b,i) => `<div style="width:16px;height:16px;background:#00000060;border:1px solid ${i===0?'#fff':'#ffffff40'};border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:8px">${b}</div>`).join('')}</div>
+    </div>
+  `),
+
+  'game3d-flight': base(`
+    <div style="height:200px;background:linear-gradient(180deg,#1a3a5f 0%,#87ceeb 50%,#4a7a2e 90%);position:relative;overflow:hidden">
+      <div style="position:absolute;top:40%;left:50%;transform:translate(-50%,-50%);font-size:20px">✈️</div>
+      <div style="position:absolute;top:6px;left:50%;transform:translateX(-50%);font-size:5px;color:#fff;text-shadow:1px 1px 2px #000">ALT: 5,200ft · SPD: 340kts</div>
+    </div>
+  `),
+
+  'game3d-dungeon': base(`
+    <div style="height:200px;background:#0a0a0a;position:relative;overflow:hidden">
+      <div style="position:absolute;inset:20px;background:radial-gradient(circle at center,#2a1a0a 0%,#0a0a0a 70%)"></div>
+      <div style="position:absolute;top:50%;left:30%;width:20px;height:20px;background:#1a1a1a;border:1px solid #333"></div>
+      <div style="position:absolute;top:50%;right:30%;width:20px;height:20px;background:#1a1a1a;border:1px solid #333"></div>
+      <div style="position:absolute;top:30%;left:50%;transform:translateX(-50%);font-size:14px">🧟</div>
+      <div style="position:absolute;bottom:6px;left:6px;font-size:5px;color:#ef4444">❤️❤️❤️ | ⚔️ 15 DMG</div>
+      <div style="position:absolute;bottom:6px;right:6px;font-size:5px;color:#fbbf24">💰 120 Gold</div>
+    </div>
+  `, '#0a0a0a', '#fff'),
+
+  'game3d-golf': base(`
+    <div style="height:200px;background:linear-gradient(180deg,#87ceeb 0%,#87ceeb 50%,#22c55e 60%,#16a34a 100%);position:relative;overflow:hidden">
+      <div style="position:absolute;top:55%;right:25%;width:8px;height:20px;background:#333;border-radius:1px"></div>
+      <div style="position:absolute;top:48%;right:24%;width:8px;height:8px;background:#ef4444;border-radius:50%"></div>
+      <div style="position:absolute;bottom:30%;left:30%;width:6px;height:6px;border-radius:50%;background:#fff;box-shadow:0 0 4px #fff"></div>
+      <div style="position:absolute;top:6px;left:50%;transform:translateX(-50%);font-size:6px;color:#fff;text-shadow:1px 1px 2px #000">Hole 3 · Par 4 · Stroke 2</div>
+    </div>
+  `),
+
+  'game3d-tank': base(`
+    <div style="height:200px;background:linear-gradient(180deg,#4a5568 0%,#2d3748 50%,#4a6a3a 70%,#2d5016 100%);position:relative;overflow:hidden">
+      <div style="position:absolute;bottom:30px;left:50%;transform:translateX(-50%);font-size:16px">🪖</div>
+      <div style="position:absolute;top:40px;right:30px;font-size:12px">💥</div>
+      <div style="position:absolute;top:6px;left:6px;font-size:5px;color:#fff;text-shadow:1px 1px 2px #000">HP: 85% | Ammo: 12</div>
+      <div style="position:absolute;top:6px;right:6px;font-size:5px;color:#ef4444">Kills: 3</div>
+    </div>
+  `),
+
+  // ═══════════════════════════════════════════
+  // METAVERSE — Additional Previews
+  // ═══════════════════════════════════════════
+  'metaverse-underwater': base(`
+    <div style="height:200px;background:linear-gradient(180deg,#0a3d6e 0%,#06234a 50%,#041a30 100%);position:relative;overflow:hidden">
+      ${Array.from({length:8}).map(() => `<div style="position:absolute;top:${Math.random()*150}px;left:${Math.random()*100}%;width:${2+Math.random()*3}px;height:${2+Math.random()*3}px;border-radius:50%;background:#ffffff20"></div>`).join('')}
+      <div style="position:absolute;top:30px;left:30px;font-size:10px">🐠</div>
+      <div style="position:absolute;top:60px;right:40px;font-size:12px">🐡</div>
+      <div style="position:absolute;bottom:20px;left:20px;font-size:8px">🪸</div>
+      <div style="position:absolute;bottom:20px;right:30px;font-size:10px">🪸</div>
+      <div style="position:absolute;top:6px;left:6px;font-size:6px;font-weight:600;color:#06b6d4">🌊 UNDERWATER</div>
+      <div style="position:absolute;bottom:8px;right:8px;font-size:5px;color:#3b82f6">Depth: 45m</div>
+    </div>
+  `, '#041a30', '#fff'),
+
+  'metaverse-museum': base(`
+    <div style="height:200px;background:#f5f0eb;position:relative;overflow:hidden">
+      <div style="position:absolute;top:20px;left:50%;transform:translateX(-50%);font-size:8px;font-weight:300;letter-spacing:3px;color:#555">MUSEUM</div>
+      <div style="position:absolute;left:0;width:100%;height:120px;top:40px;background:#fff"></div>
+      <div style="position:absolute;top:50px;display:flex;gap:20px;left:15px">
+        ${[{c:'#e74c3c'},{c:'#3498db'},{c:'#f39c12'},{c:'#2ecc71'}].map(p => `<div style="width:24px;height:32px;background:${p.c};border:2px solid #d4a853"></div>`).join('')}
+      </div>
+      <div style="position:absolute;bottom:0;width:100%;height:40px;background:#d4c5b5"></div>
+    </div>
+  `, '#f5f0eb', '#333'),
+
+  'metaverse-nightclub': base(`
+    <div style="height:200px;background:#050005;position:relative;overflow:hidden">
+      ${[{x:20,c:'#ff00ff'},{x:50,c:'#00ffff'},{x:80,c:'#ff00ff'}].map(l => `<div style="position:absolute;bottom:50px;left:${l.x}%;width:2px;height:60px;background:linear-gradient(0deg,${l.c},transparent);opacity:.6;transform:rotate(${(l.x-50)*0.5}deg)"></div>`).join('')}
+      <div style="position:absolute;bottom:0;width:100%;height:50px;display:grid;grid-template-columns:repeat(8,1fr);gap:1px">${Array.from({length:8}).map((_,i) => `<div style="background:hsl(${i*45+Date.now()%360},80%,50%);opacity:.4"></div>`).join('')}</div>
+      <div style="position:absolute;top:30px;left:50%;transform:translateX(-50%);width:12px;height:12px;border-radius:50%;background:radial-gradient(#fff,#888);box-shadow:0 0 20px #fff40"></div>
+      <div style="position:absolute;top:6px;left:6px;font-size:6px;font-weight:700;color:#ff00ff">🎵 NIGHTCLUB</div>
+    </div>
+  `, '#050005', '#fff'),
+
+  'metaverse-marketplace-3d': base(`
+    <div style="height:200px;background:#f5f0eb;position:relative;overflow:hidden">
+      <div style="position:absolute;top:10px;left:50%;transform:translateX(-50%);font-size:8px;font-weight:600;color:#ea580c">🏪 3D Market</div>
+      <div style="position:absolute;bottom:0;width:100%;height:40px;background:#d4c5b5"></div>
+      <div style="display:flex;gap:8px;position:absolute;top:40px;left:10px">${['🏬','🏬','🏬'].map((s,i) => `<div style="width:30px;height:50px;background:hsl(${i*40+20},30%,85%);border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:14px;border:1px solid #d4c5b5">${s}</div>`).join('')}</div>
+    </div>
+  `, '#f5f0eb', '#333'),
+
+  'metaverse-sports-arena': base(`
+    <div style="height:200px;background:#1a3a1a;position:relative;overflow:hidden">
+      <div style="position:absolute;inset:20px;background:#2d5016;border:2px solid #fff;border-radius:4px"></div>
+      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:30px;height:30px;border:2px solid #fff;border-radius:50%"></div>
+      <div style="position:absolute;top:50%;left:0;right:0;height:2px;background:#fff;transform:translateY(-50%)"></div>
+      <div style="position:absolute;top:6px;left:50%;transform:translateX(-50%);background:#00000080;padding:2px 8px;border-radius:3px;font-size:6px;color:#fff;font-weight:700">HOME 2 — 1 AWAY</div>
+    </div>
+  `, '#1a3a1a', '#fff'),
+
+  'metaverse-zen-garden': base(`
+    <div style="height:200px;background:linear-gradient(180deg,#87ceeb 0%,#e8dcc8 50%,#d4c5a0 100%);position:relative;overflow:hidden">
+      <div style="position:absolute;bottom:0;width:100%;height:100px;background:#e8dcc8;background-image:repeating-linear-gradient(90deg,transparent,transparent 8px,#d4c5a060 9px,transparent 10px)"></div>
+      <div style="position:absolute;bottom:40px;left:30px;font-size:10px">🪨</div>
+      <div style="position:absolute;bottom:40px;right:30px;font-size:12px">🎋</div>
+      <div style="position:absolute;bottom:30px;left:50%;transform:translateX(-50%);font-size:8px">🧘</div>
+      <div style="position:absolute;top:6px;left:50%;transform:translateX(-50%);font-size:6px;color:#555;letter-spacing:2px">🍃 ZEN GARDEN</div>
+    </div>
+  `),
+
+  // ═══════════════════════════════════════════
+  // CASINO — Remaining Previews
+  // ═══════════════════════════════════════════
+  'casino-craps': base(`
+    <div style="padding:8px;background:#0a3d0a">
+      <div style="text-align:center;font-size:7px;color:#d4a853;margin-bottom:4px">CRAPS</div>
+      <div style="display:flex;justify-content:center;gap:6px;margin-bottom:6px"><div style="width:24px;height:24px;background:#fff;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#000">⚃</div><div style="width:24px;height:24px;background:#fff;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#000">⚅</div></div>
+      <div style="display:flex;gap:2px;justify-content:center">${['PASS','DONT','FIELD','COME'].map(b => `<div style="padding:2px 6px;background:#1a5e1a;border:1px solid #d4a85340;border-radius:2px;font-size:4px;color:#d4a853">${b}</div>`).join('')}</div>
+    </div>
+  `, '#0a3d0a', '#fff'),
+
+  'casino-sic-bo': base(`
+    <div style="padding:8px;background:#3d0a0a">
+      <div style="text-align:center;font-size:7px;color:#d4a853;margin-bottom:4px">SIC BO</div>
+      <div style="display:flex;justify-content:center;gap:4px;margin-bottom:6px">${['⚂','⚄','⚁'].map(d => `<div style="width:20px;height:20px;background:#fff;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:10px">${d}</div>`).join('')}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px">${['SMALL','BIG','ODD','EVEN'].map(b => `<div style="text-align:center;padding:3px;background:#5e1a1a;border:1px solid #d4a85340;border-radius:2px;font-size:5px;color:#d4a853">${b}</div>`).join('')}</div>
+    </div>
+  `, '#3d0a0a', '#fff'),
+
+  'casino-limbo': base(`
+    <div style="padding:12px;background:#0a0a0a;text-align:center">
+      <div style="font-size:7px;color:#888;margin-bottom:8px">LIMBO</div>
+      <div style="font-size:28px;font-weight:800;color:#22c55e;margin-bottom:8px">1.47x</div>
+      <div style="background:#111;border-radius:6px;padding:6px;margin-bottom:6px"><div style="font-size:5px;color:#888;margin-bottom:2px">Target: 2.00x</div><div style="font-size:5px;color:#888">Win Chance: 49.5%</div></div>
+      <div style="background:#22c55e;padding:3px 12px;border-radius:4px;font-size:7px;font-weight:700;color:#000;display:inline-block">BET</div>
+    </div>
+  `, '#0a0a0a', '#fff'),
+
+  'casino-tower': base(`
+    <div style="padding:8px;background:#0a0a0a">
+      <div style="font-size:7px;color:#888;margin-bottom:4px">TOWER — <span style="color:#fbbf24">4.8x</span></div>
+      <div style="display:flex;flex-direction:column;gap:2px;margin-bottom:4px">${Array.from({length:6}).map((_,i) => `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px">${Array.from({length:3}).map((_,j) => `<div style="height:10px;border-radius:2px;${i>3?'background:#22c55e20;border:1px solid #22c55e':i===3&&j===1?'background:#fbbf2440;border:1px solid #fbbf24':'background:#1a1a1a;border:1px solid #333'}"></div>`).join('')}</div>`).join('')}
+      <div style="text-align:center;background:#fbbf24;padding:2px 8px;border-radius:3px;font-size:5px;font-weight:700;color:#000">CASH OUT</div>
+    </div>
+  `, '#0a0a0a', '#fff'),
+
+  'casino-live-landing': base(`
+    <div style="padding:10px;background:#0a0a0a">
+      <div style="font-size:8px;font-weight:700;color:#ef4444;margin-bottom:6px">🔴 LIVE CASINO</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px">${['🃏 Blackjack','🎡 Roulette','🃏 Baccarat'].map(g => `<div style="background:#1a1a1a;border:1px solid #ef444420;border-radius:4px;padding:6px;text-align:center"><div style="font-size:6px;color:#fff">${g}</div><div style="font-size:4px;color:#ef4444;margin-top:2px">LIVE</div></div>`).join('')}</div>
+    </div>
+  `, '#0a0a0a', '#fff'),
+
+  'casino-poker-room': base(`
+    <div style="padding:8px;background:#0a3d0a">
+      <div style="font-size:7px;color:#d4a853;margin-bottom:6px">🃏 POKER ROOM</div>
+      ${[{n:'Table 1',s:'$1/$2 NL',p:'6/9'},{n:'Tournament',s:'$50 Buy-in',p:'124'}].map(t => `<div style="background:#0a2e0a;border:1px solid #d4a85320;border-radius:4px;padding:4px;margin-bottom:3px;display:flex;justify-content:space-between;font-size:5px"><span style="color:#fff">${t.n}</span><span style="color:#d4a853">${t.s}</span><span style="color:#888">${t.p} players</span></div>`).join('')}
+    </div>
+  `, '#0a3d0a', '#fff'),
+
+  'casino-slots-5reel': base(`
+    <div style="padding:8px;background:#0a0a0a;text-align:center">
+      <div style="font-size:7px;font-weight:700;color:#fbbf24;margin-bottom:4px">🏛️ PHARAOH SLOTS</div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:2px;background:#111;border:2px solid #fbbf2430;border-radius:6px;padding:4px">${['👁️','🐍','💎','🏛️','⭐','🐪','👁️','💎','🐍','🏛️','⭐','👁️','🐪','💎','🐍'].map(s => `<div style="background:#1a1a1a;border-radius:2px;padding:3px;font-size:8px">${s}</div>`).join('')}</div>
+      <div style="display:flex;gap:3px;justify-content:center;margin-top:4px"><div style="background:linear-gradient(135deg,#fbbf24,#f59e0b);padding:3px 10px;border-radius:3px;font-size:6px;font-weight:700;color:#000">SPIN</div></div>
+    </div>
+  `, '#0a0a0a', '#fff'),
+
+  'casino-slots-progressive': base(`
+    <div style="padding:8px;background:#0a0a1a;text-align:center">
+      <div style="font-size:6px;color:#888;margin-bottom:2px">PROGRESSIVE JACKPOT</div>
+      <div style="font-size:14px;font-weight:800;background:linear-gradient(135deg,#fbbf24,#ec4899,#8b5cf6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px">$2,847,391</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin-bottom:4px">${['Mini $50','Minor $500','Major $5K','Grand $$$'].map((j,i) => `<div style="background:#111;border:1px solid ${['#22c55e','#3b82f6','#a855f7','#fbbf24'][i]}30;border-radius:3px;padding:2px;font-size:4px;color:${['#22c55e','#3b82f6','#a855f7','#fbbf24'][i]}">${j}</div>`).join('')}</div>
+    </div>
+  `, '#0a0a1a', '#fff'),
+
+  'casino-dragon-tiger': base(`
+    <div style="padding:10px;background:#3d0a0a;text-align:center">
+      <div style="font-size:8px;font-weight:700;color:#d4a853;margin-bottom:6px">🐉 DRAGON TIGER 🐯</div>
+      <div style="display:flex;justify-content:space-around;margin-bottom:6px">${[{n:'DRAGON',c:'A♠'},{n:'TIGER',c:'K♥'}].map(s => `<div><div style="font-size:5px;color:#888">${s.n}</div><div style="width:22px;height:30px;background:#fff;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:${s.c.includes('♥')?'#c0392b':'#111'};margin:2px auto">${s.c}</div></div>`).join('')}</div>
+      <div style="display:flex;gap:3px;justify-content:center">${['DRAGON','TIE','TIGER'].map((b,i) => `<div style="padding:3px 8px;border-radius:3px;font-size:5px;font-weight:600;${i===0?'background:#ef4444;color:#fff':i===1?'background:#22c55e;color:#fff':'background:#3b82f6;color:#fff'}">${b}</div>`).join('')}</div>
+    </div>
+  `, '#3d0a0a', '#fff'),
+
+  'casino-andar-bahar': base(`
+    <div style="padding:10px;background:#2e1a0a;text-align:center">
+      <div style="font-size:8px;font-weight:700;color:#f59e0b;margin-bottom:6px">ANDAR BAHAR</div>
+      <div style="width:22px;height:30px;background:#fff;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#c0392b;margin:0 auto 6px;border:2px solid #f59e0b">7♥</div>
+      <div style="display:flex;gap:6px;justify-content:center">${['ANDAR','BAHAR'].map((b,i) => `<div style="padding:4px 12px;border-radius:4px;font-size:6px;font-weight:600;background:${i===0?'#3b82f6':'#ef4444'};color:#fff">${b}</div>`).join('')}</div>
+    </div>
+  `, '#2e1a0a', '#fff'),
+
+  'casino-fish-game': base(`
+    <div style="height:200px;background:linear-gradient(180deg,#0a3d6e 0%,#06234a 100%);position:relative;overflow:hidden">
+      ${Array.from({length:6}).map(() => `<div style="position:absolute;top:${20+Math.random()*120}px;left:${Math.random()*80}%;width:${2+Math.random()*3}px;height:${2+Math.random()*3}px;border-radius:50%;background:#ffffff10"></div>`).join('')}
+      <div style="position:absolute;top:30px;left:20px;font-size:12px">🐟</div>
+      <div style="position:absolute;top:60px;right:30px;font-size:14px">🐠</div>
+      <div style="position:absolute;top:90px;left:50px;font-size:16px">🦈</div>
+      <div style="position:absolute;bottom:10px;left:50%;transform:translateX(-50%);font-size:10px">🔫</div>
+      <div style="position:absolute;top:6px;right:6px;font-size:5px;color:#fbbf24">💰 $120</div>
+    </div>
+  `, '#06234a', '#fff'),
+
+  'casino-coin-flip-game': base(`
+    <div style="padding:12px;background:#0a0a0a;text-align:center">
+      <div style="font-size:7px;color:#888;margin-bottom:8px">COIN FLIP</div>
+      <div style="width:50px;height:50px;border-radius:50%;background:linear-gradient(135deg,#fbbf24,#f59e0b);margin:0 auto 8px;display:flex;align-items:center;justify-content:center;border:3px solid #d4a853"><span style="font-size:16px;font-weight:800;color:#7c2d12">H</span></div>
+      <div style="display:flex;gap:6px;justify-content:center"><div style="background:#3b82f6;padding:4px 12px;border-radius:4px;font-size:7px;font-weight:700;color:#fff">HEADS</div><div style="background:#ef4444;padding:4px 12px;border-radius:4px;font-size:7px;font-weight:700;color:#fff">TAILS</div></div>
+    </div>
+  `, '#0a0a0a', '#fff'),
 }
