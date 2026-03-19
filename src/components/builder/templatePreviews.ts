@@ -2160,4 +2160,164 @@ export const templatePreviews: Record<string, string> = {
       <div style="display:flex;gap:6px;justify-content:center"><div style="background:#3b82f6;padding:4px 12px;border-radius:4px;font-size:7px;font-weight:700;color:#fff">HEADS</div><div style="background:#ef4444;padding:4px 12px;border-radius:4px;font-size:7px;font-weight:700;color:#fff">TAILS</div></div>
     </div>
   `, '#0a0a0a', '#fff'),
+
+  'ecommerce-beauty': base(`
+    <div style="padding:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span style="font-weight:700;font-size:10px;color:#ec4899">Glow Beauty</span>
+        <div style="display:flex;gap:6px"><span style="font-size:7px;opacity:.6">Shop</span><span style="font-size:7px;opacity:.6">Cart 🛒</span></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">
+        <div style="background:linear-gradient(135deg,#fce7f3,#fbcfe8);border-radius:6px;height:40px;display:flex;align-items:center;justify-content:center;font-size:14px">💄</div>
+        <div style="background:linear-gradient(135deg,#fdf2f8,#fce7f3);border-radius:6px;height:40px;display:flex;align-items:center;justify-content:center;font-size:14px">🧴</div>
+        <div style="background:linear-gradient(135deg,#fff1f2,#ffe4e6);border-radius:6px;height:40px;display:flex;align-items:center;justify-content:center;font-size:14px">💅</div>
+      </div>
+      <div style="margin-top:8px;background:#1e1b2e;border-radius:6px;padding:6px;text-align:center">
+        <div style="font-size:7px;color:#ec4899">✨ 30% OFF — Summer Sale</div>
+      </div>
+    </div>
+  `, '#1a0a1e', '#fce7f3'),
+
+  'ecommerce-sneakers': base(`
+    <div style="padding:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span style="font-weight:800;font-size:10px">KICKS</span>
+        <div style="font-size:7px;opacity:.6">New Arrivals</div>
+      </div>
+      <div style="background:#1e1e1e;border-radius:8px;padding:10px;text-align:center;margin-bottom:6px">
+        <div style="font-size:24px">👟</div>
+        <div style="font-size:8px;font-weight:700;margin-top:4px">Air Max Pro</div>
+        <div style="font-size:7px;color:#10b981;font-weight:700">$189.99</div>
+      </div>
+      <div style="display:flex;gap:4px">
+        <div style="flex:1;background:#1e1e1e;border-radius:6px;padding:6px;text-align:center;font-size:12px">🏀</div>
+        <div style="flex:1;background:#1e1e1e;border-radius:6px;padding:6px;text-align:center;font-size:12px">⚽</div>
+        <div style="flex:1;background:#1e1e1e;border-radius:6px;padding:6px;text-align:center;font-size:12px">🎾</div>
+      </div>
+    </div>
+  `, '#111', '#f5f5f5'),
+
+  'ecommerce-books': base(`
+    <div style="padding:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span style="font-weight:700;font-size:10px;color:#d4a853">📚 BookShelf</span>
+        <span style="font-size:7px;opacity:.6">Browse</span>
+      </div>
+      <div style="display:flex;gap:4px;margin-bottom:8px">
+        <div style="width:28px;height:40px;background:linear-gradient(135deg,#dc2626,#991b1b);border-radius:2px"></div>
+        <div style="width:28px;height:40px;background:linear-gradient(135deg,#2563eb,#1e40af);border-radius:2px"></div>
+        <div style="width:28px;height:40px;background:linear-gradient(135deg,#16a34a,#15803d);border-radius:2px"></div>
+        <div style="width:28px;height:40px;background:linear-gradient(135deg,#9333ea,#7e22ce);border-radius:2px"></div>
+      </div>
+      <div style="background:#1a1510;border-radius:6px;padding:6px">
+        <div style="font-size:7px;font-weight:700">Best Sellers</div>
+        <div style="font-size:6px;opacity:.5;margin-top:2px">1984 • Sapiens • Atomic Habits</div>
+      </div>
+    </div>
+  `, '#0f0d08', '#e8d5b0'),
+
+  'ecommerce-marketplace-multi': base(`
+    <div style="padding:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span style="font-weight:800;font-size:10px;color:#f59e0b">MarketHub</span>
+        <div style="background:#f59e0b;color:#000;padding:2px 6px;border-radius:4px;font-size:6px;font-weight:700">Sell</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:4px">
+        <div style="background:#1e1e2e;border-radius:6px;padding:8px;text-align:center"><div style="font-size:14px">🏪</div><div style="font-size:6px;margin-top:2px">Electronics</div></div>
+        <div style="background:#1e1e2e;border-radius:6px;padding:8px;text-align:center"><div style="font-size:14px">👗</div><div style="font-size:6px;margin-top:2px">Fashion</div></div>
+        <div style="background:#1e1e2e;border-radius:6px;padding:8px;text-align:center"><div style="font-size:14px">🏠</div><div style="font-size:6px;margin-top:2px">Home</div></div>
+        <div style="background:#1e1e2e;border-radius:6px;padding:8px;text-align:center"><div style="font-size:14px">🎮</div><div style="font-size:6px;margin-top:2px">Gaming</div></div>
+      </div>
+    </div>
+  `, '#0a0a1a', '#e2e8f0'),
+
+  'ecommerce-subscription-box': base(`
+    <div style="padding:12px;text-align:center">
+      <div style="font-weight:800;font-size:11px;color:#a855f7;margin-bottom:4px">SubBox</div>
+      <div style="font-size:7px;opacity:.5;margin-bottom:8px">Curated monthly surprises</div>
+      <div style="background:linear-gradient(135deg,#7c3aed,#a855f7);border-radius:8px;padding:12px;margin-bottom:6px">
+        <div style="font-size:20px">📦</div>
+        <div style="font-size:8px;font-weight:700;color:#fff;margin-top:4px">Premium Box</div>
+        <div style="font-size:7px;color:#e9d5ff">$29.99/mo</div>
+      </div>
+      <div style="display:flex;gap:4px;justify-content:center">
+        <div style="background:#1e1b2e;padding:3px 8px;border-radius:4px;font-size:6px">Beauty</div>
+        <div style="background:#1e1b2e;padding:3px 8px;border-radius:4px;font-size:6px">Snacks</div>
+        <div style="background:#1e1b2e;padding:3px 8px;border-radius:4px;font-size:6px">Tech</div>
+      </div>
+    </div>
+  `, '#0a0815', '#e2e8f0'),
+
+  'game2d-breakout': base(`
+    <div style="padding:12px;text-align:center">
+      <div style="font-size:7px;color:#888;margin-bottom:6px">BREAKOUT</div>
+      <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:2px;margin-bottom:10px">
+        <div style="background:#ef4444;height:6px;border-radius:1px"></div><div style="background:#ef4444;height:6px;border-radius:1px"></div><div style="background:#ef4444;height:6px;border-radius:1px"></div><div style="background:#ef4444;height:6px;border-radius:1px"></div><div style="background:#ef4444;height:6px;border-radius:1px"></div><div style="background:#ef4444;height:6px;border-radius:1px"></div>
+        <div style="background:#f59e0b;height:6px;border-radius:1px"></div><div style="background:#f59e0b;height:6px;border-radius:1px"></div><div style="background:#f59e0b;height:6px;border-radius:1px"></div><div style="background:#f59e0b;height:6px;border-radius:1px"></div><div style="background:#f59e0b;height:6px;border-radius:1px"></div><div style="background:#f59e0b;height:6px;border-radius:1px"></div>
+        <div style="background:#22c55e;height:6px;border-radius:1px"></div><div style="background:#22c55e;height:6px;border-radius:1px"></div><div style="background:#22c55e;height:6px;border-radius:1px"></div><div style="background:#22c55e;height:6px;border-radius:1px"></div><div style="background:#22c55e;height:6px;border-radius:1px"></div><div style="background:#22c55e;height:6px;border-radius:1px"></div>
+      </div>
+      <div style="width:8px;height:8px;background:#fff;border-radius:50%;margin:0 auto 8px"></div>
+      <div style="width:40px;height:6px;background:#3b82f6;border-radius:3px;margin:0 auto"></div>
+    </div>
+  `, '#0a0a0a', '#fff'),
+
+  'game2d-pong': base(`
+    <div style="padding:12px;text-align:center;position:relative;height:100px">
+      <div style="font-size:7px;color:#888;margin-bottom:6px">PONG</div>
+      <div style="position:absolute;left:8px;top:30px;width:4px;height:24px;background:#fff;border-radius:2px"></div>
+      <div style="position:absolute;right:8px;top:40px;width:4px;height:24px;background:#fff;border-radius:2px"></div>
+      <div style="position:absolute;left:50%;top:50%;width:6px;height:6px;background:#fff;border-radius:50%;transform:translate(-50%,-50%)"></div>
+      <div style="position:absolute;left:50%;top:16px;bottom:0;width:1px;border-left:1px dashed rgba(255,255,255,.2)"></div>
+      <div style="position:absolute;left:20px;top:16px;font-size:14px;font-weight:800;opacity:.3">3</div>
+      <div style="position:absolute;right:20px;top:16px;font-size:14px;font-weight:800;opacity:.3">5</div>
+    </div>
+  `, '#0a0a0a', '#fff'),
+
+  'game2d-tower-defense': base(`
+    <div style="padding:12px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+        <span style="font-size:7px;color:#888">TOWER DEFENSE</span>
+        <span style="font-size:7px;color:#f59e0b">🪙 1250</span>
+      </div>
+      <div style="background:#1a2e1a;border-radius:6px;padding:8px;position:relative;height:60px">
+        <div style="position:absolute;left:10px;top:10px;font-size:12px">🏰</div>
+        <div style="position:absolute;left:40px;top:25px;width:30px;height:4px;background:#4a3728;border-radius:2px"></div>
+        <div style="position:absolute;right:30px;top:20px;font-size:10px">🗼</div>
+        <div style="position:absolute;right:10px;top:30px;font-size:8px">👾</div>
+        <div style="position:absolute;right:20px;top:35px;font-size:8px">👾</div>
+      </div>
+      <div style="display:flex;gap:4px;margin-top:6px;justify-content:center">
+        <div style="background:#1e1e2e;padding:3px 6px;border-radius:4px;font-size:8px">🗼</div>
+        <div style="background:#1e1e2e;padding:3px 6px;border-radius:4px;font-size:8px">🏹</div>
+        <div style="background:#1e1e2e;padding:3px 6px;border-radius:4px;font-size:8px">💣</div>
+      </div>
+    </div>
+  `, '#0a0a0a', '#e2e8f0'),
+
+  'game2d-match3': base(`
+    <div style="padding:12px;text-align:center">
+      <div style="font-size:7px;color:#888;margin-bottom:6px">MATCH 3</div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:3px;max-width:80px;margin:0 auto">
+        <div style="background:#ef4444;width:14px;height:14px;border-radius:3px"></div><div style="background:#3b82f6;width:14px;height:14px;border-radius:3px"></div><div style="background:#22c55e;width:14px;height:14px;border-radius:3px"></div><div style="background:#f59e0b;width:14px;height:14px;border-radius:3px"></div><div style="background:#a855f7;width:14px;height:14px;border-radius:3px"></div>
+        <div style="background:#3b82f6;width:14px;height:14px;border-radius:3px"></div><div style="background:#ef4444;width:14px;height:14px;border-radius:3px"></div><div style="background:#ef4444;width:14px;height:14px;border-radius:3px"></div><div style="background:#ef4444;width:14px;height:14px;border-radius:50%;box-shadow:0 0 6px #ef4444"></div><div style="background:#22c55e;width:14px;height:14px;border-radius:3px"></div>
+        <div style="background:#f59e0b;width:14px;height:14px;border-radius:3px"></div><div style="background:#a855f7;width:14px;height:14px;border-radius:3px"></div><div style="background:#3b82f6;width:14px;height:14px;border-radius:3px"></div><div style="background:#22c55e;width:14px;height:14px;border-radius:3px"></div><div style="background:#f59e0b;width:14px;height:14px;border-radius:3px"></div>
+        <div style="background:#22c55e;width:14px;height:14px;border-radius:3px"></div><div style="background:#f59e0b;width:14px;height:14px;border-radius:3px"></div><div style="background:#a855f7;width:14px;height:14px;border-radius:3px"></div><div style="background:#3b82f6;width:14px;height:14px;border-radius:3px"></div><div style="background:#ef4444;width:14px;height:14px;border-radius:3px"></div>
+      </div>
+      <div style="font-size:7px;color:#f59e0b;margin-top:6px;font-weight:700">Score: 2,450</div>
+    </div>
+  `, '#0a0a0a', '#fff'),
+
+  'game2d-maze': base(`
+    <div style="padding:12px;text-align:center">
+      <div style="font-size:7px;color:#888;margin-bottom:6px">MAZE RUNNER</div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;max-width:80px;margin:0 auto">
+        <div style="background:#333;height:10px"></div><div style="background:#333;height:10px"></div><div style="background:#333;height:10px"></div><div style="background:#333;height:10px"></div><div style="background:#333;height:10px"></div><div style="background:#333;height:10px"></div><div style="background:#333;height:10px"></div>
+        <div style="background:#333;height:10px"></div><div style="background:#1a1a2e;height:10px"></div><div style="background:#333;height:10px"></div><div style="background:#1a1a2e;height:10px"></div><div style="background:#1a1a2e;height:10px"></div><div style="background:#1a1a2e;height:10px"></div><div style="background:#333;height:10px"></div>
+        <div style="background:#333;height:10px"></div><div style="background:#1a1a2e;height:10px"></div><div style="background:#333;height:10px"></div><div style="background:#1a1a2e;height:10px"></div><div style="background:#333;height:10px"></div><div style="background:#1a1a2e;height:10px"></div><div style="background:#333;height:10px"></div>
+        <div style="background:#333;height:10px"></div><div style="background:#1a1a2e;height:10px;display:flex;align-items:center;justify-content:center"><div style="width:5px;height:5px;background:#3b82f6;border-radius:50%"></div></div><div style="background:#1a1a2e;height:10px"></div><div style="background:#1a1a2e;height:10px"></div><div style="background:#333;height:10px"></div><div style="background:#1a1a2e;height:10px"></div><div style="background:#333;height:10px"></div>
+        <div style="background:#333;height:10px"></div><div style="background:#333;height:10px"></div><div style="background:#333;height:10px"></div><div style="background:#1a1a2e;height:10px"></div><div style="background:#1a1a2e;height:10px"></div><div style="background:#1a1a2e;height:10px"></div><div style="background:#22c55e;height:10px"></div>
+      </div>
+      <div style="font-size:6px;color:#666;margin-top:6px">Find the exit 🏁</div>
+    </div>
+  `, '#0a0a0a', '#fff'),
 }
