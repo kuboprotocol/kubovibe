@@ -1832,13 +1832,6 @@ export const templatePreviews: Record<string, string> = {
     </div>
   `, '#050505', '#fff'),
 
-  'crypto-staking': base(`
-    <div style="padding:12px;background:#0a1a0a">
-      <div style="font-size:9px;font-weight:700;color:#22c55e;margin-bottom:6px">🥩 Staking</div>
-      ${[{n:'ETH',apy:'4.2%',tvl:'$2.1B'},{n:'SOL',apy:'6.8%',tvl:'$890M'}].map(p => `<div style="background:#111;border:1px solid #22c55e20;border-radius:4px;padding:4px;margin-bottom:3px;display:flex;justify-content:space-between;font-size:5px"><span style="color:#fff">${p.n}</span><span style="color:#22c55e">APY ${p.apy}</span><span style="color:#888">TVL ${p.tvl}</span></div>`).join('')}
-    </div>
-  `, '#0a1a0a', '#fff'),
-
   'crypto-lending': base(`
     <div style="padding:12px;background:#0f0720">
       <div style="font-size:9px;font-weight:700;color:#a855f7;margin-bottom:6px">🏦 Lending</div>
