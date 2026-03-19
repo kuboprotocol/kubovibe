@@ -1566,37 +1566,7 @@ export const templatePreviews: Record<string, string> = {
     </div>
   `, '#111', '#fff'),
 
-  // ═══════════════════════════════════════════
-  // SOCIAL — More Previews
-  // ═══════════════════════════════════════════
-  'social-snapchat': base(`
-    <div style="height:200px;background:#fffc00;position:relative">
-      <div style="position:absolute;inset:10px;background:#000;border-radius:12px;display:flex;align-items:center;justify-content:center"><span style="font-size:24px">👻</span></div>
-      <div style="position:absolute;bottom:0;width:100%;display:flex;justify-content:space-around;padding:4px;background:#00000020">${['🗺️','💬','📸','📰','🔦'].map(e => `<span style="font-size:10px">${e}</span>`).join('')}</div>
-    </div>
-  `, '#fffc00', '#000'),
 
-  'social-pinterest': base(`
-    <div style="padding:8px;background:#fff">
-      <div style="text-align:center;font-size:10px;font-weight:700;color:#e60023;margin-bottom:6px">Pinterest</div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px">${[50,35,45,30,55,40].map((h,i) => `<div style="height:${h}px;background:hsl(${i*55},60%,80%);border-radius:6px"></div>`).join('')}</div>
-    </div>
-  `, '#fff', '#222'),
-
-  'social-linkedin': base(`
-    <div style="background:#000">
-      <nav style="background:#1b1f23;padding:4px 8px;display:flex;justify-content:space-between"><span style="font-size:9px;font-weight:700;color:#0a66c2">in</span><div style="display:flex;gap:6px">${['🏠','👥','💼','💬'].map(e => `<span style="font-size:7px">${e}</span>`).join('')}</div></nav>
-      <div style="padding:6px"><div style="background:#1b1f23;border-radius:6px;padding:6px;margin-bottom:4px"><div style="display:flex;gap:4px;align-items:center"><div style="width:16px;height:16px;border-radius:50%;background:#334155"></div><div><div style="font-size:6px;font-weight:600;color:#fff">Professional User</div><div style="font-size:4px;color:#888">Sr. Engineer at Tech Co</div></div></div><div style="font-size:5px;color:#b0b0b0;margin-top:4px">Excited to announce my new role...</div></div></div>
-    </div>
-  `, '#000', '#fff'),
-
-  'social-spotify': base(`
-    <div style="display:flex;height:200px;background:#121212">
-      <div style="width:40px;background:#000;padding:6px 4px">${['🏠','🔍','📚'].map(e => `<div style="text-align:center;margin:6px 0;font-size:8px">${e}</div>`).join('')}</div>
-      <div style="flex:1;padding:6px"><div style="font-size:8px;font-weight:700;color:#fff;margin-bottom:6px">Good Evening</div><div style="display:grid;grid-template-columns:repeat(2,1fr);gap:3px">${[{c:'#e91e63'},{c:'#1db954'},{c:'#ff5722'},{c:'#2196f3'}].map(p => `<div style="display:flex;gap:3px;background:#1a1a1a;border-radius:4px;overflow:hidden"><div style="width:18px;height:18px;background:${p.c}"></div><div style="font-size:5px;padding:3px;color:#fff">Playlist</div></div>`).join('')}</div></div>
-      <div style="position:absolute;bottom:0;left:0;right:0;height:24px;background:#1a1a1a;display:flex;align-items:center;padding:0 8px;gap:4px"><div style="width:12px;height:12px;background:#333;border-radius:2px"></div><div style="flex:1"><div style="font-size:5px;color:#fff">Song Title</div><div style="height:2px;background:#333;border-radius:1px;margin-top:2px"><div style="width:40%;height:100%;background:#1db954;border-radius:1px"></div></div></div><span style="font-size:8px">▶</span></div>
-    </div>
-  `, '#121212', '#fff'),
 
   'social-twitch': base(`
     <div style="display:flex;height:200px;background:#0e0e10">
@@ -1862,13 +1832,6 @@ export const templatePreviews: Record<string, string> = {
     </div>
   `, '#050505', '#fff'),
 
-  'crypto-staking': base(`
-    <div style="padding:12px;background:#0a1a0a">
-      <div style="font-size:9px;font-weight:700;color:#22c55e;margin-bottom:6px">🥩 Staking</div>
-      ${[{n:'ETH',apy:'4.2%',tvl:'$2.1B'},{n:'SOL',apy:'6.8%',tvl:'$890M'}].map(p => `<div style="background:#111;border:1px solid #22c55e20;border-radius:4px;padding:4px;margin-bottom:3px;display:flex;justify-content:space-between;font-size:5px"><span style="color:#fff">${p.n}</span><span style="color:#22c55e">APY ${p.apy}</span><span style="color:#888">TVL ${p.tvl}</span></div>`).join('')}
-    </div>
-  `, '#0a1a0a', '#fff'),
-
   'crypto-lending': base(`
     <div style="padding:12px;background:#0f0720">
       <div style="font-size:9px;font-weight:700;color:#a855f7;margin-bottom:6px">🏦 Lending</div>
@@ -2016,125 +1979,6 @@ export const templatePreviews: Record<string, string> = {
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px">${['🎮 Game $30','✈️ Trip $100','📚 Book $15'].map(g => `<div style="background:#fff;border:1px solid #f0abfc;border-radius:8px;padding:4px;text-align:center;font-size:4px;color:#d946ef">${g}</div>`).join('')}</div>
     </div>
   `, '#fef0ff', '#333'),
-
-  // ═══════════════════════════════════════════
-  // GAMES 2D — Additional Previews
-  // ═══════════════════════════════════════════
-  'game2d-racing': base(`
-    <div style="height:200px;background:#333;position:relative;overflow:hidden">
-      <div style="position:absolute;inset:0;background:linear-gradient(180deg,#1a1a1a 0%,#333 100%)"></div>
-      <div style="position:absolute;left:50%;top:0;bottom:0;width:2px;background:repeating-linear-gradient(180deg,#fff 0px,#fff 10px,transparent 10px,transparent 20px)"></div>
-      <div style="position:absolute;bottom:40px;left:50%;transform:translateX(-50%);font-size:16px">🏎️</div>
-      <div style="position:absolute;top:60px;left:30%;font-size:12px">🚗</div>
-      <div style="position:absolute;top:30px;right:30%;font-size:12px">🚙</div>
-      <div style="position:absolute;top:6px;right:6px;font-size:6px;color:#fff">🏁 Lap 2/3</div>
-      <div style="position:absolute;top:6px;left:6px;font-size:6px;color:#22c55e">⚡ 120 mph</div>
-    </div>
-  `, '#333', '#fff'),
-
-  'game2d-breakout': base(`
-    <div style="height:200px;background:#0a0a0a;position:relative;overflow:hidden;padding:6px">
-      <div style="display:grid;grid-template-columns:repeat(8,1fr);gap:2px;margin-bottom:10px">${Array.from({length:24}).map((_,i) => `<div style="height:6px;background:hsl(${i*15},80%,50%);border-radius:1px"></div>`).join('')}</div>
-      <div style="position:absolute;top:50%;left:50%;width:6px;height:6px;border-radius:50%;background:#fff;box-shadow:0 0 6px #fff"></div>
-      <div style="position:absolute;bottom:20px;left:50%;transform:translateX(-50%);width:36px;height:6px;background:linear-gradient(90deg,#06b6d4,#3b82f6);border-radius:3px"></div>
-      <div style="position:absolute;top:6px;right:6px;font-size:6px;color:#fff">Score: 1200</div>
-    </div>
-  `, '#0a0a0a', '#fff'),
-
-  'game2d-pong': base(`
-    <div style="height:200px;background:#000;position:relative;overflow:hidden">
-      <div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:repeating-linear-gradient(180deg,#fff 0px,#fff 6px,transparent 6px,transparent 12px)"></div>
-      <div style="position:absolute;left:10px;top:50%;transform:translateY(-50%);width:4px;height:30px;background:#fff;border-radius:2px;box-shadow:0 0 8px #ec489980"></div>
-      <div style="position:absolute;right:10px;top:40%;transform:translateY(-50%);width:4px;height:30px;background:#fff;border-radius:2px;box-shadow:0 0 8px #06b6d480"></div>
-      <div style="position:absolute;top:50%;left:55%;width:5px;height:5px;border-radius:50%;background:#fff;box-shadow:0 0 10px #fff"></div>
-      <div style="position:absolute;top:10px;left:30%;font-size:16px;font-weight:800;color:#ec4899">3</div>
-      <div style="position:absolute;top:10px;right:30%;font-size:16px;font-weight:800;color:#06b6d4">5</div>
-    </div>
-  `, '#000', '#fff'),
-
-  'game2d-tower-defense': base(`
-    <div style="height:200px;background:#2d5016;position:relative;overflow:hidden">
-      <div style="position:absolute;top:40px;left:0;width:60px;height:16px;background:#8b7355;border-radius:0 8px 8px 0"></div>
-      <div style="position:absolute;top:40px;left:60px;width:16px;height:60px;background:#8b7355"></div>
-      <div style="position:absolute;top:84px;left:60px;width:60px;height:16px;background:#8b7355"></div>
-      <div style="position:absolute;top:84px;right:0;width:40px;height:16px;background:#8b7355;border-radius:8px 0 0 8px"></div>
-      <div style="position:absolute;top:30px;left:80px;font-size:12px">🏰</div>
-      <div style="position:absolute;top:32px;left:20px;width:8px;height:8px;border-radius:50%;background:#ef4444"></div>
-      <div style="position:absolute;top:6px;left:6px;font-size:5px;color:#fff">Wave 5 · Gold: 250</div>
-    </div>
-  `, '#2d5016', '#fff'),
-
-  'game2d-match3': base(`
-    <div style="padding:6px;background:#1a0030;text-align:center">
-      <div style="font-size:8px;font-weight:700;color:#ec4899;margin-bottom:4px">💎 MATCH</div>
-      <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:2px;width:90px;margin:0 auto">${Array.from({length:36}).map((_,i) => `<div style="width:100%;aspect-ratio:1;background:hsl(${(i*37)%360},70%,50%);border-radius:3px;font-size:6px;display:flex;align-items:center;justify-content:center">${['💎','⭐','🔥','💜','🟢','🔵'][i%6]}</div>`).join('')}</div>
-      <div style="font-size:5px;color:#888;margin-top:4px">Score: 4,200 · Moves: 12</div>
-    </div>
-  `, '#1a0030', '#fff'),
-
-  'game2d-maze': base(`
-    <div style="height:200px;background:#0a0a14;position:relative;overflow:hidden">
-      <div style="position:absolute;inset:10px;border:2px solid #334155;border-radius:4px">
-        <div style="position:absolute;top:20px;left:20px;right:40%;height:2px;background:#334155"></div>
-        <div style="position:absolute;top:50px;right:20px;left:40%;height:2px;background:#334155"></div>
-        <div style="position:absolute;top:80px;left:20px;right:30%;height:2px;background:#334155"></div>
-        <div style="position:absolute;top:20px;left:50%;width:2px;height:30px;background:#334155"></div>
-        <div style="position:absolute;top:50px;left:30%;width:2px;height:30px;background:#334155"></div>
-      </div>
-      <div style="position:absolute;top:30px;left:30px;width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 8px #22c55e"></div>
-      <div style="position:absolute;bottom:20px;right:20px;font-size:8px">🔑</div>
-      <div style="position:absolute;top:6px;left:6px;font-size:5px;color:#888">⏱ 01:24</div>
-    </div>
-  `, '#0a0a14', '#fff'),
-
-  // ═══════════════════════════════════════════
-  // GAMES 3D — Previews
-  // ═══════════════════════════════════════════
-  'game3d-fps': base(`
-    <div style="height:200px;background:linear-gradient(180deg,#1a1a2e 0%,#2a2a3e 100%);position:relative;overflow:hidden">
-      <div style="position:absolute;bottom:0;width:100%;height:60px;background:#2d2d4e;border-top:1px solid #3a3a5e"></div>
-      ${[{x:30,h:80,w:20},{x:70,h:60,w:16},{x:120,h:70,w:18}].map(b => `<div style="position:absolute;bottom:60px;left:${b.x}px;width:${b.w}px;height:${b.h}px;background:#333358;border:1px solid #3a3a6e"></div>`).join('')}
-      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)"><div style="width:2px;height:12px;background:#22c55e;position:absolute;top:-6px;left:-1px"></div><div style="width:12px;height:2px;background:#22c55e;position:absolute;top:-1px;left:-6px"></div></div>
-      <div style="position:absolute;bottom:6px;left:6px;font-size:5px;color:#fff">HP: 100 | Ammo: 30/90</div>
-      <div style="position:absolute;top:6px;right:6px;font-size:6px;color:#ef4444">Score: 450</div>
-    </div>
-  `, '#1a1a2e', '#fff'),
-
-  'game3d-racing': base(`
-    <div style="height:200px;background:linear-gradient(180deg,#87ceeb 0%,#87ceeb 50%,#4a7a2e 70%,#333 85%,#333 100%);position:relative;overflow:hidden">
-      <div style="position:absolute;bottom:30px;left:50%;transform:translateX(-50%);width:80px;height:8px;background:#555;border-radius:2px;transform:perspective(100px) rotateX(20deg)"></div>
-      <div style="position:absolute;bottom:35px;left:50%;transform:translateX(-50%);font-size:16px">🏎️</div>
-      <div style="position:absolute;top:6px;left:6px;font-size:6px;color:#fff;text-shadow:1px 1px 2px #000">LAP 2/3 · 120 mph</div>
-    </div>
-  `),
-
-  'game3d-minecraft': base(`
-    <div style="height:200px;background:linear-gradient(180deg,#87ceeb 0%,#87ceeb 40%,#4a7a2e 60%,#8b6f47 80%,#555 100%);position:relative;overflow:hidden">
-      <div style="position:absolute;top:20px;left:60px;width:20px;height:20px;background:#8b6f47;border:1px solid #6b5335"></div>
-      <div style="position:absolute;top:0;left:60px;width:20px;height:20px;background:#2d5016;border:1px solid #1a3a0a"></div>
-      <div style="position:absolute;top:20px;left:80px;width:20px;height:20px;background:#2d5016;border:1px solid #1a3a0a"></div>
-      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)"><div style="width:1px;height:10px;background:#fff;position:absolute;top:-5px;left:0"></div><div style="width:10px;height:1px;background:#fff;position:absolute;top:0;left:-5px"></div></div>
-      <div style="position:absolute;bottom:6px;left:50%;transform:translateX(-50%);display:flex;gap:2px">${['🟫','🟩','⬜','💎'].map((b,i) => `<div style="width:16px;height:16px;background:#00000060;border:1px solid ${i===0?'#fff':'#ffffff40'};border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:8px">${b}</div>`).join('')}</div>
-    </div>
-  `),
-
-  'game3d-flight': base(`
-    <div style="height:200px;background:linear-gradient(180deg,#1a3a5f 0%,#87ceeb 50%,#4a7a2e 90%);position:relative;overflow:hidden">
-      <div style="position:absolute;top:40%;left:50%;transform:translate(-50%,-50%);font-size:20px">✈️</div>
-      <div style="position:absolute;top:6px;left:50%;transform:translateX(-50%);font-size:5px;color:#fff;text-shadow:1px 1px 2px #000">ALT: 5,200ft · SPD: 340kts</div>
-    </div>
-  `),
-
-  'game3d-dungeon': base(`
-    <div style="height:200px;background:#0a0a0a;position:relative;overflow:hidden">
-      <div style="position:absolute;inset:20px;background:radial-gradient(circle at center,#2a1a0a 0%,#0a0a0a 70%)"></div>
-      <div style="position:absolute;top:50%;left:30%;width:20px;height:20px;background:#1a1a1a;border:1px solid #333"></div>
-      <div style="position:absolute;top:50%;right:30%;width:20px;height:20px;background:#1a1a1a;border:1px solid #333"></div>
-      <div style="position:absolute;top:30%;left:50%;transform:translateX(-50%);font-size:14px">🧟</div>
-      <div style="position:absolute;bottom:6px;left:6px;font-size:5px;color:#ef4444">❤️❤️❤️ | ⚔️ 15 DMG</div>
-      <div style="position:absolute;bottom:6px;right:6px;font-size:5px;color:#fbbf24">💰 120 Gold</div>
-    </div>
-  `, '#0a0a0a', '#fff'),
 
   'game3d-golf': base(`
     <div style="height:200px;background:linear-gradient(180deg,#87ceeb 0%,#87ceeb 50%,#22c55e 60%,#16a34a 100%);position:relative;overflow:hidden">
