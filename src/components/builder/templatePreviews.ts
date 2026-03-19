@@ -1566,37 +1566,7 @@ export const templatePreviews: Record<string, string> = {
     </div>
   `, '#111', '#fff'),
 
-  // ═══════════════════════════════════════════
-  // SOCIAL — More Previews
-  // ═══════════════════════════════════════════
-  'social-snapchat': base(`
-    <div style="height:200px;background:#fffc00;position:relative">
-      <div style="position:absolute;inset:10px;background:#000;border-radius:12px;display:flex;align-items:center;justify-content:center"><span style="font-size:24px">👻</span></div>
-      <div style="position:absolute;bottom:0;width:100%;display:flex;justify-content:space-around;padding:4px;background:#00000020">${['🗺️','💬','📸','📰','🔦'].map(e => `<span style="font-size:10px">${e}</span>`).join('')}</div>
-    </div>
-  `, '#fffc00', '#000'),
 
-  'social-pinterest': base(`
-    <div style="padding:8px;background:#fff">
-      <div style="text-align:center;font-size:10px;font-weight:700;color:#e60023;margin-bottom:6px">Pinterest</div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px">${[50,35,45,30,55,40].map((h,i) => `<div style="height:${h}px;background:hsl(${i*55},60%,80%);border-radius:6px"></div>`).join('')}</div>
-    </div>
-  `, '#fff', '#222'),
-
-  'social-linkedin': base(`
-    <div style="background:#000">
-      <nav style="background:#1b1f23;padding:4px 8px;display:flex;justify-content:space-between"><span style="font-size:9px;font-weight:700;color:#0a66c2">in</span><div style="display:flex;gap:6px">${['🏠','👥','💼','💬'].map(e => `<span style="font-size:7px">${e}</span>`).join('')}</div></nav>
-      <div style="padding:6px"><div style="background:#1b1f23;border-radius:6px;padding:6px;margin-bottom:4px"><div style="display:flex;gap:4px;align-items:center"><div style="width:16px;height:16px;border-radius:50%;background:#334155"></div><div><div style="font-size:6px;font-weight:600;color:#fff">Professional User</div><div style="font-size:4px;color:#888">Sr. Engineer at Tech Co</div></div></div><div style="font-size:5px;color:#b0b0b0;margin-top:4px">Excited to announce my new role...</div></div></div>
-    </div>
-  `, '#000', '#fff'),
-
-  'social-spotify': base(`
-    <div style="display:flex;height:200px;background:#121212">
-      <div style="width:40px;background:#000;padding:6px 4px">${['🏠','🔍','📚'].map(e => `<div style="text-align:center;margin:6px 0;font-size:8px">${e}</div>`).join('')}</div>
-      <div style="flex:1;padding:6px"><div style="font-size:8px;font-weight:700;color:#fff;margin-bottom:6px">Good Evening</div><div style="display:grid;grid-template-columns:repeat(2,1fr);gap:3px">${[{c:'#e91e63'},{c:'#1db954'},{c:'#ff5722'},{c:'#2196f3'}].map(p => `<div style="display:flex;gap:3px;background:#1a1a1a;border-radius:4px;overflow:hidden"><div style="width:18px;height:18px;background:${p.c}"></div><div style="font-size:5px;padding:3px;color:#fff">Playlist</div></div>`).join('')}</div></div>
-      <div style="position:absolute;bottom:0;left:0;right:0;height:24px;background:#1a1a1a;display:flex;align-items:center;padding:0 8px;gap:4px"><div style="width:12px;height:12px;background:#333;border-radius:2px"></div><div style="flex:1"><div style="font-size:5px;color:#fff">Song Title</div><div style="height:2px;background:#333;border-radius:1px;margin-top:2px"><div style="width:40%;height:100%;background:#1db954;border-radius:1px"></div></div></div><span style="font-size:8px">▶</span></div>
-    </div>
-  `, '#121212', '#fff'),
 
   'social-twitch': base(`
     <div style="display:flex;height:200px;background:#0e0e10">
