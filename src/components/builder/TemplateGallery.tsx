@@ -162,8 +162,8 @@ function TemplateCard({ template, index, onSelect }: { template: Template; index
           {previewHtml ? (
             <iframe
               srcDoc={previewHtml}
-              className="w-[400%] h-[400%] origin-top-left pointer-events-none border-0"
-              style={{ transform: 'scale(0.25)' }}
+              className="w-[286%] h-[286%] origin-top-left pointer-events-none border-0"
+              style={{ transform: 'scale(0.35)' }}
               title={template.name}
               sandbox=""
               tabIndex={-1}
