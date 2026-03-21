@@ -127,23 +127,23 @@ export const templatePreviews: Record<string, string> = {
   `, '#fafafa', '#222'),
 
   'casino-landing': base(`
-    <div style="padding:12px;background:#1e2040">
+    <div style="padding:12px;background:#2a2d55">
       <div style="text-align:center;margin-bottom:8px"><span style="font-size:14px;font-weight:800;background:linear-gradient(135deg,#fbbf24,#f59e0b);-webkit-background-clip:text;-webkit-text-fill-color:transparent">🎰 CASINO</span></div>
-      <div style="background:linear-gradient(135deg,#7c2d12,#991b1b);border-radius:6px;padding:8px;text-align:center;margin-bottom:8px;border:1px solid #fbbf2480"><div style="font-size:8px;color:#fbbf24;font-weight:700">🎁 WELCOME BONUS</div><div style="font-size:12px;color:#fff;font-weight:800">100% up to $500</div></div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px">${['🎰','🃏','🎲','⭐','🎯','💎'].map(e => `<div style="background:#383858;border-radius:4px;padding:6px;text-align:center;border:1px solid #555"><div style="font-size:14px">${e}</div><div style="font-size:5px;color:#ddd;margin-top:2px">Play</div></div>`).join('')}</div>
+      <div style="background:linear-gradient(135deg,#7c2d12,#991b1b);border-radius:6px;padding:8px;text-align:center;margin-bottom:8px;border:1px solid #fbbf24cc"><div style="font-size:8px;color:#fbbf24;font-weight:700">🎁 WELCOME BONUS</div><div style="font-size:12px;color:#fff;font-weight:800">100% up to $500</div></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px">${['🎰','🃏','🎲','⭐','🎯','💎'].map(e => `<div style="background:#484878;border-radius:4px;padding:6px;text-align:center;border:1px solid #666"><div style="font-size:14px">${e}</div><div style="font-size:5px;color:#ddd;margin-top:2px">Play</div></div>`).join('')}</div>
     </div>
-  `, '#161625', '#fff'),
+  `, '#2a2d55', '#fff'),
 
   'casino-slots': base(`
-    <div style="padding:12px;background:#1e2040;text-align:center">
+    <div style="padding:12px;background:#2a2d55;text-align:center">
       <div style="font-size:10px;font-weight:700;color:#fbbf24;margin-bottom:6px">🎰 MEGA SLOTS</div>
-      <div style="background:#2a2a50;border-radius:8px;padding:8px;border:2px solid #fbbf2480;display:inline-block">
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-bottom:6px">${['🍒','💎','7️⃣','⭐','🍋','🔔','💎','7️⃣','🍒'].map(e => `<div style="background:#383858;border-radius:4px;padding:6px;font-size:14px">${e}</div>`).join('')}</div>
+      <div style="background:#363670;border-radius:8px;padding:8px;border:2px solid #fbbf24cc;display:inline-block">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-bottom:6px">${['🍒','💎','7️⃣','⭐','🍋','🔔','💎','7️⃣','🍒'].map(e => `<div style="background:#484878;border-radius:4px;padding:6px;font-size:14px">${e}</div>`).join('')}</div>
         <div style="background:linear-gradient(135deg,#fbbf24,#f59e0b);padding:4px 16px;border-radius:4px;font-size:8px;font-weight:700;color:#000">SPIN</div>
       </div>
       <div style="margin-top:6px;font-size:7px;color:#ccc">Balance: $1,000.00</div>
     </div>
-  `, '#161625', '#fff'),
+  `, '#2a2d55', '#fff'),
 
   'faucet-crypto': base(`
     <div style="padding:12px">
@@ -451,29 +451,29 @@ export const templatePreviews: Record<string, string> = {
 
   // Casino HD
   'casino-roulette': base(`
-    <div style="padding:8px;background:#1a6b1a">
-      <div style="width:80px;height:80px;border-radius:50%;background:conic-gradient(#c0392b 0deg,#111 10deg,#c0392b 20deg,#111 30deg,#c0392b 40deg,#111 50deg,#c0392b 60deg,#111 70deg,#c0392b 80deg,#111 90deg,#c0392b 100deg,#111 110deg,#c0392b 120deg,#111 130deg,#c0392b 140deg,#111 150deg,#c0392b 160deg,#111 170deg,#c0392b 180deg,#111 190deg,#c0392b 200deg,#111 210deg,#c0392b 220deg,#111 230deg,#c0392b 240deg,#111 250deg,#c0392b 260deg,#111 270deg,#c0392b 280deg,#111 290deg,#c0392b 300deg,#111 310deg,#c0392b 320deg,#111 330deg,#c0392b 340deg,#111 350deg,#c0392b 360deg);margin:0 auto;border:3px solid #d4a853;display:flex;align-items:center;justify-content:center"><div style="width:20px;height:20px;border-radius:50%;background:#1a6b1a;border:2px solid #d4a853;display:flex;align-items:center;justify-content:center;font-size:7px;color:#d4a853;font-weight:700">0</div></div>
+    <div style="padding:8px;background:#1f8a1f">
+      <div style="width:80px;height:80px;border-radius:50%;background:conic-gradient(#c0392b 0deg,#111 10deg,#c0392b 20deg,#111 30deg,#c0392b 40deg,#111 50deg,#c0392b 60deg,#111 70deg,#c0392b 80deg,#111 90deg,#c0392b 100deg,#111 110deg,#c0392b 120deg,#111 130deg,#c0392b 140deg,#111 150deg,#c0392b 160deg,#111 170deg,#c0392b 180deg,#111 190deg,#c0392b 200deg,#111 210deg,#c0392b 220deg,#111 230deg,#c0392b 240deg,#111 250deg,#c0392b 260deg,#111 270deg,#c0392b 280deg,#111 290deg,#c0392b 300deg,#111 310deg,#c0392b 320deg,#111 330deg,#c0392b 340deg,#111 350deg,#c0392b 360deg);margin:0 auto;border:3px solid #ffd875;display:flex;align-items:center;justify-content:center"><div style="width:20px;height:20px;border-radius:50%;background:#1f8a1f;border:2px solid #ffd875;display:flex;align-items:center;justify-content:center;font-size:7px;color:#d4a853;font-weight:700">0</div></div>
       <div style="text-align:center;margin-top:6px;font-size:6px;color:#d4a853">Balance: $5,000</div>
-      <div style="display:flex;gap:2px;justify-content:center;margin-top:4px">${[5,25,100].map(v => `<div style="width:18px;height:18px;border-radius:50%;background:#c0392b;border:2px solid #d4a853;display:flex;align-items:center;justify-content:center;font-size:5px;color:#fff;font-weight:700">$${v}</div>`).join('')}</div>
+      <div style="display:flex;gap:2px;justify-content:center;margin-top:4px">${[5,25,100].map(v => `<div style="width:18px;height:18px;border-radius:50%;background:#c0392b;border:2px solid #ffd875;display:flex;align-items:center;justify-content:center;font-size:5px;color:#fff;font-weight:700">$${v}</div>`).join('')}</div>
     </div>
   `, '#145214', '#e8c878'),
 
   'casino-poker': base(`
-    <div style="padding:10px;background:#1e7a1e;border-radius:8px;position:relative">
+    <div style="padding:10px;background:#259025;border-radius:8px;position:relative">
       <div style="text-align:center;font-size:7px;color:#d4a853;margin-bottom:6px">TEXAS HOLD'EM</div>
       <div style="display:flex;gap:3px;justify-content:center;margin-bottom:8px">${['A♠','K♥','10♦','7♣','2♠'].map(c => `<div style="width:18px;height:26px;background:#fff;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:6px;font-weight:700;color:${c.includes('♥')||c.includes('♦')?'#c0392b':'#111'}">${c}</div>`).join('')}</div>
       <div style="text-align:center;font-size:8px;color:#ffd700;font-weight:700;margin-bottom:6px">POT: $2,400</div>
-      <div style="display:flex;justify-content:center;gap:3px;margin-bottom:4px">${['Q♥','J♥'].map(c => `<div style="width:22px;height:30px;background:#fff;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:700;color:#c0392b;border:1px solid #d4a853">${c}</div>`).join('')}</div>
+      <div style="display:flex;justify-content:center;gap:3px;margin-bottom:4px">${['Q♥','J♥'].map(c => `<div style="width:22px;height:30px;background:#fff;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:700;color:#c0392b;border:1px solid #ffd875">${c}</div>`).join('')}</div>
       <div style="display:flex;gap:3px;justify-content:center">${['Fold','Call','Raise'].map((a,i) => `<div style="padding:2px 6px;border-radius:3px;font-size:5px;font-weight:600;${i===0?'background:#c0392b;color:#fff':i===1?'background:#2980b9;color:#fff':'background:#d4a853;color:#000'}">${a}</div>`).join('')}</div>
     </div>
   `, '#186018', '#fff'),
 
   'casino-blackjack': base(`
-    <div style="padding:10px;background:#1e7a1e">
+    <div style="padding:10px;background:#259025">
       <div style="text-align:center;font-size:7px;color:#d4a853;margin-bottom:6px">♠ BLACKJACK ♠</div>
       <div style="text-align:center;margin-bottom:4px"><div style="font-size:5px;color:#ddd">DEALER (17)</div><div style="display:flex;gap:2px;justify-content:center;margin-top:2px">${['K♠','7♣'].map(c => `<div style="width:18px;height:26px;background:#fff;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:6px;font-weight:700">${c}</div>`).join('')}</div></div>
-      <div style="text-align:center;margin-top:8px"><div style="font-size:5px;color:#ddd">YOUR HAND (20)</div><div style="display:flex;gap:2px;justify-content:center;margin-top:2px">${['Q♥','10♦'].map(c => `<div style="width:20px;height:28px;background:#fff;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:700;color:#c0392b;border:1px solid #d4a853">${c}</div>`).join('')}</div></div>
-      <div style="display:flex;gap:3px;justify-content:center;margin-top:6px">${['HIT','STAND','DOUBLE'].map((a,i) => `<div style="padding:3px 8px;border-radius:3px;font-size:5px;font-weight:700;${i===1?'background:#d4a853;color:#000':'background:#1a5a1a;color:#fff;border:1px solid #d4a853'}">${a}</div>`).join('')}</div>
+      <div style="text-align:center;margin-top:8px"><div style="font-size:5px;color:#ddd">YOUR HAND (20)</div><div style="display:flex;gap:2px;justify-content:center;margin-top:2px">${['Q♥','10♦'].map(c => `<div style="width:20px;height:28px;background:#fff;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:700;color:#c0392b;border:1px solid #ffd875">${c}</div>`).join('')}</div></div>
+      <div style="display:flex;gap:3px;justify-content:center;margin-top:6px">${['HIT','STAND','DOUBLE'].map((a,i) => `<div style="padding:3px 8px;border-radius:3px;font-size:5px;font-weight:700;${i===1?'background:#d4a853;color:#000':'background:#1a5a1a;color:#fff;border:1px solid #ffd875'}">${a}</div>`).join('')}</div>
     </div>
   `, '#186018', '#fff'),
 
@@ -641,33 +641,33 @@ export const templatePreviews: Record<string, string> = {
   // CASINO — Additional Previews
   // ═══════════════════════════════════════════
   'casino-crash': base(`
-    <div style="padding:8px;background:#1e2040;height:200px;position:relative">
+    <div style="padding:8px;background:#2a2d55;height:200px;position:relative">
       <div style="font-size:7px;color:#ccc;margin-bottom:4px">CRASH</div>
-      <div style="position:relative;height:100px;border-left:1px solid #444;border-bottom:1px solid #444;margin-bottom:6px">
+      <div style="position:relative;height:100px;border-left:1px solid #666;border-bottom:1px solid #666;margin-bottom:6px">
         <svg viewBox="0 0 120 80" style="width:100%;height:100%"><path d="M0,80 Q30,75 50,60 T90,20 L90,20" fill="none" stroke="#22c55e" stroke-width="2"/><circle cx="90" cy="20" r="3" fill="#22c55e"/></svg>
         <div style="position:absolute;top:10px;left:50%;transform:translateX(-50%);font-size:20px;font-weight:800;color:#22c55e">2.47x</div>
       </div>
       <div style="display:flex;gap:4px;justify-content:center"><div style="background:#22c55e;padding:3px 12px;border-radius:4px;font-size:7px;font-weight:700;color:#000">CASH OUT</div></div>
       <div style="display:flex;gap:2px;position:absolute;bottom:6px;left:8px">${[1.2,3.5,1.8,12.4,2.1,1.0].map(v => `<span style="font-size:5px;padding:1px 3px;border-radius:2px;background:${v>=2?'#22c55e20':'#ef444420'};color:${v>=2?'#22c55e':'#ef4444'}">${v}x</span>`).join('')}</div>
     </div>
-  `, '#161625', '#fff'),
+  `, '#2a2d55', '#fff'),
 
   'casino-mines': base(`
-    <div style="padding:10px;background:#1e2040">
+    <div style="padding:10px;background:#2a2d55">
       <div style="font-size:7px;color:#ccc;margin-bottom:6px">MINES — <span style="color:#22c55e">3.24x</span></div>
       <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:3px;margin-bottom:6px">
         ${Array.from({length:25}).map((_,i) => {
           if(i===3||i===11||i===18) return `<div style="width:100%;aspect-ratio:1;background:#22c55e20;border:1px solid #22c55e;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:10px">💎</div>`
           if(i===7) return `<div style="width:100%;aspect-ratio:1;background:#ef444420;border:1px solid #ef4444;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:10px">💣</div>`
-          return `<div style="width:100%;aspect-ratio:1;background:#383858;border:1px solid #555;border-radius:3px"></div>`
+          return `<div style="width:100%;aspect-ratio:1;background:#484878;border:1px solid #666;border-radius:3px"></div>`
         }).join('')}
       </div>
       <div style="display:flex;gap:4px;justify-content:center"><div style="background:#22c55e;padding:3px 10px;border-radius:4px;font-size:6px;font-weight:700;color:#000">CASH OUT $32.40</div></div>
     </div>
-  `, '#161625', '#fff'),
+  `, '#2a2d55', '#fff'),
 
   'casino-plinko': base(`
-    <div style="padding:6px;background:#1e2040;text-align:center">
+    <div style="padding:6px;background:#2a2d55;text-align:center">
       <div style="font-size:7px;color:#ccc;margin-bottom:4px">PLINKO</div>
       <div style="position:relative;height:120px;width:100px;margin:0 auto">
         ${Array.from({length:8}).map((_,row) => Array.from({length:row+3}).map((_,col) => `<div style="position:absolute;top:${row*14+4}px;left:${50-(row+3)*5+col*10}px;width:4px;height:4px;border-radius:50%;background:#334155"></div>`).join('')).join('')}
@@ -675,18 +675,18 @@ export const templatePreviews: Record<string, string> = {
       </div>
       <div style="display:flex;gap:1px;justify-content:center;margin-top:2px">${['0.2','0.5','1','2','5','10','5','2','1','0.5','0.2'].map((v,i) => `<div style="font-size:4px;padding:2px 2px;background:${Number(v)>=5?'#f59e0b':Number(v)>=2?'#eab308':'#334155'};color:${Number(v)>=2?'#000':'#999'};border-radius:1px;font-weight:600">${v}x</div>`).join('')}</div>
     </div>
-  `, '#161625', '#fff'),
+  `, '#2a2d55', '#fff'),
 
   'casino-wheel': base(`
-    <div style="padding:8px;background:#1e2040;text-align:center">
+    <div style="padding:8px;background:#2a2d55;text-align:center">
       <div style="font-size:8px;font-weight:700;color:#fbbf24;margin-bottom:4px">🎡 WHEEL OF FORTUNE</div>
-      <div style="width:90px;height:90px;border-radius:50%;background:conic-gradient(#ef4444 0deg,#f59e0b 30deg,#22c55e 60deg,#3b82f6 90deg,#8b5cf6 120deg,#ec4899 150deg,#ef4444 180deg,#f59e0b 210deg,#22c55e 240deg,#3b82f6 270deg,#8b5cf6 300deg,#ec4899 330deg,#ef4444 360deg);margin:0 auto;border:3px solid #fbbf24;display:flex;align-items:center;justify-content:center;box-shadow:0 0 20px #fbbf2440"><div style="width:20px;height:20px;border-radius:50%;background:#1e2040;border:2px solid #fbbf24;display:flex;align-items:center;justify-content:center;font-size:6px;color:#fbbf24;font-weight:700">▶</div></div>
+      <div style="width:90px;height:90px;border-radius:50%;background:conic-gradient(#ef4444 0deg,#f59e0b 30deg,#22c55e 60deg,#3b82f6 90deg,#8b5cf6 120deg,#ec4899 150deg,#ef4444 180deg,#f59e0b 210deg,#22c55e 240deg,#3b82f6 270deg,#8b5cf6 300deg,#ec4899 330deg,#ef4444 360deg);margin:0 auto;border:3px solid #fbbf24;display:flex;align-items:center;justify-content:center;box-shadow:0 0 20px #fbbf2440"><div style="width:20px;height:20px;border-radius:50%;background:#2a2d55;border:2px solid #fbbf24;display:flex;align-items:center;justify-content:center;font-size:6px;color:#fbbf24;font-weight:700">▶</div></div>
       <div style="font-size:5px;color:#ccc;margin-top:4px">Click to spin • Balance: $500</div>
     </div>
-  `, '#161625', '#fff'),
+  `, '#2a2d55', '#fff'),
 
   'casino-baccarat': base(`
-    <div style="padding:8px;background:#1e7a1e">
+    <div style="padding:8px;background:#259025">
       <div style="text-align:center;font-size:7px;color:#d4a853;margin-bottom:6px">BACCARAT</div>
       <div style="display:flex;justify-content:space-around;margin-bottom:6px">
         <div style="text-align:center"><div style="font-size:5px;color:#ddd">PLAYER (8)</div><div style="display:flex;gap:2px;margin-top:2px">${['9♠','K♣'].map(c => `<div style="width:16px;height:22px;background:#fff;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:5px;font-weight:700">${c}</div>`).join('')}</div></div>
@@ -697,20 +697,20 @@ export const templatePreviews: Record<string, string> = {
   `, '#186018', '#fff'),
 
   'casino-keno': base(`
-    <div style="padding:6px;background:#222260">
+    <div style="padding:6px;background:#2d2d75">
       <div style="font-size:7px;color:#fbbf24;text-align:center;margin-bottom:4px">KENO</div>
       <div style="display:grid;grid-template-columns:repeat(10,1fr);gap:1px;margin-bottom:4px">
         ${Array.from({length:40}).map((_,i) => {
           const n = i+1; const sel = [3,7,15,22,28,33,37].includes(n); const hit = [7,22,33].includes(n)
-          return `<div style="text-align:center;font-size:4px;padding:2px;border-radius:2px;font-weight:600;${hit?'background:#22c55e;color:#000':sel?'background:#3b82f6;color:#fff':'background:#353570;color:#bbb'}">${n}</div>`
+          return `<div style="text-align:center;font-size:4px;padding:2px;border-radius:2px;font-weight:600;${hit?'background:#22c55e;color:#000':sel?'background:#3b82f6;color:#fff':'background:#454590;color:#bbb'}">${n}</div>`
         }).join('')}
       </div>
       <div style="text-align:center;font-size:5px;color:#ccc">Hits: 3/7 — Win: $45.00</div>
     </div>
-  `, '#181845', '#e2e8f0'),
+  `, '#2d2d75', '#e2e8f0'),
 
   'casino-video-poker': base(`
-    <div style="padding:8px;background:#222260">
+    <div style="padding:8px;background:#2d2d75">
       <div style="font-size:7px;color:#fbbf24;text-align:center;margin-bottom:4px">VIDEO POKER — Jacks or Better</div>
       <div style="display:flex;gap:3px;justify-content:center;margin-bottom:6px">
         ${['J♥','Q♠','7♦','J♣','3♠'].map((c,i) => `<div style="position:relative"><div style="width:22px;height:32px;background:#fff;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:700;color:${c.includes('♥')||c.includes('♦')?'#c0392b':'#111'};${i===0||i===3?'border:2px solid #fbbf24':''}">${c}</div>${i===0||i===3?'<div style="font-size:4px;color:#fbbf24;text-align:center">HOLD</div>':''}</div>`).join('')}
@@ -718,21 +718,21 @@ export const templatePreviews: Record<string, string> = {
       <div style="text-align:center;font-size:6px;color:#22c55e;font-weight:700;margin-bottom:4px">PAIR OF JACKS!</div>
       <div style="display:flex;gap:3px;justify-content:center"><div style="background:#fbbf24;padding:2px 10px;border-radius:3px;font-size:6px;font-weight:700;color:#000">DRAW</div></div>
     </div>
-  `, '#181845', '#e2e8f0'),
+  `, '#2d2d75', '#e2e8f0'),
 
   'casino-hilo': base(`
-    <div style="padding:10px;background:#1e2040;text-align:center">
+    <div style="padding:10px;background:#2a2d55;text-align:center">
       <div style="font-size:7px;color:#ccc;margin-bottom:6px">HI-LO • <span style="color:#22c55e">1.86x</span></div>
-      <div style="width:40px;height:56px;background:#fff;border-radius:4px;margin:0 auto 8px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#c0392b;border:2px solid #d4a853">8♥</div>
+      <div style="width:40px;height:56px;background:#fff;border-radius:4px;margin:0 auto 8px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#c0392b;border:2px solid #ffd875">8♥</div>
       <div style="display:flex;gap:4px;justify-content:center;margin-bottom:6px"><div style="background:#22c55e;padding:3px 10px;border-radius:3px;font-size:6px;font-weight:700;color:#000">▲ HIGH</div><div style="background:#ef4444;padding:3px 10px;border-radius:3px;font-size:6px;font-weight:700;color:#fff">▼ LOW</div></div>
-      <div style="display:flex;gap:2px;justify-content:center">${['3♣','J♠','5♦','K♥','8♣'].map(c => `<div style="width:14px;height:20px;background:#383858;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:5px;color:#ccc">${c}</div>`).join('')}</div>
+      <div style="display:flex;gap:2px;justify-content:center">${['3♣','J♠','5♦','K♥','8♣'].map(c => `<div style="width:14px;height:20px;background:#484878;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:5px;color:#ccc">${c}</div>`).join('')}</div>
     </div>
-  `, '#161625', '#fff'),
+  `, '#2a2d55', '#fff'),
 
   'casino-aviator': base(`
-    <div style="padding:8px;background:#3d2020;height:200px;position:relative">
+    <div style="padding:8px;background:#5a3030;height:200px;position:relative">
       <div style="font-size:7px;color:#ef4444;margin-bottom:4px">AVIATOR</div>
-      <div style="position:relative;height:100px;border-left:1px solid #444;border-bottom:1px solid #444">
+      <div style="position:relative;height:100px;border-left:1px solid #666;border-bottom:1px solid #666">
         <svg viewBox="0 0 120 80" style="width:100%;height:100%"><path d="M0,78 Q20,76 40,70 T80,30 L100,5" fill="none" stroke="#ef4444" stroke-width="2"/></svg>
         <div style="position:absolute;top:5px;right:10px;font-size:16px">✈️</div>
         <div style="position:absolute;top:30px;left:50%;transform:translateX(-50%);font-size:18px;font-weight:800;color:#ef4444">5.23x</div>
@@ -742,29 +742,29 @@ export const templatePreviews: Record<string, string> = {
   `, '#2d1818', '#fff'),
 
   'casino-sports': base(`
-    <div style="display:flex;height:200px;background:#1e2040">
-      <div style="width:30px;background:#2a2a50;padding:4px 2px;font-size:6px">${['⚽','🏀','🎾','🥊','🎮'].map(e => `<div style="text-align:center;margin:6px 0">${e}</div>`).join('')}</div>
+    <div style="display:flex;height:200px;background:#2a2d55">
+      <div style="width:30px;background:#363670;padding:4px 2px;font-size:6px">${['⚽','🏀','🎾','🥊','🎮'].map(e => `<div style="text-align:center;margin:6px 0">${e}</div>`).join('')}</div>
       <div style="flex:1;padding:6px">
         <div style="font-size:8px;font-weight:700;color:#fff;margin-bottom:6px">⚽ Football</div>
-        ${[{t1:'Barcelona',t2:'Real Madrid',o:['1.85','3.50','4.20']},{t1:'Liverpool',t2:'Man City',o:['2.10','3.30','3.40']}].map(m => `<div style="background:#2a2a50;border-radius:4px;padding:4px;margin-bottom:4px;border:1px solid #4a4a60"><div style="display:flex;justify-content:space-between;font-size:6px;margin-bottom:3px"><span style="color:#fff">${m.t1} vs ${m.t2}</span><span style="color:#22c55e;font-size:5px">LIVE</span></div><div style="display:flex;gap:2px">${m.o.map((o,i) => `<div style="flex:1;text-align:center;padding:2px;background:#303060;border-radius:2px;font-size:6px;font-weight:600;color:#3b82f6">${['1','X','2'][i]} ${o}</div>`).join('')}</div></div>`).join('')}
+        ${[{t1:'Barcelona',t2:'Real Madrid',o:['1.85','3.50','4.20']},{t1:'Liverpool',t2:'Man City',o:['2.10','3.30','3.40']}].map(m => `<div style="background:#363670;border-radius:4px;padding:4px;margin-bottom:4px;border:1px solid #5a5a80"><div style="display:flex;justify-content:space-between;font-size:6px;margin-bottom:3px"><span style="color:#fff">${m.t1} vs ${m.t2}</span><span style="color:#22c55e;font-size:5px">LIVE</span></div><div style="display:flex;gap:2px">${m.o.map((o,i) => `<div style="flex:1;text-align:center;padding:2px;background:#3a3a75;border-radius:2px;font-size:6px;font-weight:600;color:#3b82f6">${['1','X','2'][i]} ${o}</div>`).join('')}</div></div>`).join('')}
       </div>
     </div>
-  `, '#161625', '#fff'),
+  `, '#2a2d55', '#fff'),
 
   'casino-dice-game': base(`
-    <div style="padding:10px;background:#1e2040;text-align:center">
+    <div style="padding:10px;background:#2a2d55;text-align:center">
       <div style="font-size:7px;color:#ccc;margin-bottom:6px">DICE — Roll Over</div>
-      <div style="background:#2a2a50;border-radius:6px;padding:8px;margin-bottom:6px">
-        <div style="width:100%;height:6px;background:#303060;border-radius:3px;position:relative;margin-bottom:4px"><div style="width:55%;height:100%;background:linear-gradient(90deg,#ef4444,#f59e0b);border-radius:3px"></div><div style="position:absolute;left:55%;top:-3px;width:8px;height:12px;background:#fff;border-radius:2px;transform:translateX(-50%)"></div></div>
+      <div style="background:#363670;border-radius:6px;padding:8px;margin-bottom:6px">
+        <div style="width:100%;height:6px;background:#3a3a75;border-radius:3px;position:relative;margin-bottom:4px"><div style="width:55%;height:100%;background:linear-gradient(90deg,#ef4444,#f59e0b);border-radius:3px"></div><div style="position:absolute;left:55%;top:-3px;width:8px;height:12px;background:#fff;border-radius:2px;transform:translateX(-50%)"></div></div>
         <div style="display:flex;justify-content:space-between;font-size:5px;color:#ccc"><span>0</span><span style="color:#22c55e;font-weight:700">55.00</span><span>100</span></div>
       </div>
       <div style="font-size:14px;font-weight:800;color:#22c55e;margin-bottom:4px">72.41</div>
       <div style="font-size:5px;color:#ccc">Win Chance: 45% • Multiplier: 2.18x</div>
     </div>
-  `, '#161625', '#fff'),
+  `, '#2a2d55', '#fff'),
 
   'casino-scratch': base(`
-    <div style="padding:10px;background:#303060;text-align:center">
+    <div style="padding:10px;background:#3a3a75;text-align:center">
       <div style="font-size:8px;font-weight:700;color:#fbbf24;margin-bottom:6px">🎫 SCRATCH & WIN</div>
       <div style="background:linear-gradient(135deg,#c0a060,#d4a853);border-radius:8px;padding:8px;display:inline-block;margin-bottom:4px">
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px">
@@ -773,39 +773,39 @@ export const templatePreviews: Record<string, string> = {
       </div>
       <div style="font-size:6px;color:#22c55e;font-weight:700">3x 💎 = $500!</div>
     </div>
-  `, '#252545', '#e2e8f0'),
+  `, '#3a3a75', '#e2e8f0'),
 
   'casino-bingo': base(`
-    <div style="padding:8px;background:#3d1070">
+    <div style="padding:8px;background:#501890">
       <div style="font-size:8px;font-weight:700;color:#ec4899;text-align:center;margin-bottom:4px">🎱 BINGO</div>
       <div style="display:flex;gap:6px;justify-content:center">
         <div><div style="display:grid;grid-template-columns:repeat(5,1fr);gap:1px">
           <div style="grid-column:1/-1;display:grid;grid-template-columns:repeat(5,1fr);gap:1px">${['B','I','N','G','O'].map(l => `<div style="text-align:center;font-size:6px;font-weight:700;color:#ec4899;padding:1px">${l}</div>`).join('')}</div>
-          ${Array.from({length:25}).map((_,i) => {const n=i+1;const hit=[3,8,12,17,22].includes(n);return `<div style="width:14px;height:14px;font-size:5px;display:flex;align-items:center;justify-content:center;border-radius:2px;${hit?'background:#ec4899;color:#fff;font-weight:700':'background:#353570;color:#ccc'}">${n}</div>`}).join('')}
+          ${Array.from({length:25}).map((_,i) => {const n=i+1;const hit=[3,8,12,17,22].includes(n);return `<div style="width:14px;height:14px;font-size:5px;display:flex;align-items:center;justify-content:center;border-radius:2px;${hit?'background:#ec4899;color:#fff;font-weight:700':'background:#454590;color:#ccc'}">${n}</div>`}).join('')}
         </div></div>
         <div style="text-align:center"><div style="font-size:16px;margin-bottom:2px">🎱</div><div style="font-size:12px;font-weight:800;color:#fbbf24">42</div><div style="font-size:5px;color:#ccc">Called</div></div>
       </div>
     </div>
-  `, '#2d0850', '#e2e8f0'),
+  `, '#501890', '#e2e8f0'),
 
   'casino-coin-flip': base(`
-    <div style="padding:12px;background:#1e2040;text-align:center">
+    <div style="padding:12px;background:#2a2d55;text-align:center">
       <div style="font-size:7px;color:#ccc;margin-bottom:8px">COIN FLIP</div>
-      <div style="width:50px;height:50px;border-radius:50%;background:linear-gradient(135deg,#fbbf24,#f59e0b);margin:0 auto 8px;display:flex;align-items:center;justify-content:center;border:3px solid #d4a853;box-shadow:0 0 20px #fbbf2440"><span style="font-size:16px;font-weight:800;color:#7c2d12">H</span></div>
+      <div style="width:50px;height:50px;border-radius:50%;background:linear-gradient(135deg,#fbbf24,#f59e0b);margin:0 auto 8px;display:flex;align-items:center;justify-content:center;border:3px solid #ffd875;box-shadow:0 0 20px #fbbf2440"><span style="font-size:16px;font-weight:800;color:#7c2d12">H</span></div>
       <div style="display:flex;gap:6px;justify-content:center"><div style="background:#3b82f6;padding:4px 12px;border-radius:4px;font-size:7px;font-weight:700;color:#fff">HEADS</div><div style="background:#ef4444;padding:4px 12px;border-radius:4px;font-size:7px;font-weight:700;color:#fff">TAILS</div></div>
       <div style="font-size:5px;color:#ccc;margin-top:6px">Streak: 3 🔥 • Balance: $250</div>
     </div>
-  `, '#161625', '#fff'),
+  `, '#2a2d55', '#fff'),
 
   'casino-lottery': base(`
-    <div style="padding:8px;background:#222260;text-align:center">
+    <div style="padding:8px;background:#2d2d75;text-align:center">
       <div style="font-size:8px;font-weight:700;color:#fbbf24;margin-bottom:4px">🎰 MEGA LOTTERY</div>
       <div style="font-size:14px;font-weight:800;color:#22c55e;margin-bottom:4px">$2,450,000</div>
       <div style="font-size:5px;color:#ccc;margin-bottom:6px">Next draw in 04:32:18</div>
       <div style="display:flex;gap:3px;justify-content:center;margin-bottom:6px">${[7,14,22,35,41,9].map((n,i) => `<div style="width:20px;height:20px;border-radius:50%;background:${i===5?'#fbbf24':'#3b82f6'};display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:700;color:#fff">${n}</div>`).join('')}</div>
       <div style="background:#22c55e;padding:3px 14px;border-radius:4px;font-size:7px;font-weight:700;color:#000;display:inline-block">BUY TICKET — $5</div>
     </div>
-  `, '#181845', '#e2e8f0'),
+  `, '#2d2d75', '#e2e8f0'),
 
   // ═══════════════════════════════════════════
   // SOCIAL — Additional Previews
@@ -2064,10 +2064,10 @@ export const templatePreviews: Record<string, string> = {
   // CASINO — Remaining Previews
   // ═══════════════════════════════════════════
   'casino-craps': base(`
-    <div style="padding:8px;background:#1e7a1e">
+    <div style="padding:8px;background:#259025">
       <div style="text-align:center;font-size:7px;color:#d4a853;margin-bottom:4px">CRAPS</div>
       <div style="display:flex;justify-content:center;gap:6px;margin-bottom:6px"><div style="width:24px;height:24px;background:#fff;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#000">⚃</div><div style="width:24px;height:24px;background:#fff;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#000">⚅</div></div>
-      <div style="display:flex;gap:2px;justify-content:center">${['PASS','DONT','FIELD','COME'].map(b => `<div style="padding:2px 6px;background:#1a5e1a;border:1px solid #d4a85340;border-radius:2px;font-size:4px;color:#d4a853">${b}</div>`).join('')}</div>
+      <div style="display:flex;gap:2px;justify-content:center">${['PASS','DONT','FIELD','COME'].map(b => `<div style="padding:2px 6px;background:#1a5e1a;border:1px solid #ffd87540;border-radius:2px;font-size:4px;color:#d4a853">${b}</div>`).join('')}</div>
     </div>
   `, '#186018', '#fff'),
 
@@ -2075,54 +2075,54 @@ export const templatePreviews: Record<string, string> = {
     <div style="padding:8px;background:#3d0a0a">
       <div style="text-align:center;font-size:7px;color:#d4a853;margin-bottom:4px">SIC BO</div>
       <div style="display:flex;justify-content:center;gap:4px;margin-bottom:6px">${['⚂','⚄','⚁'].map(d => `<div style="width:20px;height:20px;background:#fff;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:10px">${d}</div>`).join('')}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px">${['SMALL','BIG','ODD','EVEN'].map(b => `<div style="text-align:center;padding:3px;background:#5e1a1a;border:1px solid #d4a85340;border-radius:2px;font-size:5px;color:#d4a853">${b}</div>`).join('')}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px">${['SMALL','BIG','ODD','EVEN'].map(b => `<div style="text-align:center;padding:3px;background:#5e1a1a;border:1px solid #ffd87540;border-radius:2px;font-size:5px;color:#d4a853">${b}</div>`).join('')}</div>
     </div>
   `, '#3d0a0a', '#fff'),
 
   'casino-limbo': base(`
-    <div style="padding:12px;background:#1e2040;text-align:center">
+    <div style="padding:12px;background:#2a2d55;text-align:center">
       <div style="font-size:7px;color:#ccc;margin-bottom:8px">LIMBO</div>
       <div style="font-size:28px;font-weight:800;color:#22c55e;margin-bottom:8px">1.47x</div>
-      <div style="background:#2a2a50;border-radius:6px;padding:6px;margin-bottom:6px"><div style="font-size:5px;color:#ccc;margin-bottom:2px">Target: 2.00x</div><div style="font-size:5px;color:#ccc">Win Chance: 49.5%</div></div>
+      <div style="background:#363670;border-radius:6px;padding:6px;margin-bottom:6px"><div style="font-size:5px;color:#ccc;margin-bottom:2px">Target: 2.00x</div><div style="font-size:5px;color:#ccc">Win Chance: 49.5%</div></div>
       <div style="background:#22c55e;padding:3px 12px;border-radius:4px;font-size:7px;font-weight:700;color:#000;display:inline-block">BET</div>
     </div>
-  `, '#161625', '#fff'),
+  `, '#2a2d55', '#fff'),
 
   'casino-tower': base(`
-    <div style="padding:8px;background:#1e2040">
+    <div style="padding:8px;background:#2a2d55">
       <div style="font-size:7px;color:#ccc;margin-bottom:4px">TOWER — <span style="color:#fbbf24">4.8x</span></div>
-      <div style="display:flex;flex-direction:column;gap:2px;margin-bottom:4px">${Array.from({length:6}).map((_,i) => `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px">${Array.from({length:3}).map((_,j) => `<div style="height:10px;border-radius:2px;${i>3?'background:#22c55e20;border:1px solid #22c55e':i===3&&j===1?'background:#fbbf2440;border:1px solid #fbbf24':'background:#383858;border:1px solid #555'}"></div>`).join('')}</div>`).join('')}
+      <div style="display:flex;flex-direction:column;gap:2px;margin-bottom:4px">${Array.from({length:6}).map((_,i) => `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px">${Array.from({length:3}).map((_,j) => `<div style="height:10px;border-radius:2px;${i>3?'background:#22c55e20;border:1px solid #22c55e':i===3&&j===1?'background:#fbbf2440;border:1px solid #fbbf24':'background:#484878;border:1px solid #666'}"></div>`).join('')}</div>`).join('')}
       <div style="text-align:center;background:#fbbf24;padding:2px 8px;border-radius:3px;font-size:5px;font-weight:700;color:#000">CASH OUT</div>
     </div>
-  `, '#161625', '#fff'),
+  `, '#2a2d55', '#fff'),
 
   'casino-live-landing': base(`
-    <div style="padding:10px;background:#1e2040">
+    <div style="padding:10px;background:#2a2d55">
       <div style="font-size:8px;font-weight:700;color:#ef4444;margin-bottom:6px">🔴 LIVE CASINO</div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px">${['🃏 Blackjack','🎡 Roulette','🃏 Baccarat'].map(g => `<div style="background:#383858;border:1px solid #ef444420;border-radius:4px;padding:6px;text-align:center"><div style="font-size:6px;color:#fff">${g}</div><div style="font-size:4px;color:#ef4444;margin-top:2px">LIVE</div></div>`).join('')}</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px">${['🃏 Blackjack','🎡 Roulette','🃏 Baccarat'].map(g => `<div style="background:#484878;border:1px solid #ef444420;border-radius:4px;padding:6px;text-align:center"><div style="font-size:6px;color:#fff">${g}</div><div style="font-size:4px;color:#ef4444;margin-top:2px">LIVE</div></div>`).join('')}</div>
     </div>
-  `, '#161625', '#fff'),
+  `, '#2a2d55', '#fff'),
 
   'casino-poker-room': base(`
-    <div style="padding:8px;background:#1e7a1e">
+    <div style="padding:8px;background:#259025">
       <div style="font-size:7px;color:#d4a853;margin-bottom:6px">🃏 POKER ROOM</div>
-      ${[{n:'Table 1',s:'$1/$2 NL',p:'6/9'},{n:'Tournament',s:'$50 Buy-in',p:'124'}].map(t => `<div style="background:#1a6b1a;border:1px solid #d4a85320;border-radius:4px;padding:4px;margin-bottom:3px;display:flex;justify-content:space-between;font-size:5px"><span style="color:#fff">${t.n}</span><span style="color:#d4a853">${t.s}</span><span style="color:#ccc">${t.p} players</span></div>`).join('')}
+      ${[{n:'Table 1',s:'$1/$2 NL',p:'6/9'},{n:'Tournament',s:'$50 Buy-in',p:'124'}].map(t => `<div style="background:#1f8a1f;border:1px solid #ffd87520;border-radius:4px;padding:4px;margin-bottom:3px;display:flex;justify-content:space-between;font-size:5px"><span style="color:#fff">${t.n}</span><span style="color:#d4a853">${t.s}</span><span style="color:#ccc">${t.p} players</span></div>`).join('')}
     </div>
   `, '#186018', '#fff'),
 
   'casino-slots-5reel': base(`
-    <div style="padding:8px;background:#1e2040;text-align:center">
+    <div style="padding:8px;background:#2a2d55;text-align:center">
       <div style="font-size:7px;font-weight:700;color:#fbbf24;margin-bottom:4px">🏛️ PHARAOH SLOTS</div>
-      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:2px;background:#2a2a50;border:2px solid #fbbf2430;border-radius:6px;padding:4px">${['👁️','🐍','💎','🏛️','⭐','🐪','👁️','💎','🐍','🏛️','⭐','👁️','🐪','💎','🐍'].map(s => `<div style="background:#383858;border-radius:2px;padding:3px;font-size:8px">${s}</div>`).join('')}</div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:2px;background:#363670;border:2px solid #fbbf2430;border-radius:6px;padding:4px">${['👁️','🐍','💎','🏛️','⭐','🐪','👁️','💎','🐍','🏛️','⭐','👁️','🐪','💎','🐍'].map(s => `<div style="background:#484878;border-radius:2px;padding:3px;font-size:8px">${s}</div>`).join('')}</div>
       <div style="display:flex;gap:3px;justify-content:center;margin-top:4px"><div style="background:linear-gradient(135deg,#fbbf24,#f59e0b);padding:3px 10px;border-radius:3px;font-size:6px;font-weight:700;color:#000">SPIN</div></div>
     </div>
-  `, '#161625', '#fff'),
+  `, '#2a2d55', '#fff'),
 
   'casino-slots-progressive': base(`
     <div style="padding:8px;background:#0a0a1a;text-align:center">
       <div style="font-size:6px;color:#ccc;margin-bottom:2px">PROGRESSIVE JACKPOT</div>
       <div style="font-size:14px;font-weight:800;background:linear-gradient(135deg,#fbbf24,#ec4899,#8b5cf6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px">$2,847,391</div>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin-bottom:4px">${['Mini $50','Minor $500','Major $5K','Grand $$$'].map((j,i) => `<div style="background:#2a2a50;border:1px solid ${['#22c55e','#3b82f6','#a855f7','#fbbf24'][i]}30;border-radius:3px;padding:2px;font-size:4px;color:${['#22c55e','#3b82f6','#a855f7','#fbbf24'][i]}">${j}</div>`).join('')}</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin-bottom:4px">${['Mini $50','Minor $500','Major $5K','Grand $$$'].map((j,i) => `<div style="background:#363670;border:1px solid ${['#22c55e','#3b82f6','#a855f7','#fbbf24'][i]}30;border-radius:3px;padding:2px;font-size:4px;color:${['#22c55e','#3b82f6','#a855f7','#fbbf24'][i]}">${j}</div>`).join('')}</div>
     </div>
   `, '#0a0a1a', '#fff'),
 
@@ -2154,12 +2154,12 @@ export const templatePreviews: Record<string, string> = {
   `, '#06234a', '#fff'),
 
   'casino-coin-flip-game': base(`
-    <div style="padding:12px;background:#1e2040;text-align:center">
+    <div style="padding:12px;background:#2a2d55;text-align:center">
       <div style="font-size:7px;color:#ccc;margin-bottom:8px">COIN FLIP</div>
-      <div style="width:50px;height:50px;border-radius:50%;background:linear-gradient(135deg,#fbbf24,#f59e0b);margin:0 auto 8px;display:flex;align-items:center;justify-content:center;border:3px solid #d4a853"><span style="font-size:16px;font-weight:800;color:#7c2d12">H</span></div>
+      <div style="width:50px;height:50px;border-radius:50%;background:linear-gradient(135deg,#fbbf24,#f59e0b);margin:0 auto 8px;display:flex;align-items:center;justify-content:center;border:3px solid #ffd875"><span style="font-size:16px;font-weight:800;color:#7c2d12">H</span></div>
       <div style="display:flex;gap:6px;justify-content:center"><div style="background:#3b82f6;padding:4px 12px;border-radius:4px;font-size:7px;font-weight:700;color:#fff">HEADS</div><div style="background:#ef4444;padding:4px 12px;border-radius:4px;font-size:7px;font-weight:700;color:#fff">TAILS</div></div>
     </div>
-  `, '#161625', '#fff'),
+  `, '#2a2d55', '#fff'),
 
   'ecommerce-beauty': base(`
     <div style="padding:12px">
@@ -2259,7 +2259,7 @@ export const templatePreviews: Record<string, string> = {
       <div style="width:8px;height:8px;background:#fff;border-radius:50%;margin:0 auto 8px"></div>
       <div style="width:40px;height:6px;background:#3b82f6;border-radius:3px;margin:0 auto"></div>
     </div>
-  `, '#161625', '#fff'),
+  `, '#2a2d55', '#fff'),
 
   'game2d-pong': base(`
     <div style="padding:12px;text-align:center;position:relative;height:100px">
@@ -2271,7 +2271,7 @@ export const templatePreviews: Record<string, string> = {
       <div style="position:absolute;left:20px;top:16px;font-size:14px;font-weight:800;opacity:.3">3</div>
       <div style="position:absolute;right:20px;top:16px;font-size:14px;font-weight:800;opacity:.3">5</div>
     </div>
-  `, '#161625', '#fff'),
+  `, '#2a2d55', '#fff'),
 
   'game2d-tower-defense': base(`
     <div style="padding:12px">
@@ -2305,19 +2305,19 @@ export const templatePreviews: Record<string, string> = {
       </div>
       <div style="font-size:7px;color:#f59e0b;margin-top:6px;font-weight:700">Score: 2,450</div>
     </div>
-  `, '#161625', '#fff'),
+  `, '#2a2d55', '#fff'),
 
   'game2d-maze': base(`
     <div style="padding:12px;text-align:center">
       <div style="font-size:7px;color:#ccc;margin-bottom:6px">MAZE RUNNER</div>
       <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;max-width:80px;margin:0 auto">
         <div style="background:#333;height:10px"></div><div style="background:#333;height:10px"></div><div style="background:#333;height:10px"></div><div style="background:#333;height:10px"></div><div style="background:#333;height:10px"></div><div style="background:#333;height:10px"></div><div style="background:#333;height:10px"></div>
-        <div style="background:#333;height:10px"></div><div style="background:#303060;height:10px"></div><div style="background:#333;height:10px"></div><div style="background:#303060;height:10px"></div><div style="background:#303060;height:10px"></div><div style="background:#303060;height:10px"></div><div style="background:#333;height:10px"></div>
-        <div style="background:#333;height:10px"></div><div style="background:#303060;height:10px"></div><div style="background:#333;height:10px"></div><div style="background:#303060;height:10px"></div><div style="background:#333;height:10px"></div><div style="background:#303060;height:10px"></div><div style="background:#333;height:10px"></div>
-        <div style="background:#333;height:10px"></div><div style="background:#303060;height:10px;display:flex;align-items:center;justify-content:center"><div style="width:5px;height:5px;background:#3b82f6;border-radius:50%"></div></div><div style="background:#303060;height:10px"></div><div style="background:#303060;height:10px"></div><div style="background:#333;height:10px"></div><div style="background:#303060;height:10px"></div><div style="background:#333;height:10px"></div>
-        <div style="background:#333;height:10px"></div><div style="background:#333;height:10px"></div><div style="background:#333;height:10px"></div><div style="background:#303060;height:10px"></div><div style="background:#303060;height:10px"></div><div style="background:#303060;height:10px"></div><div style="background:#22c55e;height:10px"></div>
+        <div style="background:#333;height:10px"></div><div style="background:#3a3a75;height:10px"></div><div style="background:#333;height:10px"></div><div style="background:#3a3a75;height:10px"></div><div style="background:#3a3a75;height:10px"></div><div style="background:#3a3a75;height:10px"></div><div style="background:#333;height:10px"></div>
+        <div style="background:#333;height:10px"></div><div style="background:#3a3a75;height:10px"></div><div style="background:#333;height:10px"></div><div style="background:#3a3a75;height:10px"></div><div style="background:#333;height:10px"></div><div style="background:#3a3a75;height:10px"></div><div style="background:#333;height:10px"></div>
+        <div style="background:#333;height:10px"></div><div style="background:#3a3a75;height:10px;display:flex;align-items:center;justify-content:center"><div style="width:5px;height:5px;background:#3b82f6;border-radius:50%"></div></div><div style="background:#3a3a75;height:10px"></div><div style="background:#3a3a75;height:10px"></div><div style="background:#333;height:10px"></div><div style="background:#3a3a75;height:10px"></div><div style="background:#333;height:10px"></div>
+        <div style="background:#333;height:10px"></div><div style="background:#333;height:10px"></div><div style="background:#333;height:10px"></div><div style="background:#3a3a75;height:10px"></div><div style="background:#3a3a75;height:10px"></div><div style="background:#3a3a75;height:10px"></div><div style="background:#22c55e;height:10px"></div>
       </div>
       <div style="font-size:6px;color:#bbb;margin-top:6px">Find the exit 🏁</div>
     </div>
-  `, '#161625', '#fff'),
+  `, '#2a2d55', '#fff'),
 }
