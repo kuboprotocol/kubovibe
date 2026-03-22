@@ -52,40 +52,28 @@ const Index = () => {
 
       <FAQSection />
 
-      <footer className="py-12 px-6 border-t border-border">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-sm text-muted-foreground">© 2026 KUBO VIBE. All rights reserved.</p>
-          <div className="flex items-center gap-6 text-sm text-muted-foreground">
-            <a href="/privacy" className="hover:text-primary transition-colors">
-              Privacy
-            </a>
-            <a href="/terms" className="hover:text-primary transition-colors">
-              Terms
-            </a>
-            <a
-              href="https://x.com/KUBOPROTOCOL"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-primary transition-colors"
-            >
-              Twitter
-            </a>
-            <a
-              href="https://t.me/+WoYG4tMTuJY5ZjNh"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-primary transition-colors"
-            >
-              Telegram
-            </a>
-            <a
-              href="https://github.com/kuboprotocol/kubovibe"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-primary transition-colors"
-            >
-              GitHub
-            </a>
+      <footer className="py-16 px-6 border-t border-border">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex flex-col md:flex-row items-start justify-between gap-10 mb-10">
+            <div className="space-y-3">
+              <p className="text-sm font-semibold text-foreground tracking-wide">KUBO VIBE</p>
+              <p className="text-xs text-muted-foreground leading-relaxed max-w-xs">
+                A product by KUBO PROTOCOL<br />
+                CNPJ: 65.822.139/0001-66
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
+              <a href="/privacy" className="hover:text-foreground transition-colors">Privacy Policy</a>
+              <a href="/terms" className="hover:text-foreground transition-colors">Terms of Service</a>
+              <a href="https://x.com/KUBOPROTOCOL" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">Twitter</a>
+              <a href="https://t.me/+WoYG4tMTuJY5ZjNh" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">Telegram</a>
+              <a href="https://github.com/kuboprotocol/kubovibe" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">GitHub</a>
+            </div>
+          </div>
+          <div className="border-t border-border pt-6">
+            <p className="text-xs text-muted-foreground text-center">
+              © {new Date().getFullYear()} KUBO PROTOCOL. All rights reserved.
+            </p>
           </div>
         </div>
       </footer>
