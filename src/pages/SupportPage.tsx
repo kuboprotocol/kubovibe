@@ -281,7 +281,7 @@ export default function SupportPage() {
             </h2>
             <p className="text-muted-foreground text-center mb-8 text-sm">
               Didn't find your answer above?{' '}
-              {user ? 'Send us a message and we'll get back to you.' : 'Log in to submit a support ticket.'}
+              {user ? "Send us a message and we'll get back to you." : 'Log in to submit a support ticket.'}
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-4">
