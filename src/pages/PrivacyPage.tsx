@@ -147,8 +147,9 @@ export default function PrivacyPage() {
       </main>
 
       <footer className="py-8 px-6 border-t border-border">
-        <div className="max-w-4xl mx-auto text-center text-sm text-muted-foreground">
-          © 2026 KUBO VIBE. All rights reserved.
+        <div className="max-w-4xl mx-auto text-center space-y-1">
+          <p className="text-xs text-muted-foreground">A product by KUBO PROTOCOL · CNPJ: 65.822.139/0001-66</p>
+          <p className="text-xs text-muted-foreground">© {new Date().getFullYear()} KUBO PROTOCOL. All rights reserved.</p>
         </div>
       </footer>
     </div>
