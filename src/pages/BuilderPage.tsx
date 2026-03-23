@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, Send, Code, Eye, Loader2, Copy, Check, Save, Download, LayoutTemplate, Zap } from 'lucide-react'
+import { Send, Eye, Loader2, Copy, Check, Code } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { streamChat, type Msg } from '@/lib/streamChat'
 import { supabase } from '@/integrations/supabase/client'
@@ -11,7 +11,14 @@ import { toast } from 'sonner'
 import ReactMarkdown from 'react-markdown'
 import TemplateGallery, { type Template } from '@/components/builder/TemplateGallery'
 import PromptAttachMenu from '@/components/landing/PromptAttachMenu'
+import BuilderToolbar, { type DeviceFrame } from '@/components/builder/BuilderToolbar'
 import logoImg from '@/assets/logo-kubovibe.png'
+
+const DEVICE_WIDTHS: Record<DeviceFrame, string> = {
+  desktop: '100%',
+  tablet: '768px',
+  mobile: '375px',
+}
 
 export default function BuilderPage() {
   const navigate = useNavigate()
@@ -31,6 +38,8 @@ export default function BuilderPage() {
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(projectId || null)
   const [saving, setSaving] = useState(false)
   const [showTemplates, setShowTemplates] = useState(false)
+  const [deviceFrame, setDeviceFrame] = useState<DeviceFrame>('desktop')
+  const [previewKey, setPreviewKey] = useState(0)
 
   const chatEndRef = useRef<HTMLDivElement>(null)
 
@@ -38,13 +47,11 @@ export default function BuilderPage() {
     if (projectId) loadProject(projectId)
   }, [projectId])
 
-  // Auto-send prompt from landing page
   const hasSentInitialPrompt = useRef(false)
   useEffect(() => {
     if (initialPrompt && !hasSentInitialPrompt.current && !projectId && user) {
       hasSentInitialPrompt.current = true
       setInput(initialPrompt)
-      // Small delay to let state settle, then send
       setTimeout(() => {
         const userMsg: Msg = { role: 'user', content: initialPrompt }
         setMessages([userMsg])
@@ -185,49 +192,23 @@ export default function BuilderPage() {
 
   return (
     <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
-      {/* Header */}
-      <header className="flex items-center justify-between px-4 py-2.5 glass glass-border z-20">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} className="text-muted-foreground hover:text-foreground rounded-xl">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div className="h-5 w-px bg-border/50" />
-          <div className="flex items-center gap-2">
-            <img src={logoImg} alt="KUBO VIBE" className="h-6" />
-            <span className="text-sm font-display font-bold text-foreground truncate max-w-[200px]">{projectTitle}</span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {subscription?.is_active && (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/10 border border-primary/20 text-xs font-medium text-primary">
-              <Zap className="h-3 w-3" />
-              {editsRemaining} edições
-            </div>
-          )}
-          <Button variant="ghost" size="sm" onClick={() => setShowTemplates(true)} className="text-xs rounded-xl gap-1.5 text-muted-foreground">
-            <LayoutTemplate className="h-3.5 w-3.5" /> Templates
-          </Button>
-          <div className="flex items-center gap-1 bg-secondary/50 rounded-xl p-0.5">
-            <button onClick={() => setActiveTab('preview')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${activeTab === 'preview' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
-              <Eye className="h-3.5 w-3.5" /> Preview
-            </button>
-            <button onClick={() => setActiveTab('code')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${activeTab === 'code' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
-              <Code className="h-3.5 w-3.5" /> Code
-            </button>
-          </div>
-          {generatedCode && (
-            <>
-              <Button variant="outline" size="sm" onClick={handleDownload} className="text-xs rounded-xl">
-                <Download className="h-3 w-3 mr-1" /> Download
-              </Button>
-              <Button variant="hero" size="sm" onClick={() => saveProject(generatedCode, messages)} disabled={saving} className="text-xs rounded-xl">
-                {saving ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Save className="h-3 w-3 mr-1" />} Save
-              </Button>
-            </>
-          )}
-        </div>
-      </header>
+      {/* Toolbar */}
+      <BuilderToolbar
+        projectTitle={projectTitle}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        deviceFrame={deviceFrame}
+        onDeviceFrameChange={setDeviceFrame}
+        onRefreshPreview={() => setPreviewKey(k => k + 1)}
+        onSave={() => saveProject(generatedCode, messages)}
+        onDownload={handleDownload}
+        onShowTemplates={() => setShowTemplates(true)}
+        saving={saving}
+        hasCode={!!generatedCode}
+        editsRemaining={editsRemaining}
+        isSubscribed={!!subscription?.is_active}
+        generatedCode={generatedCode}
+      />
 
       {/* Main content */}
       <div className="flex-1 flex min-h-0">
@@ -300,11 +281,35 @@ export default function BuilderPage() {
         <div className="flex-1 relative bg-muted">
           <AnimatePresence mode="wait">
             {activeTab === 'preview' ? (
-              <motion.div key="preview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0">
+              <motion.div key="preview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 flex items-start justify-center overflow-auto">
                 {generatedCode ? (
-                  <iframe srcDoc={generatedCode} className="w-full h-full border-0 bg-background" sandbox="allow-scripts" title="App Preview" />
+                  <div
+                    className="h-full transition-all duration-300 ease-in-out"
+                    style={{
+                      width: DEVICE_WIDTHS[deviceFrame],
+                      maxWidth: '100%',
+                      ...(deviceFrame !== 'desktop' ? {
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '12px',
+                        marginTop: '16px',
+                        marginBottom: '16px',
+                        height: 'calc(100% - 32px)',
+                        boxShadow: '0 4px 24px hsl(var(--foreground) / 0.1)',
+                        overflow: 'hidden',
+                      } : {}),
+                    }}
+                  >
+                    <iframe
+                      key={previewKey}
+                      srcDoc={generatedCode}
+                      className="w-full h-full border-0 bg-background"
+                      sandbox="allow-scripts"
+                      title="App Preview"
+                      style={deviceFrame !== 'desktop' ? { borderRadius: '12px' } : {}}
+                    />
+                  </div>
                 ) : (
-                  <div className="flex items-center justify-center h-full">
+                  <div className="flex items-center justify-center h-full w-full">
                     <div className="text-center">
                       <div className="h-16 w-16 rounded-2xl bg-accent flex items-center justify-center mx-auto mb-4">
                         <Eye className="h-8 w-8 text-accent-foreground" />
@@ -330,14 +335,6 @@ export default function BuilderPage() {
               </motion.div>
             )}
           </AnimatePresence>
-
-          {generatedCode && activeTab === 'preview' && (
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="absolute bottom-4 right-4 flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => setActiveTab('code')} className="bg-card shadow-lg">
-                <Code className="h-3.5 w-3.5 mr-1.5" /> View code
-              </Button>
-            </motion.div>
-          )}
         </div>
       </div>
 
