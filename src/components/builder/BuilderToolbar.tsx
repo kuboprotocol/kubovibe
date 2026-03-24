@@ -130,6 +130,9 @@ export default function BuilderToolbar({
             <DropdownMenuItem onClick={onShowTemplates}>
               <LayoutTemplate className="h-3.5 w-3.5 mr-2" /> Templates
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={onCloneSite}>
+              <Layers className="h-3.5 w-3.5 mr-2" /> Clonar Site / DApp
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleOpenInNewTab} disabled={!hasCode}>
               <ExternalLink className="h-3.5 w-3.5 mr-2" /> Abrir em nova aba
