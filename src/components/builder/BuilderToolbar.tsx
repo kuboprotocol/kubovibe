@@ -28,6 +28,7 @@ interface BuilderToolbarProps {
   onSave: () => void
   onDownload: () => void
   onShowTemplates: () => void
+  onCloneSite: () => void
   saving: boolean
   hasCode: boolean
   editsRemaining: number | null
