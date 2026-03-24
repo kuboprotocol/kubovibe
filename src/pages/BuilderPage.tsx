@@ -186,6 +186,71 @@ export default function BuilderPage() {
 
   const handleTemplateSelect = (template: Template) => { setShowTemplates(false); setInput(template.prompt) }
 
+  const handleClone = async (url: string) => {
+    if (!subscription?.is_active) {
+      toast.error('Você precisa de um plano ativo para clonar.', {
+        action: { label: 'Ver planos', onClick: () => navigate('/pricing') },
+      })
+      return
+    }
+    if (!canEdit) {
+      toast('Suas edições acabaram!', {
+        action: { label: 'Recarregar', onClick: () => navigate('/pricing') },
+      })
+      return
+    }
+    await incrementEdit()
+    setIsCloning(true)
+    setShowCloneDialog(false)
+
+    const cloneMsg: Msg = { role: 'user', content: `🔗 Clonar: ${url}` }
+    const newMessages = [...messages, cloneMsg]
+    setMessages(newMessages)
+    setIsLoading(true)
+
+    let assistantSoFar = ''
+    let finalMessages = newMessages
+
+    const upsertAssistant = (chunk: string) => {
+      assistantSoFar += chunk
+      setMessages(prev => {
+        const last = prev[prev.length - 1]
+        if (last?.role === 'assistant') {
+          const updated = prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: assistantSoFar } : m))
+          finalMessages = updated; return updated
+        }
+        const updated = [...prev, { role: 'assistant' as const, content: assistantSoFar }]
+        finalMessages = updated; return updated
+      })
+      const html = extractHtml(assistantSoFar)
+      if (html.includes('<')) setGeneratedCode(html)
+    }
+
+    try {
+      await streamClone({
+        url,
+        onDelta: (chunk) => upsertAssistant(chunk),
+        onDone: () => {
+          setIsLoading(false)
+          setIsCloning(false)
+          const html = extractHtml(assistantSoFar)
+          if (html.includes('<')) saveProject(html, finalMessages)
+          toast.success('Site clonado com sucesso! 🎉')
+        },
+        onError: (error) => {
+          toast.error(error)
+          setIsLoading(false)
+          setIsCloning(false)
+        },
+      })
+    } catch (e) {
+      console.error(e)
+      toast.error('Falha ao clonar o site')
+      setIsLoading(false)
+      setIsCloning(false)
+    }
+  }
+
   const suggestions = [
     'A task management app with drag & drop',
     'A weather dashboard with live data',
