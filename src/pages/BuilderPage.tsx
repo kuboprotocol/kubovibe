@@ -39,6 +39,8 @@ export default function BuilderPage() {
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(projectId || null)
   const [saving, setSaving] = useState(false)
   const [showTemplates, setShowTemplates] = useState(false)
+  const [showCloneDialog, setShowCloneDialog] = useState(false)
+  const [isCloning, setIsCloning] = useState(false)
   const [deviceFrame, setDeviceFrame] = useState<DeviceFrame>('desktop')
   const [previewKey, setPreviewKey] = useState(0)
 
