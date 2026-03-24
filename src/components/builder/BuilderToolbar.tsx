@@ -38,7 +38,7 @@ interface BuilderToolbarProps {
 
 export default function BuilderToolbar({
   projectTitle, activeTab, onTabChange, deviceFrame, onDeviceFrameChange,
-  onRefreshPreview, onSave, onDownload, onShowTemplates,
+  onRefreshPreview, onSave, onDownload, onShowTemplates, onCloneSite,
   saving, hasCode, editsRemaining, isSubscribed, generatedCode,
 }: BuilderToolbarProps) {
   const navigate = useNavigate()
