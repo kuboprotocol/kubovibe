@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import {
   ArrowLeft, Eye, Code, Monitor, Smartphone, Tablet,
   RotateCw, ExternalLink, Share2, Save, Loader2, Download,
-  LayoutTemplate, Zap, MoreHorizontal, Copy, Check, Globe,
+  LayoutTemplate, Zap, MoreHorizontal, Copy, Check, Globe, Layers,
 } from 'lucide-react'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
@@ -28,6 +28,7 @@ interface BuilderToolbarProps {
   onSave: () => void
   onDownload: () => void
   onShowTemplates: () => void
+  onCloneSite: () => void
   saving: boolean
   hasCode: boolean
   editsRemaining: number | null
@@ -37,7 +38,7 @@ interface BuilderToolbarProps {
 
 export default function BuilderToolbar({
   projectTitle, activeTab, onTabChange, deviceFrame, onDeviceFrameChange,
-  onRefreshPreview, onSave, onDownload, onShowTemplates,
+  onRefreshPreview, onSave, onDownload, onShowTemplates, onCloneSite,
   saving, hasCode, editsRemaining, isSubscribed, generatedCode,
 }: BuilderToolbarProps) {
   const navigate = useNavigate()
@@ -128,6 +129,9 @@ export default function BuilderToolbar({
             </DropdownMenuItem>
             <DropdownMenuItem onClick={onShowTemplates}>
               <LayoutTemplate className="h-3.5 w-3.5 mr-2" /> Templates
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onCloneSite}>
+              <Layers className="h-3.5 w-3.5 mr-2" /> Clonar Site / DApp
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleOpenInNewTab} disabled={!hasCode}>

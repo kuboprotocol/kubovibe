@@ -3,7 +3,7 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Send, Eye, Loader2, Copy, Check, Code } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { streamChat, type Msg } from '@/lib/streamChat'
+import { streamChat, streamClone, type Msg } from '@/lib/streamChat'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/hooks/useAuth'
 import { useSubscription } from '@/hooks/useSubscription'
@@ -12,6 +12,7 @@ import ReactMarkdown from 'react-markdown'
 import TemplateGallery, { type Template } from '@/components/builder/TemplateGallery'
 import PromptAttachMenu from '@/components/landing/PromptAttachMenu'
 import BuilderToolbar, { type DeviceFrame } from '@/components/builder/BuilderToolbar'
+import CloneDialog from '@/components/builder/CloneDialog'
 import logoImg from '@/assets/logo-kubovibe.png'
 
 const DEVICE_WIDTHS: Record<DeviceFrame, string> = {
@@ -38,6 +39,8 @@ export default function BuilderPage() {
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(projectId || null)
   const [saving, setSaving] = useState(false)
   const [showTemplates, setShowTemplates] = useState(false)
+  const [showCloneDialog, setShowCloneDialog] = useState(false)
+  const [isCloning, setIsCloning] = useState(false)
   const [deviceFrame, setDeviceFrame] = useState<DeviceFrame>('desktop')
   const [previewKey, setPreviewKey] = useState(0)
 
@@ -183,6 +186,71 @@ export default function BuilderPage() {
 
   const handleTemplateSelect = (template: Template) => { setShowTemplates(false); setInput(template.prompt) }
 
+  const handleClone = async (url: string) => {
+    if (!subscription?.is_active) {
+      toast.error('Você precisa de um plano ativo para clonar.', {
+        action: { label: 'Ver planos', onClick: () => navigate('/pricing') },
+      })
+      return
+    }
+    if (!canEdit) {
+      toast('Suas edições acabaram!', {
+        action: { label: 'Recarregar', onClick: () => navigate('/pricing') },
+      })
+      return
+    }
+    await incrementEdit()
+    setIsCloning(true)
+    setShowCloneDialog(false)
+
+    const cloneMsg: Msg = { role: 'user', content: `🔗 Clonar: ${url}` }
+    const newMessages = [...messages, cloneMsg]
+    setMessages(newMessages)
+    setIsLoading(true)
+
+    let assistantSoFar = ''
+    let finalMessages = newMessages
+
+    const upsertAssistant = (chunk: string) => {
+      assistantSoFar += chunk
+      setMessages(prev => {
+        const last = prev[prev.length - 1]
+        if (last?.role === 'assistant') {
+          const updated = prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: assistantSoFar } : m))
+          finalMessages = updated; return updated
+        }
+        const updated = [...prev, { role: 'assistant' as const, content: assistantSoFar }]
+        finalMessages = updated; return updated
+      })
+      const html = extractHtml(assistantSoFar)
+      if (html.includes('<')) setGeneratedCode(html)
+    }
+
+    try {
+      await streamClone({
+        url,
+        onDelta: (chunk) => upsertAssistant(chunk),
+        onDone: () => {
+          setIsLoading(false)
+          setIsCloning(false)
+          const html = extractHtml(assistantSoFar)
+          if (html.includes('<')) saveProject(html, finalMessages)
+          toast.success('Site clonado com sucesso! 🎉')
+        },
+        onError: (error) => {
+          toast.error(error)
+          setIsLoading(false)
+          setIsCloning(false)
+        },
+      })
+    } catch (e) {
+      console.error(e)
+      toast.error('Falha ao clonar o site')
+      setIsLoading(false)
+      setIsCloning(false)
+    }
+  }
+
   const suggestions = [
     'A task management app with drag & drop',
     'A weather dashboard with live data',
@@ -203,6 +271,7 @@ export default function BuilderPage() {
         onSave={() => saveProject(generatedCode, messages)}
         onDownload={handleDownload}
         onShowTemplates={() => setShowTemplates(true)}
+        onCloneSite={() => setShowCloneDialog(true)}
         saving={saving}
         hasCode={!!generatedCode}
         editsRemaining={editsRemaining}
@@ -341,6 +410,13 @@ export default function BuilderPage() {
       <AnimatePresence>
         {showTemplates && <TemplateGallery onSelect={handleTemplateSelect} onClose={() => setShowTemplates(false)} />}
       </AnimatePresence>
+
+      <CloneDialog
+        open={showCloneDialog}
+        onOpenChange={setShowCloneDialog}
+        onClone={handleClone}
+        isCloning={isCloning}
+      />
     </div>
   )
 }

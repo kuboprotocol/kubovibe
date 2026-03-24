@@ -3,40 +3,26 @@ import { supabase } from "@/integrations/supabase/client";
 export type Msg = { role: "user" | "assistant"; content: string };
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-code`;
+const CLONE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/clone-site`;
 
-export async function streamChat({
-  messages,
-  onDelta,
-  onDone,
-  onError,
-}: {
-  messages: Msg[];
-  onDelta: (deltaText: string) => void;
-  onDone: () => void;
-  onError?: (error: string) => void;
-}) {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+async function getAuthHeaders() {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) throw new Error("You must be logged in.");
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${session.access_token}`,
+    apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+  };
+}
 
-  if (!session?.access_token) {
-    onError?.("You must be logged in to use the builder.");
-    return;
-  }
-
-  const resp = await fetch(CHAT_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${session.access_token}`,
-      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-    },
-    body: JSON.stringify({ messages }),
-  });
-
+async function processStream(
+  resp: Response,
+  onDelta: (deltaText: string) => void,
+  onDone: () => void,
+  onError?: (error: string) => void
+) {
   if (!resp.ok) {
     let errorMessage = `Error ${resp.status}`;
-
     try {
       const errorData = await resp.json();
       if (typeof errorData?.error === "string" && errorData.error.trim()) {
@@ -44,15 +30,12 @@ export async function streamChat({
       }
     } catch {
       const fallbackText = await resp.text().catch(() => "");
-      if (fallbackText.trim()) {
-        errorMessage = fallbackText;
-      }
+      if (fallbackText.trim()) errorMessage = fallbackText;
     }
 
     if (resp.status === 402 && errorMessage === `Error ${resp.status}`) {
       errorMessage = "Sem créditos suficientes no serviço de IA. Tente um prompt menor ou recarregue os créditos.";
     }
-
     if (resp.status === 429 && errorMessage === `Error ${resp.status}`) {
       errorMessage = "Muitas requisições em sequência. Aguarde alguns segundos e tente novamente.";
     }
@@ -61,10 +44,7 @@ export async function streamChat({
     return;
   }
 
-  if (!resp.body) {
-    onError?.("No response body");
-    return;
-  }
+  if (!resp.body) { onError?.("No response body"); return; }
 
   const reader = resp.body.getReader();
   const decoder = new TextDecoder();
@@ -86,10 +66,7 @@ export async function streamChat({
       if (!line.startsWith("data: ")) continue;
 
       const jsonStr = line.slice(6).trim();
-      if (jsonStr === "[DONE]") {
-        streamDone = true;
-        break;
-      }
+      if (jsonStr === "[DONE]") { streamDone = true; break; }
 
       try {
         const parsed = JSON.parse(jsonStr);
@@ -114,11 +91,61 @@ export async function streamChat({
         const parsed = JSON.parse(jsonStr);
         const content = parsed.choices?.[0]?.delta?.content as string | undefined;
         if (content) onDelta(content);
-      } catch {
-        // ignore final partial leftovers
-      }
+      } catch { /* ignore */ }
     }
   }
 
   onDone();
+}
+
+export async function streamChat({
+  messages,
+  onDelta,
+  onDone,
+  onError,
+}: {
+  messages: Msg[];
+  onDelta: (deltaText: string) => void;
+  onDone: () => void;
+  onError?: (error: string) => void;
+}) {
+  const headers = await getAuthHeaders().catch((e) => {
+    onError?.(e.message);
+    return null;
+  });
+  if (!headers) return;
+
+  const resp = await fetch(CHAT_URL, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ messages }),
+  });
+
+  await processStream(resp, onDelta, onDone, onError);
+}
+
+export async function streamClone({
+  url,
+  onDelta,
+  onDone,
+  onError,
+}: {
+  url: string;
+  onDelta: (deltaText: string) => void;
+  onDone: () => void;
+  onError?: (error: string) => void;
+}) {
+  const headers = await getAuthHeaders().catch((e) => {
+    onError?.(e.message);
+    return null;
+  });
+  if (!headers) return;
+
+  const resp = await fetch(CLONE_URL, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ url }),
+  });
+
+  await processStream(resp, onDelta, onDone, onError);
 }
