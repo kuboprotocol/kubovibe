@@ -271,6 +271,7 @@ export default function BuilderPage() {
         onSave={() => saveProject(generatedCode, messages)}
         onDownload={handleDownload}
         onShowTemplates={() => setShowTemplates(true)}
+        onCloneSite={() => setShowCloneDialog(true)}
         saving={saving}
         hasCode={!!generatedCode}
         editsRemaining={editsRemaining}
