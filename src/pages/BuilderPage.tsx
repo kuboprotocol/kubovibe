@@ -410,6 +410,13 @@ export default function BuilderPage() {
       <AnimatePresence>
         {showTemplates && <TemplateGallery onSelect={handleTemplateSelect} onClose={() => setShowTemplates(false)} />}
       </AnimatePresence>
+
+      <CloneDialog
+        open={showCloneDialog}
+        onOpenChange={setShowCloneDialog}
+        onClone={handleClone}
+        isCloning={isCloning}
+      />
     </div>
   )
 }
