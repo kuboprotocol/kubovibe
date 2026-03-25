@@ -190,7 +190,8 @@ Recreate this website as a single HTML file with Tailwind CSS, matching the visu
     }
 
     if (!aiResponse) {
-      return jsonResponse(503, { error: "No AI service available. Try again later." });
+      // Check if both failed due to credits/rate limits
+      return jsonResponse(402, { error: "Sem créditos suficientes no serviço de IA. Recarregue seus créditos ou tente novamente mais tarde." });
     }
 
     return new Response(aiResponse.body, {
