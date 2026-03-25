@@ -19,51 +19,26 @@ Rules:
 - The HTML must be complete and runnable in an iframe.
 - Start with <!DOCTYPE html> and end with </html>.`;
 
-const OPENROUTER_DEFAULT_MAX_TOKENS = 8000;
-const OPENROUTER_MIN_MAX_TOKENS = 512;
-
 const jsonResponse = (status: number, error: string) =>
   new Response(JSON.stringify({ error }), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
-const parseAffordableTokens = (errorText: string): number | null => {
-  const fromMessage = errorText.match(/can only afford\s+(\d+)/i);
-  if (fromMessage) return Number(fromMessage[1]);
-
-  try {
-    const parsed = JSON.parse(errorText);
-    const message = parsed?.error?.message;
-    if (typeof message === "string") {
-      const fromJsonMessage = message.match(/can only afford\s+(\d+)/i);
-      if (fromJsonMessage) return Number(fromJsonMessage[1]);
-    }
-  } catch {
-    // ignore parsing errors
-  }
-
-  return null;
-};
-
-const callOpenRouter = async (
+const callKimi = async (
   apiKey: string,
   messages: Array<{ role: string; content: string }>,
-  maxTokens: number
 ) =>
-  fetch("https://openrouter.ai/api/v1/chat/completions", {
+  fetch("https://api.moonshot.cn/v1/chat/completions", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
-      "HTTP-Referer": "https://kubovibe.lovable.app",
-      "X-Title": "KUBO VIBE Builder",
     },
     body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
+      model: "moonshot-v1-8k",
       messages,
       stream: true,
-      max_tokens: maxTokens,
     }),
   });
 
@@ -107,52 +82,33 @@ serve(async (req) => {
       return jsonResponse(400, "No valid messages provided.");
     }
 
+    const KIMI_API_KEY = Deno.env.get("KIMI_API_KEY");
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
 
+    console.log("KIMI_API_KEY present:", !!KIMI_API_KEY);
     console.log("LOVABLE_API_KEY present:", !!LOVABLE_API_KEY);
-    console.log("OPENROUTER_API_KEY present:", !!OPENROUTER_API_KEY);
 
     const fullMessages = [{ role: "system", content: SYSTEM_PROMPT }, ...messages];
 
-    // PRIMARY: OpenRouter
-    if (OPENROUTER_API_KEY) {
-      console.log("Trying OpenRouter (primary)...");
-      let maxTokens = OPENROUTER_DEFAULT_MAX_TOKENS;
-      let orResponse = await callOpenRouter(OPENROUTER_API_KEY, fullMessages, maxTokens);
+    // PRIMARY: Kimi (Moonshot AI)
+    if (KIMI_API_KEY) {
+      console.log("Trying Kimi (primary)...");
+      const kimiResponse = await callKimi(KIMI_API_KEY, fullMessages);
 
-      if (!orResponse.ok && orResponse.status === 402) {
-        const errorText = await orResponse.text().catch(() => "Unknown error");
-        console.warn("OpenRouter 402 on first attempt:", errorText);
-
-        const affordableTokens = parseAffordableTokens(errorText);
-        if (
-          affordableTokens &&
-          Number.isFinite(affordableTokens) &&
-          affordableTokens >= OPENROUTER_MIN_MAX_TOKENS &&
-          affordableTokens < maxTokens
-        ) {
-          maxTokens = affordableTokens;
-          console.log(`Retrying OpenRouter with reduced max_tokens=${maxTokens}...`);
-          orResponse = await callOpenRouter(OPENROUTER_API_KEY, fullMessages, maxTokens);
-        }
-      }
-
-      if (orResponse.ok) {
-        console.log("Using OpenRouter ✓");
-        return new Response(orResponse.body, {
+      if (kimiResponse.ok) {
+        console.log("Using Kimi ✓");
+        return new Response(kimiResponse.body, {
           headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
         });
       }
 
-      const orError = await orResponse.text().catch(() => "Unknown error");
-      console.warn("OpenRouter failed:", orResponse.status, orError);
+      const kimiError = await kimiResponse.text().catch(() => "Unknown error");
+      console.warn("Kimi failed:", kimiResponse.status, kimiError);
 
-      if (orResponse.status !== 402 && orResponse.status !== 429) {
-        // Non-recoverable OpenRouter error, fall through to Lovable AI
-        console.log("Falling back to Lovable AI Gateway...");
-      } else {
-        console.log("OpenRouter rate/credit limit, falling back to Lovable AI...");
+      if (kimiResponse.status === 429) {
+        console.log("Kimi rate limited, falling back to Lovable AI...");
+      } else if (kimiResponse.status === 402 || kimiResponse.status === 401) {
+        console.log("Kimi auth/credit issue, falling back to Lovable AI...");
       }
     }
 

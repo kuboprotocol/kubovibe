@@ -38,7 +38,6 @@ serve(async (req) => {
   }
 
   try {
-    // Auth check
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return jsonResponse(401, { error: "Unauthorized" });
@@ -104,7 +103,7 @@ serve(async (req) => {
 
     console.log("Scrape successful. HTML length:", scrapedHtml.length, "Markdown length:", scrapedMarkdown.length);
 
-    // Step 2: Build AI prompt with scraped data
+    // Step 2: Build AI prompt
     const truncatedHtml = scrapedHtml.slice(0, 15000);
     const truncatedMarkdown = scrapedMarkdown.slice(0, 8000);
 
@@ -126,8 +125,8 @@ ${truncatedMarkdown}
 
 Recreate this website as a single HTML file with Tailwind CSS, matching the visual design as closely as possible.`;
 
-    // Step 3: Generate clone with AI (streaming)
-    const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
+    // Step 3: Generate clone with AI
+    const KIMI_API_KEY = Deno.env.get("KIMI_API_KEY");
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
     const fullMessages = [
@@ -137,36 +136,34 @@ Recreate this website as a single HTML file with Tailwind CSS, matching the visu
 
     let aiResponse: Response | null = null;
 
-    // Try OpenRouter first
-    if (OPENROUTER_API_KEY) {
-      console.log("Step 2: Generating clone with OpenRouter...");
-      const orResp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    // PRIMARY: Kimi (Moonshot AI)
+    if (KIMI_API_KEY) {
+      console.log("Step 2: Generating clone with Kimi...");
+      const kimiResp = await fetch("https://api.moonshot.cn/v1/chat/completions", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+          Authorization: `Bearer ${KIMI_API_KEY}`,
           "Content-Type": "application/json",
-          "HTTP-Referer": "https://kubovibe.lovable.app",
-          "X-Title": "KUBO VIBE Clone",
         },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
+          model: "moonshot-v1-32k",
           messages: fullMessages,
           stream: true,
-          max_tokens: 16000,
         }),
       });
 
-      if (orResp.ok) {
-        aiResponse = orResp;
-        console.log("Using OpenRouter for clone ✓");
+      if (kimiResp.ok) {
+        aiResponse = kimiResp;
+        console.log("Using Kimi for clone ✓");
       } else {
-        console.warn("OpenRouter failed for clone:", orResp.status);
+        const errText = await kimiResp.text().catch(() => "");
+        console.warn("Kimi failed for clone:", kimiResp.status, errText);
       }
     }
 
-    // Fallback to Lovable AI
+    // FALLBACK: Lovable AI
     if (!aiResponse && LOVABLE_API_KEY) {
-      console.log("Step 2: Generating clone with Lovable AI...");
+      console.log("Step 2: Generating clone with Lovable AI (fallback)...");
       const lovResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -190,7 +187,6 @@ Recreate this website as a single HTML file with Tailwind CSS, matching the visu
     }
 
     if (!aiResponse) {
-      // Check if both failed due to credits/rate limits
       return jsonResponse(402, { error: "Sem créditos suficientes no serviço de IA. Recarregue seus créditos ou tente novamente mais tarde." });
     }
 
