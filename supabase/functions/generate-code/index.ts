@@ -126,12 +126,15 @@ serve(async (req) => {
     }
 
     const KIMI_API_KEY = Deno.env.get("KIMI_API_KEY");
+    const DEEPSEEK_API_KEY = Deno.env.get("DEEPSEEK_API_KEY");
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
     console.log("KIMI_API_KEY present:", !!KIMI_API_KEY);
+    console.log("DEEPSEEK_API_KEY present:", !!DEEPSEEK_API_KEY);
     console.log("LOVABLE_API_KEY present:", !!LOVABLE_API_KEY);
 
     const fullMessages = [{ role: "system", content: SYSTEM_PROMPT }, ...messages];
+    const failures: string[] = [];
 
     // PRIMARY: Kimi (Moonshot AI)
     if (KIMI_API_KEY) {
@@ -147,46 +150,50 @@ serve(async (req) => {
 
       const kimiError = await kimiResponse.text().catch(() => "Unknown error");
       console.warn("Kimi failed:", kimiResponse.status, kimiError);
-
-      if (kimiResponse.status === 429) {
-        console.log("Kimi rate limited, falling back to Lovable AI...");
-      } else if (kimiResponse.status === 402 || kimiResponse.status === 401) {
-        console.log("Kimi auth/credit issue, falling back to Lovable AI...");
-      }
+      failures.push(providerFailureMessage("Kimi", kimiResponse.status));
     }
 
-    // FALLBACK: Lovable AI Gateway
-    if (LOVABLE_API_KEY) {
-      console.log("Trying Lovable AI Gateway (fallback)...");
-      try {
-        const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "google/gemini-2.5-flash",
-            messages: fullMessages,
-            stream: true,
-          }),
-        });
+    // SECONDARY: DeepSeek
+    if (DEEPSEEK_API_KEY) {
+      console.log("Trying DeepSeek (secondary fallback)...");
+      const deepseekResponse = await callDeepSeek(DEEPSEEK_API_KEY, fullMessages);
 
-        if (response.ok) {
+      if (deepseekResponse.ok) {
+        console.log("Using DeepSeek ✓");
+        return new Response(deepseekResponse.body, {
+          headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+        });
+      }
+
+      const deepseekError = await deepseekResponse.text().catch(() => "Unknown error");
+      console.warn("DeepSeek failed:", deepseekResponse.status, deepseekError);
+      failures.push(providerFailureMessage("DeepSeek", deepseekResponse.status));
+    }
+
+    // TERTIARY: Lovable AI Gateway
+    if (LOVABLE_API_KEY) {
+      console.log("Trying Lovable AI Gateway (tertiary fallback)...");
+      try {
+        const lovableResponse = await callLovable(LOVABLE_API_KEY, fullMessages);
+
+        if (lovableResponse.ok) {
           console.log("Using Lovable AI Gateway ✓");
-          return new Response(response.body, {
+          return new Response(lovableResponse.body, {
             headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
           });
         }
 
-        const errorText = await response.text().catch(() => "Unknown error");
-        console.error("Lovable AI also failed:", response.status, errorText);
+        const lovableError = await lovableResponse.text().catch(() => "Unknown error");
+        console.error("Lovable AI also failed:", lovableResponse.status, lovableError);
+        failures.push(providerFailureMessage("Lovable AI", lovableResponse.status));
       } catch (lovableError) {
         console.error("Lovable AI Gateway fetch error:", lovableError);
+        failures.push("Lovable AI: erro de conexão");
       }
     }
 
-    return jsonResponse(503, "Nenhum serviço de IA disponível no momento. Tente novamente mais tarde.");
+    const details = failures.length ? ` (${failures.join(" | ")})` : "";
+    return jsonResponse(503, `Nenhum serviço de IA disponível no momento. Tente novamente mais tarde.${details}`);
   } catch (e) {
     console.error("generate-code error:", e);
     return jsonResponse(500, "Something went wrong. Please try again.");
