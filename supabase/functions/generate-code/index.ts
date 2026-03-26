@@ -42,6 +42,49 @@ const callKimi = async (
     }),
   });
 
+const callDeepSeek = async (
+  apiKey: string,
+  messages: Array<{ role: string; content: string }>,
+) =>
+  fetch("https://api.deepseek.com/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "deepseek-chat",
+      messages,
+      stream: true,
+    }),
+  });
+
+const callLovable = async (
+  apiKey: string,
+  messages: Array<{ role: string; content: string }>,
+) =>
+  fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "google/gemini-2.5-flash",
+      messages,
+      stream: true,
+    }),
+  });
+
+const providerFailureMessage = (provider: string, status: number) => {
+  if (status === 401) return `${provider}: chave inválida (401)`;
+  if (status === 402) return `${provider}: sem créditos (402)`;
+  if (status === 404) return `${provider}: modelo/rota não encontrado (404)`;
+  if (status === 410) return `${provider}: modelo descontinuado (410)`;
+  if (status === 429) return `${provider}: limite de requisições (429)`;
+  return `${provider}: erro ${status}`;
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
