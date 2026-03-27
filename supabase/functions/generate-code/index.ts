@@ -25,6 +25,8 @@ const jsonResponse = (status: number, error: string) =>
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
+// --- Provider call helpers ---
+
 const callKimi = async (
   apiKey: string,
   messages: Array<{ role: string; content: string }>,
@@ -85,6 +87,61 @@ const providerFailureMessage = (provider: string, status: number) => {
   return `${provider}: erro ${status}`;
 };
 
+// --- Complexity detection ---
+
+function isHeavyCodeRequest(messages: Array<{ role: string; content: string }>): boolean {
+  const lastUserMsg = [...messages].reverse().find(m => m.role === "user")?.content?.toLowerCase() || "";
+  
+  const heavyKeywords = [
+    "crie um app", "crie uma aplicação", "create an app", "build a",
+    "dashboard", "sistema completo", "full system", "e-commerce", "ecommerce",
+    "landing page", "website", "página completa", "full page",
+    "crud", "formulário complexo", "complex form", "api", "backend",
+    "banco de dados", "database", "autenticação", "authentication",
+    "gere o código", "generate code", "implementar", "implement",
+    "clone", "clonar", "replicar", "replicate",
+    "html completo", "complete html", "aplicativo", "application",
+    "painel", "admin", "gerenciamento", "management",
+  ];
+  
+  // Heavy if: contains heavy keywords OR message is long (complex request)
+  const hasHeavyKeyword = heavyKeywords.some(kw => lastUserMsg.includes(kw));
+  const isLongRequest = lastUserMsg.length > 300;
+  
+  return hasHeavyKeyword || isLongRequest;
+}
+
+// --- Try a provider with error handling ---
+
+async function tryProvider(
+  name: string,
+  callFn: () => Promise<Response>,
+  failures: string[],
+): Promise<Response | null> {
+  try {
+    console.log(`Trying ${name}...`);
+    const response = await callFn();
+    
+    if (response.ok) {
+      console.log(`Using ${name} ✓`);
+      return new Response(response.body, {
+        headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+      });
+    }
+    
+    const errorText = await response.text().catch(() => "Unknown error");
+    console.warn(`${name} failed:`, response.status, errorText);
+    failures.push(providerFailureMessage(name, response.status));
+    return null;
+  } catch (err) {
+    console.error(`${name} fetch error:`, err);
+    failures.push(`${name}: erro de conexão`);
+    return null;
+  }
+}
+
+// --- Main handler ---
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -93,7 +150,6 @@ serve(async (req) => {
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      console.error("No auth header found");
       return jsonResponse(401, "Unauthorized");
     }
 
@@ -104,7 +160,6 @@ serve(async (req) => {
     const token = authHeader.replace("Bearer ", "");
     const { data, error: authError } = await supabase.auth.getUser(token);
     if (authError || !data?.user) {
-      console.error("Auth error:", authError?.message);
       return jsonResponse(401, "Unauthorized");
     }
 
@@ -129,66 +184,47 @@ serve(async (req) => {
     const DEEPSEEK_API_KEY = Deno.env.get("DEEPSEEK_API_KEY");
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
-    console.log("KIMI_API_KEY present:", !!KIMI_API_KEY);
-    console.log("DEEPSEEK_API_KEY present:", !!DEEPSEEK_API_KEY);
-    console.log("LOVABLE_API_KEY present:", !!LOVABLE_API_KEY);
-
     const fullMessages = [{ role: "system", content: SYSTEM_PROMPT }, ...messages];
     const failures: string[] = [];
+    const heavy = isHeavyCodeRequest(messages);
+    
+    console.log(`Request type: ${heavy ? "HEAVY CODE" : "LIGHT/MEDIUM"}`);
 
-    // PRIMARY: Kimi (Moonshot AI)
-    if (KIMI_API_KEY) {
-      console.log("Trying Kimi (primary)...");
-      const kimiResponse = await callKimi(KIMI_API_KEY, fullMessages);
+    if (heavy) {
+      // HEAVY CODE: DeepSeek (primary) → Kimi (fallback) → Lovable AI (final)
+      console.log("Routing: DeepSeek → Kimi → Lovable AI");
 
-      if (kimiResponse.ok) {
-        console.log("Using Kimi ✓");
-        return new Response(kimiResponse.body, {
-          headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
-        });
+      if (DEEPSEEK_API_KEY) {
+        const result = await tryProvider("DeepSeek", () => callDeepSeek(DEEPSEEK_API_KEY, fullMessages), failures);
+        if (result) return result;
       }
 
-      const kimiError = await kimiResponse.text().catch(() => "Unknown error");
-      console.warn("Kimi failed:", kimiResponse.status, kimiError);
-      failures.push(providerFailureMessage("Kimi", kimiResponse.status));
-    }
-
-    // SECONDARY: DeepSeek
-    if (DEEPSEEK_API_KEY) {
-      console.log("Trying DeepSeek (secondary fallback)...");
-      const deepseekResponse = await callDeepSeek(DEEPSEEK_API_KEY, fullMessages);
-
-      if (deepseekResponse.ok) {
-        console.log("Using DeepSeek ✓");
-        return new Response(deepseekResponse.body, {
-          headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
-        });
+      if (KIMI_API_KEY) {
+        const result = await tryProvider("Kimi", () => callKimi(KIMI_API_KEY, fullMessages), failures);
+        if (result) return result;
       }
 
-      const deepseekError = await deepseekResponse.text().catch(() => "Unknown error");
-      console.warn("DeepSeek failed:", deepseekResponse.status, deepseekError);
-      failures.push(providerFailureMessage("DeepSeek", deepseekResponse.status));
-    }
+      if (LOVABLE_API_KEY) {
+        const result = await tryProvider("Lovable AI", () => callLovable(LOVABLE_API_KEY, fullMessages), failures);
+        if (result) return result;
+      }
+    } else {
+      // LIGHT/MEDIUM: Kimi (primary) → DeepSeek (fallback) → Lovable AI (final)
+      console.log("Routing: Kimi → DeepSeek → Lovable AI");
 
-    // TERTIARY: Lovable AI Gateway
-    if (LOVABLE_API_KEY) {
-      console.log("Trying Lovable AI Gateway (tertiary fallback)...");
-      try {
-        const lovableResponse = await callLovable(LOVABLE_API_KEY, fullMessages);
+      if (KIMI_API_KEY) {
+        const result = await tryProvider("Kimi", () => callKimi(KIMI_API_KEY, fullMessages), failures);
+        if (result) return result;
+      }
 
-        if (lovableResponse.ok) {
-          console.log("Using Lovable AI Gateway ✓");
-          return new Response(lovableResponse.body, {
-            headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
-          });
-        }
+      if (DEEPSEEK_API_KEY) {
+        const result = await tryProvider("DeepSeek", () => callDeepSeek(DEEPSEEK_API_KEY, fullMessages), failures);
+        if (result) return result;
+      }
 
-        const lovableError = await lovableResponse.text().catch(() => "Unknown error");
-        console.error("Lovable AI also failed:", lovableResponse.status, lovableError);
-        failures.push(providerFailureMessage("Lovable AI", lovableResponse.status));
-      } catch (lovableError) {
-        console.error("Lovable AI Gateway fetch error:", lovableError);
-        failures.push("Lovable AI: erro de conexão");
+      if (LOVABLE_API_KEY) {
+        const result = await tryProvider("Lovable AI", () => callLovable(LOVABLE_API_KEY, fullMessages), failures);
+        if (result) return result;
       }
     }
 
