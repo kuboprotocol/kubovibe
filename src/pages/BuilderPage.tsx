@@ -379,14 +379,17 @@ export default function BuilderPage() {
                     />
                   </div>
                 ) : (
-                  <div className="flex items-center justify-center h-full w-full">
-                    <div className="text-center">
-                      <div className="h-16 w-16 rounded-2xl bg-accent flex items-center justify-center mx-auto mb-4">
-                        <Eye className="h-8 w-8 text-accent-foreground" />
+                  <div className="flex items-center justify-center h-full w-full relative">
+                    <AILoadingAnimation isVisible={isLoading && !generatedCode} />
+                    {!isLoading && (
+                      <div className="text-center">
+                        <div className="h-16 w-16 rounded-2xl bg-accent flex items-center justify-center mx-auto mb-4">
+                          <Eye className="h-8 w-8 text-accent-foreground" />
+                        </div>
+                        <p className="text-muted-foreground font-medium">Preview will appear here</p>
+                        <p className="text-xs text-muted-foreground mt-1">Describe your app to start building</p>
                       </div>
-                      <p className="text-muted-foreground font-medium">Preview will appear here</p>
-                      <p className="text-xs text-muted-foreground mt-1">Describe your app to start building</p>
-                    </div>
+                    )}
                   </div>
                 )}
               </motion.div>
