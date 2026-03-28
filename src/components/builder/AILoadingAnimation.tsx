@@ -7,6 +7,14 @@ const MESSAGES = [
   { text: "We are working on your project. Thank you for your trust.", lang: "en" },
   { text: "Nous travaillons sur votre projet. Merci pour votre confiance.", lang: "fr" },
   { text: "Estamos trabajando en tu proyecto. Gracias por tu confianza.", lang: "es" },
+  { text: "A mágica está acontecendo nos bastidores...", lang: "pt" },
+  { text: "Building something amazing, just for you.", lang: "en" },
+  { text: "Cada linha de código é pensada com cuidado.", lang: "pt" },
+  { text: "Transforming your idea into reality...", lang: "en" },
+  { text: "Wir arbeiten an Ihrem Projekt. Danke für Ihr Vertrauen.", lang: "de" },
+  { text: "プロジェクトに取り組んでいます。ご信頼ありがとうございます。", lang: "ja" },
+  { text: "Quase lá! Seu app está tomando forma.", lang: "pt" },
+  { text: "Great things take a moment. Hang tight!", lang: "en" },
 ]
 
 const CODE_LINES = [
