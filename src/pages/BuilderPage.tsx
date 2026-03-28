@@ -380,7 +380,7 @@ export default function BuilderPage() {
                   </div>
                 ) : (
                   <div className="flex items-center justify-center h-full w-full relative">
-                    <AILoadingAnimation isVisible={isLoading && !generatedCode} />
+                    <AILoadingAnimation isVisible={isLoading} />
                     {!isLoading && (
                       <div className="text-center">
                         <div className="h-16 w-16 rounded-2xl bg-accent flex items-center justify-center mx-auto mb-4">
