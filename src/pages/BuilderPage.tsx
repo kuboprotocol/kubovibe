@@ -352,20 +352,18 @@ export default function BuilderPage() {
           <AnimatePresence mode="wait">
             {activeTab === 'preview' ? (
               <motion.div key="preview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 flex items-start justify-center overflow-auto">
-                {generatedCode ? (
+              {generatedCode ? (
                   <div
-                    className="h-full transition-all duration-300 ease-in-out"
+                    className="w-full h-full"
                     style={{
-                      width: DEVICE_WIDTHS[deviceFrame],
-                      maxWidth: '100%',
                       ...(deviceFrame !== 'desktop' ? {
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '12px',
-                        marginTop: '16px',
-                        marginBottom: '16px',
-                        height: 'calc(100% - 32px)',
-                        boxShadow: '0 4px 24px hsl(var(--foreground) / 0.1)',
+                        maxWidth: deviceFrame === 'tablet' ? 768 : 390,
+                        maxHeight: deviceFrame === 'tablet' ? 1024 : 844,
+                        margin: '0 auto',
+                        border: '8px solid hsl(var(--border))',
+                        borderRadius: '24px',
                         overflow: 'hidden',
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
                       } : {}),
                     }}
                   >
@@ -382,13 +380,18 @@ export default function BuilderPage() {
                   <div className="flex items-center justify-center h-full w-full relative">
                     <AILoadingAnimation isVisible={isLoading} />
                     {!isLoading && (
-                      <div className="text-center">
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.5, ease: 'easeOut' }}
+                        className="text-center"
+                      >
                         <div className="h-16 w-16 rounded-2xl bg-accent flex items-center justify-center mx-auto mb-4">
                           <Eye className="h-8 w-8 text-accent-foreground" />
                         </div>
                         <p className="text-muted-foreground font-medium">Preview will appear here</p>
                         <p className="text-xs text-muted-foreground mt-1">Describe your app to start building</p>
-                      </div>
+                      </motion.div>
                     )}
                   </div>
                 )}
