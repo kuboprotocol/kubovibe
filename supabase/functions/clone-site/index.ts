@@ -7,24 +7,27 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const CLONE_SYSTEM_PROMPT = `You are an expert frontend developer specialized in cloning websites. You will receive scraped data from a website including its HTML structure, content, and design details.
+const CLONE_SYSTEM_PROMPT = `You are an elite frontend developer who clones websites with pixel-perfect accuracy. You receive detailed scraped data from a website including its full HTML, extracted branding (colors, fonts, spacing), content, and link structure.
 
-Your task: Recreate a visually identical clone of the website as a single, complete, self-contained HTML file.
+Your task: Recreate an EXACT visual clone as a single, complete, self-contained HTML file.
 
-Rules:
-- Output ONLY the HTML code. No explanations, no markdown fences.
-- Use Tailwind CSS via CDN: <script src="https://cdn.tailwindcss.com"></script>
-- Replicate the exact visual design: colors, typography, spacing, layout, images.
-- Preserve all text content, headings, paragraphs, lists, and links.
-- For images, use the original URLs when available, or placeholder images from https://placehold.co/ with appropriate sizes.
-- Make it responsive, matching the original site's responsive behavior.
-- Include inline JavaScript for any interactive elements (menus, dropdowns, modals, tabs, sliders).
-- Use Font Awesome CDN for icons if the original uses icons: <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-- For DApps or Web3 interfaces, replicate the UI layout faithfully (wallet connect buttons, token displays, swap interfaces, etc.).
-- The HTML must be complete and runnable in an iframe.
+CRITICAL RULES:
+- Output ONLY the raw HTML code. No explanations, no markdown fences, no comments before <!DOCTYPE html>.
 - Start with <!DOCTYPE html> and end with </html>.
-- Match the color scheme exactly. If you can identify specific hex/rgb colors from the HTML, use those exact values.
-- Preserve the overall page structure and visual hierarchy.`;
+- Use Tailwind CSS via CDN: <script src="https://cdn.tailwindcss.com"></script>
+- Configure Tailwind with the EXACT colors, fonts, and spacing extracted from the branding data using a <script> block to extend the theme.
+- Replicate EVERY section: header/nav, hero, features, content sections, footer, etc.
+- Preserve ALL text content exactly as provided - do not summarize or shorten.
+- Use the EXACT original image URLs when available. For missing images, use https://placehold.co/ with matching dimensions and colors.
+- Match the color scheme EXACTLY using the extracted brand colors.
+- Include Font Awesome CDN for icons: <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+- Load Google Fonts matching the original site's typography.
+- Include inline JavaScript for ALL interactive elements (mobile menus, dropdowns, modals, tabs, sliders, accordions).
+- Make it fully responsive matching the original site's breakpoints.
+- The HTML must be complete and runnable standalone in an iframe.
+- For DApps/Web3 UIs: replicate wallet buttons, token displays, swap interfaces, charts faithfully.
+- Match shadows, border-radius, gradients, hover effects, and transitions.
+- If the original uses animations, add CSS transitions/animations to match.`;
 
 const jsonResponse = (status: number, body: Record<string, unknown>) =>
   new Response(JSON.stringify(body), {
@@ -67,13 +70,13 @@ serve(async (req) => {
       formattedUrl = `https://${formattedUrl}`;
     }
 
-    // Step 1: Scrape with Firecrawl
+    // Step 1: Scrape with Firecrawl (HTML + branding + markdown + links)
     const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
     if (!FIRECRAWL_API_KEY) {
       return jsonResponse(500, { error: "Firecrawl not configured. Connect the Firecrawl service first." });
     }
 
-    console.log("Step 1: Scraping", formattedUrl);
+    console.log("Step 1: Scraping", formattedUrl, "with branding extraction...");
 
     const scrapeResponse = await fetch("https://api.firecrawl.dev/v1/scrape", {
       method: "POST",
@@ -83,9 +86,9 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         url: formattedUrl,
-        formats: ["markdown", "html", "links", "screenshot"],
+        formats: ["html", "markdown", "links", "branding"],
         onlyMainContent: false,
-        waitFor: 3000,
+        waitFor: 5000,
       }),
     });
 
@@ -100,34 +103,66 @@ serve(async (req) => {
     const scrapedMarkdown = scrapeData?.data?.markdown || scrapeData?.markdown || "";
     const scrapedLinks = scrapeData?.data?.links || scrapeData?.links || [];
     const metadata = scrapeData?.data?.metadata || scrapeData?.metadata || {};
+    const branding = scrapeData?.data?.branding || scrapeData?.branding || null;
 
-    console.log("Scrape successful. HTML length:", scrapedHtml.length, "Markdown length:", scrapedMarkdown.length);
+    console.log("Scrape successful. HTML:", scrapedHtml.length, "chars | Branding:", branding ? "YES" : "NO");
 
-    // Step 2: Build AI prompt
-    const truncatedHtml = scrapedHtml.slice(0, 15000);
-    const truncatedMarkdown = scrapedMarkdown.slice(0, 8000);
+    // Step 2: Build a rich AI prompt with all extracted data
+    // Allow more HTML for better fidelity (up to 50k chars)
+    const truncatedHtml = scrapedHtml.slice(0, 50000);
+    const truncatedMarkdown = scrapedMarkdown.slice(0, 15000);
 
-    const clonePrompt = `Clone this website: ${formattedUrl}
+    let brandingSection = "";
+    if (branding) {
+      brandingSection = `
+## Extracted Brand Design (USE THESE EXACT VALUES):
+- Color Scheme: ${branding.colorScheme || "unknown"}
+- Logo: ${branding.logo || branding.images?.logo || "N/A"}
+${branding.colors ? `- Colors:
+  - Primary: ${branding.colors.primary || "N/A"}
+  - Secondary: ${branding.colors.secondary || "N/A"}
+  - Accent: ${branding.colors.accent || "N/A"}
+  - Background: ${branding.colors.background || "N/A"}
+  - Text Primary: ${branding.colors.textPrimary || "N/A"}
+  - Text Secondary: ${branding.colors.textSecondary || "N/A"}` : ""}
+${branding.typography ? `- Typography:
+  - Primary Font: ${branding.typography.fontFamilies?.primary || "N/A"}
+  - Heading Font: ${branding.typography.fontFamilies?.heading || "N/A"}
+  - Code Font: ${branding.typography.fontFamilies?.code || "N/A"}
+  - H1 Size: ${branding.typography.fontSizes?.h1 || "N/A"}
+  - H2 Size: ${branding.typography.fontSizes?.h2 || "N/A"}
+  - Body Size: ${branding.typography.fontSizes?.body || "N/A"}` : ""}
+${branding.spacing ? `- Spacing:
+  - Base Unit: ${branding.spacing.baseUnit || "N/A"}px
+  - Border Radius: ${branding.spacing.borderRadius || "N/A"}` : ""}
+${branding.fonts?.length ? `- Fonts Used: ${branding.fonts.map((f: any) => f.family).join(", ")}` : ""}
+${branding.components?.buttonPrimary ? `- Primary Button: bg=${branding.components.buttonPrimary.background}, text=${branding.components.buttonPrimary.textColor}, radius=${branding.components.buttonPrimary.borderRadius}` : ""}`;
+    }
+
+    const clonePrompt = `Clone this website EXACTLY: ${formattedUrl}
 
 ## Website Metadata
 - Title: ${metadata.title || "Unknown"}
 - Description: ${metadata.description || "N/A"}
+- Language: ${metadata.language || "en"}
+${brandingSection}
 
-## HTML Structure (truncated):
+## Full HTML Structure:
 \`\`\`html
 ${truncatedHtml}
 \`\`\`
 
-## Content (Markdown):
+## Full Text Content (Markdown):
 ${truncatedMarkdown}
 
-## Links found: ${scrapedLinks.slice(0, 20).join(", ")}
+## Navigation Links: ${scrapedLinks.slice(0, 30).join(", ")}
 
-Recreate this website as a single HTML file with Tailwind CSS, matching the visual design as closely as possible.`;
+IMPORTANT: Recreate this website as a PIXEL-PERFECT single HTML file. Use the exact brand colors, fonts, and spacing provided above. Preserve all text content, images, and layout structure.`;
 
-    // Step 3: Generate clone with AI
-    const KIMI_API_KEY = Deno.env.get("KIMI_API_KEY");
+    // Step 3: Generate clone with DeepSeek (heavy code task) or fallbacks
+    const DEEPSEEK_API_KEY = Deno.env.get("DEEPSEEK_API_KEY");
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const KIMI_API_KEY = Deno.env.get("KIMI_API_KEY");
 
     const fullMessages = [
       { role: "system", content: CLONE_SYSTEM_PROMPT },
@@ -136,34 +171,36 @@ Recreate this website as a single HTML file with Tailwind CSS, matching the visu
 
     let aiResponse: Response | null = null;
 
-    // PRIMARY: Kimi (Moonshot AI)
-    if (KIMI_API_KEY) {
-      console.log("Step 2: Generating clone with Kimi...");
-      const kimiResp = await fetch("https://api.moonshot.cn/v1/chat/completions", {
+    // PRIMARY: DeepSeek (best for heavy code generation)
+    if (DEEPSEEK_API_KEY) {
+      console.log("Step 2: Generating clone with DeepSeek (heavy code)...");
+      const dsResp = await fetch("https://api.deepseek.com/chat/completions", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${KIMI_API_KEY}`,
+          Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "moonshot-v1-32k",
+          model: "deepseek-coder",
           messages: fullMessages,
           stream: true,
+          max_tokens: 16384,
+          temperature: 0.2,
         }),
       });
 
-      if (kimiResp.ok) {
-        aiResponse = kimiResp;
-        console.log("Using Kimi for clone ✓");
+      if (dsResp.ok) {
+        aiResponse = dsResp;
+        console.log("Using DeepSeek for clone ✓");
       } else {
-        const errText = await kimiResp.text().catch(() => "");
-        console.warn("Kimi failed for clone:", kimiResp.status, errText);
+        const errText = await dsResp.text().catch(() => "");
+        console.warn("DeepSeek failed for clone:", dsResp.status, errText);
       }
     }
 
-    // FALLBACK: Lovable AI
+    // FALLBACK 1: Lovable AI (Gemini)
     if (!aiResponse && LOVABLE_API_KEY) {
-      console.log("Step 2: Generating clone with Lovable AI (fallback)...");
+      console.log("Step 2: Fallback to Lovable AI for clone...");
       const lovResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -182,12 +219,37 @@ Recreate this website as a single HTML file with Tailwind CSS, matching the visu
         console.log("Using Lovable AI for clone ✓");
       } else {
         const errText = await lovResp.text().catch(() => "");
-        console.error("Lovable AI also failed:", lovResp.status, errText);
+        console.error("Lovable AI failed:", lovResp.status, errText);
+      }
+    }
+
+    // FALLBACK 2: Kimi
+    if (!aiResponse && KIMI_API_KEY) {
+      console.log("Step 2: Fallback to Kimi for clone...");
+      const kimiResp = await fetch("https://api.moonshot.cn/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${KIMI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "moonshot-v1-32k",
+          messages: fullMessages,
+          stream: true,
+        }),
+      });
+
+      if (kimiResp.ok) {
+        aiResponse = kimiResp;
+        console.log("Using Kimi for clone ✓");
+      } else {
+        const errText = await kimiResp.text().catch(() => "");
+        console.error("Kimi also failed:", kimiResp.status, errText);
       }
     }
 
     if (!aiResponse) {
-      return jsonResponse(402, { error: "Sem créditos suficientes no serviço de IA. Recarregue seus créditos ou tente novamente mais tarde." });
+      return jsonResponse(402, { error: "Nenhum serviço de IA disponível. Verifique suas chaves de API." });
     }
 
     return new Response(aiResponse.body, {
