@@ -98,15 +98,31 @@ function GlowOrb({ size, x, y, delay, color }: { size: number; x: string; y: str
   )
 }
 
+function formatTime(seconds: number) {
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  return m > 0 ? `${m}:${s.toString().padStart(2, '0')}` : `0:${s.toString().padStart(2, '0')}`
+}
+
 export default function AILoadingAnimation({ isVisible }: { isVisible: boolean }) {
   const [messageIndex, setMessageIndex] = useState(0)
+  const [elapsed, setElapsed] = useState(0)
 
   useEffect(() => {
-    if (!isVisible) return
+    if (!isVisible) {
+      setElapsed(0)
+      return
+    }
     const interval = setInterval(() => {
       setMessageIndex(prev => (prev + 1) % MESSAGES.length)
     }, 4000)
-    return () => clearInterval(interval)
+    const timer = setInterval(() => {
+      setElapsed(prev => prev + 1)
+    }, 1000)
+    return () => {
+      clearInterval(interval)
+      clearInterval(timer)
+    }
   }, [isVisible])
 
   return (
@@ -179,6 +195,18 @@ export default function AILoadingAnimation({ isVisible }: { isVisible: boolean }
                 </motion.div>
                 <ProgressDots />
               </div>
+
+              {/* Elapsed timer */}
+              <motion.div
+                className="flex items-center gap-2 text-xs text-muted-foreground/70 font-mono"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 1 }}
+              >
+                <span>⏱</span>
+                <span>{formatTime(elapsed)}</span>
+                <span className="text-muted-foreground/40">elapsed</span>
+              </motion.div>
 
               {/* Rotating subtitle */}
               <div className="h-12 flex items-center justify-center">
