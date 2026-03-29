@@ -196,6 +196,18 @@ export default function AILoadingAnimation({ isVisible }: { isVisible: boolean }
                 <ProgressDots />
               </div>
 
+              {/* Elapsed timer */}
+              <motion.div
+                className="flex items-center gap-2 text-xs text-muted-foreground/70 font-mono"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 1 }}
+              >
+                <span>⏱</span>
+                <span>{formatTime(elapsed)}</span>
+                <span className="text-muted-foreground/40">elapsed</span>
+              </motion.div>
+
               {/* Rotating subtitle */}
               <div className="h-12 flex items-center justify-center">
                 <AnimatePresence mode="wait">
