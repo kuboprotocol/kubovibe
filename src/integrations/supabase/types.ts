@@ -14,6 +14,75 @@ export type Database = {
   }
   public: {
     Tables: {
+      connect_products: {
+        Row: {
+          connected_account_id: string
+          created_at: string
+          created_by: string
+          currency: string
+          description: string | null
+          id: string
+          name: string
+          price_cents: number
+          stripe_price_id: string | null
+          stripe_product_id: string
+        }
+        Insert: {
+          connected_account_id: string
+          created_at?: string
+          created_by: string
+          currency?: string
+          description?: string | null
+          id?: string
+          name: string
+          price_cents: number
+          stripe_price_id?: string | null
+          stripe_product_id: string
+        }
+        Update: {
+          connected_account_id?: string
+          created_at?: string
+          created_by?: string
+          currency?: string
+          description?: string | null
+          id?: string
+          name?: string
+          price_cents?: number
+          stripe_price_id?: string | null
+          stripe_product_id?: string
+        }
+        Relationships: []
+      }
+      connected_accounts: {
+        Row: {
+          contact_email: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          stripe_account_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          contact_email?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          stripe_account_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          contact_email?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          stripe_account_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
