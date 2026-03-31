@@ -1,34 +1,27 @@
 // ============================================================
 // Edge Function: stripe-connect-account
-// Purpose: Create and retrieve Stripe Connected Accounts (V2 API)
+// Purpose: Create and retrieve Stripe Connected Accounts (V1 API)
 // ============================================================
 
 import Stripe from "npm:stripe@^18";
 import { createClient } from "npm:@supabase/supabase-js@^2";
 
-// CORS headers required for browser requests
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// ---- Initialize Stripe Client ----
-// PLACEHOLDER: Ensure STRIPE_SECRET_KEY is set in your project secrets.
 const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
 if (!stripeKey) {
-  throw new Error(
-    "Missing STRIPE_SECRET_KEY. Add it via Lovable Cloud secrets."
-  );
+  throw new Error("Missing STRIPE_SECRET_KEY.");
 }
 const stripeClient = new Stripe(stripeKey);
 
-// ---- Initialize Supabase Admin Client ----
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 Deno.serve(async (req: Request) => {
-  // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -60,7 +53,7 @@ Deno.serve(async (req: Request) => {
     const url = new URL(req.url);
     const action = url.searchParams.get("action");
 
-    // ---- ACTION: Create a new Connected Account ----
+    // ---- ACTION: Create a new Connected Account (V1 Express) ----
     if (req.method === "POST" && action === "create") {
       const { display_name, contact_email } = await req.json();
 
@@ -71,33 +64,20 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      // Step 1: Create a V2 Connected Account via Stripe
-      // - dashboard: 'express' → Stripe-hosted dashboard for the connected account
-      // - responsibilities: platform collects fees and handles losses
-      // - capabilities: enable stripe_transfers so the account can receive payouts
-      const account = await stripeClient.v2.core.accounts.create({
-        display_name,
-        contact_email,
-        identity: { country: "us" },
-        dashboard: "express",
-        defaults: {
-          responsibilities: {
-            fees_collector: "application",
-            losses_collector: "application",
-          },
+      // Create an Express connected account using V1 API
+      const account = await stripeClient.accounts.create({
+        type: "express",
+        country: "US",
+        email: contact_email,
+        business_profile: {
+          name: display_name,
         },
-        configuration: {
-          recipient: {
-            capabilities: {
-              stripe_balance: {
-                stripe_transfers: { requested: true },
-              },
-            },
-          },
+        capabilities: {
+          transfers: { requested: true },
         },
       });
 
-      // Step 2: Store the mapping in our database
+      // Store the mapping in our database
       const { error: insertError } = await supabase
         .from("connected_accounts")
         .insert({
@@ -117,7 +97,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // ---- ACTION: Get account status (always from Stripe API) ----
+    // ---- ACTION: Get account status ----
     if (req.method === "GET" && action === "status") {
       const stripeAccountId = url.searchParams.get("stripe_account_id");
       if (!stripeAccountId) {
@@ -127,30 +107,26 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      // Retrieve account with expanded configuration and requirements
-      const account = await stripeClient.v2.core.accounts.retrieve(
-        stripeAccountId,
-        { include: ["configuration.recipient", "requirements"] }
-      );
+      // Retrieve the account using V1 API
+      const account = await stripeClient.accounts.retrieve(stripeAccountId);
 
-      // Check if the account is ready to receive payments
-      const readyToReceivePayments =
-        account?.configuration?.recipient?.capabilities?.stripe_balance
-          ?.stripe_transfers?.status === "active";
+      // Check if the account can receive transfers
+      const transfersCapability = account.capabilities?.transfers;
+      const readyToReceivePayments = transfersCapability === "active";
 
       // Check onboarding completion by looking at requirements
-      const requirementsStatus =
-        account.requirements?.summary?.minimum_deadline?.status;
-      const onboardingComplete =
-        requirementsStatus !== "currently_due" &&
-        requirementsStatus !== "past_due";
+      const hasCurrentlyDue = (account.requirements?.currently_due?.length ?? 0) > 0;
+      const hasPastDue = (account.requirements?.past_due?.length ?? 0) > 0;
+      const onboardingComplete = !hasCurrentlyDue && !hasPastDue;
 
       return new Response(
         JSON.stringify({
           account_id: account.id,
           ready_to_receive_payments: readyToReceivePayments,
           onboarding_complete: onboardingComplete,
-          requirements_status: requirementsStatus || "none",
+          details_submitted: account.details_submitted,
+          charges_enabled: account.charges_enabled,
+          payouts_enabled: account.payouts_enabled,
         }),
         {
           status: 200,
