@@ -1,6 +1,6 @@
 // ============================================================
 // Edge Function: stripe-connect-onboard
-// Purpose: Create Stripe Account Links for onboarding connected accounts
+// Purpose: Create Stripe Account Links for onboarding (V1 API)
 // ============================================================
 
 import Stripe from "npm:stripe@^18";
@@ -11,7 +11,6 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// PLACEHOLDER: Ensure STRIPE_SECRET_KEY is configured
 const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
 if (!stripeKey) {
   throw new Error("Missing STRIPE_SECRET_KEY.");
@@ -33,23 +32,14 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Create an Account Link using the V2 API
-    // - use_case: 'account_onboarding' walks the user through Stripe's KYC flow
-    // - configurations: ['recipient'] matches our account configuration
-    // - return_url: where Stripe redirects after onboarding completes
-    // - refresh_url: where Stripe redirects if the link expires
-    const accountLink = await stripeClient.v2.core.accountLinks.create({
+    // Create an Account Link using V1 API for onboarding
+    const accountLink = await stripeClient.accountLinks.create({
       account: account_id,
-      use_case: {
-        type: "account_onboarding",
-        account_onboarding: {
-          configurations: ["recipient"],
-          refresh_url: refresh_url || "https://kubovibe.lovable.app/connect",
-          return_url:
-            return_url ||
-            `https://kubovibe.lovable.app/connect?accountId=${account_id}`,
-        },
-      },
+      type: "account_onboarding",
+      refresh_url: refresh_url || "https://kubovibe.lovable.app/connect",
+      return_url:
+        return_url ||
+        `https://kubovibe.lovable.app/connect?accountId=${account_id}`,
     });
 
     return new Response(JSON.stringify({ url: accountLink.url }), {
