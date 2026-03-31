@@ -16,6 +16,7 @@ import PrivacyPage from "./pages/PrivacyPage";
 import NotFound from "./pages/NotFound";
 import PricingPage from "./pages/PricingPage";
 import SupportPage from "./pages/SupportPage";
+import ConnectPage from "./pages/ConnectPage";
 
 const queryClient = new QueryClient();
 
