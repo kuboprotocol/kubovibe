@@ -420,8 +420,8 @@ export default function BuilderPage() {
                   </div>
                 ) : (
                   <div className="flex items-center justify-center h-full w-full relative">
-                    <AILoadingAnimation isVisible={isLoading} />
-                    {!isLoading && (
+                    <AILoadingAnimation isVisible={showLoading} chatLanguage={chatLanguage} />
+                    {!showLoading && !isLoading && (
                       <motion.div
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
