@@ -393,8 +393,14 @@ export default function BuilderPage() {
         <div className="flex-1 relative bg-muted">
           <AnimatePresence mode="wait">
             {activeTab === 'preview' ? (
-              <motion.div key="preview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 flex items-start justify-center overflow-auto">
-              {generatedCode ? (
+              <motion.div key="preview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 flex items-start justify-center overflow-auto relative">
+                {/* Loading overlay — sits on top of everything */}
+                {showLoading && (
+                  <div className="absolute inset-0 z-20">
+                    <AILoadingAnimation isVisible={showLoading} chatLanguage={chatLanguage} />
+                  </div>
+                )}
+              {generatedCode && !showLoading ? (
                   <div
                     className="w-full h-full"
                     style={{
@@ -418,25 +424,22 @@ export default function BuilderPage() {
                       style={deviceFrame !== 'desktop' ? { borderRadius: '12px' } : {}}
                     />
                   </div>
-                ) : (
+                ) : !showLoading ? (
                   <div className="flex items-center justify-center h-full w-full relative">
-                    <AILoadingAnimation isVisible={showLoading} chatLanguage={chatLanguage} />
-                    {!showLoading && !isLoading && (
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ duration: 0.5, ease: 'easeOut' }}
-                        className="text-center"
-                      >
-                        <div className="h-16 w-16 rounded-2xl bg-accent flex items-center justify-center mx-auto mb-4">
-                          <Eye className="h-8 w-8 text-accent-foreground" />
-                        </div>
-                        <p className="text-muted-foreground font-medium">Preview will appear here</p>
-                        <p className="text-xs text-muted-foreground mt-1">Describe your app to start building</p>
-                      </motion.div>
-                    )}
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 0.5, ease: 'easeOut' }}
+                      className="text-center"
+                    >
+                      <div className="h-16 w-16 rounded-2xl bg-accent flex items-center justify-center mx-auto mb-4">
+                        <Eye className="h-8 w-8 text-accent-foreground" />
+                      </div>
+                      <p className="text-muted-foreground font-medium">Preview will appear here</p>
+                      <p className="text-xs text-muted-foreground mt-1">Describe your app to start building</p>
+                    </motion.div>
                   </div>
-                )}
+                ) : null}
               </motion.div>
             ) : (
               <motion.div key="code" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 flex flex-col">
