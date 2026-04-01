@@ -1,21 +1,102 @@
 import { motion, AnimatePresence } from 'framer-motion'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import robotImg from '@/assets/robot-coding.png'
 
-const MESSAGES = [
-  { text: "Estamos trabalhando no seu projeto. Obrigado pela confiança.", lang: "pt" },
-  { text: "We are working on your project. Thank you for your trust.", lang: "en" },
-  { text: "Nous travaillons sur votre projet. Merci pour votre confiance.", lang: "fr" },
-  { text: "Estamos trabajando en tu proyecto. Gracias por tu confianza.", lang: "es" },
-  { text: "A mágica está acontecendo nos bastidores...", lang: "pt" },
-  { text: "Building something amazing, just for you.", lang: "en" },
-  { text: "Cada linha de código é pensada com cuidado.", lang: "pt" },
-  { text: "Transforming your idea into reality...", lang: "en" },
-  { text: "Wir arbeiten an Ihrem Projekt. Danke für Ihr Vertrauen.", lang: "de" },
-  { text: "プロジェクトに取り組んでいます。ご信頼ありがとうございます。", lang: "ja" },
-  { text: "Quase lá! Seu app está tomando forma.", lang: "pt" },
-  { text: "Great things take a moment. Hang tight!", lang: "en" },
-]
+// Messages grouped by language
+const MESSAGES_BY_LANG: Record<string, string[]> = {
+  pt: [
+    "Estamos trabalhando no seu projeto. Obrigado pela confiança.",
+    "A mágica está acontecendo nos bastidores...",
+    "Cada linha de código é pensada com cuidado.",
+    "Quase lá! Seu app está tomando forma.",
+    "Transformando suas ideias em realidade...",
+    "Nosso robô está programando sem parar!",
+    "Criando algo incrível, só pra você.",
+    "Preparando cada detalhe com carinho.",
+    "Seu projeto está ficando sensacional!",
+    "Aguarde um instante, a IA está em ação.",
+    "Montando a estrutura do seu aplicativo...",
+    "A criatividade artificial está a todo vapor!",
+    "Estamos quase prontos. Não saia daí!",
+    "Otimizando o código para a melhor performance.",
+    "Dando os toques finais no seu projeto.",
+    "Conectando os componentes com precisão.",
+    "Design e código caminhando juntos.",
+    "A inteligência artificial está concentrada!",
+    "Seu app ganha vida a cada segundo.",
+    "Finalizando os últimos detalhes...",
+  ],
+  en: [
+    "We are working on your project. Thank you for your trust.",
+    "Building something amazing, just for you.",
+    "Transforming your idea into reality...",
+    "Great things take a moment. Hang tight!",
+    "Our robot is coding non-stop!",
+    "Every line of code is crafted with care.",
+    "Almost there! Your app is taking shape.",
+    "The AI is hard at work behind the scenes.",
+    "Creativity meets technology, just for you.",
+    "Preparing every detail with precision.",
+    "Your project is looking amazing!",
+    "Hold on, the magic is happening.",
+    "Assembling your application structure...",
+    "Optimizing code for best performance.",
+    "Adding the finishing touches to your project.",
+    "Connecting components with precision.",
+    "Design and code working in harmony.",
+    "The artificial intelligence is focused!",
+    "Your app comes to life every second.",
+    "Wrapping up the final details...",
+  ],
+  es: [
+    "Estamos trabajando en tu proyecto. Gracias por tu confianza.",
+    "La magia está sucediendo tras bastidores...",
+    "Cada línea de código se piensa con cuidado.",
+    "¡Casi listo! Tu app está tomando forma.",
+    "Transformando tus ideas en realidad...",
+    "Nuestro robot está programando sin parar.",
+    "Creando algo increíble, solo para ti.",
+    "Preparando cada detalle con cariño.",
+    "Tu proyecto está quedando sensacional.",
+    "Espera un momento, la IA está en acción.",
+  ],
+  fr: [
+    "Nous travaillons sur votre projet. Merci pour votre confiance.",
+    "La magie opère en coulisses...",
+    "Chaque ligne de code est soigneusement pensée.",
+    "Presque terminé ! Votre app prend forme.",
+    "Transformer vos idées en réalité...",
+    "Notre robot code sans relâche !",
+    "Création de quelque chose d'incroyable, juste pour vous.",
+    "Préparer chaque détail avec soin.",
+    "Votre projet est sensationnel !",
+    "Patientez un instant, l'IA est en action.",
+  ],
+  de: [
+    "Wir arbeiten an Ihrem Projekt. Danke für Ihr Vertrauen.",
+    "Die Magie geschieht hinter den Kulissen...",
+    "Jede Codezeile wird sorgfältig durchdacht.",
+    "Fast fertig! Ihre App nimmt Gestalt an.",
+    "Ihre Ideen werden Wirklichkeit...",
+    "Unser Roboter programmiert ohne Pause!",
+    "Etwas Erstaunliches wird nur für Sie erstellt.",
+    "Jedes Detail wird mit Sorgfalt vorbereitet.",
+    "Ihr Projekt sieht fantastisch aus!",
+    "Einen Moment bitte, die KI ist in Aktion.",
+  ],
+  ja: [
+    "プロジェクトに取り組んでいます。ご信頼ありがとうございます。",
+    "魔法が舞台裏で起こっています...",
+    "コードの一行一行を丁寧に作成しています。",
+    "もう少しです！アプリが形になっています。",
+    "あなたのアイデアを現実に変えています...",
+    "ロボットが休みなくプログラミング中！",
+    "あなただけのために、素晴らしいものを作成中。",
+    "すべてのディテールを丁寧に準備しています。",
+    "プロジェクトが素晴らしい仕上がりに！",
+    "少々お待ちください、AIが作業中です。",
+  ],
+}
 
 const CODE_LINES = [
   'const app = createApp({',
@@ -104,18 +185,49 @@ function formatTime(seconds: number) {
   return m > 0 ? `${m}:${s.toString().padStart(2, '0')}` : `0:${s.toString().padStart(2, '0')}`
 }
 
-export default function AILoadingAnimation({ isVisible }: { isVisible: boolean }) {
+/** Detect language from text using simple heuristics */
+function detectLanguage(text: string): string {
+  const lower = text.toLowerCase()
+  // Japanese/Chinese characters
+  if (/[\u3040-\u30ff\u4e00-\u9fff]/.test(lower)) return 'ja'
+  // Portuguese indicators
+  if (/\b(criar|fazer|adicionar|quero|preciso|pode|como|obrigado|olá|projeto|página|botão|não|sim|está|são|você|também|aplicativo)\b/.test(lower)) return 'pt'
+  // Spanish indicators
+  if (/\b(crear|hacer|añadir|quiero|necesito|puede|cómo|gracias|hola|proyecto|página|botón|también|aplicación)\b/.test(lower)) return 'es'
+  // French indicators
+  if (/\b(créer|faire|ajouter|veux|besoin|peut|comment|merci|bonjour|projet|aussi|application|je|nous|vous|est)\b/.test(lower)) return 'fr'
+  // German indicators
+  if (/\b(erstellen|machen|hinzufügen|möchte|brauche|kann|wie|danke|hallo|projekt|auch|anwendung|ich|wir|sie|ist)\b/.test(lower)) return 'de'
+  // Default to English
+  return 'en'
+}
+
+interface AILoadingAnimationProps {
+  isVisible: boolean
+  /** The language detected from user's chat messages */
+  chatLanguage?: string
+}
+
+export default function AILoadingAnimation({ isVisible, chatLanguage }: AILoadingAnimationProps) {
   const [messageIndex, setMessageIndex] = useState(0)
   const [elapsed, setElapsed] = useState(0)
+
+  // Get messages for the detected language, fallback to 'en'
+  const messages = useMemo(() => {
+    const lang = chatLanguage || 'en'
+    return MESSAGES_BY_LANG[lang] || MESSAGES_BY_LANG['en']
+  }, [chatLanguage])
 
   useEffect(() => {
     if (!isVisible) {
       setElapsed(0)
+      setMessageIndex(0)
       return
     }
+    // Rotate messages every 5 seconds (slower since we have more messages)
     const interval = setInterval(() => {
-      setMessageIndex(prev => (prev + 1) % MESSAGES.length)
-    }, 4000)
+      setMessageIndex(prev => (prev + 1) % messages.length)
+    }, 5000)
     const timer = setInterval(() => {
       setElapsed(prev => prev + 1)
     }, 1000)
@@ -123,7 +235,7 @@ export default function AILoadingAnimation({ isVisible }: { isVisible: boolean }
       clearInterval(interval)
       clearInterval(timer)
     }
-  }, [isVisible])
+  }, [isVisible, messages])
 
   return (
     <AnimatePresence>
@@ -219,7 +331,7 @@ export default function AILoadingAnimation({ isVisible }: { isVisible: boolean }
                     transition={{ duration: 0.5 }}
                     className="text-sm text-muted-foreground text-center max-w-sm font-medium"
                   >
-                    {MESSAGES[messageIndex].text}
+                    {messages[messageIndex]}
                   </motion.p>
                 </AnimatePresence>
               </div>
@@ -230,3 +342,5 @@ export default function AILoadingAnimation({ isVisible }: { isVisible: boolean }
     </AnimatePresence>
   )
 }
+
+export { detectLanguage }
