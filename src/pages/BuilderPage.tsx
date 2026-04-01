@@ -13,7 +13,7 @@ import TemplateGallery, { type Template } from '@/components/builder/TemplateGal
 import PromptAttachMenu from '@/components/landing/PromptAttachMenu'
 import BuilderToolbar, { type DeviceFrame } from '@/components/builder/BuilderToolbar'
 import CloneDialog from '@/components/builder/CloneDialog'
-import AILoadingAnimation from '@/components/builder/AILoadingAnimation'
+import AILoadingAnimation, { detectLanguage } from '@/components/builder/AILoadingAnimation'
 import logoImg from '@/assets/logo-kubovibe.png'
 
 const DEVICE_WIDTHS: Record<DeviceFrame, string> = {
