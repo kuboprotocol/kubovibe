@@ -45,6 +45,48 @@ export default function BuilderPage() {
   const [deviceFrame, setDeviceFrame] = useState<DeviceFrame>('desktop')
   const [previewKey, setPreviewKey] = useState(0)
 
+  // Minimum loading duration: 95 seconds (1:35)
+  const MIN_LOADING_MS = 95_000
+  const loadingStartRef = useRef<number>(0)
+  const [showLoading, setShowLoading] = useState(false)
+  const generationDoneRef = useRef(false)
+  const pendingSaveRef = useRef<(() => void) | null>(null)
+
+  // Detect chat language from user messages
+  const chatLanguage = useMemo(() => {
+    const userMessages = messages.filter(m => m.role === 'user')
+    if (userMessages.length === 0) return 'pt'
+    const lastMsg = userMessages[userMessages.length - 1].content
+    return detectLanguage(lastMsg)
+  }, [messages])
+
+  // When isLoading becomes true, start the minimum timer
+  useEffect(() => {
+    if (isLoading && !showLoading) {
+      loadingStartRef.current = Date.now()
+      generationDoneRef.current = false
+      pendingSaveRef.current = null
+      setShowLoading(true)
+    }
+    if (!isLoading && showLoading) {
+      generationDoneRef.current = true
+      const elapsed = Date.now() - loadingStartRef.current
+      const remaining = MIN_LOADING_MS - elapsed
+      if (remaining > 0) {
+        const timeout = setTimeout(() => {
+          setShowLoading(false)
+          pendingSaveRef.current?.()
+          pendingSaveRef.current = null
+        }, remaining)
+        return () => clearTimeout(timeout)
+      } else {
+        setShowLoading(false)
+        pendingSaveRef.current?.()
+        pendingSaveRef.current = null
+      }
+    }
+  }, [isLoading])
+
   const chatEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
