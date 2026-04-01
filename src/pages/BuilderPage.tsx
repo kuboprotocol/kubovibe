@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Send, Eye, Loader2, Copy, Check, Code } from 'lucide-react'
@@ -13,7 +13,7 @@ import TemplateGallery, { type Template } from '@/components/builder/TemplateGal
 import PromptAttachMenu from '@/components/landing/PromptAttachMenu'
 import BuilderToolbar, { type DeviceFrame } from '@/components/builder/BuilderToolbar'
 import CloneDialog from '@/components/builder/CloneDialog'
-import AILoadingAnimation from '@/components/builder/AILoadingAnimation'
+import AILoadingAnimation, { detectLanguage } from '@/components/builder/AILoadingAnimation'
 import logoImg from '@/assets/logo-kubovibe.png'
 
 const DEVICE_WIDTHS: Record<DeviceFrame, string> = {
@@ -44,6 +44,48 @@ export default function BuilderPage() {
   const [isCloning, setIsCloning] = useState(false)
   const [deviceFrame, setDeviceFrame] = useState<DeviceFrame>('desktop')
   const [previewKey, setPreviewKey] = useState(0)
+
+  // Minimum loading duration: 95 seconds (1:35)
+  const MIN_LOADING_MS = 95_000
+  const loadingStartRef = useRef<number>(0)
+  const [showLoading, setShowLoading] = useState(false)
+  const generationDoneRef = useRef(false)
+  const pendingSaveRef = useRef<(() => void) | null>(null)
+
+  // Detect chat language from user messages
+  const chatLanguage = useMemo(() => {
+    const userMessages = messages.filter(m => m.role === 'user')
+    if (userMessages.length === 0) return 'pt'
+    const lastMsg = userMessages[userMessages.length - 1].content
+    return detectLanguage(lastMsg)
+  }, [messages])
+
+  // When isLoading becomes true, start the minimum timer
+  useEffect(() => {
+    if (isLoading && !showLoading) {
+      loadingStartRef.current = Date.now()
+      generationDoneRef.current = false
+      pendingSaveRef.current = null
+      setShowLoading(true)
+    }
+    if (!isLoading && showLoading) {
+      generationDoneRef.current = true
+      const elapsed = Date.now() - loadingStartRef.current
+      const remaining = MIN_LOADING_MS - elapsed
+      if (remaining > 0) {
+        const timeout = setTimeout(() => {
+          setShowLoading(false)
+          pendingSaveRef.current?.()
+          pendingSaveRef.current = null
+        }, remaining)
+        return () => clearTimeout(timeout)
+      } else {
+        setShowLoading(false)
+        pendingSaveRef.current?.()
+        pendingSaveRef.current = null
+      }
+    }
+  }, [isLoading])
 
   const chatEndRef = useRef<HTMLDivElement>(null)
 
@@ -351,8 +393,14 @@ export default function BuilderPage() {
         <div className="flex-1 relative bg-muted">
           <AnimatePresence mode="wait">
             {activeTab === 'preview' ? (
-              <motion.div key="preview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 flex items-start justify-center overflow-auto">
-              {generatedCode ? (
+              <motion.div key="preview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 flex items-start justify-center overflow-auto relative">
+                {/* Loading overlay — sits on top of everything */}
+                {showLoading && (
+                  <div className="absolute inset-0 z-20">
+                    <AILoadingAnimation isVisible={showLoading} chatLanguage={chatLanguage} />
+                  </div>
+                )}
+              {generatedCode && !showLoading ? (
                   <div
                     className="w-full h-full"
                     style={{
@@ -376,25 +424,22 @@ export default function BuilderPage() {
                       style={deviceFrame !== 'desktop' ? { borderRadius: '12px' } : {}}
                     />
                   </div>
-                ) : (
+                ) : !showLoading ? (
                   <div className="flex items-center justify-center h-full w-full relative">
-                    <AILoadingAnimation isVisible={isLoading} />
-                    {!isLoading && (
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ duration: 0.5, ease: 'easeOut' }}
-                        className="text-center"
-                      >
-                        <div className="h-16 w-16 rounded-2xl bg-accent flex items-center justify-center mx-auto mb-4">
-                          <Eye className="h-8 w-8 text-accent-foreground" />
-                        </div>
-                        <p className="text-muted-foreground font-medium">Preview will appear here</p>
-                        <p className="text-xs text-muted-foreground mt-1">Describe your app to start building</p>
-                      </motion.div>
-                    )}
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 0.5, ease: 'easeOut' }}
+                      className="text-center"
+                    >
+                      <div className="h-16 w-16 rounded-2xl bg-accent flex items-center justify-center mx-auto mb-4">
+                        <Eye className="h-8 w-8 text-accent-foreground" />
+                      </div>
+                      <p className="text-muted-foreground font-medium">Preview will appear here</p>
+                      <p className="text-xs text-muted-foreground mt-1">Describe your app to start building</p>
+                    </motion.div>
                   </div>
-                )}
+                ) : null}
               </motion.div>
             ) : (
               <motion.div key="code" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 flex flex-col">
