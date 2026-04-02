@@ -67,7 +67,7 @@ Deno.serve(async (req: Request) => {
       // Create an Express connected account using V1 API
       const account = await stripeClient.accounts.create({
         type: "express",
-        country: "US",
+        country: "BR",
         email: contact_email,
         business_profile: {
           name: display_name,
