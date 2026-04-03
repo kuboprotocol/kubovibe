@@ -1,41 +1,148 @@
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, Sparkles, Zap, Shield, QrCode } from 'lucide-react'
+import { ArrowLeft, Sparkles, Zap, Crown, Rocket, Star, Gift, Check } from 'lucide-react'
 import { motion } from 'framer-motion'
-import { QRCodeSVG } from 'qrcode.react'
 import { useAuth } from '@/hooks/useAuth'
-import { useSubscription } from '@/hooks/useSubscription'
 import { supabase } from '@/integrations/supabase/client'
 import { toast } from 'sonner'
+import { useState } from 'react'
 import logoImg from '@/assets/logo-kubovibe.png'
+
+const packages = [
+  {
+    id: '48a38db7-179d-4a7c-8495-ca531b5e63f9',
+    name: 'Free',
+    price: 'R$ 0',
+    priceNum: 0,
+    credits: 5,
+    description: 'Experimente o Kubo Vibe sem compromisso',
+    icon: Gift,
+    badge: '🎁',
+    color: 'from-muted to-secondary',
+    borderColor: 'border-border',
+    isFree: true,
+  },
+  {
+    id: '44f8bdd1-3b20-49b4-8295-6975ebf63f6e',
+    name: 'Starter',
+    price: 'R$ 4,99',
+    priceNum: 4.99,
+    credits: 25,
+    description: 'Ideal para começar',
+    icon: Zap,
+    badge: '⚡',
+    color: 'from-secondary to-muted',
+    borderColor: 'border-border',
+  },
+  {
+    id: '7ee54f24-e872-41a0-b13d-e7f2d1c87f93',
+    name: 'Basic',
+    price: 'R$ 19,99',
+    priceNum: 19.99,
+    credits: 80,
+    description: 'Ótimo custo-benefício',
+    icon: Star,
+    badge: '⭐',
+    color: 'from-secondary to-muted',
+    borderColor: 'border-border',
+  },
+  {
+    id: 'bdc6b8d1-99e2-449d-9d28-20db4fe23ba7',
+    name: 'Pro',
+    price: 'R$ 39,99',
+    priceNum: 39.99,
+    credits: 120,
+    description: 'Para usuários ativos',
+    icon: Crown,
+    badge: '👑',
+    color: 'from-secondary to-muted',
+    borderColor: 'border-primary/30',
+  },
+  {
+    id: 'e64760e9-ee95-440e-af05-a797dc7893d6',
+    name: 'Advanced',
+    price: 'R$ 59,99',
+    priceNum: 59.99,
+    credits: 200,
+    description: 'Equilíbrio entre volume e economia',
+    icon: Sparkles,
+    badge: '⭐',
+    popular: true,
+    color: 'from-primary/20 to-accent',
+    borderColor: 'border-primary/50',
+  },
+  {
+    id: 'a4271d86-0d6d-4c20-a8f8-d9cc8ced0c99',
+    name: 'Elite',
+    price: 'R$ 99,99',
+    priceNum: 99.99,
+    credits: 350,
+    description: 'Máximo desempenho, menor custo por crédito',
+    icon: Rocket,
+    badge: '🚀',
+    bestValue: true,
+    color: 'from-primary/15 to-accent/50',
+    borderColor: 'border-primary/40',
+  },
+]
 
 export default function PricingPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { subscription, refetch } = useSubscription()
+  const [loadingId, setLoadingId] = useState<string | null>(null)
 
-  // PIX payload for static key (phone)
-  const pixKey = '11945794932'
-  const pixPayload = `00020126580014br.gov.bcb.pix0136${pixKey}5204000053039865406005.005802BR5913KUBO VIBE6008SAOPAULO62070503***6304`
+  const handleCheckout = async (pkg: typeof packages[0]) => {
+    if (!user) {
+      navigate('/auth')
+      return
+    }
 
-  const handleActivatePlan = async () => {
-    if (!user) { navigate('/auth'); return }
-    if (subscription?.is_active) { toast.info('Seu plano Beta já está ativo!'); return }
+    if (pkg.isFree) {
+      // Activate free plan directly
+      const { error } = await supabase
+        .from('subscriptions' as any)
+        .upsert({
+          user_id: user.id,
+          plan: 'free',
+          edits_used: 0,
+          edits_limit: 5,
+          is_active: true,
+          paid_at: new Date().toISOString(),
+        } as any, { onConflict: 'user_id' })
 
-    const { error } = await supabase
-      .from('subscriptions' as any)
-      .upsert({
-        user_id: user.id,
-        plan: 'beta',
-        edits_used: 0,
-        edits_limit: 20,
-        is_active: true,
-        paid_at: new Date().toISOString(),
-      } as any, { onConflict: 'user_id' })
+      if (error) {
+        toast.error('Erro ao ativar plano gratuito')
+      } else {
+        toast.success('Plano Free ativado! 🎁 5 créditos disponíveis')
+      }
+      return
+    }
 
-    if (error) { toast.error('Erro ao ativar plano'); return }
-    toast.success('Plano Beta ativado com sucesso! 🎉')
-    await refetch()
+    setLoadingId(pkg.id)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await supabase.functions.invoke('polar-checkout', {
+        body: { product_id: pkg.id },
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      })
+
+      if (res.error) throw new Error(res.error.message)
+      const { checkout_url } = res.data
+      if (checkout_url) {
+        window.location.href = checkout_url
+      } else {
+        toast.error('Erro ao criar checkout')
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao processar pagamento')
+    } finally {
+      setLoadingId(null)
+    }
+  }
+
+  const costPerCredit = (pkg: typeof packages[0]) => {
+    if (pkg.isFree) return '—'
+    return `R$ ${(pkg.priceNum / pkg.credits).toFixed(2)}`
   }
 
   return (
@@ -45,7 +152,7 @@ export default function PricingPage() {
 
       {/* Header */}
       <header className="sticky top-0 z-50 glass glass-border">
-        <div className="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="rounded-xl">
               <ArrowLeft className="h-5 w-5" />
@@ -55,114 +162,131 @@ export default function PricingPage() {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-6 py-16 relative z-10">
-        {/* Motivational quote */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-12 md:py-20 relative z-10">
+        {/* Hero */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-12"
+          className="text-center mb-12 md:mb-16"
         >
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-6">
             <Sparkles className="h-4 w-4 text-primary" />
-            <span className="text-sm font-medium text-primary">Plano Beta Exclusivo</span>
+            <span className="text-sm font-medium text-primary">Pacotes de Créditos</span>
           </div>
-          <h1 className="text-3xl md:text-4xl font-display font-bold text-foreground mb-4">
-            Cada grande ideia começa com um <span className="text-primary">primeiro passo</span>
+          <h1 className="text-3xl md:text-5xl font-display font-bold text-foreground mb-4">
+            Potencialize suas <span className="text-primary">criações</span>
           </h1>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            "O futuro pertence àqueles que acreditam na beleza dos seus sonhos." — Eleanor Roosevelt
+            Escolha o pacote ideal para você. Quanto mais créditos, menor o custo por uso.
           </p>
         </motion.div>
 
-        {/* Plan card */}
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="max-w-lg mx-auto"
-        >
-          <div className="glass glass-border rounded-3xl p-8 shadow-gold">
-            <div className="text-center mb-6">
-              <div className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-accent text-accent-foreground text-xs font-bold mb-4">
-                <Zap className="h-3 w-3" /> BETA
-              </div>
-              <h2 className="text-2xl font-display font-bold text-foreground">Plano Beta</h2>
-              <div className="mt-3">
-                <span className="text-4xl font-display font-bold text-primary">R$ 5</span>
-                <span className="text-muted-foreground">/mês</span>
-              </div>
-            </div>
+        {/* Packages grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-6 max-w-6xl mx-auto">
+          {packages.map((pkg, i) => {
+            const Icon = pkg.icon
+            return (
+              <motion.div
+                key={pkg.id}
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.08 }}
+                className="relative"
+              >
+                {/* Popular / Best Value badge */}
+                {pkg.popular && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10">
+                    <span className="px-4 py-1 rounded-full bg-primary text-primary-foreground text-xs font-bold shadow-lg">
+                      ⭐ Mais popular
+                    </span>
+                  </div>
+                )}
+                {pkg.bestValue && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10">
+                    <span className="px-4 py-1 rounded-full bg-primary text-primary-foreground text-xs font-bold shadow-lg">
+                      🚀 Melhor valor
+                    </span>
+                  </div>
+                )}
 
-            <ul className="space-y-3 mb-8">
-              {[
-                '20 edições por mês',
-                'Acesso ao Builder completo',
-                'Templates exclusivos',
-                'Suporte da comunidade',
-              ].map((feature) => (
-                <li key={feature} className="flex items-center gap-3 text-sm text-foreground">
-                  <Shield className="h-4 w-4 text-primary flex-shrink-0" />
-                  {feature}
-                </li>
-              ))}
-            </ul>
+                <div
+                  className={`h-full glass rounded-2xl p-6 border ${pkg.borderColor} transition-all duration-300 hover:scale-[1.02] hover:shadow-xl ${
+                    pkg.popular ? 'ring-2 ring-primary/50 shadow-gold' : ''
+                  } ${pkg.bestValue ? 'ring-1 ring-primary/30' : ''}`}
+                >
+                  {/* Header */}
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${pkg.color} flex items-center justify-center`}>
+                      <Icon className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="font-display font-bold text-foreground text-lg">{pkg.name}</h3>
+                    </div>
+                  </div>
 
-            {/* PIX QR Code */}
-            <div className="bg-secondary/50 rounded-2xl p-6 mb-6">
-              <div className="flex items-center justify-center gap-2 mb-4">
-                <QrCode className="h-5 w-5 text-primary" />
-                <h3 className="font-display font-bold text-foreground">Pague via PIX</h3>
-              </div>
-              <div className="flex justify-center mb-4">
-                <div className="bg-background p-4 rounded-xl">
-                  <QRCodeSVG
-                    value={pixPayload}
-                    size={200}
-                    bgColor="#ffffff"
-                    fgColor="#000000"
-                    level="M"
-                  />
+                  {/* Price */}
+                  <div className="mb-4">
+                    <span className="text-3xl font-display font-bold text-foreground">{pkg.price}</span>
+                  </div>
+
+                  {/* Credits highlight */}
+                  <div className="bg-primary/10 rounded-xl px-4 py-3 mb-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Créditos</span>
+                      <span className="text-2xl font-display font-bold text-primary">{pkg.credits}</span>
+                    </div>
+                  </div>
+
+                  {/* Features */}
+                  <ul className="space-y-2 mb-6">
+                    <li className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Check className="h-4 w-4 text-primary flex-shrink-0" />
+                      {pkg.description}
+                    </li>
+                    <li className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Check className="h-4 w-4 text-primary flex-shrink-0" />
+                      Custo por crédito: <span className="font-semibold text-foreground">{costPerCredit(pkg)}</span>
+                    </li>
+                    <li className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Check className="h-4 w-4 text-primary flex-shrink-0" />
+                      Acesso ao Builder completo
+                    </li>
+                  </ul>
+
+                  {/* CTA */}
+                  <Button
+                    variant={pkg.popular || pkg.bestValue ? 'hero' : 'outline'}
+                    className="w-full h-11 rounded-xl text-sm font-semibold"
+                    onClick={() => handleCheckout(pkg)}
+                    disabled={loadingId === pkg.id}
+                  >
+                    {loadingId === pkg.id
+                      ? 'Processando...'
+                      : pkg.isFree
+                        ? 'Começar grátis'
+                        : `Comprar ${pkg.credits} créditos`}
+                  </Button>
                 </div>
-              </div>
-              <p className="text-center text-xs text-muted-foreground">
-                Chave PIX (Telefone): <span className="font-mono text-foreground">{pixKey}</span>
-              </p>
-              <p className="text-center text-xs text-muted-foreground mt-1">
-                Valor: <span className="font-bold text-primary">R$ 5,00</span>
-              </p>
-            </div>
+              </motion.div>
+            )
+          })}
+        </div>
 
-            <Button
-              variant="hero"
-              className="w-full h-12 rounded-xl text-sm font-semibold"
-              onClick={handleActivatePlan}
-            >
-              {subscription?.is_active ? 'Plano já ativo ✓' : 'Já paguei — Ativar meu plano'}
-            </Button>
-
-            {subscription?.is_active && (
-              <p className="text-center text-xs text-muted-foreground mt-3">
-                Edições restantes: <span className="font-bold text-primary">{subscription.edits_limit - subscription.edits_used}</span> de {subscription.edits_limit}
-              </p>
-            )}
-          </div>
-        </motion.div>
-
-        {/* Thank you message */}
+        {/* Bottom message */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.3 }}
-          className="text-center mt-12"
+          transition={{ delay: 0.5 }}
+          className="text-center mt-12 md:mt-16"
         >
-          <div className="glass glass-border rounded-2xl p-6 max-w-lg mx-auto">
+          <div className="glass glass-border rounded-2xl p-6 max-w-2xl mx-auto">
             <Sparkles className="h-8 w-8 text-primary mx-auto mb-3" />
             <h3 className="font-display font-bold text-foreground text-lg mb-2">
-              Obrigado por investir no KUBO VIBE! 💛
+              Kubo Vibe — Web3 Super App 💛
             </h3>
             <p className="text-sm text-muted-foreground">
-              Você faz parte do início de algo incrível. Cada contribuição nos ajuda a construir 
-              a plataforma dos sonhos para criadores como você. Juntos, vamos transformar ideias em realidade!
+              Integra wallets, dApps e experiências gamificadas em um único ecossistema.
+              Simplifica o blockchain e permite crescimento escalável com monetização sustentável.
             </p>
           </div>
         </motion.div>
