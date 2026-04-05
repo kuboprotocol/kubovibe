@@ -252,7 +252,7 @@ export default function PricingPage() {
                     </li>
                     <li className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Check className="h-4 w-4 text-primary flex-shrink-0" />
-                      Acesso ao Builder completo
+                      Full Builder access
                     </li>
                   </ul>
 
