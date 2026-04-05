@@ -111,9 +111,9 @@ export default function PricingPage() {
         } as any, { onConflict: 'user_id' })
 
       if (error) {
-        toast.error('Erro ao ativar plano gratuito')
+        toast.error('Error activating free plan')
       } else {
-        toast.success('Plano Free ativado! 🎁 5 créditos disponíveis')
+        toast.success('Free plan activated! 🎁 5 credits available')
       }
       return
     }
