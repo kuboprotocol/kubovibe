@@ -131,7 +131,7 @@ export default function PricingPage() {
       if (checkout_url) {
         window.location.href = checkout_url
       } else {
-        toast.error('Erro ao criar checkout')
+        toast.error('Error creating checkout')
       }
     } catch (err: any) {
       toast.error(err.message || 'Erro ao processar pagamento')
