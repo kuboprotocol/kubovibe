@@ -142,7 +142,7 @@ export default function PricingPage() {
 
   const costPerCredit = (pkg: typeof packages[0]) => {
     if (pkg.isFree) return '—'
-    return `R$ ${(pkg.priceNum / pkg.credits).toFixed(2)}`
+    return `$${(pkg.priceNum / pkg.credits).toFixed(2)}`
   }
 
   return (
