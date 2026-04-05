@@ -12,10 +12,10 @@ const packages = [
   {
     id: '48a38db7-179d-4a7c-8495-ca531b5e63f9',
     name: 'Free',
-    price: 'R$ 0',
+    price: '$0',
     priceNum: 0,
     credits: 5,
-    description: 'Experimente o Kubo Vibe sem compromisso',
+    description: 'Try Kubo Vibe with no commitment',
     icon: Gift,
     badge: '🎁',
     color: 'from-muted to-secondary',
@@ -25,10 +25,10 @@ const packages = [
   {
     id: '44f8bdd1-3b20-49b4-8295-6975ebf63f6e',
     name: 'Starter',
-    price: 'R$ 4,99',
+    price: '$4.99',
     priceNum: 4.99,
     credits: 25,
-    description: 'Ideal para começar',
+    description: 'Ideal to get started',
     icon: Zap,
     badge: '⚡',
     color: 'from-secondary to-muted',
@@ -37,10 +37,10 @@ const packages = [
   {
     id: '7ee54f24-e872-41a0-b13d-e7f2d1c87f93',
     name: 'Basic',
-    price: 'R$ 19,99',
+    price: '$19.99',
     priceNum: 19.99,
     credits: 80,
-    description: 'Ótimo custo-benefício',
+    description: 'Great cost-benefit ratio',
     icon: Star,
     badge: '⭐',
     color: 'from-secondary to-muted',
@@ -49,10 +49,10 @@ const packages = [
   {
     id: 'bdc6b8d1-99e2-449d-9d28-20db4fe23ba7',
     name: 'Pro',
-    price: 'R$ 39,99',
+    price: '$39.99',
     priceNum: 39.99,
     credits: 120,
-    description: 'Para usuários ativos',
+    description: 'For active users',
     icon: Crown,
     badge: '👑',
     color: 'from-secondary to-muted',
@@ -61,10 +61,10 @@ const packages = [
   {
     id: 'e64760e9-ee95-440e-af05-a797dc7893d6',
     name: 'Advanced',
-    price: 'R$ 59,99',
+    price: '$59.99',
     priceNum: 59.99,
     credits: 200,
-    description: 'Equilíbrio entre volume e economia',
+    description: 'Balance between volume and savings',
     icon: Sparkles,
     badge: '⭐',
     popular: true,
@@ -74,10 +74,10 @@ const packages = [
   {
     id: 'a4271d86-0d6d-4c20-a8f8-d9cc8ced0c99',
     name: 'Elite',
-    price: 'R$ 99,99',
+    price: '$99.99',
     priceNum: 99.99,
     credits: 350,
-    description: 'Máximo desempenho, menor custo por crédito',
+    description: 'Maximum performance, lowest cost per credit',
     icon: Rocket,
     badge: '🚀',
     bestValue: true,
@@ -111,9 +111,9 @@ export default function PricingPage() {
         } as any, { onConflict: 'user_id' })
 
       if (error) {
-        toast.error('Erro ao ativar plano gratuito')
+        toast.error('Error activating free plan')
       } else {
-        toast.success('Plano Free ativado! 🎁 5 créditos disponíveis')
+        toast.success('Free plan activated! 🎁 5 credits available')
       }
       return
     }
@@ -131,10 +131,10 @@ export default function PricingPage() {
       if (checkout_url) {
         window.location.href = checkout_url
       } else {
-        toast.error('Erro ao criar checkout')
+        toast.error('Error creating checkout')
       }
     } catch (err: any) {
-      toast.error(err.message || 'Erro ao processar pagamento')
+      toast.error(err.message || 'Error processing payment')
     } finally {
       setLoadingId(null)
     }
@@ -142,7 +142,7 @@ export default function PricingPage() {
 
   const costPerCredit = (pkg: typeof packages[0]) => {
     if (pkg.isFree) return '—'
-    return `R$ ${(pkg.priceNum / pkg.credits).toFixed(2)}`
+    return `$${(pkg.priceNum / pkg.credits).toFixed(2)}`
   }
 
   return (
@@ -171,13 +171,16 @@ export default function PricingPage() {
         >
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-6">
             <Sparkles className="h-4 w-4 text-primary" />
-            <span className="text-sm font-medium text-primary">Pacotes de Créditos</span>
+            <span className="text-sm font-medium text-primary">Credit Packages</span>
           </div>
           <h1 className="text-3xl md:text-5xl font-display font-bold text-foreground mb-4">
-            Potencialize suas <span className="text-primary">criações</span>
+            Supercharge your <span className="text-primary">creations</span>
           </h1>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            Escolha o pacote ideal para você. Quanto mais créditos, menor o custo por uso.
+            Choose the ideal package for you. More credits = lower cost per use.
+          </p>
+          <p className="text-muted-foreground/70 text-sm mt-2">
+            Prices in USD — local currency shown at checkout
           </p>
         </motion.div>
 
@@ -197,14 +200,14 @@ export default function PricingPage() {
                 {pkg.popular && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10">
                     <span className="px-4 py-1 rounded-full bg-primary text-primary-foreground text-xs font-bold shadow-lg">
-                      ⭐ Mais popular
+                      ⭐ Most popular
                     </span>
                   </div>
                 )}
                 {pkg.bestValue && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10">
                     <span className="px-4 py-1 rounded-full bg-primary text-primary-foreground text-xs font-bold shadow-lg">
-                      🚀 Melhor valor
+                      🚀 Best value
                     </span>
                   </div>
                 )}
@@ -232,7 +235,7 @@ export default function PricingPage() {
                   {/* Credits highlight */}
                   <div className="bg-primary/10 rounded-xl px-4 py-3 mb-4">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Créditos</span>
+                      <span className="text-sm text-muted-foreground">Credits</span>
                       <span className="text-2xl font-display font-bold text-primary">{pkg.credits}</span>
                     </div>
                   </div>
@@ -245,11 +248,11 @@ export default function PricingPage() {
                     </li>
                     <li className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Check className="h-4 w-4 text-primary flex-shrink-0" />
-                      Custo por crédito: <span className="font-semibold text-foreground">{costPerCredit(pkg)}</span>
+                      Cost per credit: <span className="font-semibold text-foreground">{costPerCredit(pkg)}</span>
                     </li>
                     <li className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Check className="h-4 w-4 text-primary flex-shrink-0" />
-                      Acesso ao Builder completo
+                      Full Builder access
                     </li>
                   </ul>
 
@@ -261,10 +264,10 @@ export default function PricingPage() {
                     disabled={loadingId === pkg.id}
                   >
                     {loadingId === pkg.id
-                      ? 'Processando...'
+                      ? 'Processing...'
                       : pkg.isFree
-                        ? 'Começar grátis'
-                        : `Comprar ${pkg.credits} créditos`}
+                        ? 'Start free'
+                        : `Buy ${pkg.credits} credits`}
                   </Button>
                 </div>
               </motion.div>
@@ -285,8 +288,8 @@ export default function PricingPage() {
               Kubo Vibe — Web3 Super App 💛
             </h3>
             <p className="text-sm text-muted-foreground">
-              Integra wallets, dApps e experiências gamificadas em um único ecossistema.
-              Simplifica o blockchain e permite crescimento escalável com monetização sustentável.
+              Integrates wallets, dApps and gamified experiences in a single ecosystem.
+              Simplifies blockchain and enables scalable growth with sustainable monetization.
             </p>
           </div>
         </motion.div>
