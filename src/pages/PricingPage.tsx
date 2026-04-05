@@ -235,7 +235,7 @@ export default function PricingPage() {
                   {/* Credits highlight */}
                   <div className="bg-primary/10 rounded-xl px-4 py-3 mb-4">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Créditos</span>
+                      <span className="text-sm text-muted-foreground">Credits</span>
                       <span className="text-2xl font-display font-bold text-primary">{pkg.credits}</span>
                     </div>
                   </div>
