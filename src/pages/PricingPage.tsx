@@ -134,7 +134,7 @@ export default function PricingPage() {
         toast.error('Error creating checkout')
       }
     } catch (err: any) {
-      toast.error(err.message || 'Erro ao processar pagamento')
+      toast.error(err.message || 'Error processing payment')
     } finally {
       setLoadingId(null)
     }
