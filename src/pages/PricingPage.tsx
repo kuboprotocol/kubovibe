@@ -264,10 +264,10 @@ export default function PricingPage() {
                     disabled={loadingId === pkg.id}
                   >
                     {loadingId === pkg.id
-                      ? 'Processando...'
+                      ? 'Processing...'
                       : pkg.isFree
-                        ? 'Começar grátis'
-                        : `Comprar ${pkg.credits} créditos`}
+                        ? 'Start free'
+                        : `Buy ${pkg.credits} credits`}
                   </Button>
                 </div>
               </motion.div>
