@@ -288,8 +288,8 @@ export default function PricingPage() {
               Kubo Vibe — Web3 Super App 💛
             </h3>
             <p className="text-sm text-muted-foreground">
-              Integra wallets, dApps e experiências gamificadas em um único ecossistema.
-              Simplifica o blockchain e permite crescimento escalável com monetização sustentável.
+              Integrates wallets, dApps and gamified experiences in a single ecosystem.
+              Simplifies blockchain and enables scalable growth with sustainable monetization.
             </p>
           </div>
         </motion.div>
