@@ -200,7 +200,7 @@ export default function PricingPage() {
                 {pkg.popular && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10">
                     <span className="px-4 py-1 rounded-full bg-primary text-primary-foreground text-xs font-bold shadow-lg">
-                      ⭐ Mais popular
+                      ⭐ Most popular
                     </span>
                   </div>
                 )}
