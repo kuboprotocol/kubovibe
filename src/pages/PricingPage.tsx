@@ -171,13 +171,16 @@ export default function PricingPage() {
         >
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-6">
             <Sparkles className="h-4 w-4 text-primary" />
-            <span className="text-sm font-medium text-primary">Pacotes de Créditos</span>
+            <span className="text-sm font-medium text-primary">Credit Packages</span>
           </div>
           <h1 className="text-3xl md:text-5xl font-display font-bold text-foreground mb-4">
-            Potencialize suas <span className="text-primary">criações</span>
+            Supercharge your <span className="text-primary">creations</span>
           </h1>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            Escolha o pacote ideal para você. Quanto mais créditos, menor o custo por uso.
+            Choose the ideal package for you. More credits = lower cost per use.
+          </p>
+          <p className="text-muted-foreground/70 text-sm mt-2">
+            Prices in USD — local currency shown at checkout
           </p>
         </motion.div>
 
