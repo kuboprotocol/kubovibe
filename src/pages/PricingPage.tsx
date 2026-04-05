@@ -248,7 +248,7 @@ export default function PricingPage() {
                     </li>
                     <li className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Check className="h-4 w-4 text-primary flex-shrink-0" />
-                      Custo por crédito: <span className="font-semibold text-foreground">{costPerCredit(pkg)}</span>
+                      Cost per credit: <span className="font-semibold text-foreground">{costPerCredit(pkg)}</span>
                     </li>
                     <li className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Check className="h-4 w-4 text-primary flex-shrink-0" />
