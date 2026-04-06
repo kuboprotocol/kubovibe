@@ -49,6 +49,23 @@ export default function BuilderPage() {
   const [previewKey, setPreviewKey] = useState(0)
   const [attachedFiles, setAttachedFiles] = useState<UploadedFile[]>([])
   const [uploadProgress, setUploadProgress] = useState<number | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
+
+  const handleFileUpload = useCallback(async (file: File) => {
+    const validationError = validateFile(file)
+    if (validationError) { toast.error(validationError); return }
+    if (!user) { toast.error('Faça login primeiro'); return }
+    try {
+      setUploadProgress(0)
+      const uploaded = await uploadFile(file, user.id, setUploadProgress)
+      setAttachedFiles(prev => [...prev, uploaded])
+      toast.success(`"${file.name}" enviado!`)
+    } catch (err: any) {
+      toast.error(err.message || 'Erro no upload')
+    } finally {
+      setUploadProgress(null)
+    }
+  }, [user])
 
   // Minimum loading duration: 95 seconds (1:35)
   const MIN_LOADING_MS = 95_000
