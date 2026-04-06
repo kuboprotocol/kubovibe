@@ -16,6 +16,7 @@ export interface UploadedFile {
   url: string
   name: string
   size: number
+  originalSize: number
   mimeType: string
   category: FileCategory
   path: string
@@ -137,6 +138,7 @@ export async function uploadFile(
     url: urlData.publicUrl,
     name: file.name,
     size: processedFile.size,
+    originalSize: file.size,
     mimeType: processedFile.type,
     category: getFileCategory(file.type),
     path,
