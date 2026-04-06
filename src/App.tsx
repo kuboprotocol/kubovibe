@@ -17,6 +17,7 @@ import NotFound from "./pages/NotFound";
 import PricingPage from "./pages/PricingPage";
 import SupportPage from "./pages/SupportPage";
 import ConnectPage from "./pages/ConnectPage";
+import PublicAppPage from "./pages/PublicAppPage";
 
 const queryClient = new QueryClient();
 
@@ -40,6 +41,8 @@ const App = () => (
             <Route path="/builder/:projectId" element={<ProtectedRoute><BuilderPage /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
             <Route path="/connect" element={<ProtectedRoute><ConnectPage /></ProtectedRoute>} />
+            <Route path="/app/:projectId" element={<PublicAppPage />} />
+            <Route path="/app/:projectId/:slug" element={<PublicAppPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
