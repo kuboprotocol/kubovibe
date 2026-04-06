@@ -14,6 +14,9 @@ import PromptAttachMenu from '@/components/landing/PromptAttachMenu'
 import BuilderToolbar, { type DeviceFrame } from '@/components/builder/BuilderToolbar'
 import CloneDialog from '@/components/builder/CloneDialog'
 import AILoadingAnimation, { detectLanguage } from '@/components/builder/AILoadingAnimation'
+import FilePreview from '@/components/builder/FilePreview'
+import { uploadFile, validateFile, getAllAllowedTypes, type UploadedFile } from '@/lib/fileUpload'
+import { Progress } from '@/components/ui/progress'
 import logoImg from '@/assets/logo-kubovibe.png'
 
 const DEVICE_WIDTHS: Record<DeviceFrame, string> = {
