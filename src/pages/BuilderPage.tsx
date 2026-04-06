@@ -47,6 +47,8 @@ export default function BuilderPage() {
   const [isCloning, setIsCloning] = useState(false)
   const [deviceFrame, setDeviceFrame] = useState<DeviceFrame>('desktop')
   const [previewKey, setPreviewKey] = useState(0)
+  const [attachedFiles, setAttachedFiles] = useState<UploadedFile[]>([])
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null)
 
   // Minimum loading duration: 95 seconds (1:35)
   const MIN_LOADING_MS = 95_000
