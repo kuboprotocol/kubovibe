@@ -454,21 +454,7 @@ export default function BuilderPage() {
             )}
             <div className="flex items-end gap-2">
               <PromptAttachMenu
-                onAttachFile={async (file) => {
-                  const validationError = validateFile(file)
-                  if (validationError) { toast.error(validationError); return }
-                  if (!user) { toast.error('Faça login primeiro'); return }
-                  try {
-                    setUploadProgress(0)
-                    const uploaded = await uploadFile(file, user.id, setUploadProgress)
-                    setAttachedFiles(prev => [...prev, uploaded])
-                    toast.success(`"${file.name}" enviado!`)
-                  } catch (err: any) {
-                    toast.error(err.message || 'Erro no upload')
-                  } finally {
-                    setUploadProgress(null)
-                  }
-                }}
+                onAttachFile={handleFileUpload}
                 onScreenshot={() => toast.info('Screenshot functionality coming soon')}
                 onAddReference={(url) => {
                   setInput(prev => prev + `\n[Reference: ${url}]`)
