@@ -16,6 +16,7 @@ export interface UploadedFile {
   url: string
   name: string
   size: number
+  originalSize: number
   mimeType: string
   category: FileCategory
   path: string
