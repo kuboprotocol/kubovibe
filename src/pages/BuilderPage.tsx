@@ -464,7 +464,16 @@ export default function BuilderPage() {
               <div className="relative flex-1">
                 <textarea value={input} onChange={(e) => setInput(e.target.value)} placeholder="Describe your app..." rows={2}
                   className="w-full resize-none bg-secondary rounded-xl px-4 py-3 pr-12 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }} />
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
+                  onPaste={(e) => {
+                    const items = Array.from(e.clipboardData.items)
+                    const imageItem = items.find(item => item.type.startsWith('image/'))
+                    if (imageItem) {
+                      e.preventDefault()
+                      const file = imageItem.getAsFile()
+                      if (file) handleFileUpload(file)
+                    }
+                  }} />
                 <Button size="icon" variant="hero" className="absolute right-2 bottom-2 h-8 w-8 rounded-lg" onClick={send} disabled={isLoading || !input.trim()}>
                   {isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
                 </Button>
