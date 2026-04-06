@@ -353,7 +353,24 @@ export default function BuilderPage() {
       {/* Main content */}
       <div className="flex-1 flex min-h-0">
         {/* Chat panel */}
-        <div className="w-[380px] flex flex-col border-r border-border/50 bg-card/50 backdrop-blur-sm">
+        <div
+          className={`w-[380px] flex flex-col border-r border-border/50 bg-card/50 backdrop-blur-sm relative transition-colors ${isDragging ? 'bg-primary/5' : ''}`}
+          onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true) }}
+          onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false) }}
+          onDrop={(e) => {
+            e.preventDefault(); e.stopPropagation(); setIsDragging(false)
+            const files = Array.from(e.dataTransfer.files)
+            files.forEach(handleFileUpload)
+          }}
+        >
+          {isDragging && (
+            <div className="absolute inset-0 z-30 flex items-center justify-center bg-background/80 backdrop-blur-sm border-2 border-dashed border-primary rounded-lg pointer-events-none">
+              <div className="text-center">
+                <p className="text-primary font-medium text-sm">Solte o arquivo aqui</p>
+                <p className="text-muted-foreground text-xs mt-1">Imagem, vídeo, áudio, PDF, DOC, ZIP</p>
+              </div>
+            </div>
+          )}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {messages.length === 0 && (
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center text-center pt-12 px-4">
