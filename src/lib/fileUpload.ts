@@ -52,6 +52,51 @@ export function validateFile(file: File): string | null {
   return null
 }
 
+const COMPRESS_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+const COMPRESS_MAX_WIDTH = 1920
+const COMPRESS_QUALITY = 0.8
+
+async function compressImage(file: File): Promise<File> {
+  if (!COMPRESS_TYPES.includes(file.type)) return file
+  // Skip small images (< 200KB)
+  if (file.size < 200 * 1024) return file
+
+  return new Promise((resolve) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      let { width, height } = img
+      if (width > COMPRESS_MAX_WIDTH) {
+        height = Math.round((height * COMPRESS_MAX_WIDTH) / width)
+        width = COMPRESS_MAX_WIDTH
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')!
+      ctx.drawImage(img, 0, 0, width, height)
+
+      const outputType = file.type === 'image/png' ? 'image/webp' : file.type
+      canvas.toBlob(
+        (blob) => {
+          if (blob && blob.size < file.size) {
+            const ext = outputType === 'image/webp' ? '.webp' : file.name.substring(file.name.lastIndexOf('.'))
+            const name = file.name.replace(/\.[^.]+$/, ext)
+            resolve(new File([blob], name, { type: outputType }))
+          } else {
+            resolve(file) // Keep original if compressed is larger
+          }
+        },
+        outputType,
+        COMPRESS_QUALITY
+      )
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file) }
+    img.src = url
+  })
+}
+
 export async function uploadFile(
   file: File,
   userId: string,
@@ -60,16 +105,21 @@ export async function uploadFile(
   const error = validateFile(file)
   if (error) throw new Error(error)
 
-  const safeName = sanitizeFileName(file.name)
+  onProgress?.(5)
+
+  // Compress images before upload
+  const processedFile = await compressImage(file)
+
+  onProgress?.(15)
+
+  const safeName = sanitizeFileName(processedFile.name)
   const timestamp = Date.now()
   const path = `${userId}/${timestamp}_${safeName}`
 
-  onProgress?.(10)
-
   const { error: uploadError } = await supabase.storage
     .from('uploads')
-    .upload(path, file, {
-      contentType: file.type,
+    .upload(path, processedFile, {
+      contentType: processedFile.type,
       upsert: false,
     })
 
@@ -86,8 +136,8 @@ export async function uploadFile(
   return {
     url: urlData.publicUrl,
     name: file.name,
-    size: file.size,
-    mimeType: file.type,
+    size: processedFile.size,
+    mimeType: processedFile.type,
     category: getFileCategory(file.type),
     path,
   }
