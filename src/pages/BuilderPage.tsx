@@ -14,6 +14,9 @@ import PromptAttachMenu from '@/components/landing/PromptAttachMenu'
 import BuilderToolbar, { type DeviceFrame } from '@/components/builder/BuilderToolbar'
 import CloneDialog from '@/components/builder/CloneDialog'
 import AILoadingAnimation, { detectLanguage } from '@/components/builder/AILoadingAnimation'
+import FilePreview from '@/components/builder/FilePreview'
+import { uploadFile, validateFile, getAllAllowedTypes, type UploadedFile } from '@/lib/fileUpload'
+import { Progress } from '@/components/ui/progress'
 import logoImg from '@/assets/logo-kubovibe.png'
 
 const DEVICE_WIDTHS: Record<DeviceFrame, string> = {
@@ -44,6 +47,8 @@ export default function BuilderPage() {
   const [isCloning, setIsCloning] = useState(false)
   const [deviceFrame, setDeviceFrame] = useState<DeviceFrame>('desktop')
   const [previewKey, setPreviewKey] = useState(0)
+  const [attachedFiles, setAttachedFiles] = useState<UploadedFile[]>([])
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null)
 
   // Minimum loading duration: 95 seconds (1:35)
   const MIN_LOADING_MS = 95_000
@@ -188,9 +193,15 @@ export default function BuilderPage() {
       return
     }
     await incrementEdit()
-    const userMsg: Msg = { role: 'user', content: input }
+    // Build content with attached file URLs
+    let content = input
+    if (attachedFiles.length > 0) {
+      const fileRefs = attachedFiles.map(f => `[${f.category}: ${f.name}](${f.url})`).join('\n')
+      content = `${input}\n\nArquivos anexados:\n${fileRefs}`
+    }
+    const userMsg: Msg = { role: 'user', content }
     const newMessages = [...messages, userMsg]
-    setMessages(newMessages); setInput(''); setIsLoading(true)
+    setMessages(newMessages); setInput(''); setAttachedFiles([]); setIsLoading(true)
     let assistantSoFar = ''
     let finalMessages = newMessages
 
@@ -349,7 +360,36 @@ export default function BuilderPage() {
                     <div className="prose prose-sm max-w-none text-secondary-foreground [&_pre]:hidden [&_code]:hidden">
                       <ReactMarkdown>{msg.content.replace(/```[\s\S]*?```/g, '').replace(/<[^>]*>/g, '').trim() || 'Generating your app...'}</ReactMarkdown>
                     </div>
-                  ) : msg.content}
+                  ) : (
+                    <div>
+                      <p>{msg.content.replace(/\n\nArquivos anexados:\n[\s\S]*$/, '')}</p>
+                      {msg.content.includes('Arquivos anexados:') && (
+                        <div className="mt-2 space-y-1">
+                          {msg.content
+                            .match(/\[(\w+): ([^\]]+)\]\(([^)]+)\)/g)
+                            ?.map((match, j) => {
+                              const parts = match.match(/\[(\w+): ([^\]]+)\]\(([^)]+)\)/)
+                              if (!parts) return null
+                              const [, category, name, url] = parts
+                              return (
+                                <FilePreview
+                                  key={j}
+                                  file={{
+                                    url,
+                                    name,
+                                    size: 0,
+                                    mimeType: '',
+                                    category: category as any,
+                                    path: '',
+                                  }}
+                                  compact
+                                />
+                              )
+                            })}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </motion.div>
             ))}
@@ -364,12 +404,36 @@ export default function BuilderPage() {
             <div ref={chatEndRef} />
           </div>
 
-          <div className="p-3 border-t border-border">
+          <div className="p-3 border-t border-border space-y-2">
+            {uploadProgress !== null && (
+              <div className="flex items-center gap-2 px-1">
+                <Progress value={uploadProgress} className="h-1.5 flex-1" />
+                <span className="text-[10px] text-muted-foreground">{uploadProgress}%</span>
+              </div>
+            )}
+            {attachedFiles.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 px-1">
+                {attachedFiles.map((f, i) => (
+                  <FilePreview key={i} file={f} compact />
+                ))}
+              </div>
+            )}
             <div className="flex items-end gap-2">
               <PromptAttachMenu
-                onAttachFile={(file) => {
-                  setInput(prev => prev + `\n[Attached: ${file.name}]`)
-                  toast.success(`Arquivo "${file.name}" anexado`)
+                onAttachFile={async (file) => {
+                  const validationError = validateFile(file)
+                  if (validationError) { toast.error(validationError); return }
+                  if (!user) { toast.error('Faça login primeiro'); return }
+                  try {
+                    setUploadProgress(0)
+                    const uploaded = await uploadFile(file, user.id, setUploadProgress)
+                    setAttachedFiles(prev => [...prev, uploaded])
+                    toast.success(`"${file.name}" enviado!`)
+                  } catch (err: any) {
+                    toast.error(err.message || 'Erro no upload')
+                  } finally {
+                    setUploadProgress(null)
+                  }
                 }}
                 onScreenshot={() => toast.info('Screenshot functionality coming soon')}
                 onAddReference={(url) => {

@@ -153,7 +153,7 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
         ref={fileInputRef}
         onChange={handleFileChange}
         className="hidden"
-        accept="image/*,.pdf,.txt,.md"
+        accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.zip,.rar"
       />
       
       <Popover open={open} onOpenChange={setOpen}>
