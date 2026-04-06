@@ -49,6 +49,8 @@ export default function BuilderPage() {
   const [previewKey, setPreviewKey] = useState(0)
   const [attachedFiles, setAttachedFiles] = useState<UploadedFile[]>([])
   const [uploadProgress, setUploadProgress] = useState<number | null>(null)
+  const [isPublished, setIsPublished] = useState(false)
+  const [publishedUrl, setPublishedUrl] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
 
   const handleFileUpload = useCallback(async (file: File) => {
