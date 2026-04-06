@@ -193,9 +193,15 @@ export default function BuilderPage() {
       return
     }
     await incrementEdit()
-    const userMsg: Msg = { role: 'user', content: input }
+    // Build content with attached file URLs
+    let content = input
+    if (attachedFiles.length > 0) {
+      const fileRefs = attachedFiles.map(f => `[${f.category}: ${f.name}](${f.url})`).join('\n')
+      content = `${input}\n\nArquivos anexados:\n${fileRefs}`
+    }
+    const userMsg: Msg = { role: 'user', content }
     const newMessages = [...messages, userMsg]
-    setMessages(newMessages); setInput(''); setIsLoading(true)
+    setMessages(newMessages); setInput(''); setAttachedFiles([]); setIsLoading(true)
     let assistantSoFar = ''
     let finalMessages = newMessages
 
