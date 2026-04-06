@@ -49,6 +49,8 @@ export default function BuilderPage() {
   const [previewKey, setPreviewKey] = useState(0)
   const [attachedFiles, setAttachedFiles] = useState<UploadedFile[]>([])
   const [uploadProgress, setUploadProgress] = useState<number | null>(null)
+  const [isPublished, setIsPublished] = useState(false)
+  const [publishedUrl, setPublishedUrl] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
 
   const handleFileUpload = useCallback(async (file: File) => {
@@ -169,6 +171,8 @@ export default function BuilderPage() {
     setGeneratedCode(data.generated_code || '')
     setMessages((data.messages as Msg[]) || [])
     setCurrentProjectId(id)
+    setIsPublished((data as any).is_published || false)
+    setPublishedUrl((data as any).published_url || null)
   }
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
@@ -330,6 +334,25 @@ export default function BuilderPage() {
     }
   }
 
+  const handlePublish = async (): Promise<string | null> => {
+    if (!user || !generatedCode) return null
+    await saveProject(generatedCode, messages)
+    const slug = projectTitle.replace(/[^a-z0-9]/gi, '-').toLowerCase().slice(0, 40)
+    const pid = currentProjectId || 'draft'
+    const url = `https://kubovibe.lovable.app/app/${pid}/${slug}`
+    const { error } = await supabase.from('projects').update({
+      is_published: true,
+      published_url: url,
+      published_at: new Date().toISOString(),
+    } as any).eq('id', pid)
+    if (!error) {
+      setIsPublished(true)
+      setPublishedUrl(url)
+      return url
+    }
+    return null
+  }
+
   const suggestions = [
     'A task management app with drag & drop',
     'A weather dashboard with live data',
@@ -351,11 +374,14 @@ export default function BuilderPage() {
         onDownload={handleDownload}
         onShowTemplates={() => setShowTemplates(true)}
         onCloneSite={() => setShowCloneDialog(true)}
+        onPublish={handlePublish}
         saving={saving}
         hasCode={!!generatedCode}
         editsRemaining={editsRemaining}
         isSubscribed={!!subscription?.is_active}
         generatedCode={generatedCode}
+        isPublished={isPublished}
+        publishedUrl={publishedUrl}
       />
 
       {/* Main content */}

@@ -113,7 +113,10 @@ export type Database = {
           description: string | null
           generated_code: string | null
           id: string
+          is_published: boolean
           messages: Json | null
+          published_at: string | null
+          published_url: string | null
           title: string
           updated_at: string
           user_id: string
@@ -123,7 +126,10 @@ export type Database = {
           description?: string | null
           generated_code?: string | null
           id?: string
+          is_published?: boolean
           messages?: Json | null
+          published_at?: string | null
+          published_url?: string | null
           title?: string
           updated_at?: string
           user_id: string
@@ -133,7 +139,10 @@ export type Database = {
           description?: string | null
           generated_code?: string | null
           id?: string
+          is_published?: boolean
           messages?: Json | null
+          published_at?: string | null
+          published_url?: string | null
           title?: string
           updated_at?: string
           user_id?: string
