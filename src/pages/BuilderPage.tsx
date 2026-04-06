@@ -59,7 +59,15 @@ export default function BuilderPage() {
       setUploadProgress(0)
       const uploaded = await uploadFile(file, user.id, setUploadProgress)
       setAttachedFiles(prev => [...prev, uploaded])
-      toast.success(`"${file.name}" enviado!`)
+      const fmt = (bytes: number) => bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(0)} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+      if (uploaded.originalSize > uploaded.size) {
+        const saved = Math.round((1 - uploaded.size / uploaded.originalSize) * 100)
+        toast.success(`"${file.name}" enviado!`, {
+          description: `${fmt(uploaded.originalSize)} → ${fmt(uploaded.size)} (${saved}% menor)`,
+        })
+      } else {
+        toast.success(`"${file.name}" enviado!`)
+      }
     } catch (err: any) {
       toast.error(err.message || 'Erro no upload')
     } finally {
