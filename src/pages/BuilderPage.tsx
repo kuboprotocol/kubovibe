@@ -360,7 +360,36 @@ export default function BuilderPage() {
                     <div className="prose prose-sm max-w-none text-secondary-foreground [&_pre]:hidden [&_code]:hidden">
                       <ReactMarkdown>{msg.content.replace(/```[\s\S]*?```/g, '').replace(/<[^>]*>/g, '').trim() || 'Generating your app...'}</ReactMarkdown>
                     </div>
-                  ) : msg.content}
+                  ) : (
+                    <div>
+                      <p>{msg.content.replace(/\n\nArquivos anexados:\n[\s\S]*$/, '')}</p>
+                      {msg.content.includes('Arquivos anexados:') && (
+                        <div className="mt-2 space-y-1">
+                          {msg.content
+                            .match(/\[(\w+): ([^\]]+)\]\(([^)]+)\)/g)
+                            ?.map((match, j) => {
+                              const parts = match.match(/\[(\w+): ([^\]]+)\]\(([^)]+)\)/)
+                              if (!parts) return null
+                              const [, category, name, url] = parts
+                              return (
+                                <FilePreview
+                                  key={j}
+                                  file={{
+                                    url,
+                                    name,
+                                    size: 0,
+                                    mimeType: '',
+                                    category: category as any,
+                                    path: '',
+                                  }}
+                                  compact
+                                />
+                              )
+                            })}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </motion.div>
             ))}
