@@ -412,6 +412,7 @@ export default function BuilderPage() {
                                     url,
                                     name,
                                     size: 0,
+                                    originalSize: 0,
                                     mimeType: '',
                                     category: category as any,
                                     path: '',
