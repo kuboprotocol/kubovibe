@@ -171,6 +171,8 @@ export default function BuilderPage() {
     setGeneratedCode(data.generated_code || '')
     setMessages((data.messages as Msg[]) || [])
     setCurrentProjectId(id)
+    setIsPublished((data as any).is_published || false)
+    setPublishedUrl((data as any).published_url || null)
   }
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
