@@ -149,6 +149,43 @@ export default function ShortlinksPage() {
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
+      {/* Confetti overlay */}
+      <AnimatePresence>
+        {showConfetti && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] pointer-events-none"
+          >
+            {Array.from({ length: 60 }).map((_, i) => (
+              <motion.div
+                key={i}
+                initial={{
+                  x: Math.random() * window.innerWidth,
+                  y: -20,
+                  rotate: 0,
+                  scale: Math.random() * 0.5 + 0.5,
+                }}
+                animate={{
+                  y: window.innerHeight + 20,
+                  rotate: Math.random() * 720 - 360,
+                  x: Math.random() * window.innerWidth,
+                }}
+                transition={{
+                  duration: Math.random() * 2 + 2,
+                  delay: Math.random() * 1.5,
+                  ease: 'easeIn',
+                }}
+                className="absolute w-3 h-3 rounded-sm"
+                style={{
+                  backgroundColor: ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8'][i % 8],
+                }}
+              />
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
       <div className="absolute inset-0 gradient-mesh pointer-events-none" />
 
       <header className="sticky top-0 z-50 glass glass-border">
