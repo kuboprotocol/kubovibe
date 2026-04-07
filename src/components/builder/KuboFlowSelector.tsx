@@ -1,13 +1,21 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Zap, Brain, Rocket, Sparkles } from 'lucide-react'
+import { Zap, Brain, Rocket, Sparkles, Lock } from 'lucide-react'
+import { toast } from 'sonner'
 
 export type KuboFlowMode = 'flow' | 'think' | 'ship'
+
+const MODE_PLAN_REQUIREMENTS: Record<KuboFlowMode, string[]> = {
+  flow: [],           // free for all
+  think: ['pro', 'ultra', 'starter'],
+  ship: ['ultra'],
+}
 
 interface KuboFlowSelectorProps {
   mode: KuboFlowMode
   onChange: (mode: KuboFlowMode) => void
   autoDetected?: boolean
+  userPlan?: string
 }
 
 const MODES = [
@@ -46,7 +54,19 @@ const MODES = [
   },
 ]
 
-export default function KuboFlowSelector({ mode, onChange, autoDetected }: KuboFlowSelectorProps) {
+function isModeLocked(modeId: KuboFlowMode, plan: string): boolean {
+  const required = MODE_PLAN_REQUIREMENTS[modeId]
+  if (required.length === 0) return false
+  return !required.includes(plan.toLowerCase())
+}
+
+function getUpgradeLabel(modeId: KuboFlowMode): string {
+  if (modeId === 'think') return 'Pro'
+  if (modeId === 'ship') return 'Ultra'
+  return ''
+}
+
+export default function KuboFlowSelector({ mode, onChange, autoDetected, userPlan = 'free' }: KuboFlowSelectorProps) {
   const activeIndex = MODES.findIndex(m => m.id === mode)
   const activeMode = MODES[activeIndex]
   const [showAutoLabel, setShowAutoLabel] = useState(false)
@@ -88,16 +108,26 @@ export default function KuboFlowSelector({ mode, onChange, autoDetected }: KuboF
         {MODES.map((m) => {
           const Icon = m.icon
           const isActive = mode === m.id
+          const locked = isModeLocked(m.id, userPlan)
           return (
             <button
               key={m.id}
-              onClick={() => onChange(m.id)}
+              onClick={() => {
+                if (locked) {
+                  toast.error(`Modo ${m.label} requer plano ${getUpgradeLabel(m.id)}`, {
+                    description: 'Faça upgrade para desbloquear este modo.',
+                    action: { label: 'Ver planos', onClick: () => window.location.href = '/pricing' },
+                  })
+                  return
+                }
+                onChange(m.id)
+              }}
               className={`relative z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-display font-bold transition-all duration-200 cursor-pointer select-none ${
-                isActive ? m.textActive : 'text-muted-foreground hover:text-foreground'
+                locked ? 'text-muted-foreground/50 cursor-not-allowed' : isActive ? m.textActive : 'text-muted-foreground hover:text-foreground'
               }`}
-              title={m.desc}
+              title={locked ? `Requer plano ${getUpgradeLabel(m.id)}` : m.desc}
             >
-              <Icon className={`h-3.5 w-3.5 ${isActive ? 'drop-shadow-sm' : ''}`} />
+              {locked ? <Lock className="h-3 w-3" /> : <Icon className={`h-3.5 w-3.5 ${isActive ? 'drop-shadow-sm' : ''}`} />}
               <span className="hidden sm:inline tracking-wider">{m.label}</span>
             </button>
           )
