@@ -32,17 +32,32 @@ export default function ProfilePage() {
   }, [user])
 
   const loadProfile = async () => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('display_name, avatar_url')
-      .eq('id', user!.id)
-      .single()
+    const [profileRes, referralsRes] = await Promise.all([
+      supabase.from('profiles').select('display_name, avatar_url, referral_code').eq('id', user!.id).single(),
+      supabase.from('referrals').select('id, credits_awarded').eq('referrer_id', user!.id),
+    ])
 
-    if (!error && data) {
-      setDisplayName(data.display_name || '')
-      setAvatarUrl(data.avatar_url)
+    if (!profileRes.error && profileRes.data) {
+      setDisplayName(profileRes.data.display_name || '')
+      setAvatarUrl(profileRes.data.avatar_url)
+      setReferralCode(profileRes.data.referral_code || '')
+    }
+    if (!referralsRes.error && referralsRes.data) {
+      setReferralCount(referralsRes.data.length)
+      setReferralCredits(referralsRes.data.reduce((sum, r) => sum + Number(r.credits_awarded), 0))
     }
     setLoading(false)
+  }
+
+  const handleCopyReferral = async () => {
+    try {
+      await navigator.clipboard.writeText(`https://kubovibe.lovable.app/auth?ref=${referralCode}`)
+      setCopied(true)
+      toast.success('Link copiado!')
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      toast.error('Erro ao copiar')
+    }
   }
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
