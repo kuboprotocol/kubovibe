@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client'
 import { toast } from 'sonner'
 import logoImg from '@/assets/logo-kubovibe.png'
 import StreakCard from '@/components/shortlinks/StreakCard'
+import BadgesCard from '@/components/shortlinks/BadgesCard'
 
 const DAILY_LIMIT = 10
 const CREDIT_PER_VIEW = 0.5
