@@ -182,6 +182,77 @@ export type Database = {
         }
         Relationships: []
       }
+      shortlink_clicks: {
+        Row: {
+          clicked_at: string
+          completed: boolean
+          completed_at: string | null
+          id: string
+          reward_credited: number
+          shortlink_id: string
+          user_id: string
+        }
+        Insert: {
+          clicked_at?: string
+          completed?: boolean
+          completed_at?: string | null
+          id?: string
+          reward_credited?: number
+          shortlink_id: string
+          user_id: string
+        }
+        Update: {
+          clicked_at?: string
+          completed?: boolean
+          completed_at?: string | null
+          id?: string
+          reward_credited?: number
+          shortlink_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shortlink_clicks_shortlink_id_fkey"
+            columns: ["shortlink_id"]
+            isOneToOne: false
+            referencedRelation: "shortlinks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shortlinks: {
+        Row: {
+          created_at: string
+          destination_url: string
+          id: string
+          is_active: boolean
+          reward_credits: number
+          slug: string
+          title: string
+          wait_seconds: number
+        }
+        Insert: {
+          created_at?: string
+          destination_url: string
+          id?: string
+          is_active?: boolean
+          reward_credits?: number
+          slug: string
+          title?: string
+          wait_seconds?: number
+        }
+        Update: {
+          created_at?: string
+          destination_url?: string
+          id?: string
+          is_active?: boolean
+          reward_credits?: number
+          slug?: string
+          title?: string
+          wait_seconds?: number
+        }
+        Relationships: []
+      }
       subscriptions: {
         Row: {
           created_at: string
