@@ -298,6 +298,62 @@ export default function ShortlinksPage() {
             ))}
           </div>
         )}
+
+        {/* Unity Ads Bonus Section */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="mt-8">
+          <div className="glass glass-border rounded-2xl p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Film className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-display font-bold text-foreground">Bônus: Assistir Anúncio</h3>
+                <p className="text-xs text-muted-foreground">Assista até {DAILY_AD_LIMIT} anúncios por dia e ganhe +0.5 crédito cada</p>
+              </div>
+              <span className="ml-auto text-sm font-bold text-primary">{adCount}/{DAILY_AD_LIMIT}</span>
+            </div>
+
+            <AnimatePresence>
+              {watchingAd ? (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="text-center py-4">
+                  <div className="bg-muted rounded-xl p-6 mb-4 flex flex-col items-center justify-center min-h-[120px]">
+                    <Play className="h-8 w-8 text-primary animate-pulse mb-2" />
+                    <p className="text-sm text-muted-foreground mb-2">Assistindo anúncio...</p>
+                    {adCountdown > 0 ? (
+                      <div className="text-2xl font-display font-bold text-primary">{adCountdown}s</div>
+                    ) : (
+                      <Button variant="hero" className="rounded-xl" onClick={completeAd}>
+                        ✅ Resgatar +0.5 crédito
+                      </Button>
+                    )}
+                  </div>
+                </motion.div>
+              ) : (
+                <Button
+                  variant="outline"
+                  className="w-full h-11 rounded-xl"
+                  onClick={watchAd}
+                  disabled={adCount >= DAILY_AD_LIMIT}
+                >
+                  <Play className="h-4 w-4 mr-2" />
+                  {adCount >= DAILY_AD_LIMIT ? 'Limite de anúncios atingido hoje' : '🎬 Assistir anúncio (+0.5 crédito)'}
+                </Button>
+              )}
+            </AnimatePresence>
+          </div>
+        </motion.div>
+
+        {/* Daily summary */}
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} className="mt-6 text-center">
+          <div className="inline-flex items-center gap-4 glass glass-border rounded-full px-6 py-3">
+            <span className="text-sm text-muted-foreground">Resumo diário:</span>
+            <span className="text-sm"><strong className="text-primary">{todayCount}</strong> links = <strong className="text-primary">+{(todayCount * 0.5).toFixed(1)}</strong></span>
+            <span className="text-muted-foreground">+</span>
+            <span className="text-sm"><strong className="text-primary">{adCount}</strong> anúncios = <strong className="text-primary">+{(adCount * 0.5).toFixed(1)}</strong></span>
+            <span className="text-muted-foreground">=</span>
+            <span className="text-sm font-bold text-primary">+{creditsEarned.toFixed(1)} total</span>
+          </div>
+        </motion.div>
       </main>
     </div>
   )
