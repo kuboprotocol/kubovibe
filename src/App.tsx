@@ -18,6 +18,7 @@ import PricingPage from "./pages/PricingPage";
 import SupportPage from "./pages/SupportPage";
 import ConnectPage from "./pages/ConnectPage";
 import ShortlinksPage from "./pages/ShortlinksPage";
+import LeaderboardPage from "./pages/LeaderboardPage";
 import PublicAppPage from "./pages/PublicAppPage";
 
 const queryClient = new QueryClient();
@@ -43,6 +44,7 @@ const App = () => (
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
             <Route path="/connect" element={<ProtectedRoute><ConnectPage /></ProtectedRoute>} />
             <Route path="/shortlinks" element={<ProtectedRoute><ShortlinksPage /></ProtectedRoute>} />
+            <Route path="/leaderboard" element={<ProtectedRoute><LeaderboardPage /></ProtectedRoute>} />
             <Route path="/app/:projectId" element={<PublicAppPage />} />
             <Route path="/app/:projectId/:slug" element={<PublicAppPage />} />
             <Route path="*" element={<NotFound />} />

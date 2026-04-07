@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { ArrowLeft, Zap, Play, Wallet, Send, Gift } from 'lucide-react'
+import { ArrowLeft, Zap, Play, Wallet, Send, Gift, Trophy } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
@@ -354,8 +354,16 @@ export default function ShortlinksPage() {
           </div>
         </motion.div>
 
-        {/* Telegram CTA */}
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="mt-6 text-center">
+        {/* CTAs */}
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="mt-6 flex flex-col items-center gap-3">
+          <Button
+            variant="outline"
+            className="rounded-full gap-2 px-6"
+            onClick={() => navigate('/leaderboard')}
+          >
+            <Trophy className="h-4 w-4" />
+            🏆 Ver Ranking de Streaks
+          </Button>
           <Button
             variant="outline"
             className="rounded-full gap-2 px-6"
