@@ -217,7 +217,7 @@ export default function ShortlinksPage() {
       <header className="sticky top-0 z-50 glass glass-border">
         <div className="max-w-lg mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="rounded-xl">
+            <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} className="rounded-xl">
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <img src={logoImg} alt="KUBO VIBE" className="h-8" />
