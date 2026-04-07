@@ -25,6 +25,7 @@ export default function ShortlinksPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const [links, setLinks] = useState<Shortlink[]>([])
+  const [completedIds, setCompletedIds] = useState<Set<string>>(new Set())
   const [todayCount, setTodayCount] = useState(0)
   const [activeLink, setActiveLink] = useState<Shortlink | null>(null)
   const [activeClickId, setActiveClickId] = useState<string | null>(null)
