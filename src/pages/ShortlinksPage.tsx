@@ -371,6 +371,18 @@ export default function ShortlinksPage() {
             <span className="text-sm font-bold text-primary">+{creditsEarned.toFixed(1)} total</span>
           </div>
         </motion.div>
+
+        {/* Telegram CTA */}
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }} className="mt-4 text-center">
+          <Button
+            variant="outline"
+            className="rounded-full gap-2 px-6"
+            onClick={() => window.open('https://t.me/kubovibe', '_blank')}
+          >
+            <Send className="h-4 w-4" />
+            📲 Ganhe mais créditos no Telegram
+          </Button>
+        </motion.div>
       </main>
     </div>
   )
