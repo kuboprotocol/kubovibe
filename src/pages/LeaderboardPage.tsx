@@ -31,7 +31,7 @@ export default function LeaderboardPage() {
   useEffect(() => {
     async function fetchLeaderboard() {
       const { data: streaks } = await supabase
-        .from('user_streaks' as any)
+        .from('user_streaks')
         .select('user_id, current_streak, longest_streak')
         .order('longest_streak', { ascending: false })
         .limit(50)
@@ -41,7 +41,7 @@ export default function LeaderboardPage() {
         return
       }
 
-      const userIds = (streaks as any[]).map((s: any) => s.user_id)
+      const userIds = streaks.map((s) => s.user_id)
       const { data: profiles } = await supabase
         .from('profiles')
         .select('id, display_name, avatar_url')
@@ -51,7 +51,7 @@ export default function LeaderboardPage() {
         (profiles || []).map(p => [p.id, p])
       )
 
-      const merged: LeaderboardEntry[] = (streaks as any[]).map((s: any) => {
+      const merged: LeaderboardEntry[] = streaks.map((s) => {
         const profile = profileMap.get(s.user_id)
         return {
           user_id: s.user_id,
