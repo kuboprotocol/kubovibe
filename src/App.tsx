@@ -48,6 +48,7 @@ const App = () => (
             <Route path="/leaderboard" element={<ProtectedRoute><LeaderboardPage /></ProtectedRoute>} />
             <Route path="/app/:projectId" element={<PublicAppPage />} />
             <Route path="/app/:projectId/:slug" element={<PublicAppPage />} />
+            <Route path="/unsubscribe" element={<UnsubscribePage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
