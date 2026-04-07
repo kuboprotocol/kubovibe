@@ -154,6 +154,29 @@ Deno.serve(async (req: Request) => {
 
       // Calculate and credit streak bonus
       streakBonus = getStreakBonus(currentStreak);
+
+      // Unlock badges for streak milestones
+      const BADGE_MILESTONES = [3, 7, 14, 30];
+      const newBadges: string[] = [];
+      for (const milestone of BADGE_MILESTONES) {
+        if (currentStreak >= milestone) {
+          const badgeType = `streak_${milestone}`;
+          const { data: existing } = await supabaseAdmin
+            .from("user_badges")
+            .select("id")
+            .eq("user_id", userId)
+            .eq("badge_type", badgeType)
+            .maybeSingle();
+
+          if (!existing) {
+            await supabaseAdmin.from("user_badges").insert({
+              user_id: userId,
+              badge_type: badgeType,
+            });
+            newBadges.push(badgeType);
+          }
+        }
+      }
     }
 
     // Add credits to subscription
