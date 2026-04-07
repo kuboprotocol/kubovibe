@@ -503,8 +503,8 @@ export default function BuilderPage() {
           <div className="p-3 border-t border-border space-y-2">
             {/* KUBO FLOW AI Mode Selector */}
             <div className="flex items-center justify-between px-1">
-              <KuboFlowSelector mode={flowMode} onChange={setFlowMode} />
-              <span className="text-[10px] text-muted-foreground font-display">KUBO FLOW AI</span>
+              <KuboFlowSelector mode={flowMode} onChange={handleModeChange} autoDetected={autoDetectedMode} />
+              <span className="text-[10px] text-muted-foreground font-display tracking-widest">KUBO FLOW AI</span>
             </div>
             {uploadProgress !== null && (
               <div className="flex items-center gap-2 px-1">
