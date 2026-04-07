@@ -61,7 +61,7 @@ export default function AuthPage() {
         if (error) throw error
         navigate('/dashboard')
       } else {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -71,6 +71,17 @@ export default function AuthPage() {
         })
         if (error) throw error
         toast.success('Conta criada com sucesso!')
+
+        // Send welcome email (fire-and-forget)
+        supabase.functions.invoke('send-transactional-email', {
+          body: {
+            templateName: 'welcome',
+            recipientEmail: email,
+            idempotencyKey: `welcome-${data.user?.id || email}`,
+            templateData: { name: displayName },
+          },
+        }).catch(() => {})
+
         navigate('/dashboard')
       }
     } catch (err: any) {
