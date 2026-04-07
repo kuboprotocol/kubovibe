@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { Plus, FileText, Trash2, LogOut, Code, Pencil, UserCircle, Search, MoreHorizontal, Zap, Globe, BarChart3, CreditCard } from 'lucide-react'
+import { Plus, FileText, Trash2, LogOut, Code, Pencil, UserCircle, Search, MoreHorizontal, Zap, Globe, BarChart3, CreditCard, Gift } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { motion } from 'framer-motion'
@@ -80,8 +80,12 @@ export default function DashboardPage() {
             <img src={logoImg} alt="KUBO VIBE" className="h-7" />
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => navigate('/shortlinks')} className="rounded-xl gap-2 border-primary/20 text-primary hover:bg-primary/10">
+              <Gift className="h-4 w-4" /> Ganhar Créditos
+            </Button>
             <Button variant="hero" size="sm" onClick={() => navigate('/builder')} className="rounded-xl gap-2">
               <Plus className="h-4 w-4" /> Novo Projeto
+            </Button>
             </Button>
             <Button variant="ghost" size="icon" onClick={() => navigate('/profile')} title="Perfil" className="rounded-xl text-muted-foreground hover:text-foreground">
               <UserCircle className="h-5 w-5" />
