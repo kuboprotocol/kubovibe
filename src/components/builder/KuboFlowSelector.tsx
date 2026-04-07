@@ -1,13 +1,21 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Zap, Brain, Rocket, Sparkles } from 'lucide-react'
+import { Zap, Brain, Rocket, Sparkles, Lock } from 'lucide-react'
+import { toast } from 'sonner'
 
 export type KuboFlowMode = 'flow' | 'think' | 'ship'
+
+const MODE_PLAN_REQUIREMENTS: Record<KuboFlowMode, string[]> = {
+  flow: [],           // free for all
+  think: ['pro', 'ultra', 'starter'],
+  ship: ['ultra'],
+}
 
 interface KuboFlowSelectorProps {
   mode: KuboFlowMode
   onChange: (mode: KuboFlowMode) => void
   autoDetected?: boolean
+  userPlan?: string
 }
 
 const MODES = [
