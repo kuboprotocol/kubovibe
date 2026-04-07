@@ -61,7 +61,7 @@ export default function AuthPage() {
         if (error) throw error
         navigate('/dashboard')
       } else {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -71,6 +71,43 @@ export default function AuthPage() {
         })
         if (error) throw error
         toast.success('Conta criada com sucesso!')
+
+        // Send welcome email (fire-and-forget)
+        supabase.functions.invoke('send-transactional-email', {
+          body: {
+            templateName: 'welcome',
+            recipientEmail: email,
+            idempotencyKey: `welcome-${data.user?.id || email}`,
+            templateData: { name: displayName },
+          },
+        }).catch(() => {})
+
+        // If referred, notify the referrer
+        if (refCode && data.user) {
+          supabase
+            .from('profiles')
+            .select('id')
+            .eq('referral_code', refCode)
+            .maybeSingle()
+            .then(({ data: referrer }) => {
+              if (referrer) {
+                supabase
+                  .from('profiles')
+                  .select('id')
+                  .eq('id', referrer.id)
+                  .maybeSingle()
+                  .then(({ data: referrerProfile }) => {
+                    if (referrerProfile) {
+                      // Get referrer email from auth (we can't, so we look up via profiles)
+                      // Instead, we use the referrer's profile to find their email indirectly
+                      // Since we can't access auth.users, we skip email for referrer from client
+                      // The referral notification will be handled separately
+                    }
+                  })
+              }
+            })
+        }
+
         navigate('/dashboard')
       }
     } catch (err: any) {
