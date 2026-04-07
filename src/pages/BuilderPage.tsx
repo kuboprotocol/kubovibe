@@ -15,6 +15,7 @@ import BuilderToolbar, { type DeviceFrame } from '@/components/builder/BuilderTo
 import CloneDialog from '@/components/builder/CloneDialog'
 import AILoadingAnimation, { detectLanguage } from '@/components/builder/AILoadingAnimation'
 import FilePreview from '@/components/builder/FilePreview'
+import KuboFlowSelector, { autoDetectMode, type KuboFlowMode } from '@/components/builder/KuboFlowSelector'
 import { uploadFile, validateFile, getAllAllowedTypes, type UploadedFile } from '@/lib/fileUpload'
 import { Progress } from '@/components/ui/progress'
 import logoImg from '@/assets/logo-kubovibe.png'
@@ -52,6 +53,7 @@ export default function BuilderPage() {
   const [isPublished, setIsPublished] = useState(false)
   const [publishedUrl, setPublishedUrl] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [flowMode, setFlowMode] = useState<KuboFlowMode>('flow')
 
   const handleFileUpload = useCallback(async (file: File) => {
     const validationError = validateFile(file)
@@ -152,8 +154,12 @@ export default function BuilderPage() {
           if (html.includes('<')) setGeneratedCode(html)
         }
 
+        const detectedMode = autoDetectMode(initialPrompt)
+        setFlowMode(detectedMode)
+
         streamChat({
           messages: [userMsg],
+          mode: detectedMode,
           onDelta: (chunk) => upsertAssistant(chunk),
           onDone: () => { setIsLoading(false); const html = extractHtml(assistantSoFar); if (html.includes('<')) saveProject(html, finalMessages) },
           onError: (error) => { toast.error(error); setIsLoading(false) },
@@ -252,6 +258,7 @@ export default function BuilderPage() {
     try {
       await streamChat({
         messages: newMessages,
+        mode: flowMode,
         onDelta: (chunk) => upsertAssistant(chunk),
         onDone: () => { setIsLoading(false); const html = extractHtml(assistantSoFar); if (html.includes('<')) saveProject(html, finalMessages) },
         onError: (error) => { toast.error(error); setIsLoading(false) },
@@ -474,6 +481,11 @@ export default function BuilderPage() {
           </div>
 
           <div className="p-3 border-t border-border space-y-2">
+            {/* KUBO FLOW AI Mode Selector */}
+            <div className="flex items-center justify-between px-1">
+              <KuboFlowSelector mode={flowMode} onChange={setFlowMode} />
+              <span className="text-[10px] text-muted-foreground font-display">KUBO FLOW AI</span>
+            </div>
             {uploadProgress !== null && (
               <div className="flex items-center gap-2 px-1">
                 <Progress value={uploadProgress} className="h-1.5 flex-1" />
