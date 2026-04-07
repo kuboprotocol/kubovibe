@@ -8,6 +8,7 @@ import {
   Container,
   Head,
   Heading,
+  Hr,
   Html,
   Preview,
   Text,
@@ -24,20 +25,22 @@ export const RecoveryEmail = ({
 }: RecoveryEmailProps) => (
   <Html lang="en" dir="ltr">
     <Head />
-    <Preview>Reset your password for {siteName}</Preview>
+    <Preview>Redefinir sua senha — {siteName}</Preview>
     <Body style={main}>
       <Container style={container}>
-        <Heading style={h1}>Reset your password</Heading>
+        <Text style={brand}>⚡ KUBO VIBE</Text>
+        <Hr style={divider} />
+        <Heading style={h1}>Redefinir sua senha</Heading>
         <Text style={text}>
-          We received a request to reset your password for {siteName}. Click
-          the button below to choose a new password.
+          Recebemos uma solicitação para redefinir sua senha no {siteName}.
+          Clique no botão abaixo para escolher uma nova senha.
         </Text>
         <Button style={button} href={confirmationUrl}>
-          Reset Password
+          Redefinir Senha
         </Button>
         <Text style={footer}>
-          If you didn't request a password reset, you can safely ignore this
-          email. Your password will not be changed.
+          Se você não solicitou a redefinição de senha, pode ignorar este email.
+          Sua senha não será alterada.
         </Text>
       </Container>
     </Body>
@@ -46,26 +49,36 @@ export const RecoveryEmail = ({
 
 export default RecoveryEmail
 
-const main = { backgroundColor: '#ffffff', fontFamily: 'Arial, sans-serif' }
-const container = { padding: '20px 25px' }
-const h1 = {
-  fontSize: '22px',
+const main = { backgroundColor: '#ffffff', fontFamily: "'Inter', Arial, sans-serif" }
+const container = { padding: '24px 28px' }
+const brand = {
+  fontSize: '18px',
   fontWeight: 'bold' as const,
-  color: '#000000',
+  color: '#C9941A',
+  fontFamily: "'Orbitron', 'Inter', Arial, sans-serif",
+  margin: '0 0 16px',
+  letterSpacing: '2px',
+}
+const divider = { borderColor: '#E5E5E5', margin: '0 0 24px' }
+const h1 = {
+  fontSize: '24px',
+  fontWeight: 'bold' as const,
+  color: '#1A1A1A',
   margin: '0 0 20px',
 }
 const text = {
-  fontSize: '14px',
-  color: '#55575d',
-  lineHeight: '1.5',
-  margin: '0 0 25px',
+  fontSize: '15px',
+  color: '#555555',
+  lineHeight: '1.6',
+  margin: '0 0 24px',
 }
 const button = {
-  backgroundColor: '#000000',
-  color: '#ffffff',
-  fontSize: '14px',
-  borderRadius: '8px',
-  padding: '12px 20px',
+  backgroundColor: '#C9941A',
+  color: '#0D0D0D',
+  fontSize: '15px',
+  fontWeight: 'bold' as const,
+  borderRadius: '14px',
+  padding: '14px 28px',
   textDecoration: 'none',
 }
-const footer = { fontSize: '12px', color: '#999999', margin: '30px 0 0' }
+const footer = { fontSize: '12px', color: '#999999', margin: '32px 0 0' }
