@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client'
 import { toast } from 'sonner'
 import logoImg from '@/assets/logo-kubovibe.png'
 import StreakCard from '@/components/shortlinks/StreakCard'
+import BadgesCard from '@/components/shortlinks/BadgesCard'
 
 const DAILY_LIMIT = 10
 const CREDIT_PER_VIEW = 0.5
@@ -250,6 +251,9 @@ export default function ShortlinksPage() {
 
         {/* Streak Card */}
         <StreakCard currentStreak={currentStreak} longestStreak={longestStreak} />
+
+        {/* Badges */}
+        <BadgesCard />
 
         {/* Progress */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass glass-border rounded-2xl p-4 mb-8">
