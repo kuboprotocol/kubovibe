@@ -107,6 +107,39 @@ export type Database = {
         }
         Relationships: []
       }
+      project_versions: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          generated_code: string | null
+          id: string
+          project_id: string
+          published_at: string | null
+          title: string
+          version_number: number
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          generated_code?: string | null
+          id?: string
+          project_id: string
+          published_at?: string | null
+          title: string
+          version_number?: number
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          generated_code?: string | null
+          id?: string
+          project_id?: string
+          published_at?: string | null
+          title?: string
+          version_number?: number
+        }
+        Relationships: []
+      }
       projects: {
         Row: {
           created_at: string
