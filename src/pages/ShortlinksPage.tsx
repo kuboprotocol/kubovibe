@@ -35,6 +35,7 @@ export default function ShortlinksPage() {
   const [crediting, setCrediting] = useState(false)
   const [unityLoaded, setUnityLoaded] = useState(false)
   const unityInitRef = useRef(false)
+  const [showConfetti, setShowConfetti] = useState(false)
 
   // Load Unity Ads SDK
   useEffect(() => {
@@ -122,8 +123,15 @@ export default function ShortlinksPage() {
         headers: { Authorization: `Bearer ${session?.access_token}` },
       })
       if (res.error) throw new Error(res.error.message)
-      toast.success(`+${CREDIT_PER_VIEW} crédito ganho! 🎉`)
-      setTodayCount(c => c + 1)
+      const newCount = todayCount + 1
+      setTodayCount(newCount)
+      if (newCount >= DAILY_LIMIT) {
+        toast.success('🎉 Todos os créditos do dia conquistados!')
+        setShowConfetti(true)
+        setTimeout(() => setShowConfetti(false), 5000)
+      } else {
+        toast.success(`+${CREDIT_PER_VIEW} crédito ganho! 🎉`)
+      }
     } catch (err: any) {
       toast.error(err.message || 'Erro ao creditar')
     } finally {
