@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { ArrowLeft, Gift, ExternalLink, Check, Clock, Zap, Play, Film } from 'lucide-react'
+import { ArrowLeft, Gift, ExternalLink, Check, Clock, Zap, Play, Film, Send, Wallet } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
@@ -58,6 +58,15 @@ export default function ShortlinksPage() {
       .gte('clicked_at', todayStart.toISOString())
 
     setTodayCount(count || 0)
+
+    // Count today's ad rewards
+    const { count: adsDone } = await supabase
+      .from('ad_rewards' as any)
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .gte('created_at', todayStart.toISOString())
+
+    setAdCount(adsDone || 0)
     setLoading(false)
   }, [user])
 
@@ -203,15 +212,23 @@ export default function ShortlinksPage() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8 relative z-10">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-4">
-            <Gift className="h-4 w-4 text-primary" />
-            <span className="text-sm font-medium text-primary">Kubo Shortlinks</span>
+        {/* Credit Wallet Card */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
+          <div className="glass glass-border rounded-2xl p-5 border-primary/20">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-accent flex items-center justify-center">
+                <Wallet className="h-6 w-6 text-primary" />
+              </div>
+              <div className="flex-1">
+                <h2 className="font-display font-bold text-foreground text-lg">💰 Ganhar Créditos</h2>
+                <p className="text-sm text-muted-foreground">Até +6 créditos por dia (10 links + 2 anúncios)</p>
+              </div>
+              <div className="text-right">
+                <div className="text-2xl font-display font-bold text-primary">+{creditsEarned.toFixed(1)}</div>
+                <span className="text-xs text-muted-foreground">ganhos hoje</span>
+              </div>
+            </div>
           </div>
-          <h1 className="text-2xl md:text-4xl font-display font-bold text-foreground mb-2">
-            Assista links, ganhe <span className="text-primary">créditos</span>
-          </h1>
-          <p className="text-muted-foreground">Visite 10 links por dia e ganhe até +5 créditos diários!</p>
         </motion.div>
 
         {/* Progress bar */}
@@ -353,6 +370,18 @@ export default function ShortlinksPage() {
             <span className="text-muted-foreground">=</span>
             <span className="text-sm font-bold text-primary">+{creditsEarned.toFixed(1)} total</span>
           </div>
+        </motion.div>
+
+        {/* Telegram CTA */}
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }} className="mt-4 text-center">
+          <Button
+            variant="outline"
+            className="rounded-full gap-2 px-6"
+            onClick={() => window.open('https://t.me/kubovibe', '_blank')}
+          >
+            <Send className="h-4 w-4" />
+            📲 Ganhe mais créditos no Telegram
+          </Button>
         </motion.div>
       </main>
     </div>

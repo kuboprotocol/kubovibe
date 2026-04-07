@@ -1,0 +1,1 @@
+ALTER TABLE public.shortlink_clicks ADD COLUMN IF NOT EXISTS ip_address text;

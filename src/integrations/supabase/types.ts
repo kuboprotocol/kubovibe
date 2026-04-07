@@ -212,6 +212,7 @@ export type Database = {
           completed: boolean
           completed_at: string | null
           id: string
+          ip_address: string | null
           reward_credited: number
           shortlink_id: string
           user_id: string
@@ -221,6 +222,7 @@ export type Database = {
           completed?: boolean
           completed_at?: string | null
           id?: string
+          ip_address?: string | null
           reward_credited?: number
           shortlink_id: string
           user_id: string
@@ -230,6 +232,7 @@ export type Database = {
           completed?: boolean
           completed_at?: string | null
           id?: string
+          ip_address?: string | null
           reward_credited?: number
           shortlink_id?: string
           user_id?: string
