@@ -154,8 +154,12 @@ export default function BuilderPage() {
           if (html.includes('<')) setGeneratedCode(html)
         }
 
+        const detectedMode = autoDetectMode(initialPrompt)
+        setFlowMode(detectedMode)
+
         streamChat({
           messages: [userMsg],
+          mode: detectedMode,
           onDelta: (chunk) => upsertAssistant(chunk),
           onDone: () => { setIsLoading(false); const html = extractHtml(assistantSoFar); if (html.includes('<')) saveProject(html, finalMessages) },
           onError: (error) => { toast.error(error); setIsLoading(false) },
@@ -254,6 +258,7 @@ export default function BuilderPage() {
     try {
       await streamChat({
         messages: newMessages,
+        mode: flowMode,
         onDelta: (chunk) => upsertAssistant(chunk),
         onDone: () => { setIsLoading(false); const html = extractHtml(assistantSoFar); if (html.includes('<')) saveProject(html, finalMessages) },
         onError: (error) => { toast.error(error); setIsLoading(false) },
