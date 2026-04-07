@@ -103,11 +103,13 @@ export async function streamChat({
   onDelta,
   onDone,
   onError,
+  mode,
 }: {
   messages: Msg[];
   onDelta: (deltaText: string) => void;
   onDone: () => void;
   onError?: (error: string) => void;
+  mode?: string;
 }) {
   const headers = await getAuthHeaders().catch((e) => {
     onError?.(e.message);
@@ -118,7 +120,7 @@ export async function streamChat({
   const resp = await fetch(CHAT_URL, {
     method: "POST",
     headers,
-    body: JSON.stringify({ messages }),
+    body: JSON.stringify({ messages, mode: mode || 'flow' }),
   });
 
   await processStream(resp, onDelta, onDone, onError);

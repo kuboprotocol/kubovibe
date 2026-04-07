@@ -7,17 +7,56 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const SYSTEM_PROMPT = `You are an expert frontend developer. The user will describe an app or feature they want to build. You must generate a single, complete, self-contained HTML file that implements it.
+// --- KUBO FLOW AI System Prompts ---
+
+const FLOW_PROMPT = `You are KUBO FLOW AI in ⚡ FLOW mode — maximum speed code generation.
 
 Rules:
 - Output ONLY the HTML code. No explanations, no markdown fences.
 - Use Tailwind CSS via CDN: <script src="https://cdn.tailwindcss.com"></script>
-- Use modern, clean UI design with good spacing, colors, and typography.
-- Make it responsive and visually polished.
-- Include inline JavaScript for interactivity when needed.
+- Generate code INSTANTLY. Zero explanations. Pure output.
+- Modern, clean UI with glass effects, gradients, and micro-interactions.
+- Responsive and visually polished.
+- Include inline JavaScript for interactivity.
 - Use emoji or SVG icons, no external icon libraries.
-- The HTML must be complete and runnable in an iframe.
-- Start with <!DOCTYPE html> and end with </html>.`;
+- Start with <!DOCTYPE html> and end with </html>.
+- Focus: SPEED + VISUAL IMPACT.`;
+
+const THINK_PROMPT = `You are KUBO FLOW AI in 🧠 THINK mode — strategic analysis before generation.
+
+Rules:
+- First, briefly analyze the request (2-3 lines max): architecture, approach, key decisions.
+- Then generate the complete HTML code.
+- Use Tailwind CSS via CDN: <script src="https://cdn.tailwindcss.com"></script>
+- Think like a senior architect: scalable patterns, clean structure, best practices.
+- Modern UI with thoughtful UX decisions.
+- Responsive and accessible.
+- Include inline JavaScript for interactivity.
+- Use emoji or SVG icons, no external icon libraries.
+- Start code with <!DOCTYPE html> and end with </html>.
+- Focus: STRATEGY + QUALITY.`;
+
+const SHIP_PROMPT = `You are KUBO FLOW AI in 🚀 SHIP mode — production-grade code generation.
+
+Rules:
+- Generate COMPLETE, OPTIMIZED, PRODUCTION-READY code.
+- Use Tailwind CSS via CDN: <script src="https://cdn.tailwindcss.com"></script>
+- Think like you're building for a billion-dollar startup (Stripe, Vercel, Apple level).
+- Include automatic improvements: performance, SEO meta tags, accessibility, error handling.
+- Premium UI: glassmorphism, smooth animations, micro-interactions, perfect spacing.
+- Mobile-first responsive design.
+- Clean, componentized code structure.
+- Include inline JavaScript with error handling.
+- Use emoji or SVG icons, no external icon libraries.
+- Start with <!DOCTYPE html> and end with </html>.
+- Add invisible improvements the user didn't ask for but needs.
+- Focus: PRODUCTION QUALITY + PREMIUM UX + OPTIMIZATION.`;
+
+const MODE_PROMPTS: Record<string, string> = {
+  flow: FLOW_PROMPT,
+  think: THINK_PROMPT,
+  ship: SHIP_PROMPT,
+};
 
 const jsonResponse = (status: number, error: string) =>
   new Response(JSON.stringify({ error }), {
@@ -87,30 +126,6 @@ const providerFailureMessage = (provider: string, status: number) => {
   return `${provider}: erro ${status}`;
 };
 
-// --- Complexity detection ---
-
-function isHeavyCodeRequest(messages: Array<{ role: string; content: string }>): boolean {
-  const lastUserMsg = [...messages].reverse().find(m => m.role === "user")?.content?.toLowerCase() || "";
-  
-  const heavyKeywords = [
-    "crie um app", "crie uma aplicação", "create an app", "build a",
-    "dashboard", "sistema completo", "full system", "e-commerce", "ecommerce",
-    "landing page", "website", "página completa", "full page",
-    "crud", "formulário complexo", "complex form", "api", "backend",
-    "banco de dados", "database", "autenticação", "authentication",
-    "gere o código", "generate code", "implementar", "implement",
-    "clone", "clonar", "replicar", "replicate",
-    "html completo", "complete html", "aplicativo", "application",
-    "painel", "admin", "gerenciamento", "management",
-  ];
-  
-  // Heavy if: contains heavy keywords OR message is long (complex request)
-  const hasHeavyKeyword = heavyKeywords.some(kw => lastUserMsg.includes(kw));
-  const isLongRequest = lastUserMsg.length > 300;
-  
-  return hasHeavyKeyword || isLongRequest;
-}
-
 // --- Try a provider with error handling ---
 
 async function tryProvider(
@@ -167,6 +182,7 @@ serve(async (req) => {
 
     const body = await req.json();
     const rawMessages = body?.messages;
+    const mode = body?.mode || "flow";
 
     if (!Array.isArray(rawMessages) || rawMessages.length === 0 || rawMessages.length > 20) {
       return jsonResponse(400, "Invalid messages: must be an array of 1-20 items.");
@@ -184,14 +200,19 @@ serve(async (req) => {
     const DEEPSEEK_API_KEY = Deno.env.get("DEEPSEEK_API_KEY");
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
-    const fullMessages = [{ role: "system", content: SYSTEM_PROMPT }, ...messages];
+    // Select system prompt based on KUBO FLOW mode
+    const systemPrompt = MODE_PROMPTS[mode] || FLOW_PROMPT;
+    console.log(`KUBO FLOW mode: ${mode.toUpperCase()}`);
+
+    const fullMessages = [{ role: "system", content: systemPrompt }, ...messages];
     const failures: string[] = [];
-    const heavy = isHeavyCodeRequest(messages);
+    
+    // SHIP mode always routes to heavy providers first
+    const heavy = mode === "ship" || isHeavyCodeRequest(messages);
     
     console.log(`Request type: ${heavy ? "HEAVY CODE" : "LIGHT/MEDIUM"}`);
 
     if (heavy) {
-      // HEAVY CODE: DeepSeek (primary) → Kimi (fallback) → Lovable AI (final)
       console.log("Routing: DeepSeek → Kimi → Lovable AI");
 
       if (DEEPSEEK_API_KEY) {
@@ -209,7 +230,6 @@ serve(async (req) => {
         if (result) return result;
       }
     } else {
-      // LIGHT/MEDIUM: Kimi (primary) → DeepSeek (fallback) → Lovable AI (final)
       console.log("Routing: Kimi → DeepSeek → Lovable AI");
 
       if (KIMI_API_KEY) {
@@ -235,3 +255,26 @@ serve(async (req) => {
     return jsonResponse(500, "Something went wrong. Please try again.");
   }
 });
+
+// --- Complexity detection ---
+
+function isHeavyCodeRequest(messages: Array<{ role: string; content: string }>): boolean {
+  const lastUserMsg = [...messages].reverse().find(m => m.role === "user")?.content?.toLowerCase() || "";
+  
+  const heavyKeywords = [
+    "crie um app", "crie uma aplicação", "create an app", "build a",
+    "dashboard", "sistema completo", "full system", "e-commerce", "ecommerce",
+    "landing page", "website", "página completa", "full page",
+    "crud", "formulário complexo", "complex form", "api", "backend",
+    "banco de dados", "database", "autenticação", "authentication",
+    "gere o código", "generate code", "implementar", "implement",
+    "clone", "clonar", "replicar", "replicate",
+    "html completo", "complete html", "aplicativo", "application",
+    "painel", "admin", "gerenciamento", "management",
+  ];
+  
+  const hasHeavyKeyword = heavyKeywords.some(kw => lastUserMsg.includes(kw));
+  const isLongRequest = lastUserMsg.length > 300;
+  
+  return hasHeavyKeyword || isLongRequest;
+}
