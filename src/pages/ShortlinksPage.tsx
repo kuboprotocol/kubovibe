@@ -31,6 +31,9 @@ export default function ShortlinksPage() {
   const [countdown, setCountdown] = useState(0)
   const [completing, setCompleting] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [adCount, setAdCount] = useState(0)
+  const [watchingAd, setWatchingAd] = useState(false)
+  const [adCountdown, setAdCountdown] = useState(0)
 
   const fetchData = useCallback(async () => {
     if (!user) return
@@ -136,7 +139,42 @@ export default function ShortlinksPage() {
     }
   }
 
-  const creditsEarned = todayCount * 0.5
+  // Ad countdown timer
+  useEffect(() => {
+    if (adCountdown <= 0) return
+    const t = setTimeout(() => setAdCountdown(c => c - 1), 1000)
+    return () => clearTimeout(t)
+  }, [adCountdown])
+
+  const watchAd = async () => {
+    if (!user) return
+    if (adCount >= DAILY_AD_LIMIT) {
+      toast.info('Limite de anúncios atingido hoje!')
+      return
+    }
+    setWatchingAd(true)
+    setAdCountdown(10)
+  }
+
+  const completeAd = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await supabase.functions.invoke('unity-ad-reward', {
+        body: { reward_type: 'completed' },
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      })
+      if (res.error) throw new Error(res.error.message)
+      toast.success('+0.5 crédito por assistir anúncio! 🎬')
+      setAdCount(c => c + 1)
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao creditar anúncio')
+    } finally {
+      setWatchingAd(false)
+      setAdCountdown(0)
+    }
+  }
+
+  const creditsEarned = (todayCount * 0.5) + (adCount * 0.5)
   const progressPercent = (todayCount / DAILY_LINK_LIMIT) * 100
 
   if (!user) {
