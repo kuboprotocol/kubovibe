@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
-import { ArrowLeft, Camera, Loader2, Mail, User, Shield } from 'lucide-react'
+import { ArrowLeft, Camera, Loader2, Mail, User, Shield, Gift, Users, Copy, Check } from 'lucide-react'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/hooks/useAuth'
 import { toast } from 'sonner'
@@ -21,6 +21,10 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [referralCode, setReferralCode] = useState('')
+  const [referralCount, setReferralCount] = useState(0)
+  const [referralCredits, setReferralCredits] = useState(0)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     if (!user) return
@@ -28,17 +32,32 @@ export default function ProfilePage() {
   }, [user])
 
   const loadProfile = async () => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('display_name, avatar_url')
-      .eq('id', user!.id)
-      .single()
+    const [profileRes, referralsRes] = await Promise.all([
+      supabase.from('profiles').select('display_name, avatar_url, referral_code').eq('id', user!.id).single(),
+      supabase.from('referrals').select('id, credits_awarded').eq('referrer_id', user!.id),
+    ])
 
-    if (!error && data) {
-      setDisplayName(data.display_name || '')
-      setAvatarUrl(data.avatar_url)
+    if (!profileRes.error && profileRes.data) {
+      setDisplayName(profileRes.data.display_name || '')
+      setAvatarUrl(profileRes.data.avatar_url)
+      setReferralCode(profileRes.data.referral_code || '')
+    }
+    if (!referralsRes.error && referralsRes.data) {
+      setReferralCount(referralsRes.data.length)
+      setReferralCredits(referralsRes.data.reduce((sum, r) => sum + Number(r.credits_awarded), 0))
     }
     setLoading(false)
+  }
+
+  const handleCopyReferral = async () => {
+    try {
+      await navigator.clipboard.writeText(`https://kubovibe.lovable.app/auth?ref=${referralCode}`)
+      setCopied(true)
+      toast.success('Link copiado!')
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      toast.error('Erro ao copiar')
+    }
   }
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -232,6 +251,58 @@ export default function ProfilePage() {
               {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Salvar alterações
             </Button>
+          </motion.div>
+
+          {/* Referral Section */}
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.25 }}
+            className="glass glass-border rounded-2xl p-8 space-y-5"
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <Gift className="h-4 w-4 text-primary" />
+              <h3 className="font-semibold text-foreground font-display">Programa de indicações</h3>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-xl bg-secondary/50 p-4 text-center">
+                <div className="flex items-center justify-center gap-1.5 mb-1">
+                  <Users className="h-4 w-4 text-primary" />
+                  <span className="text-xs text-muted-foreground">Indicados</span>
+                </div>
+                <p className="text-2xl font-display font-bold text-foreground">{referralCount}</p>
+              </div>
+              <div className="rounded-xl bg-secondary/50 p-4 text-center">
+                <div className="flex items-center justify-center gap-1.5 mb-1">
+                  <Gift className="h-4 w-4 text-primary" />
+                  <span className="text-xs text-muted-foreground">Créditos ganhos</span>
+                </div>
+                <p className="text-2xl font-display font-bold text-foreground">{referralCredits}</p>
+              </div>
+            </div>
+
+            {referralCode && (
+              <div className="space-y-2">
+                <Label className="text-muted-foreground text-sm">Seu link de indicação</Label>
+                <div className="flex gap-2">
+                  <Input
+                    value={`https://kubovibe.lovable.app/auth?ref=${referralCode}`}
+                    readOnly
+                    className="text-xs bg-muted/30"
+                  />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={handleCopyReferral}
+                    className="shrink-0 border-primary/20 text-primary hover:bg-primary/10"
+                  >
+                    {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  </Button>
+                </div>
+                <p className="text-[11px] text-muted-foreground">+100 créditos para cada indicação que assinar um plano pago</p>
+              </div>
+            )}
           </motion.div>
         </motion.div>
       </main>
