@@ -63,9 +63,9 @@ Deno.serve(async (req: Request) => {
       .eq("user_id", userId)
       .gte("created_at", todayStart.toISOString());
 
-    if ((count || 0) >= 2) {
+    if ((count || 0) >= 10) {
       return new Response(
-        JSON.stringify({ error: "Daily ad limit reached", limit: 2 }),
+        JSON.stringify({ error: "Daily ad limit reached", limit: 10 }),
         { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
