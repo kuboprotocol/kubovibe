@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/integrations/supabase/client'
 import { lovable } from '@/integrations/lovable/index'
 import { Button } from '@/components/ui/button'
@@ -12,6 +12,8 @@ import logoImg from '@/assets/logo-kubovibe.png'
 
 export default function AuthPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const refCode = searchParams.get('ref') || ''
   const { user, loading } = useAuth()
   const [isLogin, setIsLogin] = useState(true)
   const [email, setEmail] = useState('')
@@ -63,7 +65,7 @@ export default function AuthPage() {
           email,
           password,
           options: {
-            data: { display_name: displayName },
+            data: { display_name: displayName, ...(refCode ? { referral_code: refCode } : {}) },
             emailRedirectTo: window.location.origin,
           },
         })
