@@ -21,6 +21,10 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [referralCode, setReferralCode] = useState('')
+  const [referralCount, setReferralCount] = useState(0)
+  const [referralCredits, setReferralCredits] = useState(0)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     if (!user) return
