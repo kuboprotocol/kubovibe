@@ -113,6 +113,7 @@ export type Database = {
           created_at: string
           display_name: string | null
           id: string
+          referral_code: string | null
           updated_at: string
         }
         Insert: {
@@ -120,6 +121,7 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           id: string
+          referral_code?: string | null
           updated_at?: string
         }
         Update: {
@@ -127,6 +129,7 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           id?: string
+          referral_code?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -203,6 +206,30 @@ export type Database = {
           title?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      referrals: {
+        Row: {
+          created_at: string
+          credits_awarded: number
+          id: string
+          referred_id: string
+          referrer_id: string
+        }
+        Insert: {
+          created_at?: string
+          credits_awarded?: number
+          id?: string
+          referred_id: string
+          referrer_id: string
+        }
+        Update: {
+          created_at?: string
+          credits_awarded?: number
+          id?: string
+          referred_id?: string
+          referrer_id?: string
         }
         Relationships: []
       }
