@@ -20,12 +20,12 @@ export default function BadgesCard() {
     if (!user) return
     async function fetch() {
       const { data } = await supabase
-        .from('user_badges' as any)
+        .from('user_badges')
         .select('badge_type')
         .eq('user_id', user!.id)
 
       if (data) {
-        setUnlockedBadges(new Set((data as any[]).map((b: any) => b.badge_type)))
+        setUnlockedBadges(new Set(data.map((b) => b.badge_type)))
       }
       setLoading(false)
     }
