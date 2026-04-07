@@ -2,14 +2,15 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { ArrowLeft, Gift, ExternalLink, Check, Clock, Zap } from 'lucide-react'
+import { ArrowLeft, Gift, ExternalLink, Check, Clock, Zap, Play, Film } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
 import { toast } from 'sonner'
 import logoImg from '@/assets/logo-kubovibe.png'
 
-const DAILY_LIMIT = 10
+const DAILY_LINK_LIMIT = 10
+const DAILY_AD_LIMIT = 2
 
 interface Shortlink {
   id: string
@@ -30,6 +31,9 @@ export default function ShortlinksPage() {
   const [countdown, setCountdown] = useState(0)
   const [completing, setCompleting] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [adCount, setAdCount] = useState(0)
+  const [watchingAd, setWatchingAd] = useState(false)
+  const [adCountdown, setAdCountdown] = useState(0)
 
   const fetchData = useCallback(async () => {
     if (!user) return
@@ -68,7 +72,7 @@ export default function ShortlinksPage() {
 
   const startLink = async (link: Shortlink) => {
     if (!user) { navigate('/auth'); return }
-    if (todayCount >= DAILY_LIMIT) {
+    if (todayCount >= DAILY_LINK_LIMIT) {
       toast.info('Limite diário atingido! Volte amanhã 🌅')
       return
     }
@@ -135,8 +139,43 @@ export default function ShortlinksPage() {
     }
   }
 
-  const creditsEarned = todayCount * 0.5
-  const progressPercent = (todayCount / DAILY_LIMIT) * 100
+  // Ad countdown timer
+  useEffect(() => {
+    if (adCountdown <= 0) return
+    const t = setTimeout(() => setAdCountdown(c => c - 1), 1000)
+    return () => clearTimeout(t)
+  }, [adCountdown])
+
+  const watchAd = async () => {
+    if (!user) return
+    if (adCount >= DAILY_AD_LIMIT) {
+      toast.info('Limite de anúncios atingido hoje!')
+      return
+    }
+    setWatchingAd(true)
+    setAdCountdown(10)
+  }
+
+  const completeAd = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await supabase.functions.invoke('unity-ad-reward', {
+        body: { reward_type: 'completed' },
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      })
+      if (res.error) throw new Error(res.error.message)
+      toast.success('+0.5 crédito por assistir anúncio! 🎬')
+      setAdCount(c => c + 1)
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao creditar anúncio')
+    } finally {
+      setWatchingAd(false)
+      setAdCountdown(0)
+    }
+  }
+
+  const creditsEarned = (todayCount * 0.5) + (adCount * 0.5)
+  const progressPercent = (todayCount / DAILY_LINK_LIMIT) * 100
 
   if (!user) {
     navigate('/auth')
@@ -157,7 +196,7 @@ export default function ShortlinksPage() {
           </div>
           <div className="flex items-center gap-2 text-sm">
             <Zap className="h-4 w-4 text-primary" />
-            <span className="text-muted-foreground">{todayCount}/{DAILY_LIMIT} hoje</span>
+            <span className="text-muted-foreground">{todayCount}/{DAILY_LINK_LIMIT} hoje</span>
             <span className="text-primary font-bold">+{creditsEarned} créditos</span>
           </div>
         </div>
@@ -179,10 +218,10 @@ export default function ShortlinksPage() {
         <div className="glass glass-border rounded-2xl p-4 mb-6">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm text-muted-foreground">Progresso diário</span>
-            <span className="text-sm font-bold text-primary">{todayCount}/{DAILY_LIMIT} links</span>
+            <span className="text-sm font-bold text-primary">{todayCount}/{DAILY_LINK_LIMIT} links</span>
           </div>
           <Progress value={progressPercent} className="h-3" />
-          {todayCount >= DAILY_LIMIT && (
+          {todayCount >= DAILY_LINK_LIMIT && (
             <p className="text-xs text-primary mt-2 text-center">🎉 Parabéns! Limite diário atingido! Volte amanhã.</p>
           )}
         </div>
@@ -249,7 +288,7 @@ export default function ShortlinksPage() {
                       size="sm"
                       className="rounded-lg"
                       onClick={() => startLink(link)}
-                      disabled={!!activeLink || todayCount >= DAILY_LIMIT}
+                      disabled={!!activeLink || todayCount >= DAILY_LINK_LIMIT}
                     >
                       <ExternalLink className="h-4 w-4" />
                     </Button>
@@ -259,6 +298,62 @@ export default function ShortlinksPage() {
             ))}
           </div>
         )}
+
+        {/* Unity Ads Bonus Section */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="mt-8">
+          <div className="glass glass-border rounded-2xl p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Film className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-display font-bold text-foreground">Bônus: Assistir Anúncio</h3>
+                <p className="text-xs text-muted-foreground">Assista até {DAILY_AD_LIMIT} anúncios por dia e ganhe +0.5 crédito cada</p>
+              </div>
+              <span className="ml-auto text-sm font-bold text-primary">{adCount}/{DAILY_AD_LIMIT}</span>
+            </div>
+
+            <AnimatePresence>
+              {watchingAd ? (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="text-center py-4">
+                  <div className="bg-muted rounded-xl p-6 mb-4 flex flex-col items-center justify-center min-h-[120px]">
+                    <Play className="h-8 w-8 text-primary animate-pulse mb-2" />
+                    <p className="text-sm text-muted-foreground mb-2">Assistindo anúncio...</p>
+                    {adCountdown > 0 ? (
+                      <div className="text-2xl font-display font-bold text-primary">{adCountdown}s</div>
+                    ) : (
+                      <Button variant="hero" className="rounded-xl" onClick={completeAd}>
+                        ✅ Resgatar +0.5 crédito
+                      </Button>
+                    )}
+                  </div>
+                </motion.div>
+              ) : (
+                <Button
+                  variant="outline"
+                  className="w-full h-11 rounded-xl"
+                  onClick={watchAd}
+                  disabled={adCount >= DAILY_AD_LIMIT}
+                >
+                  <Play className="h-4 w-4 mr-2" />
+                  {adCount >= DAILY_AD_LIMIT ? 'Limite de anúncios atingido hoje' : '🎬 Assistir anúncio (+0.5 crédito)'}
+                </Button>
+              )}
+            </AnimatePresence>
+          </div>
+        </motion.div>
+
+        {/* Daily summary */}
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} className="mt-6 text-center">
+          <div className="inline-flex items-center gap-4 glass glass-border rounded-full px-6 py-3">
+            <span className="text-sm text-muted-foreground">Resumo diário:</span>
+            <span className="text-sm"><strong className="text-primary">{todayCount}</strong> links = <strong className="text-primary">+{(todayCount * 0.5).toFixed(1)}</strong></span>
+            <span className="text-muted-foreground">+</span>
+            <span className="text-sm"><strong className="text-primary">{adCount}</strong> anúncios = <strong className="text-primary">+{(adCount * 0.5).toFixed(1)}</strong></span>
+            <span className="text-muted-foreground">=</span>
+            <span className="text-sm font-bold text-primary">+{creditsEarned.toFixed(1)} total</span>
+          </div>
+        </motion.div>
       </main>
     </div>
   )
