@@ -181,7 +181,7 @@ export default function DashboardPage() {
                       {project.description && <p className="text-xs text-muted-foreground mt-1 truncate">{project.description}</p>}
                       <div className="flex items-center gap-2 mt-3">
                         {project.is_published && (
-                          <span className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 font-medium">
+                          <span className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg bg-accent/50 text-accent-foreground font-medium">
                             <Globe className="h-2.5 w-2.5" /> Published
                           </span>
                         )}
