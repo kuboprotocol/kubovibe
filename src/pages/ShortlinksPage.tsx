@@ -284,22 +284,26 @@ export default function ShortlinksPage() {
           <div className="text-center text-muted-foreground py-12">Carregando links...</div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {links.map((link, i) => (
+            {links.map((link, i) => {
+              const isDone = completedIds.has(link.id)
+              return (
               <motion.div
                 key={link.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.05 }}
               >
-                <div className="glass glass-border rounded-xl p-4 hover:scale-[1.02] transition-all duration-200">
+                <div className={`glass glass-border rounded-xl p-4 transition-all duration-200 ${isDone ? 'opacity-60' : 'hover:scale-[1.02]'}`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-lg">
-                        {link.title.split(' ')[0]}
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg ${isDone ? 'bg-green-500/20' : 'bg-primary/10'}`}>
+                        {isDone ? <Check className="h-5 w-5 text-green-500" /> : link.title.split(' ')[0]}
                       </div>
                       <div>
                         <h4 className="font-semibold text-foreground text-sm">{link.title}</h4>
-                        <span className="text-xs text-muted-foreground">+{link.reward_credits} crédito • {link.wait_seconds}s</span>
+                        <span className="text-xs text-muted-foreground">
+                          {isDone ? '✅ Concluído hoje' : `+${link.reward_credits} crédito • ${link.wait_seconds}s`}
+                        </span>
                       </div>
                     </div>
                     <Button
@@ -307,14 +311,15 @@ export default function ShortlinksPage() {
                       size="sm"
                       className="rounded-lg"
                       onClick={() => startLink(link)}
-                      disabled={!!activeLink || todayCount >= DAILY_LINK_LIMIT}
+                      disabled={!!activeLink || todayCount >= DAILY_LINK_LIMIT || isDone}
                     >
-                      <ExternalLink className="h-4 w-4" />
+                      {isDone ? <Check className="h-4 w-4 text-green-500" /> : <ExternalLink className="h-4 w-4" />}
                     </Button>
                   </div>
                 </div>
               </motion.div>
-            ))}
+              )
+            })}
           </div>
         )}
 
