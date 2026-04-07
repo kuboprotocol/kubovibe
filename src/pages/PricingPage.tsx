@@ -38,12 +38,17 @@ export default function PricingPage() {
   const handleCheckout = async (pkg: typeof packages[number]) => {
     if (!user) { navigate('/auth'); return }
 
+    if ((pkg as any).isShortlinks) {
+      navigate('/shortlinks')
+      return
+    }
+
     if (pkg.isFree) {
       const { error } = await supabase
         .from('subscriptions')
         .upsert({ user_id: user.id, plan: 'free', edits_used: 0, edits_limit: 5, is_active: true, paid_at: new Date().toISOString() }, { onConflict: 'user_id' })
-      if (error) toast.error('Error activating free plan')
-      else toast.success('Free plan activated! 🎁 5 credits available')
+      if (error) toast.error('Erro ao ativar plano free')
+      else toast.success('Plano Free ativado! 🎁 5 créditos disponíveis')
       return
     }
 
