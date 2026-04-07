@@ -20,6 +20,7 @@ import ConnectPage from "./pages/ConnectPage";
 import ShortlinksPage from "./pages/ShortlinksPage";
 import LeaderboardPage from "./pages/LeaderboardPage";
 import PublicAppPage from "./pages/PublicAppPage";
+import UnsubscribePage from "./pages/UnsubscribePage";
 
 const queryClient = new QueryClient();
 
