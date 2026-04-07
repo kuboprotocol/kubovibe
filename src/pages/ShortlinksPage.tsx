@@ -13,7 +13,8 @@ import StreakCard from '@/components/shortlinks/StreakCard'
 const DAILY_LIMIT = 10
 const CREDIT_PER_VIEW = 0.5
 const UNITY_GAME_ID = 'zw52l859eq65bwtg'
-const UNITY_AD_UNIT_ID = 'Rewarded_Android'
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+const UNITY_AD_UNIT_ID = isIOS ? 'Rewarded_iOS' : 'Rewarded_Android'
 
 declare global {
   interface Window {
