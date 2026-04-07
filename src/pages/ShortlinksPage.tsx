@@ -247,6 +247,9 @@ export default function ShortlinksPage() {
           </div>
         </motion.div>
 
+        {/* Streak Card */}
+        <StreakCard currentStreak={currentStreak} longestStreak={longestStreak} />
+
         {/* Progress */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass glass-border rounded-2xl p-4 mb-8">
           <div className="flex items-center justify-between mb-2">
