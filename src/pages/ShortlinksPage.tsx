@@ -51,14 +51,15 @@ export default function ShortlinksPage() {
     const todayStart = new Date()
     todayStart.setHours(0, 0, 0, 0)
 
-    const { count } = await supabase
+    const { count, data: clicksData } = await supabase
       .from('shortlink_clicks' as any)
-      .select('*', { count: 'exact', head: true })
+      .select('shortlink_id', { count: 'exact' })
       .eq('user_id', user.id)
       .eq('completed', true)
       .gte('clicked_at', todayStart.toISOString())
 
     setTodayCount(count || 0)
+    setCompletedIds(new Set((clicksData as any[] || []).map((c: any) => c.shortlink_id)))
 
     // Count today's ad rewards
     const { count: adsDone } = await supabase
