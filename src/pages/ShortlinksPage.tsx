@@ -66,13 +66,24 @@ export default function ShortlinksPage() {
     const todayStart = new Date()
     todayStart.setHours(0, 0, 0, 0)
 
-    const { count } = await supabase
-      .from('ad_rewards' as any)
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .gte('created_at', todayStart.toISOString())
+    const [adResult, streakResult] = await Promise.all([
+      supabase
+        .from('ad_rewards' as any)
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .gte('created_at', todayStart.toISOString()),
+      supabase
+        .from('user_streaks' as any)
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle(),
+    ])
 
-    setTodayCount(count || 0)
+    setTodayCount(adResult.count || 0)
+    if (streakResult.data) {
+      setCurrentStreak((streakResult.data as any).current_streak || 0)
+      setLongestStreak((streakResult.data as any).longest_streak || 0)
+    }
     setLoading(false)
   }, [user])
 
