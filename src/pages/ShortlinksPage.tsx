@@ -69,7 +69,7 @@ export default function ShortlinksPage() {
 
   const startLink = async (link: Shortlink) => {
     if (!user) { navigate('/auth'); return }
-    if (todayCount >= DAILY_LIMIT) {
+    if (todayCount >= DAILY_LINK_LIMIT) {
       toast.info('Limite diário atingido! Volte amanhã 🌅')
       return
     }
@@ -137,7 +137,7 @@ export default function ShortlinksPage() {
   }
 
   const creditsEarned = todayCount * 0.5
-  const progressPercent = (todayCount / DAILY_LIMIT) * 100
+  const progressPercent = (todayCount / DAILY_LINK_LIMIT) * 100
 
   if (!user) {
     navigate('/auth')
@@ -158,7 +158,7 @@ export default function ShortlinksPage() {
           </div>
           <div className="flex items-center gap-2 text-sm">
             <Zap className="h-4 w-4 text-primary" />
-            <span className="text-muted-foreground">{todayCount}/{DAILY_LIMIT} hoje</span>
+            <span className="text-muted-foreground">{todayCount}/{DAILY_LINK_LIMIT} hoje</span>
             <span className="text-primary font-bold">+{creditsEarned} créditos</span>
           </div>
         </div>
@@ -180,10 +180,10 @@ export default function ShortlinksPage() {
         <div className="glass glass-border rounded-2xl p-4 mb-6">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm text-muted-foreground">Progresso diário</span>
-            <span className="text-sm font-bold text-primary">{todayCount}/{DAILY_LIMIT} links</span>
+            <span className="text-sm font-bold text-primary">{todayCount}/{DAILY_LINK_LIMIT} links</span>
           </div>
           <Progress value={progressPercent} className="h-3" />
-          {todayCount >= DAILY_LIMIT && (
+          {todayCount >= DAILY_LINK_LIMIT && (
             <p className="text-xs text-primary mt-2 text-center">🎉 Parabéns! Limite diário atingido! Volte amanhã.</p>
           )}
         </div>
@@ -250,7 +250,7 @@ export default function ShortlinksPage() {
                       size="sm"
                       className="rounded-lg"
                       onClick={() => startLink(link)}
-                      disabled={!!activeLink || todayCount >= DAILY_LIMIT}
+                      disabled={!!activeLink || todayCount >= DAILY_LINK_LIMIT}
                     >
                       <ExternalLink className="h-4 w-4" />
                     </Button>
