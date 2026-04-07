@@ -252,6 +252,58 @@ export default function ProfilePage() {
               Salvar alterações
             </Button>
           </motion.div>
+
+          {/* Referral Section */}
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.25 }}
+            className="glass glass-border rounded-2xl p-8 space-y-5"
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <Gift className="h-4 w-4 text-primary" />
+              <h3 className="font-semibold text-foreground font-display">Programa de indicações</h3>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-xl bg-secondary/50 p-4 text-center">
+                <div className="flex items-center justify-center gap-1.5 mb-1">
+                  <Users className="h-4 w-4 text-primary" />
+                  <span className="text-xs text-muted-foreground">Indicados</span>
+                </div>
+                <p className="text-2xl font-display font-bold text-foreground">{referralCount}</p>
+              </div>
+              <div className="rounded-xl bg-secondary/50 p-4 text-center">
+                <div className="flex items-center justify-center gap-1.5 mb-1">
+                  <Gift className="h-4 w-4 text-primary" />
+                  <span className="text-xs text-muted-foreground">Créditos ganhos</span>
+                </div>
+                <p className="text-2xl font-display font-bold text-foreground">{referralCredits}</p>
+              </div>
+            </div>
+
+            {referralCode && (
+              <div className="space-y-2">
+                <Label className="text-muted-foreground text-sm">Seu link de indicação</Label>
+                <div className="flex gap-2">
+                  <Input
+                    value={`https://kubovibe.lovable.app/auth?ref=${referralCode}`}
+                    readOnly
+                    className="text-xs bg-muted/30"
+                  />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={handleCopyReferral}
+                    className="shrink-0 border-primary/20 text-primary hover:bg-primary/10"
+                  >
+                    {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  </Button>
+                </div>
+                <p className="text-[11px] text-muted-foreground">+100 créditos para cada indicação que assinar um plano pago</p>
+              </div>
+            )}
+          </motion.div>
         </motion.div>
       </main>
     </div>
