@@ -142,6 +142,11 @@ export default function DashboardPage() {
           </div>
         </motion.div>
 
+        {/* Promo Cards */}
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.03 }}>
+          <PromoCards />
+        </motion.div>
+
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="mb-6">
           <div className="flex items-center justify-between">
             <div>
