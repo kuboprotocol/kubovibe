@@ -86,7 +86,6 @@ export default function DashboardPage() {
             <Button variant="hero" size="sm" onClick={() => navigate('/builder')} className="rounded-xl gap-2">
               <Plus className="h-4 w-4" /> Novo Projeto
             </Button>
-            </Button>
             <Button variant="ghost" size="icon" onClick={() => navigate('/profile')} title="Perfil" className="rounded-xl text-muted-foreground hover:text-foreground">
               <UserCircle className="h-5 w-5" />
             </Button>
