@@ -53,6 +53,7 @@ export default function BuilderPage() {
   const [isPublished, setIsPublished] = useState(false)
   const [publishedUrl, setPublishedUrl] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [flowMode, setFlowMode] = useState<KuboFlowMode>('flow')
 
   const handleFileUpload = useCallback(async (file: File) => {
     const validationError = validateFile(file)
