@@ -141,6 +141,7 @@ export default function ShortlinksPage() {
 
       toast.success(`+${activeLink.reward_credits} crédito(s) ganho(s)! 🎉`)
       setTodayCount(c => c + 1)
+      setCompletedIds(prev => new Set(prev).add(activeLink.id))
       setActiveLink(null)
       setActiveClickId(null)
     } catch (err: any) {
