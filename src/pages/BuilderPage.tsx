@@ -54,6 +54,26 @@ export default function BuilderPage() {
   const [publishedUrl, setPublishedUrl] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [flowMode, setFlowMode] = useState<KuboFlowMode>('flow')
+  const [autoDetectedMode, setAutoDetectedMode] = useState(false)
+  const manualModeRef = useRef(false)
+
+  // Auto-detect mode as user types (unless manually overridden)
+  useEffect(() => {
+    if (manualModeRef.current || !input.trim()) return
+    const detected = autoDetectMode(input)
+    if (detected !== flowMode) {
+      setFlowMode(detected)
+      setAutoDetectedMode(true)
+    }
+  }, [input])
+
+  const handleModeChange = (mode: KuboFlowMode) => {
+    manualModeRef.current = true
+    setAutoDetectedMode(false)
+    setFlowMode(mode)
+    // Reset manual flag after 10s so auto-detect resumes
+    setTimeout(() => { manualModeRef.current = false }, 10000)
+  }
 
   const handleFileUpload = useCallback(async (file: File) => {
     const validationError = validateFile(file)
