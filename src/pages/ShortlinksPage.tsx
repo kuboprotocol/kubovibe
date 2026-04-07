@@ -137,10 +137,20 @@ export default function ShortlinksPage() {
         headers: { Authorization: `Bearer ${session?.access_token}` },
       })
       if (res.error) throw new Error(res.error.message)
+      const result = res.data as any
       const newCount = todayCount + 1
       setTodayCount(newCount)
+
+      if (result?.current_streak) {
+        setCurrentStreak(result.current_streak)
+        setLongestStreak(prev => Math.max(prev, result.current_streak))
+      }
+
       if (newCount >= DAILY_LIMIT) {
-        toast.success('🎉 Todos os créditos do dia conquistados!')
+        const bonusMsg = result?.streak_bonus > 0
+          ? ` + ${result.streak_bonus} bônus de streak 🔥`
+          : ''
+        toast.success(`🎉 Todos os créditos do dia conquistados!${bonusMsg}`)
         setShowConfetti(true)
         setTimeout(() => setShowConfetti(false), 5000)
       } else {
