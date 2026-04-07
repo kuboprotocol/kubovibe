@@ -9,7 +9,8 @@ import { supabase } from '@/integrations/supabase/client'
 import { toast } from 'sonner'
 import logoImg from '@/assets/logo-kubovibe.png'
 
-const DAILY_LIMIT = 10
+const DAILY_LINK_LIMIT = 10
+const DAILY_AD_LIMIT = 2
 
 interface Shortlink {
   id: string
