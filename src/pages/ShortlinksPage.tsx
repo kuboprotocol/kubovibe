@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { ArrowLeft, Gift, ExternalLink, Check, Clock, Zap, Play, Film } from 'lucide-react'
+import { ArrowLeft, Gift, ExternalLink, Check, Clock, Zap, Play, Film, Send, Wallet } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
@@ -58,6 +58,15 @@ export default function ShortlinksPage() {
       .gte('clicked_at', todayStart.toISOString())
 
     setTodayCount(count || 0)
+
+    // Count today's ad rewards
+    const { count: adsDone } = await supabase
+      .from('ad_rewards' as any)
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .gte('created_at', todayStart.toISOString())
+
+    setAdCount(adsDone || 0)
     setLoading(false)
   }, [user])
 
