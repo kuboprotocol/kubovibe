@@ -1,0 +1,265 @@
+import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Button } from '@/components/ui/button'
+import { Progress } from '@/components/ui/progress'
+import { ArrowLeft, Gift, ExternalLink, Check, Clock, Zap } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { useAuth } from '@/hooks/useAuth'
+import { supabase } from '@/integrations/supabase/client'
+import { toast } from 'sonner'
+import logoImg from '@/assets/logo-kubovibe.png'
+
+const DAILY_LIMIT = 10
+
+interface Shortlink {
+  id: string
+  slug: string
+  title: string
+  destination_url: string
+  reward_credits: number
+  wait_seconds: number
+}
+
+export default function ShortlinksPage() {
+  const navigate = useNavigate()
+  const { user } = useAuth()
+  const [links, setLinks] = useState<Shortlink[]>([])
+  const [todayCount, setTodayCount] = useState(0)
+  const [activeLink, setActiveLink] = useState<Shortlink | null>(null)
+  const [activeClickId, setActiveClickId] = useState<string | null>(null)
+  const [countdown, setCountdown] = useState(0)
+  const [completing, setCompleting] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  const fetchData = useCallback(async () => {
+    if (!user) return
+
+    const { data: linksData } = await supabase
+      .from('shortlinks' as any)
+      .select('*')
+      .eq('is_active', true)
+      .limit(10)
+
+    setLinks((linksData as any[]) || [])
+
+    // Count today's completed clicks
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+
+    const { count } = await supabase
+      .from('shortlink_clicks' as any)
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('completed', true)
+      .gte('clicked_at', todayStart.toISOString())
+
+    setTodayCount(count || 0)
+    setLoading(false)
+  }, [user])
+
+  useEffect(() => { fetchData() }, [fetchData])
+
+  // Countdown timer
+  useEffect(() => {
+    if (countdown <= 0) return
+    const t = setTimeout(() => setCountdown(c => c - 1), 1000)
+    return () => clearTimeout(t)
+  }, [countdown])
+
+  const startLink = async (link: Shortlink) => {
+    if (!user) { navigate('/auth'); return }
+    if (todayCount >= DAILY_LIMIT) {
+      toast.info('Limite diário atingido! Volte amanhã 🌅')
+      return
+    }
+
+    // Check if already clicked this link today
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+    const { data: existing } = await supabase
+      .from('shortlink_clicks' as any)
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('shortlink_id', link.id)
+      .gte('clicked_at', todayStart.toISOString())
+      .limit(1)
+
+    if (existing && existing.length > 0) {
+      toast.info('Você já visitou este link hoje!')
+      return
+    }
+
+    // Register click
+    const { data: click, error } = await supabase
+      .from('shortlink_clicks' as any)
+      .insert({
+        user_id: user.id,
+        shortlink_id: link.id,
+        completed: false,
+        reward_credited: 0,
+      } as any)
+      .select('id')
+      .single()
+
+    if (error) {
+      toast.error('Erro ao registrar clique')
+      return
+    }
+
+    setActiveLink(link)
+    setActiveClickId((click as any).id)
+    setCountdown(link.wait_seconds)
+  }
+
+  const completeLink = async () => {
+    if (!activeClickId || !activeLink) return
+    setCompleting(true)
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await supabase.functions.invoke('complete-shortlink', {
+        body: { click_id: activeClickId },
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      })
+
+      if (res.error) throw new Error(res.error.message)
+
+      toast.success(`+${activeLink.reward_credits} crédito(s) ganho(s)! 🎉`)
+      setTodayCount(c => c + 1)
+      setActiveLink(null)
+      setActiveClickId(null)
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao completar')
+    } finally {
+      setCompleting(false)
+    }
+  }
+
+  const creditsEarned = todayCount * 0.5
+  const progressPercent = (todayCount / DAILY_LIMIT) * 100
+
+  if (!user) {
+    navigate('/auth')
+    return null
+  }
+
+  return (
+    <div className="min-h-screen bg-background relative overflow-hidden">
+      <div className="absolute inset-0 gradient-mesh pointer-events-none" />
+
+      <header className="sticky top-0 z-50 glass glass-border">
+        <div className="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="rounded-xl">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <img src={logoImg} alt="KUBO VIBE" className="h-8" />
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <Zap className="h-4 w-4 text-primary" />
+            <span className="text-muted-foreground">{todayCount}/{DAILY_LIMIT} hoje</span>
+            <span className="text-primary font-bold">+{creditsEarned} créditos</span>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8 relative z-10">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-8">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-4">
+            <Gift className="h-4 w-4 text-primary" />
+            <span className="text-sm font-medium text-primary">Kubo Shortlinks</span>
+          </div>
+          <h1 className="text-2xl md:text-4xl font-display font-bold text-foreground mb-2">
+            Assista links, ganhe <span className="text-primary">créditos</span>
+          </h1>
+          <p className="text-muted-foreground">Visite 10 links por dia e ganhe até +5 créditos diários!</p>
+        </motion.div>
+
+        {/* Progress bar */}
+        <div className="glass glass-border rounded-2xl p-4 mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm text-muted-foreground">Progresso diário</span>
+            <span className="text-sm font-bold text-primary">{todayCount}/{DAILY_LIMIT} links</span>
+          </div>
+          <Progress value={progressPercent} className="h-3" />
+          {todayCount >= DAILY_LIMIT && (
+            <p className="text-xs text-primary mt-2 text-center">🎉 Parabéns! Limite diário atingido! Volte amanhã.</p>
+          )}
+        </div>
+
+        {/* Active link (wait screen) */}
+        <AnimatePresence>
+          {activeLink && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="glass glass-border rounded-2xl p-6 mb-6 border-primary/30 ring-2 ring-primary/20"
+            >
+              <div className="text-center">
+                <Clock className="h-10 w-10 text-primary mx-auto mb-3 animate-pulse" />
+                <h3 className="font-display font-bold text-foreground text-lg mb-1">{activeLink.title}</h3>
+                <p className="text-muted-foreground text-sm mb-4">Aguarde para ganhar seu crédito...</p>
+
+                {countdown > 0 ? (
+                  <div className="mb-4">
+                    <div className="text-4xl font-display font-bold text-primary mb-2">{countdown}s</div>
+                    <Progress value={((activeLink.wait_seconds - countdown) / activeLink.wait_seconds) * 100} className="h-2 max-w-xs mx-auto" />
+                  </div>
+                ) : (
+                  <Button
+                    variant="hero"
+                    className="h-12 px-8 rounded-xl text-sm font-semibold"
+                    onClick={completeLink}
+                    disabled={completing}
+                  >
+                    {completing ? 'Creditando...' : `✅ Resgatar +${activeLink.reward_credits} crédito(s)`}
+                  </Button>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Links grid */}
+        {loading ? (
+          <div className="text-center text-muted-foreground py-12">Carregando links...</div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {links.map((link, i) => (
+              <motion.div
+                key={link.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.05 }}
+              >
+                <div className="glass glass-border rounded-xl p-4 hover:scale-[1.02] transition-all duration-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-lg">
+                        {link.title.split(' ')[0]}
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-foreground text-sm">{link.title}</h4>
+                        <span className="text-xs text-muted-foreground">+{link.reward_credits} crédito • {link.wait_seconds}s</span>
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="rounded-lg"
+                      onClick={() => startLink(link)}
+                      disabled={!!activeLink || todayCount >= DAILY_LIMIT}
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </main>
+    </div>
+  )
+}

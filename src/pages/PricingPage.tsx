@@ -9,13 +9,14 @@ import { useState, useEffect } from 'react'
 import logoImg from '@/assets/logo-kubovibe.png'
 
 const allPackages = [
-  { id: 'free', name: 'Free', price: '$0', priceNum: 0, credits: 5, description: 'Try Kubo Vibe with no commitment', icon: Gift, badge: '🎁', color: 'from-muted to-secondary', borderColor: 'border-border', isFree: true, visible: false },
-  { id: 'starter', name: 'Starter', price: '$4.99', priceNum: 4.99, credits: 35, description: 'Ideal to get started', icon: Zap, badge: '⚡', color: 'from-secondary to-muted', borderColor: 'border-border', visible: true },
+  { id: 'free', name: 'Free', price: '$0', priceNum: 0, credits: 5, description: 'Comece grátis com 5 créditos', icon: Gift, badge: '🎁', color: 'from-muted to-secondary', borderColor: 'border-border', isFree: true, visible: true },
+  { id: 'shortlinks', name: 'Shortlinks', price: 'Grátis', priceNum: 0, credits: 5, description: 'Assista 10 links por dia e ganhe +5 créditos', icon: Zap, badge: '⚡', color: 'from-primary/20 to-accent', borderColor: 'border-primary/50', isShortlinks: true, popular: true, visible: true },
+  { id: 'starter', name: 'Starter', price: '$4.99', priceNum: 4.99, credits: 35, description: 'Ideal to get started', icon: Zap, badge: '⚡', color: 'from-secondary to-muted', borderColor: 'border-border', visible: false },
   { id: 'basic', name: 'Basic', price: '$19.99', priceNum: 19.99, credits: 80, description: 'Great cost-benefit ratio', icon: Star, badge: '⭐', color: 'from-secondary to-muted', borderColor: 'border-border', visible: false },
   { id: 'pro', name: 'Pro', price: '$39.99', priceNum: 39.99, credits: 120, description: 'For active users', icon: Crown, badge: '👑', color: 'from-secondary to-muted', borderColor: 'border-primary/30', visible: false },
   { id: 'advanced', name: 'Advanced', price: '$59.99', priceNum: 59.99, credits: 200, description: 'Balance between volume and savings', icon: Sparkles, badge: '⭐', popular: true, color: 'from-primary/20 to-accent', borderColor: 'border-primary/50', visible: false },
   { id: 'elite', name: 'Elite', price: '$99.99', priceNum: 99.99, credits: 350, description: 'Maximum performance, lowest cost per credit', icon: Rocket, badge: '🚀', bestValue: true, color: 'from-primary/15 to-accent/50', borderColor: 'border-primary/40', visible: false },
-] as Array<{ id: string; name: string; price: string; priceNum: number; credits: number; description: string; icon: any; badge: string; color: string; borderColor: string; isFree?: boolean; popular?: boolean; bestValue?: boolean; visible: boolean }>
+] as Array<{ id: string; name: string; price: string; priceNum: number; credits: number; description: string; icon: any; badge: string; color: string; borderColor: string; isFree?: boolean; isShortlinks?: boolean; popular?: boolean; bestValue?: boolean; visible: boolean }>
 
 const packages = allPackages.filter(p => p.visible)
 
@@ -37,12 +38,17 @@ export default function PricingPage() {
   const handleCheckout = async (pkg: typeof packages[number]) => {
     if (!user) { navigate('/auth'); return }
 
+    if ((pkg as any).isShortlinks) {
+      navigate('/shortlinks')
+      return
+    }
+
     if (pkg.isFree) {
       const { error } = await supabase
         .from('subscriptions')
         .upsert({ user_id: user.id, plan: 'free', edits_used: 0, edits_limit: 5, is_active: true, paid_at: new Date().toISOString() }, { onConflict: 'user_id' })
-      if (error) toast.error('Error activating free plan')
-      else toast.success('Free plan activated! 🎁 5 credits available')
+      if (error) toast.error('Erro ao ativar plano free')
+      else toast.success('Plano Free ativado! 🎁 5 créditos disponíveis')
       return
     }
 
@@ -142,7 +148,7 @@ export default function PricingPage() {
                     onClick={() => handleCheckout(pkg)}
                     disabled={loadingId === pkg.id}
                   >
-                    {loadingId === pkg.id ? 'Processing...' : pkg.isFree ? 'Start free' : `Buy ${pkg.credits} credits`}
+                    {loadingId === pkg.id ? 'Processando...' : pkg.isFree ? 'Começar grátis' : (pkg as any).isShortlinks ? '🔗 Ir para Shortlinks' : `Comprar ${pkg.credits} créditos`}
                   </Button>
                 </div>
               </motion.div>
