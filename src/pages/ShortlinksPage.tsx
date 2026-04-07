@@ -37,6 +37,8 @@ export default function ShortlinksPage() {
   const [unityLoaded, setUnityLoaded] = useState(false)
   const unityInitRef = useRef(false)
   const [showConfetti, setShowConfetti] = useState(false)
+  const [currentStreak, setCurrentStreak] = useState(0)
+  const [longestStreak, setLongestStreak] = useState(0)
 
   // Load Unity Ads SDK
   useEffect(() => {
