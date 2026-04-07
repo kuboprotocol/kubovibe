@@ -12,6 +12,7 @@ import { toast } from 'sonner'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Progress } from '@/components/ui/progress'
+import { PromoCards } from '@/components/dashboard/PromoCards'
 import logoImg from '@/assets/logo-kubovibe.png'
 
 interface Project {
@@ -139,6 +140,11 @@ export default function DashboardPage() {
             <p className="text-lg font-display font-bold text-foreground capitalize">{subscription?.plan ?? 'None'}</p>
             <p className="text-[10px] text-primary mt-1">Upgrade →</p>
           </div>
+        </motion.div>
+
+        {/* Promo Cards */}
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.03 }}>
+          <PromoCards />
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="mb-6">
