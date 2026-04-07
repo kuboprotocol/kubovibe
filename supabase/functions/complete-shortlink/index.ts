@@ -6,24 +6,26 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const MIN_WAIT_SECONDS = 5;
+const DAILY_LINK_LIMIT = 10;
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
-  try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+  const json = (data: unknown, status = 200) =>
+    new Response(JSON.stringify(data), {
+      status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
 
-    const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+  try {
+    // Auth via getClaims
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return json({ error: "Unauthorized" }, 401);
+    }
 
     const supabaseUser = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -31,55 +33,96 @@ Deno.serve(async (req: Request) => {
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    const { data: { user }, error: authErr } = await supabaseUser.auth.getUser();
-    if (authErr || !user) {
-      return new Response(JSON.stringify({ error: "Invalid token" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsErr } = await supabaseUser.auth.getClaims(token);
+    if (claimsErr || !claimsData?.claims) {
+      return json({ error: "Invalid token" }, 401);
     }
+
+    const userId = claimsData.claims.sub;
+    const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+                     req.headers.get("cf-connecting-ip") || "unknown";
 
     const { click_id } = await req.json();
-    if (!click_id) {
-      return new Response(JSON.stringify({ error: "click_id required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (!click_id || typeof click_id !== "string") {
+      return json({ error: "click_id required" }, 400);
     }
 
-    // Get the click record
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    // ── ANTI-FRAUD 1: Get click record & verify ownership ──
     const { data: click, error: clickErr } = await supabaseAdmin
       .from("shortlink_clicks")
       .select("*, shortlinks(*)")
       .eq("id", click_id)
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .eq("completed", false)
       .maybeSingle();
 
     if (clickErr || !click) {
-      return new Response(JSON.stringify({ error: "Click not found or already completed" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return json({ error: "Já concluído ou não encontrado" }, 400);
+    }
+
+    // ── ANTI-FRAUD 2: Minimum time elapsed (5s) ──
+    const clickedAt = new Date(click.clicked_at).getTime();
+    const now = Date.now();
+    const elapsedSeconds = (now - clickedAt) / 1000;
+    const requiredWait = Math.max(MIN_WAIT_SECONDS, click.shortlinks?.wait_seconds || 8);
+
+    if (elapsedSeconds < requiredWait) {
+      console.warn(`⚠️ Fraud attempt: user ${userId} tried to complete in ${elapsedSeconds.toFixed(1)}s (min: ${requiredWait}s)`);
+      return json({ error: "Tempo mínimo não atingido. Aguarde." }, 429);
+    }
+
+    // ── ANTI-FRAUD 3: Daily limit check ──
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const { count: todayCompleted } = await supabaseAdmin
+      .from("shortlink_clicks")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("completed", true)
+      .gte("clicked_at", todayStart.toISOString());
+
+    if ((todayCompleted || 0) >= DAILY_LINK_LIMIT) {
+      return json({ error: "Limite diário atingido", limit: DAILY_LINK_LIMIT }, 429);
+    }
+
+    // ── ANTI-FRAUD 4: No duplicate link per day ──
+    const { count: sameLink } = await supabaseAdmin
+      .from("shortlink_clicks")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("shortlink_id", click.shortlink_id)
+      .eq("completed", true)
+      .gte("clicked_at", todayStart.toISOString());
+
+    if ((sameLink || 0) > 0) {
+      return json({ error: "Este link já foi completado hoje" }, 400);
     }
 
     const reward = click.shortlinks?.reward_credits || 0.5;
 
-    // Mark click as completed
+    // ── Mark click as completed with IP ──
     await supabaseAdmin
       .from("shortlink_clicks")
       .update({
         completed: true,
         reward_credited: reward,
         completed_at: new Date().toISOString(),
+        ip_address: clientIp,
       })
       .eq("id", click_id);
 
-    // Add credits to subscription
+    // ── Add credits to subscription ──
     const { data: sub } = await supabaseAdmin
       .from("subscriptions")
       .select("id, edits_limit")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .maybeSingle();
 
     if (sub) {
@@ -91,27 +134,20 @@ Deno.serve(async (req: Request) => {
         })
         .eq("id", sub.id);
     } else {
-      // Create subscription with reward credits
-      await supabaseAdmin
-        .from("subscriptions")
-        .insert({
-          user_id: user.id,
-          plan: "free",
-          edits_used: 0,
-          edits_limit: 5 + reward,
-          is_active: true,
-        });
+      await supabaseAdmin.from("subscriptions").insert({
+        user_id: userId,
+        plan: "free",
+        edits_used: 0,
+        edits_limit: 5 + reward,
+        is_active: true,
+      });
     }
 
-    return new Response(
-      JSON.stringify({ success: true, credits_earned: reward }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    console.log(`✅ User ${userId} earned ${reward} credits from link ${click.shortlink_id} (IP: ${clientIp}, elapsed: ${elapsedSeconds.toFixed(1)}s)`);
+
+    return json({ success: true, credits_earned: reward });
   } catch (err: any) {
     console.error("complete-shortlink error:", err);
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return json({ error: err.message }, 500);
   }
 });
