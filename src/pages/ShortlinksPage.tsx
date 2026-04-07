@@ -46,7 +46,7 @@ export default function ShortlinksPage() {
     script.async = true
     script.onload = () => {
       try {
-        window.UnityAds?.init(UNITY_GAME_ID, true) // testMode = true
+        window.UnityAds?.init(UNITY_GAME_ID, false) // production mode
         setUnityLoaded(true)
         console.log('Unity Ads initialized ✓')
       } catch (e) {
