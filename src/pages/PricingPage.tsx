@@ -15,7 +15,7 @@ const packages = [
   { id: 'pro', name: 'Pro', price: '$39.99', priceNum: 39.99, credits: 120, description: 'For active users', icon: Crown, badge: '👑', color: 'from-secondary to-muted', borderColor: 'border-primary/30' },
   { id: 'advanced', name: 'Advanced', price: '$59.99', priceNum: 59.99, credits: 200, description: 'Balance between volume and savings', icon: Sparkles, badge: '⭐', popular: true, color: 'from-primary/20 to-accent', borderColor: 'border-primary/50' },
   { id: 'elite', name: 'Elite', price: '$99.99', priceNum: 99.99, credits: 350, description: 'Maximum performance, lowest cost per credit', icon: Rocket, badge: '🚀', bestValue: true, color: 'from-primary/15 to-accent/50', borderColor: 'border-primary/40' },
-] as const
+] as Array<{ id: string; name: string; price: string; priceNum: number; credits: number; description: string; icon: any; badge: string; color: string; borderColor: string; isFree?: boolean; popular?: boolean; bestValue?: boolean }>
 
 export default function PricingPage() {
   const navigate = useNavigate()

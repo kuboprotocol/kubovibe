@@ -107,8 +107,8 @@ export default function DashboardPage() {
           </div>
           <div className="glass glass-border rounded-2xl p-4">
             <div className="flex items-center gap-2 mb-2">
-              <div className="h-8 w-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                <Globe className="h-4 w-4 text-emerald-400" />
+            <div className="h-8 w-8 rounded-lg bg-accent/50 flex items-center justify-center">
+                <Globe className="h-4 w-4 text-accent-foreground" />
               </div>
               <span className="text-xs text-muted-foreground">Published</span>
             </div>
@@ -116,8 +116,8 @@ export default function DashboardPage() {
           </div>
           <div className="glass glass-border rounded-2xl p-4">
             <div className="flex items-center gap-2 mb-2">
-              <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
-                <Zap className="h-4 w-4 text-amber-400" />
+            <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Zap className="h-4 w-4 text-primary" />
               </div>
               <span className="text-xs text-muted-foreground">Credits</span>
             </div>
