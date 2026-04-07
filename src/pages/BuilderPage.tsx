@@ -57,10 +57,17 @@ export default function BuilderPage() {
   const [autoDetectedMode, setAutoDetectedMode] = useState(false)
   const manualModeRef = useRef(false)
 
+  const userPlan = subscription?.plan || 'free'
+
   // Auto-detect mode as user types (unless manually overridden)
+  // Clamp to highest allowed mode for current plan
   useEffect(() => {
     if (manualModeRef.current || !input.trim()) return
-    const detected = autoDetectMode(input)
+    let detected = autoDetectMode(input)
+    const plan = userPlan.toLowerCase()
+    // Downgrade if locked
+    if (detected === 'ship' && !['ultra'].includes(plan)) detected = ['pro', 'starter'].includes(plan) ? 'think' : 'flow'
+    if (detected === 'think' && !['pro', 'ultra', 'starter'].includes(plan)) detected = 'flow'
     if (detected !== flowMode) {
       setFlowMode(detected)
       setAutoDetectedMode(true)
@@ -503,7 +510,7 @@ export default function BuilderPage() {
           <div className="p-3 border-t border-border space-y-2">
             {/* KUBO FLOW AI Mode Selector */}
             <div className="flex items-center justify-between px-1">
-              <KuboFlowSelector mode={flowMode} onChange={handleModeChange} autoDetected={autoDetectedMode} />
+              <KuboFlowSelector mode={flowMode} onChange={handleModeChange} autoDetected={autoDetectedMode} userPlan={userPlan} />
               <span className="text-[10px] text-muted-foreground font-display tracking-widest">KUBO FLOW AI</span>
             </div>
             {uploadProgress !== null && (
