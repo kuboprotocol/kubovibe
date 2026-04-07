@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 const PLANS: Record<string, { name: string; credits: number; priceUsd: number }> = {
-  starter:  { name: "Starter",  credits: 25,  priceUsd: 4.99 },
+  starter:  { name: "Starter",  credits: 35,  priceUsd: 4.99 },
   basic:    { name: "Basic",    credits: 80,  priceUsd: 19.99 },
   pro:      { name: "Pro",      credits: 120, priceUsd: 39.99 },
   advanced: { name: "Advanced", credits: 200, priceUsd: 59.99 },

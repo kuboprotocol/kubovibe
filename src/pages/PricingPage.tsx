@@ -8,14 +8,16 @@ import { toast } from 'sonner'
 import { useState, useEffect } from 'react'
 import logoImg from '@/assets/logo-kubovibe.png'
 
-const packages = [
-  { id: 'free', name: 'Free', price: '$0', priceNum: 0, credits: 5, description: 'Try Kubo Vibe with no commitment', icon: Gift, badge: '🎁', color: 'from-muted to-secondary', borderColor: 'border-border', isFree: true },
-  { id: 'starter', name: 'Starter', price: '$4.99', priceNum: 4.99, credits: 25, description: 'Ideal to get started', icon: Zap, badge: '⚡', color: 'from-secondary to-muted', borderColor: 'border-border' },
-  { id: 'basic', name: 'Basic', price: '$19.99', priceNum: 19.99, credits: 80, description: 'Great cost-benefit ratio', icon: Star, badge: '⭐', color: 'from-secondary to-muted', borderColor: 'border-border' },
-  { id: 'pro', name: 'Pro', price: '$39.99', priceNum: 39.99, credits: 120, description: 'For active users', icon: Crown, badge: '👑', color: 'from-secondary to-muted', borderColor: 'border-primary/30' },
-  { id: 'advanced', name: 'Advanced', price: '$59.99', priceNum: 59.99, credits: 200, description: 'Balance between volume and savings', icon: Sparkles, badge: '⭐', popular: true, color: 'from-primary/20 to-accent', borderColor: 'border-primary/50' },
-  { id: 'elite', name: 'Elite', price: '$99.99', priceNum: 99.99, credits: 350, description: 'Maximum performance, lowest cost per credit', icon: Rocket, badge: '🚀', bestValue: true, color: 'from-primary/15 to-accent/50', borderColor: 'border-primary/40' },
-] as Array<{ id: string; name: string; price: string; priceNum: number; credits: number; description: string; icon: any; badge: string; color: string; borderColor: string; isFree?: boolean; popular?: boolean; bestValue?: boolean }>
+const allPackages = [
+  { id: 'free', name: 'Free', price: '$0', priceNum: 0, credits: 5, description: 'Try Kubo Vibe with no commitment', icon: Gift, badge: '🎁', color: 'from-muted to-secondary', borderColor: 'border-border', isFree: true, visible: false },
+  { id: 'starter', name: 'Starter', price: '$4.99', priceNum: 4.99, credits: 35, description: 'Ideal to get started', icon: Zap, badge: '⚡', color: 'from-secondary to-muted', borderColor: 'border-border', visible: true },
+  { id: 'basic', name: 'Basic', price: '$19.99', priceNum: 19.99, credits: 80, description: 'Great cost-benefit ratio', icon: Star, badge: '⭐', color: 'from-secondary to-muted', borderColor: 'border-border', visible: false },
+  { id: 'pro', name: 'Pro', price: '$39.99', priceNum: 39.99, credits: 120, description: 'For active users', icon: Crown, badge: '👑', color: 'from-secondary to-muted', borderColor: 'border-primary/30', visible: false },
+  { id: 'advanced', name: 'Advanced', price: '$59.99', priceNum: 59.99, credits: 200, description: 'Balance between volume and savings', icon: Sparkles, badge: '⭐', popular: true, color: 'from-primary/20 to-accent', borderColor: 'border-primary/50', visible: false },
+  { id: 'elite', name: 'Elite', price: '$99.99', priceNum: 99.99, credits: 350, description: 'Maximum performance, lowest cost per credit', icon: Rocket, badge: '🚀', bestValue: true, color: 'from-primary/15 to-accent/50', borderColor: 'border-primary/40', visible: false },
+] as Array<{ id: string; name: string; price: string; priceNum: number; credits: number; description: string; icon: any; badge: string; color: string; borderColor: string; isFree?: boolean; popular?: boolean; bestValue?: boolean; visible: boolean }>
+
+const packages = allPackages.filter(p => p.visible)
 
 export default function PricingPage() {
   const navigate = useNavigate()
