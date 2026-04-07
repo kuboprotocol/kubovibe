@@ -6,13 +6,30 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const DAILY_LIMIT = 10;
+const REWARD_CREDITS = 0.5;
+
+// Streak bonus milestones
+const STREAK_BONUSES: { days: number; bonus: number }[] = [
+  { days: 30, bonus: 5.0 },
+  { days: 14, bonus: 2.0 },
+  { days: 7, bonus: 1.0 },
+  { days: 3, bonus: 0.5 },
+];
+
+function getStreakBonus(streak: number): number {
+  for (const { days, bonus } of STREAK_BONUSES) {
+    if (streak >= days) return bonus;
+  }
+  return 0;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Authenticate user
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -37,7 +54,6 @@ Deno.serve(async (req: Request) => {
     }
 
     const userId = claimsData.claims.sub;
-
     const body = await req.json();
     const { reward_type } = body;
 
@@ -53,7 +69,7 @@ Deno.serve(async (req: Request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Check daily ad limit (max 2 per day)
+    // Check daily ad limit
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
@@ -63,14 +79,12 @@ Deno.serve(async (req: Request) => {
       .eq("user_id", userId)
       .gte("created_at", todayStart.toISOString());
 
-    if ((count || 0) >= 10) {
+    if ((count || 0) >= DAILY_LIMIT) {
       return new Response(
-        JSON.stringify({ error: "Daily ad limit reached", limit: 10 }),
+        JSON.stringify({ error: "Daily ad limit reached", limit: DAILY_LIMIT }),
         { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    const REWARD_CREDITS = 0.5;
 
     // Record ad reward
     await supabaseAdmin.from("ad_rewards").insert({
@@ -79,7 +93,72 @@ Deno.serve(async (req: Request) => {
       ad_type: "unity_rewarded",
     });
 
+    const newCount = (count || 0) + 1;
+    let streakBonus = 0;
+    let currentStreak = 0;
+
+    // Update streak when all daily videos are completed
+    if (newCount >= DAILY_LIMIT) {
+      const today = new Date().toISOString().split("T")[0];
+
+      const { data: streakData } = await supabaseAdmin
+        .from("user_streaks")
+        .select("*")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (streakData) {
+        const lastDate = streakData.last_activity_date;
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = yesterday.toISOString().split("T")[0];
+
+        if (lastDate === today) {
+          // Already counted today
+          currentStreak = streakData.current_streak;
+        } else if (lastDate === yesterdayStr) {
+          // Consecutive day
+          currentStreak = streakData.current_streak + 1;
+          const longestStreak = Math.max(currentStreak, streakData.longest_streak);
+          await supabaseAdmin
+            .from("user_streaks")
+            .update({
+              current_streak: currentStreak,
+              longest_streak: longestStreak,
+              last_activity_date: today,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("user_id", userId);
+        } else {
+          // Streak broken, restart
+          currentStreak = 1;
+          await supabaseAdmin
+            .from("user_streaks")
+            .update({
+              current_streak: 1,
+              last_activity_date: today,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("user_id", userId);
+        }
+      } else {
+        // First streak record
+        currentStreak = 1;
+        await supabaseAdmin.from("user_streaks").insert({
+          user_id: userId,
+          current_streak: 1,
+          longest_streak: 1,
+          last_activity_date: today,
+        });
+      }
+
+      // Calculate and credit streak bonus
+      streakBonus = getStreakBonus(currentStreak);
+    }
+
     // Add credits to subscription
+    const totalCredits = REWARD_CREDITS + streakBonus;
+
     const { data: sub } = await supabaseAdmin
       .from("subscriptions")
       .select("id, edits_limit")
@@ -90,7 +169,7 @@ Deno.serve(async (req: Request) => {
       await supabaseAdmin
         .from("subscriptions")
         .update({
-          edits_limit: sub.edits_limit + REWARD_CREDITS,
+          edits_limit: sub.edits_limit + totalCredits,
           updated_at: new Date().toISOString(),
         })
         .eq("id", sub.id);
@@ -99,13 +178,19 @@ Deno.serve(async (req: Request) => {
         user_id: userId,
         plan: "free",
         edits_used: 0,
-        edits_limit: 5 + REWARD_CREDITS,
+        edits_limit: 5 + totalCredits,
         is_active: true,
       });
     }
 
     return new Response(
-      JSON.stringify({ success: true, credits_earned: REWARD_CREDITS }),
+      JSON.stringify({
+        success: true,
+        credits_earned: REWARD_CREDITS,
+        streak_bonus: streakBonus,
+        current_streak: currentStreak,
+        daily_completed: newCount >= DAILY_LIMIT,
+      }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err: any) {
