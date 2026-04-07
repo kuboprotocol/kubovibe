@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      ad_rewards: {
+        Row: {
+          ad_type: string
+          created_at: string
+          id: string
+          reward_credits: number
+          user_id: string
+        }
+        Insert: {
+          ad_type?: string
+          created_at?: string
+          id?: string
+          reward_credits?: number
+          user_id: string
+        }
+        Update: {
+          ad_type?: string
+          created_at?: string
+          id?: string
+          reward_credits?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       connect_products: {
         Row: {
           connected_account_id: string
