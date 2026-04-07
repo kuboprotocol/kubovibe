@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
 import { toast } from 'sonner'
 import logoImg from '@/assets/logo-kubovibe.png'
+import StreakCard from '@/components/shortlinks/StreakCard'
 
 const DAILY_LIMIT = 10
 const CREDIT_PER_VIEW = 0.5
@@ -36,6 +37,8 @@ export default function ShortlinksPage() {
   const [unityLoaded, setUnityLoaded] = useState(false)
   const unityInitRef = useRef(false)
   const [showConfetti, setShowConfetti] = useState(false)
+  const [currentStreak, setCurrentStreak] = useState(0)
+  const [longestStreak, setLongestStreak] = useState(0)
 
   // Load Unity Ads SDK
   useEffect(() => {
@@ -63,13 +66,24 @@ export default function ShortlinksPage() {
     const todayStart = new Date()
     todayStart.setHours(0, 0, 0, 0)
 
-    const { count } = await supabase
-      .from('ad_rewards' as any)
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .gte('created_at', todayStart.toISOString())
+    const [adResult, streakResult] = await Promise.all([
+      supabase
+        .from('ad_rewards' as any)
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .gte('created_at', todayStart.toISOString()),
+      supabase
+        .from('user_streaks' as any)
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle(),
+    ])
 
-    setTodayCount(count || 0)
+    setTodayCount(adResult.count || 0)
+    if (streakResult.data) {
+      setCurrentStreak((streakResult.data as any).current_streak || 0)
+      setLongestStreak((streakResult.data as any).longest_streak || 0)
+    }
     setLoading(false)
   }, [user])
 
@@ -123,10 +137,20 @@ export default function ShortlinksPage() {
         headers: { Authorization: `Bearer ${session?.access_token}` },
       })
       if (res.error) throw new Error(res.error.message)
+      const result = res.data as any
       const newCount = todayCount + 1
       setTodayCount(newCount)
+
+      if (result?.current_streak) {
+        setCurrentStreak(result.current_streak)
+        setLongestStreak(prev => Math.max(prev, result.current_streak))
+      }
+
       if (newCount >= DAILY_LIMIT) {
-        toast.success('🎉 Todos os créditos do dia conquistados!')
+        const bonusMsg = result?.streak_bonus > 0
+          ? ` + ${result.streak_bonus} bônus de streak 🔥`
+          : ''
+        toast.success(`🎉 Todos os créditos do dia conquistados!${bonusMsg}`)
         setShowConfetti(true)
         setTimeout(() => setShowConfetti(false), 5000)
       } else {
@@ -222,6 +246,9 @@ export default function ShortlinksPage() {
             </div>
           </div>
         </motion.div>
+
+        {/* Streak Card */}
+        <StreakCard currentStreak={currentStreak} longestStreak={longestStreak} />
 
         {/* Progress */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass glass-border rounded-2xl p-4 mb-8">
