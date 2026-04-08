@@ -2,7 +2,6 @@ import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -31,7 +30,7 @@ function statusBadge(status: string) {
       return <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">Enviado</Badge>;
     case "dlq":
     case "failed":
-      return <Badge className="bg-destructive/20 text-red-400 border-destructive/30">Falho</Badge>;
+      return <Badge className="bg-red-500/20 text-red-400 border-red-500/30">Falho</Badge>;
     case "suppressed":
       return <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">Suprimido</Badge>;
     case "pending":
@@ -45,9 +44,19 @@ function statusBadge(status: string) {
   }
 }
 
+interface EmailLog {
+  id: string;
+  message_id: string | null;
+  template_name: string;
+  recipient_email: string;
+  status: string;
+  error_message: string | null;
+  created_at: string;
+  metadata: Record<string, unknown> | null;
+}
+
 export default function EmailDashboardPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const [timeRange, setTimeRange] = useState("7d");
   const [statusFilter, setStatusFilter] = useState("all");
   const [templateFilter, setTemplateFilter] = useState("all");
@@ -61,23 +70,36 @@ export default function EmailDashboardPage() {
     return d.toISOString();
   }, [rangeHours]);
 
-  const { data: rawLogs = [], isLoading, refetch } = useQuery({
-    queryKey: ["email-logs", since],
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ["email-dashboard", since],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("email_send_log")
-        .select("*")
-        .gte("created_at", since)
-        .order("created_at", { ascending: false })
-        .limit(1000);
-      if (error) throw error;
-      return data ?? [];
+      const { data, error } = await supabase.functions.invoke("email-dashboard", {
+        body: null,
+        method: "GET",
+        headers: {},
+      });
+      // Use fetch directly for GET with query params
+      const session = await supabase.auth.getSession();
+      const token = session.data.session?.access_token;
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/email-dashboard?since=${encodeURIComponent(since)}`;
+      const res = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+      });
+      if (!res.ok) throw new Error("Failed to fetch email data");
+      return res.json() as Promise<{ logs: EmailLog[]; suppressedCount: number }>;
     },
     refetchInterval: 30000,
   });
 
+  const rawLogs = data?.logs ?? [];
+  const suppressedCount = data?.suppressedCount ?? 0;
+
+  // Deduplicate: keep latest row per message_id
   const logs = useMemo(() => {
-    const map = new Map<string, typeof rawLogs[0]>();
+    const map = new Map<string, EmailLog>();
     for (const row of rawLogs) {
       const key = row.message_id ?? row.id;
       if (!map.has(key)) map.set(key, row);
@@ -110,17 +132,6 @@ export default function EmailDashboardPage() {
   const paginated = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
 
-  const { data: suppressedCount = 0 } = useQuery({
-    queryKey: ["suppressed-count"],
-    queryFn: async () => {
-      const { count, error } = await supabase
-        .from("suppressed_emails")
-        .select("*", { count: "exact", head: true });
-      if (error) return 0;
-      return count ?? 0;
-    },
-  });
-
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="border-b border-border bg-card/50">
@@ -139,6 +150,7 @@ export default function EmailDashboardPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+        {/* Filters */}
         <div className="flex flex-wrap gap-3">
           {TIME_RANGES.map((t) => (
             <Button
@@ -173,8 +185,9 @@ export default function EmailDashboardPage() {
           </Select>
         </div>
 
+        {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <Card className="border-border bg-card">
+          <Card className="border-border">
             <CardContent className="pt-4 pb-3 px-4">
               <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
                 <Mail className="h-3.5 w-3.5" /> Total
@@ -182,7 +195,7 @@ export default function EmailDashboardPage() {
               <p className="text-2xl font-bold">{stats.total}</p>
             </CardContent>
           </Card>
-          <Card className="border-emerald-500/20 bg-card">
+          <Card className="border-emerald-500/20">
             <CardContent className="pt-4 pb-3 px-4">
               <div className="flex items-center gap-2 text-emerald-400 text-xs mb-1">
                 <CheckCircle2 className="h-3.5 w-3.5" /> Enviados
@@ -190,7 +203,7 @@ export default function EmailDashboardPage() {
               <p className="text-2xl font-bold text-emerald-400">{stats.sent}</p>
             </CardContent>
           </Card>
-          <Card className="border-destructive/20 bg-card">
+          <Card className="border-red-500/20">
             <CardContent className="pt-4 pb-3 px-4">
               <div className="flex items-center gap-2 text-red-400 text-xs mb-1">
                 <XCircle className="h-3.5 w-3.5" /> Falhos
@@ -198,7 +211,7 @@ export default function EmailDashboardPage() {
               <p className="text-2xl font-bold text-red-400">{stats.failed}</p>
             </CardContent>
           </Card>
-          <Card className="border-yellow-500/20 bg-card">
+          <Card className="border-yellow-500/20">
             <CardContent className="pt-4 pb-3 px-4">
               <div className="flex items-center gap-2 text-yellow-400 text-xs mb-1">
                 <AlertTriangle className="h-3.5 w-3.5" /> Suprimidos
@@ -206,7 +219,7 @@ export default function EmailDashboardPage() {
               <p className="text-2xl font-bold text-yellow-400">{stats.suppressed}</p>
             </CardContent>
           </Card>
-          <Card className="border-blue-500/20 bg-card">
+          <Card className="border-blue-500/20">
             <CardContent className="pt-4 pb-3 px-4">
               <div className="flex items-center gap-2 text-blue-400 text-xs mb-1">
                 <Mail className="h-3.5 w-3.5" /> Pendentes
@@ -220,13 +233,14 @@ export default function EmailDashboardPage() {
           <Card className="border-yellow-500/20 bg-yellow-500/5">
             <CardContent className="py-3 px-4">
               <p className="text-sm text-yellow-400">
-                ⚠️ {suppressedCount} endereço{suppressedCount > 1 ? "s" : ""} suprimido{suppressedCount > 1 ? "s" : ""} (bounce/unsubscribe/reclamação)
+                ⚠️ {suppressedCount} endereço{suppressedCount > 1 ? "s" : ""} suprimido{suppressedCount > 1 ? "s" : ""}
               </p>
             </CardContent>
           </Card>
         )}
 
-        <Card className="border-border bg-card">
+        {/* Email log table */}
+        <Card className="border-border">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Log de Emails ({filtered.length})</CardTitle>
           </CardHeader>
@@ -269,9 +283,7 @@ export default function EmailDashboardPage() {
                 </div>
                 {totalPages > 1 && (
                   <div className="flex items-center justify-between px-4 py-3 border-t border-border">
-                    <p className="text-xs text-muted-foreground">
-                      Página {page + 1} de {totalPages}
-                    </p>
+                    <p className="text-xs text-muted-foreground">Página {page + 1} de {totalPages}</p>
                     <div className="flex gap-2">
                       <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(page - 1)}>
                         Anterior
