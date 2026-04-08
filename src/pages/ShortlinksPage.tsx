@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { ArrowLeft, Zap, Play, Wallet, Send, Gift, Trophy } from 'lucide-react'
+import { ArrowLeft, Zap, Play, Wallet, Gift, Send, Trophy } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
@@ -13,19 +13,24 @@ import BadgesCard from '@/components/shortlinks/BadgesCard'
 
 const DAILY_LIMIT = 10
 const CREDIT_PER_VIEW = 0.5
-const UNITY_GAME_ID = 'zw52l859eq65bwtg'
-const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
-const UNITY_AD_UNIT_ID = isIOS ? 'Rewarded_iOS' : 'Rewarded_Android'
+const WATCH_DURATION = 15 // seconds to watch before claiming
 
-declare global {
-  interface Window {
-    UnityAds?: {
-      init: (gameId: string, testMode: boolean) => void
-      isReady: (adUnitId: string) => boolean
-      show: (adUnitId: string, options?: { onComplete?: () => void; onSkip?: () => void; onError?: (msg: string) => void }) => void
-    }
-    unityAdsReady?: boolean
-  }
+// Pool of short YouTube videos (educational/motivational content)
+const VIDEO_POOL = [
+  'dQw4w9WgXcQ',
+  'jNQXAC9IVRw',
+  'ZZ5LpwO-An4',
+  'kJQP7kiw5Fk',
+  '9bZkp7q19f0',
+  'RgKAFK5djSk',
+  'OPf0YbXqDm0',
+  'JGwWNGJdvx8',
+  'CevxZvSJLk8',
+  'hT_nvWreIhg',
+]
+
+function getRandomVideoId() {
+  return VIDEO_POOL[Math.floor(Math.random() * VIDEO_POOL.length)]
 }
 
 export default function ShortlinksPage() {
@@ -36,32 +41,10 @@ export default function ShortlinksPage() {
   const [watching, setWatching] = useState(false)
   const [countdown, setCountdown] = useState(0)
   const [crediting, setCrediting] = useState(false)
-  const [unityLoaded, setUnityLoaded] = useState(false)
-  const unityInitRef = useRef(false)
   const [showConfetti, setShowConfetti] = useState(false)
   const [currentStreak, setCurrentStreak] = useState(0)
   const [longestStreak, setLongestStreak] = useState(0)
-
-  // Load Unity Ads SDK
-  useEffect(() => {
-    if (unityInitRef.current) return
-    unityInitRef.current = true
-
-    const script = document.createElement('script')
-    script.src = 'https://unity-ads.unity3d.com/webview/public/config/UnityAds.js'
-    script.async = true
-    script.onload = () => {
-      try {
-        window.UnityAds?.init(UNITY_GAME_ID, false) // production mode
-        setUnityLoaded(true)
-        console.log('Unity Ads initialized ✓')
-      } catch (e) {
-        console.warn('Unity Ads init failed:', e)
-      }
-    }
-    script.onerror = () => console.warn('Unity Ads SDK failed to load')
-    document.head.appendChild(script)
-  }, [])
+  const [videoId, setVideoId] = useState('')
 
   const fetchData = useCallback(async () => {
     if (!user) return
@@ -105,29 +88,9 @@ export default function ShortlinksPage() {
       return
     }
 
+    setVideoId(getRandomVideoId())
     setWatching(true)
-
-    // Try real Unity Ads first
-    if (unityLoaded && window.UnityAds?.isReady(UNITY_AD_UNIT_ID)) {
-      window.UnityAds.show(UNITY_AD_UNIT_ID, {
-        onComplete: () => {
-          setCountdown(0)
-          creditReward()
-        },
-        onSkip: () => {
-          toast.info('Assista o vídeo completo para ganhar créditos')
-          setWatching(false)
-        },
-        onError: (msg) => {
-          console.warn('Unity Ad error:', msg)
-          // Fallback to timer
-          setCountdown(10)
-        },
-      })
-    } else {
-      // Fallback: simulated ad with timer (for dev/web)
-      setCountdown(10)
-    }
+    setCountdown(WATCH_DURATION)
   }
 
   const creditReward = async () => {
@@ -267,7 +230,7 @@ export default function ShortlinksPage() {
           )}
         </motion.div>
 
-        {/* Main CTA Button */}
+        {/* Main CTA / Video Player */}
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -281,17 +244,27 @@ export default function ShortlinksPage() {
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="glass glass-border rounded-2xl p-8 border-primary/30 ring-2 ring-primary/20"
+                className="glass glass-border rounded-2xl p-4 border-primary/30 ring-2 ring-primary/20"
               >
+                {/* YouTube Video Embed */}
+                <div className="relative w-full rounded-xl overflow-hidden mb-4" style={{ aspectRatio: '16/9' }}>
+                  <iframe
+                    src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`}
+                    title="Assista para ganhar créditos"
+                    allow="autoplay; encrypted-media"
+                    allowFullScreen
+                    className="absolute inset-0 w-full h-full"
+                  />
+                </div>
+
                 <div className="text-center">
-                  <Play className="h-12 w-12 text-primary mx-auto mb-4 animate-pulse" />
                   <h3 className="font-display font-bold text-foreground text-lg mb-1">Assistindo vídeo...</h3>
-                  <p className="text-muted-foreground text-sm mb-4">Aguarde o final para ganhar seu crédito</p>
+                  <p className="text-muted-foreground text-sm mb-4">Aguarde o timer para resgatar seu crédito</p>
 
                   {countdown > 0 ? (
-                    <div className="mb-4">
+                    <div className="mb-2">
                       <div className="text-5xl font-display font-bold text-primary mb-3">{countdown}s</div>
-                      <Progress value={((10 - countdown) / 10) * 100} className="h-2 max-w-xs mx-auto" />
+                      <Progress value={((WATCH_DURATION - countdown) / WATCH_DURATION) * 100} className="h-2 max-w-xs mx-auto" />
                     </div>
                   ) : (
                     <Button
