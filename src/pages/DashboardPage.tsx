@@ -81,6 +81,9 @@ export default function DashboardPage() {
             <img src={logoImg} alt="KUBO VIBE" className="h-7" />
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={() => navigate('/emails')} className="rounded-xl gap-2 text-muted-foreground hover:text-foreground">
+              <Mail className="h-4 w-4" /> Emails
+            </Button>
             <Button variant="outline" size="sm" onClick={() => navigate('/shortlinks')} className="rounded-xl gap-2 border-primary/20 text-primary hover:bg-primary/10">
               <Gift className="h-4 w-4" /> Ganhar Créditos
             </Button>
