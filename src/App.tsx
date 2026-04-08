@@ -21,6 +21,7 @@ import ShortlinksPage from "./pages/ShortlinksPage";
 import LeaderboardPage from "./pages/LeaderboardPage";
 import PublicAppPage from "./pages/PublicAppPage";
 import UnsubscribePage from "./pages/UnsubscribePage";
+import EmailDashboardPage from "./pages/EmailDashboardPage";
 
 const queryClient = new QueryClient();
 
@@ -46,6 +47,7 @@ const App = () => (
             <Route path="/connect" element={<ProtectedRoute><ConnectPage /></ProtectedRoute>} />
             <Route path="/shortlinks" element={<ProtectedRoute><ShortlinksPage /></ProtectedRoute>} />
             <Route path="/leaderboard" element={<ProtectedRoute><LeaderboardPage /></ProtectedRoute>} />
+            <Route path="/emails" element={<ProtectedRoute><EmailDashboardPage /></ProtectedRoute>} />
             <Route path="/app/:projectId" element={<PublicAppPage />} />
             <Route path="/app/:projectId/:slug" element={<PublicAppPage />} />
             <Route path="/unsubscribe" element={<UnsubscribePage />} />
