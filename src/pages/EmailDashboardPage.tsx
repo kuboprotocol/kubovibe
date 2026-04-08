@@ -73,12 +73,6 @@ export default function EmailDashboardPage() {
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["email-dashboard", since],
     queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke("email-dashboard", {
-        body: null,
-        method: "GET",
-        headers: {},
-      });
-      // Use fetch directly for GET with query params
       const session = await supabase.auth.getSession();
       const token = session.data.session?.access_token;
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/email-dashboard?since=${encodeURIComponent(since)}`;
