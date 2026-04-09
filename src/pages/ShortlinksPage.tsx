@@ -100,13 +100,36 @@ export default function ShortlinksPage() {
     return () => clearTimeout(t)
   }, [countdown])
 
-  const showAd = () => {
+  const showAd = async () => {
     if (!user) { navigate('/auth'); return }
     if (todayCount >= DAILY_LIMIT) {
       toast.info('Limite diário atingido! Volte amanhã 🌅')
       return
     }
 
+    // Native: use Unity Ads SDK
+    if (isNative && unityReady) {
+      setAdLoading(true)
+      try {
+        await loadRewardedAd()
+        const completed = await showRewardedAd()
+        if (completed) {
+          await creditReward()
+        } else {
+          toast.info('Assista o vídeo completo para ganhar créditos')
+        }
+        // Pre-load next ad
+        loadRewardedAd()
+      } catch (err) {
+        console.error('[UnityAds] Error:', err)
+        toast.error('Erro ao carregar anúncio. Tente novamente.')
+      } finally {
+        setAdLoading(false)
+      }
+      return
+    }
+
+    // Web fallback: YouTube video
     setVideoId(getRandomVideoId())
     setWatching(true)
     setCountdown(WATCH_DURATION)
