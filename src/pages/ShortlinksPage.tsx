@@ -326,14 +326,16 @@ export default function ShortlinksPage() {
                   variant="hero"
                   className="w-full h-20 rounded-2xl text-lg font-display font-bold gap-3 relative overflow-hidden"
                   onClick={showAd}
-                  disabled={todayCount >= DAILY_LIMIT || loading}
+                  disabled={todayCount >= DAILY_LIMIT || loading || adLoading}
                 >
                   {todayCount >= DAILY_LIMIT ? (
                     <>🎉 Limite atingido! Volte amanhã</>
+                  ) : adLoading ? (
+                    <>⏳ Carregando anúncio...</>
                   ) : (
                     <>
                       <Play className="h-6 w-6" />
-                      🎬 Assistir Vídeo (+{CREDIT_PER_VIEW} crédito)
+                      {isNative ? '🎬 Assistir Anúncio' : '🎬 Assistir Vídeo'} (+{CREDIT_PER_VIEW} crédito)
                       <span className="absolute top-2 right-3 text-xs opacity-70">{remaining} restantes</span>
                     </>
                   )}
