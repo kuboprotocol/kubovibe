@@ -83,6 +83,16 @@ export default function ShortlinksPage() {
 
   useEffect(() => { fetchData() }, [fetchData])
 
+  // Initialize Unity Ads on native
+  useEffect(() => {
+    if (isNative) {
+      initializeUnityAds().then(ok => {
+        setUnityReady(ok)
+        if (ok) loadRewardedAd()
+      })
+    }
+  }, [isNative])
+
   // Countdown timer
   useEffect(() => {
     if (countdown <= 0) return
