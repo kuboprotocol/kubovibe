@@ -51,6 +51,9 @@ export default function ShortlinksPage() {
   const [currentStreak, setCurrentStreak] = useState(0)
   const [longestStreak, setLongestStreak] = useState(0)
   const [videoId, setVideoId] = useState('')
+  const [unityReady, setUnityReady] = useState(false)
+  const [adLoading, setAdLoading] = useState(false)
+  const isNative = isNativePlatform()
 
   const fetchData = useCallback(async () => {
     if (!user) return
