@@ -10,12 +10,18 @@ import { toast } from 'sonner'
 import logoImg from '@/assets/logo-kubovibe.png'
 import StreakCard from '@/components/shortlinks/StreakCard'
 import BadgesCard from '@/components/shortlinks/BadgesCard'
+import {
+  isNativePlatform,
+  initializeUnityAds,
+  loadRewardedAd,
+  showRewardedAd,
+} from '@/lib/unityAds'
 
 const DAILY_LIMIT = 10
 const CREDIT_PER_VIEW = 0.5
-const WATCH_DURATION = 15 // seconds to watch before claiming
+const WATCH_DURATION = 15 // seconds to watch before claiming (web only)
 
-// Pool of short YouTube videos (educational/motivational content)
+// Pool of short YouTube videos (web fallback)
 const VIDEO_POOL = [
   'dQw4w9WgXcQ',
   'jNQXAC9IVRw',
