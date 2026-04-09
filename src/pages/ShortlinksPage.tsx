@@ -10,12 +10,18 @@ import { toast } from 'sonner'
 import logoImg from '@/assets/logo-kubovibe.png'
 import StreakCard from '@/components/shortlinks/StreakCard'
 import BadgesCard from '@/components/shortlinks/BadgesCard'
+import {
+  isNativePlatform,
+  initializeUnityAds,
+  loadRewardedAd,
+  showRewardedAd,
+} from '@/lib/unityAds'
 
 const DAILY_LIMIT = 10
 const CREDIT_PER_VIEW = 0.5
-const WATCH_DURATION = 15 // seconds to watch before claiming
+const WATCH_DURATION = 15 // seconds to watch before claiming (web only)
 
-// Pool of short YouTube videos (educational/motivational content)
+// Pool of short YouTube videos (web fallback)
 const VIDEO_POOL = [
   'dQw4w9WgXcQ',
   'jNQXAC9IVRw',
@@ -45,6 +51,9 @@ export default function ShortlinksPage() {
   const [currentStreak, setCurrentStreak] = useState(0)
   const [longestStreak, setLongestStreak] = useState(0)
   const [videoId, setVideoId] = useState('')
+  const [unityReady, setUnityReady] = useState(false)
+  const [adLoading, setAdLoading] = useState(false)
+  const isNative = isNativePlatform()
 
   const fetchData = useCallback(async () => {
     if (!user) return
@@ -74,6 +83,16 @@ export default function ShortlinksPage() {
 
   useEffect(() => { fetchData() }, [fetchData])
 
+  // Initialize Unity Ads on native
+  useEffect(() => {
+    if (isNative) {
+      initializeUnityAds().then(ok => {
+        setUnityReady(ok)
+        if (ok) loadRewardedAd()
+      })
+    }
+  }, [isNative])
+
   // Countdown timer
   useEffect(() => {
     if (countdown <= 0) return
@@ -81,13 +100,36 @@ export default function ShortlinksPage() {
     return () => clearTimeout(t)
   }, [countdown])
 
-  const showAd = () => {
+  const showAd = async () => {
     if (!user) { navigate('/auth'); return }
     if (todayCount >= DAILY_LIMIT) {
       toast.info('Limite diário atingido! Volte amanhã 🌅')
       return
     }
 
+    // Native: use Unity Ads SDK
+    if (isNative && unityReady) {
+      setAdLoading(true)
+      try {
+        await loadRewardedAd()
+        const completed = await showRewardedAd()
+        if (completed) {
+          await creditReward()
+        } else {
+          toast.info('Assista o vídeo completo para ganhar créditos')
+        }
+        // Pre-load next ad
+        loadRewardedAd()
+      } catch (err) {
+        console.error('[UnityAds] Error:', err)
+        toast.error('Erro ao carregar anúncio. Tente novamente.')
+      } finally {
+        setAdLoading(false)
+      }
+      return
+    }
+
+    // Web fallback: YouTube video
     setVideoId(getRandomVideoId())
     setWatching(true)
     setCountdown(WATCH_DURATION)
@@ -284,14 +326,16 @@ export default function ShortlinksPage() {
                   variant="hero"
                   className="w-full h-20 rounded-2xl text-lg font-display font-bold gap-3 relative overflow-hidden"
                   onClick={showAd}
-                  disabled={todayCount >= DAILY_LIMIT || loading}
+                  disabled={todayCount >= DAILY_LIMIT || loading || adLoading}
                 >
                   {todayCount >= DAILY_LIMIT ? (
                     <>🎉 Limite atingido! Volte amanhã</>
+                  ) : adLoading ? (
+                    <>⏳ Carregando anúncio...</>
                   ) : (
                     <>
                       <Play className="h-6 w-6" />
-                      🎬 Assistir Vídeo (+{CREDIT_PER_VIEW} crédito)
+                      {isNative ? '🎬 Assistir Anúncio' : '🎬 Assistir Vídeo'} (+{CREDIT_PER_VIEW} crédito)
                       <span className="absolute top-2 right-3 text-xs opacity-70">{remaining} restantes</span>
                     </>
                   )}
