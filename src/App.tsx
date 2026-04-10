@@ -17,6 +17,8 @@ import NotFound from "./pages/NotFound";
 import PricingPage from "./pages/PricingPage";
 import SupportPage from "./pages/SupportPage";
 import ConnectPage from "./pages/ConnectPage";
+import ConnectorsHubPage from "./pages/ConnectorsHubPage";
+import ConnectorDetailPage from "./pages/ConnectorDetailPage";
 import ShortlinksPage from "./pages/ShortlinksPage";
 import LeaderboardPage from "./pages/LeaderboardPage";
 import PublicAppPage from "./pages/PublicAppPage";
@@ -45,6 +47,8 @@ const App = () => (
             <Route path="/builder/:projectId" element={<ProtectedRoute><BuilderPage /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
             <Route path="/connect" element={<ProtectedRoute><ConnectPage /></ProtectedRoute>} />
+            <Route path="/connectors" element={<ProtectedRoute><ConnectorsHubPage /></ProtectedRoute>} />
+            <Route path="/connectors/:slug" element={<ProtectedRoute><ConnectorDetailPage /></ProtectedRoute>} />
             <Route path="/shortlinks" element={<ProtectedRoute><ShortlinksPage /></ProtectedRoute>} />
             <Route path="/leaderboard" element={<ProtectedRoute><LeaderboardPage /></ProtectedRoute>} />
             <Route path="/emails" element={<ProtectedRoute><EmailDashboardPage /></ProtectedRoute>} />
