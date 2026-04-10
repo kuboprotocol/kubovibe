@@ -178,6 +178,25 @@ export default function ShortlinksPage() {
 
   if (!user) { navigate('/auth'); return null }
 
+  const ADMIN_EMAIL = 'kuboprotocol@gmail.com'
+  const isAdmin = user.email?.toLowerCase() === ADMIN_EMAIL
+
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center px-6 text-center">
+        <div className="glass glass-border rounded-2xl p-8 max-w-md">
+          <h1 className="font-display font-bold text-2xl text-foreground mb-3">🚧 Em breve</h1>
+          <p className="text-muted-foreground mb-6">
+            Esta funcionalidade está sendo preparada e estará disponível em breve. Fique ligado!
+          </p>
+          <Button variant="hero" className="rounded-xl" onClick={() => navigate('/dashboard')}>
+            Voltar ao Dashboard
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
       {/* Confetti overlay */}
