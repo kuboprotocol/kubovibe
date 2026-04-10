@@ -93,7 +93,7 @@ export default function ConnectorDetailPage() {
             variant={isConnected ? 'default' : 'secondary'}
             className={cn(
               'gap-1.5',
-              isConnected && 'bg-green-500/15 text-green-400 border-green-500/30'
+              isConnected && 'bg-primary/15 text-primary border-primary/30'
             )}
           >
             {isConnected ? (
@@ -222,7 +222,7 @@ export default function ConnectorDetailPage() {
                     <div
                       className={cn(
                         'h-2 w-2 rounded-full shrink-0',
-                        log.status === 'success' && 'bg-green-400',
+                        log.status === 'success' && 'bg-primary',
                         log.status === 'error' && 'bg-destructive',
                         log.status === 'neutral' && 'bg-muted-foreground/40'
                       )}
