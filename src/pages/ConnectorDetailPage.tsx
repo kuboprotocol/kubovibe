@@ -10,6 +10,7 @@ import {
   ArrowLeft, CheckCircle, XCircle, ExternalLink, Copy,
   RefreshCw, Unplug, Loader2, Clock, Activity, Settings,
 } from 'lucide-react'
+import GitHubReposList from '@/components/connectors/GitHubReposList'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 
@@ -199,6 +200,9 @@ export default function ConnectorDetailPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* GitHub Repos */}
+        {isGitHub && isConnected && <GitHubReposList />}
 
         {/* Activity */}
         {isConnected && (
