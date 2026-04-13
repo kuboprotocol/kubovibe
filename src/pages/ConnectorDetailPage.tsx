@@ -201,6 +201,9 @@ export default function ConnectorDetailPage() {
           </CardContent>
         </Card>
 
+        {/* GitHub Repos */}
+        {isGitHub && isConnected && <GitHubReposList />}
+
         {/* Activity */}
         {isConnected && (
           <Card>
