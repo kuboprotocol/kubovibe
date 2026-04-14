@@ -4,10 +4,25 @@ Deno.serve(async (req) => {
   const url = new URL(req.url)
   const code = url.searchParams.get('code')
   const error = url.searchParams.get('error')
+  const stateParam = url.searchParams.get('state')
 
-  // This is a redirect endpoint — build an HTML response
+  // Parse state to get the app return URL
+  let appBaseUrl = ''
+  try {
+    if (stateParam) {
+      const decoded = JSON.parse(atob(stateParam))
+      if (decoded.returnUrl) {
+        const returnUrlObj = new URL(decoded.returnUrl)
+        appBaseUrl = returnUrlObj.origin
+      }
+    }
+  } catch {
+    // ignore parse errors
+  }
+
   const redirect = (path: string) => {
-    return new Response(`<html><head><meta http-equiv="refresh" content="0;url=${path}"></head></html>`, {
+    const target = appBaseUrl ? `${appBaseUrl}${path}` : path
+    return new Response(`<html><head><meta http-equiv="refresh" content="0;url=${target}"></head></html>`, {
       headers: { 'Content-Type': 'text/html' },
       status: 200,
     })
@@ -52,9 +67,6 @@ Deno.serve(async (req) => {
     })
     const ghUser = await userRes.json()
 
-    // We need the Supabase user — get from the state cookie or query param
-    // Since this is a redirect from GitHub, we need another way to identify the user
-    // We'll pass user info back to the frontend which will save it
     const params = new URLSearchParams({
       success: 'true',
       username: ghUser.login || '',
