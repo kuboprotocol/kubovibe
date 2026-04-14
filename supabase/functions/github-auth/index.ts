@@ -16,10 +16,13 @@ Deno.serve(async (req) => {
 
     const { returnUrl } = await req.json().catch(() => ({ returnUrl: '' }))
 
-    // Generate a random state for CSRF protection
-    const state = crypto.randomUUID()
+    // Encode the app return URL in the state so the callback can redirect back
+    const statePayload = JSON.stringify({
+      nonce: crypto.randomUUID(),
+      returnUrl: returnUrl || '',
+    })
+    const state = btoa(statePayload)
 
-    // Build GitHub OAuth URL
     const params = new URLSearchParams({
       client_id: clientId,
       redirect_uri: `${Deno.env.get('SUPABASE_URL')}/functions/v1/github-callback`,
