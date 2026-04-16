@@ -241,7 +241,7 @@ export default function ConnectorDetailPage() {
             </CardContent>
           </Card>
         )}
-      </div>
+      </motion.div>
     </div>
   )
 }
