@@ -42,7 +42,6 @@ export const connectors: ConnectorConfig[] = [
     features: ['Pagamentos via cartão', 'Assinaturas', 'Stripe Connect', 'Webhooks de pagamento'],
     docsUrl: 'https://stripe.com/docs',
     status: 'available',
-    internalRoute: '/connect',
   },
   {
     name: 'Figma',

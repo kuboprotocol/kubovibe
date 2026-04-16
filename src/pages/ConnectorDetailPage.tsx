@@ -38,6 +38,7 @@ export default function ConnectorDetailPage() {
   }
 
   const isGitHub = connector.slug === 'github'
+  const isStripe = connector.slug === 'stripe'
   const isConnected = isGitHub ? github.isConnected : fakeConnected
   const connecting = isGitHub ? github.connecting : fakeConnecting
 
@@ -48,6 +49,8 @@ export default function ConnectorDetailPage() {
     }
     if (isGitHub) {
       github.connect()
+    } else if (isStripe) {
+      navigate('/connect')
     } else {
       setFakeConnecting(true)
       await new Promise(r => setTimeout(r, 2000))
