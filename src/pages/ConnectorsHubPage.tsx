@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -78,14 +79,29 @@ export default function ConnectorsHubPage() {
         </div>
 
         {/* Connectors Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <motion.div
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+          initial="hidden"
+          animate="show"
+          variants={{
+            hidden: {},
+            show: { transition: { staggerChildren: 0.05 } },
+          }}
+        >
           {filtered.map(connector => (
-            <button
+            <motion.button
               key={connector.slug}
               onClick={() => handleConnectorClick(connector)}
+              variants={{
+                hidden: { opacity: 0, y: 16 },
+                show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' } },
+              }}
+              whileHover={{ y: -4, scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              transition={{ type: 'spring', stiffness: 320, damping: 22 }}
               className={cn(
                 'group relative text-left p-5 rounded-2xl border border-border bg-card',
-                'hover:border-primary/40 hover:shadow-glow transition-all duration-300',
+                'hover:border-primary/40 hover:shadow-glow transition-colors duration-300',
                 connector.status === 'coming_soon' && 'opacity-70'
               )}
             >
@@ -118,9 +134,9 @@ export default function ConnectorsHubPage() {
                 </span>
                 <ExternalLink className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-primary transition-colors" />
               </div>
-            </button>
+            </motion.button>
           ))}
-        </div>
+        </motion.div>
 
         {filtered.length === 0 && (
           <div className="text-center py-16 text-muted-foreground">
