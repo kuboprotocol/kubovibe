@@ -39,7 +39,6 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Fetch project
     const { data: project, error: projErr } = await supabase
       .from("projects")
       .select("generated_code, title, user_id")
@@ -64,46 +63,40 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Deploy to IPFS via web3.storage / nft.storage compatible API
-    // Using Pinata public gateway as fallback
     const htmlBlob = new Blob([project.generated_code], { type: "text/html" });
-    
-    // Use web3.storage API (free tier)
-    const w3Token = Deno.env.get("WEB3_STORAGE_TOKEN");
-    
-    if (w3Token) {
+    const pinataJwt = Deno.env.get("PINATA_JWT");
+
+    if (pinataJwt) {
       const formData = new FormData();
       formData.append("file", htmlBlob, "index.html");
+      formData.append("pinataMetadata", JSON.stringify({ name: `kubovibe-${project.title || project_id}` }));
 
-      const uploadRes = await fetch("https://api.web3.storage/upload", {
+      const uploadRes = await fetch("https://api.pinata.cloud/pinning/pinFileToIPFS", {
         method: "POST",
-        headers: { Authorization: `Bearer ${w3Token}` },
+        headers: { Authorization: `Bearer ${pinataJwt}` },
         body: formData,
       });
 
       if (!uploadRes.ok) {
         const errData = await uploadRes.text();
-        console.error("IPFS upload error:", errData);
-        return new Response(JSON.stringify({ error: "IPFS upload failed" }), {
+        console.error("Pinata upload error:", errData);
+        return new Response(JSON.stringify({ error: "IPFS upload failed", details: errData }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      const { cid } = await uploadRes.json();
-      const ipfsUrl = `https://${cid}.ipfs.w3s.link/index.html`;
-      const ipfsGateway = `https://ipfs.io/ipfs/${cid}/index.html`;
-
-      return new Response(JSON.stringify({ 
-        cid, 
-        ipfs_url: ipfsUrl,
-        gateway_url: ipfsGateway,
-        status: "deployed" 
+      const { IpfsHash: cid } = await uploadRes.json();
+      return new Response(JSON.stringify({
+        cid,
+        ipfs_url: `https://gateway.pinata.cloud/ipfs/${cid}`,
+        gateway_url: `https://ipfs.io/ipfs/${cid}`,
+        status: "deployed",
       }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Fallback: generate CID-like hash for demo purposes
+    // Fallback simulado
     const encoder = new TextEncoder();
     const data = encoder.encode(project.generated_code);
     const hashBuffer = await crypto.subtle.digest("SHA-256", data);
@@ -113,10 +106,10 @@ Deno.serve(async (req: Request) => {
 
     return new Response(JSON.stringify({
       cid: fakeCid,
-      ipfs_url: `https://${fakeCid}.ipfs.w3s.link/index.html`,
-      gateway_url: `https://ipfs.io/ipfs/${fakeCid}/index.html`,
+      ipfs_url: `https://gateway.pinata.cloud/ipfs/${fakeCid}`,
+      gateway_url: `https://ipfs.io/ipfs/${fakeCid}`,
       status: "simulated",
-      message: "Configure WEB3_STORAGE_TOKEN for real IPFS deployment",
+      message: "Configure PINATA_JWT para deploy real no IPFS",
     }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

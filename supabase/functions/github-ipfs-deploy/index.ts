@@ -38,7 +38,6 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Get GitHub token
     const serviceClient = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -62,7 +61,6 @@ Deno.serve(async (req) => {
       'User-Agent': 'KuboVibe',
     }
 
-    // Get default branch if not specified
     let targetBranch = branch
     if (!targetBranch) {
       const repoRes = await fetch(`https://api.github.com/repos/${repo_full_name}`, { headers: ghHeaders })
@@ -75,8 +73,6 @@ Deno.serve(async (req) => {
       targetBranch = repoData.default_branch || 'main'
     }
 
-    // Try to find index.html or main entry point in the repo
-    // First check repo tree for common entry points
     const treeRes = await fetch(
       `https://api.github.com/repos/${repo_full_name}/git/trees/${targetBranch}?recursive=1`,
       { headers: ghHeaders }
@@ -91,7 +87,6 @@ Deno.serve(async (req) => {
     const treeData = await treeRes.json()
     const files = (treeData.tree || []).filter((f: any) => f.type === 'blob')
 
-    // Collect deployable files (HTML, CSS, JS, images, etc.)
     const deployableExtensions = [
       '.html', '.css', '.js', '.json', '.svg', '.png', '.jpg', '.jpeg',
       '.gif', '.ico', '.webp', '.woff', '.woff2', '.ttf', '.eot', '.txt',
@@ -100,18 +95,15 @@ Deno.serve(async (req) => {
 
     const deployableFiles = files.filter((f: any) => {
       const path = f.path.toLowerCase()
-      // Skip node_modules, .git, etc.
       if (path.startsWith('node_modules/') || path.startsWith('.git/')) return false
       return deployableExtensions.some(ext => path.endsWith(ext))
     })
 
-    // Check if there's an index.html (static site)
     const hasIndexHtml = deployableFiles.some((f: any) =>
       f.path === 'index.html' || f.path === 'public/index.html' || f.path === 'dist/index.html'
     )
 
     if (!hasIndexHtml) {
-      // If no index.html, try to get README and create a simple page
       const readmeFile = files.find((f: any) =>
         f.path.toLowerCase() === 'readme.md' || f.path.toLowerCase() === 'readme'
       )
@@ -125,7 +117,6 @@ Deno.serve(async (req) => {
         })
       }
 
-      // Fetch README content and wrap in HTML
       const readmeRes = await fetch(
         `https://api.github.com/repos/${repo_full_name}/contents/${readmeFile.path}?ref=${targetBranch}`,
         { headers: { ...ghHeaders, Accept: 'application/vnd.github.raw+json' } }
@@ -156,8 +147,6 @@ Deno.serve(async (req) => {
       return await deployToIPFS(htmlContent, repo_full_name)
     }
 
-    // For static sites with index.html, fetch and deploy the main file
-    // Find the best index.html
     const indexPaths = ['dist/index.html', 'public/index.html', 'index.html']
     let indexPath = 'index.html'
     for (const p of indexPaths) {
@@ -191,30 +180,32 @@ Deno.serve(async (req) => {
 })
 
 async function deployToIPFS(htmlContent: string, repoName: string) {
-  const w3Token = Deno.env.get('WEB3_STORAGE_TOKEN')
+  const pinataJwt = Deno.env.get('PINATA_JWT')
 
-  if (w3Token) {
+  if (pinataJwt) {
     const formData = new FormData()
     formData.append('file', new Blob([htmlContent], { type: 'text/html' }), 'index.html')
+    formData.append('pinataMetadata', JSON.stringify({ name: `kubovibe-${repoName.replace('/', '-')}` }))
 
-    const uploadRes = await fetch('https://api.web3.storage/upload', {
+    const uploadRes = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${w3Token}` },
+      headers: { Authorization: `Bearer ${pinataJwt}` },
       body: formData,
     })
 
     if (!uploadRes.ok) {
-      console.error('IPFS upload error:', await uploadRes.text())
-      return new Response(JSON.stringify({ error: 'IPFS upload failed' }), {
+      const errText = await uploadRes.text()
+      console.error('Pinata upload error:', errText)
+      return new Response(JSON.stringify({ error: 'IPFS upload failed', details: errText }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    const { cid } = await uploadRes.json()
+    const { IpfsHash: cid } = await uploadRes.json()
     return new Response(JSON.stringify({
       cid,
-      ipfs_url: `https://${cid}.ipfs.w3s.link/index.html`,
-      gateway_url: `https://ipfs.io/ipfs/${cid}/index.html`,
+      ipfs_url: `https://gateway.pinata.cloud/ipfs/${cid}`,
+      gateway_url: `https://ipfs.io/ipfs/${cid}`,
       repo: repoName,
       status: 'deployed',
     }), {
@@ -232,11 +223,11 @@ async function deployToIPFS(htmlContent: string, repoName: string) {
 
   return new Response(JSON.stringify({
     cid: fakeCid,
-    ipfs_url: `https://${fakeCid}.ipfs.w3s.link/index.html`,
-    gateway_url: `https://ipfs.io/ipfs/${fakeCid}/index.html`,
+    ipfs_url: `https://gateway.pinata.cloud/ipfs/${fakeCid}`,
+    gateway_url: `https://ipfs.io/ipfs/${fakeCid}`,
     repo: repoName,
     status: 'simulated',
-    message: 'Configure WEB3_STORAGE_TOKEN para deploy real no IPFS',
+    message: 'Configure PINATA_JWT para deploy real no IPFS',
   }), {
     status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   })
