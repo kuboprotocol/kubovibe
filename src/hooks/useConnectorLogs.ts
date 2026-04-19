@@ -52,7 +52,18 @@ export function useConnectorLogs(connectorSlug: string) {
     return () => { supabase.removeChannel(channel) }
   }, [user, connectorSlug])
 
-  return { logs, loading, refetch: fetchLogs }
+  const clearLogs = useCallback(async () => {
+    if (!user) return { error: new Error('Not authenticated') }
+    const { error } = await supabase
+      .from('connector_activity_logs')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('connector_slug', connectorSlug)
+    if (!error) setLogs([])
+    return { error }
+  }, [user, connectorSlug])
+
+  return { logs, loading, refetch: fetchLogs, clearLogs }
 }
 
 export async function logConnectorEvent(params: {

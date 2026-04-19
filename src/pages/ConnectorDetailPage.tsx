@@ -1,15 +1,20 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 import { getConnectorBySlug } from '@/lib/connectorsConfig'
 import { useGitHubConnection } from '@/hooks/useGitHubConnection'
 import {
   ArrowLeft, CheckCircle, XCircle, ExternalLink, Copy,
-  RefreshCw, Unplug, Loader2, Clock, Activity, Settings,
+  RefreshCw, Unplug, Loader2, Clock, Activity, Trash2,
 } from 'lucide-react'
 import GitHubReposList from '@/components/connectors/GitHubReposList'
 import { useConnectorLogs, logConnectorEvent } from '@/hooks/useConnectorLogs'
@@ -18,6 +23,8 @@ import { toast } from 'sonner'
 import { formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
+type StatusFilter = 'all' | 'success' | 'error' | 'info' | 'warning'
+
 export default function ConnectorDetailPage() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
@@ -25,7 +32,25 @@ export default function ConnectorDetailPage() {
 
   // Real GitHub OAuth hook
   const github = useGitHubConnection()
-  const { logs, loading: logsLoading } = useConnectorLogs(slug || '')
+  const { logs, loading: logsLoading, clearLogs } = useConnectorLogs(slug || '')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [clearing, setClearing] = useState(false)
+
+  const filteredLogs = useMemo(
+    () => statusFilter === 'all' ? logs : logs.filter(l => l.status === statusFilter),
+    [logs, statusFilter]
+  )
+
+  const handleClearLogs = async () => {
+    setClearing(true)
+    const { error } = await clearLogs()
+    setClearing(false)
+    if (error) {
+      toast.error('Erro ao limpar histórico')
+    } else {
+      toast.success('Histórico limpo!')
+    }
+  }
 
   // Fallback state for non-GitHub connectors
   const [fakeConnected, setFakeConnected] = useState(false)
@@ -232,21 +257,79 @@ export default function ConnectorDetailPage() {
         {/* Activity — sempre que houver logs */}
         {(isConnected || logs.length > 0) && (
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
               <CardTitle className="text-lg flex items-center gap-2">
                 <Activity className="h-4 w-4 text-primary" /> Atividade Recente
               </CardTitle>
+              {logs.length > 0 && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive h-8">
+                      <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Limpar
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Limpar histórico de logs?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Todos os {logs.length} registros de atividade do conector <strong>{connector.name}</strong> serão permanentemente excluídos. Esta ação não pode ser desfeita.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel disabled={clearing}>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleClearLogs}
+                        disabled={clearing}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        {clearing ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Trash2 className="h-3.5 w-3.5 mr-1.5" />}
+                        Limpar tudo
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
             </CardHeader>
             <CardContent>
+              {/* Filter chips */}
+              {logs.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-4">
+                  {([
+                    { value: 'all', label: 'Todos', count: logs.length },
+                    { value: 'success', label: 'Sucesso', count: logs.filter(l => l.status === 'success').length },
+                    { value: 'error', label: 'Erros', count: logs.filter(l => l.status === 'error').length },
+                    { value: 'warning', label: 'Avisos', count: logs.filter(l => l.status === 'warning').length },
+                    { value: 'info', label: 'Info', count: logs.filter(l => l.status === 'info').length },
+                  ] as { value: StatusFilter; label: string; count: number }[]).map(f => (
+                    <button
+                      key={f.value}
+                      onClick={() => setStatusFilter(f.value)}
+                      className={cn(
+                        'px-2.5 py-1 rounded-full text-xs font-medium transition-colors border',
+                        statusFilter === f.value
+                          ? 'bg-primary/15 text-primary border-primary/30'
+                          : 'bg-secondary/50 text-muted-foreground border-border hover:bg-secondary',
+                        f.count === 0 && 'opacity-40'
+                      )}
+                      disabled={f.count === 0 && f.value !== 'all'}
+                    >
+                      {f.label} <span className="ml-1 opacity-70">{f.count}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {logsLoading ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" /> Carregando logs...
                 </div>
-              ) : logs.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Nenhuma atividade registrada ainda.</p>
+              ) : filteredLogs.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  {logs.length === 0 ? 'Nenhuma atividade registrada ainda.' : 'Nenhum log para este filtro.'}
+                </p>
               ) : (
                 <div className="space-y-3">
-                  {logs.map((log) => (
+                  {filteredLogs.map((log) => (
                     <div key={log.id} className="flex items-center gap-3 text-sm">
                       <div className={cn(
                         'h-2 w-2 rounded-full shrink-0',
