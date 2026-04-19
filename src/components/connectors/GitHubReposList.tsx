@@ -182,7 +182,7 @@ export default function GitHubReposList() {
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">{error}</p>
-          <Button variant="outline" size="sm" onClick={fetchRepos} className="mt-2">
+          <Button variant="outline" size="sm" onClick={() => fetchRepos(true)} className="mt-2">
             <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Tentar novamente
           </Button>
         </CardContent>
