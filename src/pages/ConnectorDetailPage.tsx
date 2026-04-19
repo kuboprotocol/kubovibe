@@ -229,8 +229,8 @@ export default function ConnectorDetailPage() {
         {/* GitHub Repos */}
         {isGitHub && isConnected && <GitHubReposList />}
 
-        {/* Activity */}
-        {isConnected && (
+        {/* Activity — sempre que houver logs */}
+        {(isConnected || logs.length > 0) && (
           <Card>
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
