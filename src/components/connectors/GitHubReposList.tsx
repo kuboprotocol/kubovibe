@@ -58,7 +58,7 @@ export default function GitHubReposList() {
   const [deployError, setDeployError] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
 
-  const fetchRepos = async () => {
+  const fetchRepos = async (manual = false) => {
     setLoading(true)
     setError(null)
     try {
@@ -66,22 +66,47 @@ export default function GitHubReposList() {
         body: null,
       })
       if (fnError) throw fnError
-      setRepos(data?.repos || [])
+      const list = data?.repos || []
+      setRepos(list)
+      if (manual) {
+        logConnectorEvent({
+          connectorSlug: 'github',
+          eventType: 'repos_synced',
+          message: `Sincronização concluída: ${list.length} repositórios`,
+          status: 'success',
+          metadata: { count: list.length },
+        })
+      }
     } catch (err: any) {
       console.error('Error fetching repos:', err)
       setError('Erro ao carregar repositórios')
+      logConnectorEvent({
+        connectorSlug: 'github',
+        eventType: 'repos_sync_failed',
+        message: 'Falha ao sincronizar repositórios',
+        status: 'error',
+        metadata: { error: err?.message },
+      })
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => { fetchRepos() }, [])
+  useEffect(() => { fetchRepos(false) }, [])
 
   const handleDeploy = async (repo: Repo) => {
     setDeploying(repo.full_name)
     setDeployResult(null)
     setDeployError(null)
     setDialogOpen(true)
+
+    logConnectorEvent({
+      connectorSlug: 'github',
+      eventType: 'ipfs_deploy_started',
+      message: `Deploy IPFS iniciado para ${repo.full_name}`,
+      status: 'info',
+      metadata: { repo: repo.full_name },
+    })
 
     try {
       const { data, error: fnError } = await supabase.functions.invoke('github-ipfs-deploy', {
@@ -93,11 +118,31 @@ export default function GitHubReposList() {
 
       setDeployResult(data)
       toast.success(`${repo.name} publicado no IPFS!`)
+      logConnectorEvent({
+        connectorSlug: 'github',
+        eventType: 'ipfs_deploy_completed',
+        message: `Deploy concluído: ${repo.full_name}`,
+        status: 'success',
+        metadata: {
+          repo: repo.full_name,
+          cid: data?.cid,
+          gateway_url: data?.gateway_url,
+          ipfs_url: data?.ipfs_url,
+          deploy_status: data?.status,
+        },
+      })
     } catch (err: any) {
       console.error('Deploy error:', err)
       const msg = err?.message || 'Erro ao fazer deploy'
       setDeployError(msg)
       toast.error(msg)
+      logConnectorEvent({
+        connectorSlug: 'github',
+        eventType: 'ipfs_deploy_failed',
+        message: `Falha no deploy de ${repo.full_name}`,
+        status: 'error',
+        metadata: { repo: repo.full_name, error: msg },
+      })
     } finally {
       setDeploying(null)
     }
