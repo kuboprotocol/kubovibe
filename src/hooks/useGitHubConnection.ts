@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/hooks/useAuth'
 import { toast } from 'sonner'
+import { logConnectorEvent } from '@/hooks/useConnectorLogs'
 
 interface GitHubConnection {
   id: string
@@ -69,8 +70,22 @@ export function useGitHubConnection() {
     if (error) {
       toast.error('Erro ao salvar conexão GitHub')
       console.error(error)
+      logConnectorEvent({
+        connectorSlug: 'github',
+        eventType: 'connect_failed',
+        message: 'Falha ao salvar conexão GitHub',
+        status: 'error',
+        metadata: { error: error.message },
+      })
     } else {
       toast.success('GitHub conectado com sucesso!')
+      logConnectorEvent({
+        connectorSlug: 'github',
+        eventType: 'connected',
+        message: username ? `Conectado como @${username}` : 'Conexão GitHub estabelecida',
+        status: 'success',
+        metadata: { username, scope },
+      })
       await fetchConnection()
     }
     setConnecting(false)
@@ -104,6 +119,12 @@ export function useGitHubConnection() {
     } else {
       setConnection(null)
       toast.info('GitHub desconectado.')
+      logConnectorEvent({
+        connectorSlug: 'github',
+        eventType: 'disconnected',
+        message: 'GitHub desconectado',
+        status: 'info',
+      })
     }
   }
 

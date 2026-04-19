@@ -107,6 +107,39 @@ export type Database = {
         }
         Relationships: []
       }
+      connector_activity_logs: {
+        Row: {
+          connector_slug: string
+          created_at: string
+          event_type: string
+          id: string
+          message: string
+          metadata: Json | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          connector_slug: string
+          created_at?: string
+          event_type: string
+          id?: string
+          message: string
+          metadata?: Json | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          connector_slug?: string
+          created_at?: string
+          event_type?: string
+          id?: string
+          message?: string
+          metadata?: Json | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       email_send_log: {
         Row: {
           created_at: string

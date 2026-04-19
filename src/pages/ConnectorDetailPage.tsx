@@ -12,8 +12,11 @@ import {
   RefreshCw, Unplug, Loader2, Clock, Activity, Settings,
 } from 'lucide-react'
 import GitHubReposList from '@/components/connectors/GitHubReposList'
+import { useConnectorLogs, logConnectorEvent } from '@/hooks/useConnectorLogs'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { formatDistanceToNow } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
 
 export default function ConnectorDetailPage() {
   const { slug } = useParams<{ slug: string }>()
@@ -22,6 +25,7 @@ export default function ConnectorDetailPage() {
 
   // Real GitHub OAuth hook
   const github = useGitHubConnection()
+  const { logs, loading: logsLoading } = useConnectorLogs(slug || '')
 
   // Fallback state for non-GitHub connectors
   const [fakeConnected, setFakeConnected] = useState(false)
@@ -58,6 +62,12 @@ export default function ConnectorDetailPage() {
       setFakeConnected(true)
       setFakeConnecting(false)
       toast.success(`${connector.name} conectado com sucesso!`)
+      logConnectorEvent({
+        connectorSlug: connector.slug,
+        eventType: 'connected',
+        message: `${connector.name} conectado (simulado)`,
+        status: 'success',
+      })
     }
   }
 
@@ -67,6 +77,12 @@ export default function ConnectorDetailPage() {
     } else {
       setFakeConnected(false)
       toast.info(`${connector.name} desconectado.`)
+      logConnectorEvent({
+        connectorSlug: connector.slug,
+        eventType: 'disconnected',
+        message: `${connector.name} desconectado`,
+        status: 'info',
+      })
     }
   }
 
@@ -222,22 +238,31 @@ export default function ConnectorDetailPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {[
-                  { time: 'Agora', event: isGitHub && github.connection ? `Conectado como @${github.connection.github_username}` : 'Conexão estabelecida', status: 'success' },
-                  { time: '—', event: 'Nenhuma sincronização anterior', status: 'neutral' },
-                ].map((log, i) => (
-                  <div key={i} className="flex items-center gap-3 text-sm">
-                    <div className={cn(
-                      'h-2 w-2 rounded-full shrink-0',
-                      log.status === 'success' && 'bg-primary',
-                      log.status === 'neutral' && 'bg-muted-foreground/40'
-                    )} />
-                    <span className="text-muted-foreground flex-1">{log.event}</span>
-                    <span className="text-xs text-muted-foreground/60">{log.time}</span>
-                  </div>
-                ))}
-              </div>
+              {logsLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Carregando logs...
+                </div>
+              ) : logs.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhuma atividade registrada ainda.</p>
+              ) : (
+                <div className="space-y-3">
+                  {logs.map((log) => (
+                    <div key={log.id} className="flex items-center gap-3 text-sm">
+                      <div className={cn(
+                        'h-2 w-2 rounded-full shrink-0',
+                        log.status === 'success' && 'bg-primary',
+                        log.status === 'error' && 'bg-destructive',
+                        log.status === 'warning' && 'bg-accent',
+                        log.status === 'info' && 'bg-muted-foreground/60',
+                      )} />
+                      <span className="text-foreground flex-1 truncate">{log.message}</span>
+                      <span className="text-xs text-muted-foreground/60 shrink-0">
+                        {formatDistanceToNow(new Date(log.created_at), { addSuffix: true, locale: ptBR })}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
