@@ -32,7 +32,25 @@ export default function ConnectorDetailPage() {
 
   // Real GitHub OAuth hook
   const github = useGitHubConnection()
-  const { logs, loading: logsLoading } = useConnectorLogs(slug || '')
+  const { logs, loading: logsLoading, clearLogs } = useConnectorLogs(slug || '')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [clearing, setClearing] = useState(false)
+
+  const filteredLogs = useMemo(
+    () => statusFilter === 'all' ? logs : logs.filter(l => l.status === statusFilter),
+    [logs, statusFilter]
+  )
+
+  const handleClearLogs = async () => {
+    setClearing(true)
+    const { error } = await clearLogs()
+    setClearing(false)
+    if (error) {
+      toast.error('Erro ao limpar histórico')
+    } else {
+      toast.success('Histórico limpo!')
+    }
+  }
 
   // Fallback state for non-GitHub connectors
   const [fakeConnected, setFakeConnected] = useState(false)
