@@ -1,15 +1,20 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 import { getConnectorBySlug } from '@/lib/connectorsConfig'
 import { useGitHubConnection } from '@/hooks/useGitHubConnection'
 import {
   ArrowLeft, CheckCircle, XCircle, ExternalLink, Copy,
-  RefreshCw, Unplug, Loader2, Clock, Activity, Settings,
+  RefreshCw, Unplug, Loader2, Clock, Activity, Trash2,
 } from 'lucide-react'
 import GitHubReposList from '@/components/connectors/GitHubReposList'
 import { useConnectorLogs, logConnectorEvent } from '@/hooks/useConnectorLogs'
@@ -17,6 +22,8 @@ import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+
+type StatusFilter = 'all' | 'success' | 'error' | 'info' | 'warning'
 
 export default function ConnectorDetailPage() {
   const { slug } = useParams<{ slug: string }>()
