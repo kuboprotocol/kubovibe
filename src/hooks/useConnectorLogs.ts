@@ -64,12 +64,13 @@ export async function logConnectorEvent(params: {
 }) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return
-  await supabase.from('connector_activity_logs').insert({
+  const row = {
     user_id: user.id,
     connector_slug: params.connectorSlug,
     event_type: params.eventType,
     message: params.message,
     status: params.status ?? 'success',
-    metadata: params.metadata ?? null,
-  })
+    metadata: (params.metadata ?? null) as never,
+  }
+  await supabase.from('connector_activity_logs').insert(row)
 }
