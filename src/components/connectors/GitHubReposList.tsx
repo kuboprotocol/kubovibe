@@ -198,7 +198,7 @@ export default function GitHubReposList() {
             <GitBranch className="h-4 w-4 text-primary" /> Repositórios
             <Badge variant="secondary" className="text-[10px] ml-1">{repos.length}</Badge>
           </CardTitle>
-          <Button variant="ghost" size="icon" onClick={fetchRepos} className="h-8 w-8">
+          <Button variant="ghost" size="icon" onClick={() => fetchRepos(true)} className="h-8 w-8">
             <RefreshCw className="h-3.5 w-3.5" />
           </Button>
         </CardHeader>
