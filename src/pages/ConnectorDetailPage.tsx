@@ -252,7 +252,7 @@ export default function ConnectorDetailPage() {
                         'h-2 w-2 rounded-full shrink-0',
                         log.status === 'success' && 'bg-primary',
                         log.status === 'error' && 'bg-destructive',
-                        log.status === 'warning' && 'bg-yellow-500',
+                        log.status === 'warning' && 'bg-accent',
                         log.status === 'info' && 'bg-muted-foreground/60',
                       )} />
                       <span className="text-foreground flex-1 truncate">{log.message}</span>
