@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { connectors, categories, type ConnectorConfig } from '@/lib/connectorsConfig'
 import { ArrowLeft, Search, Zap, ExternalLink } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { GlobalActivityPanel } from '@/components/connectors/GlobalActivityPanel'
 
 export default function ConnectorsHubPage() {
   const navigate = useNavigate()
