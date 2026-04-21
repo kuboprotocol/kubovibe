@@ -50,6 +50,9 @@ export default function ConnectorsHubPage() {
       </div>
 
       <div className="max-w-6xl mx-auto px-4 py-8 space-y-6">
+        {/* Global Activity */}
+        <GlobalActivityPanel />
+
         {/* Search + Filters */}
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1">
