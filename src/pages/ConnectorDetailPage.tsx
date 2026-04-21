@@ -12,11 +12,13 @@ import {
 } from '@/components/ui/alert-dialog'
 import { getConnectorBySlug } from '@/lib/connectorsConfig'
 import { useGitHubConnection } from '@/hooks/useGitHubConnection'
+import { useAuth } from '@/hooks/useAuth'
 import {
   ArrowLeft, CheckCircle, XCircle, ExternalLink, Copy,
   RefreshCw, Unplug, Loader2, Clock, Activity, Trash2,
 } from 'lucide-react'
 import GitHubReposList from '@/components/connectors/GitHubReposList'
+import { LogSimulator } from '@/components/connectors/LogSimulator'
 import { useConnectorLogs, logConnectorEvent } from '@/hooks/useConnectorLogs'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
