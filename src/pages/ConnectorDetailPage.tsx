@@ -258,6 +258,9 @@ export default function ConnectorDetailPage() {
         {/* GitHub Repos */}
         {isGitHub && isConnected && <GitHubReposList />}
 
+        {/* Log Simulator (admin only) */}
+        {isAdmin && slug && <LogSimulator connectorSlug={slug} />}
+
         {/* Activity — sempre que houver logs */}
         {(isConnected || logs.length > 0) && (
           <Card>
