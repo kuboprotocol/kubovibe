@@ -98,13 +98,33 @@ interface LogSimulatorProps {
 }
 
 export function LogSimulator({ connectorSlug }: LogSimulatorProps) {
+  const { user } = useAuth()
   const [scenario, setScenario] = useState<Scenario>('repos_synced')
   const [statusOverride, setStatusOverride] = useState<StatusOverride>('auto')
   const [speed, setSpeed] = useState([1]) // 1x default
   const [running, setRunning] = useState(false)
   const [progress, setProgress] = useState(0)
+  const [clearing, setClearing] = useState(false)
 
   const current = SCENARIOS[scenario]
+
+  const handleClearSimulated = async () => {
+    if (!user) return
+    setClearing(true)
+    const { error, count } = await supabase
+      .from('connector_activity_logs')
+      .delete({ count: 'exact' })
+      .eq('user_id', user.id)
+      .eq('connector_slug', connectorSlug)
+      .filter('metadata->>simulated', 'eq', 'true')
+    setClearing(false)
+    if (error) {
+      toast.error('Erro ao limpar logs simulados')
+      console.error(error)
+    } else {
+      toast.success(`${count ?? 0} log(s) simulado(s) removido(s)`)
+    }
+  }
 
   const handleRun = async () => {
     setRunning(true)
