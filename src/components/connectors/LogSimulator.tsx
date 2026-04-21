@@ -1,9 +1,10 @@
-import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { useState, useEffect, useMemo } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
@@ -13,24 +14,39 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader,
+  DialogTitle, DialogTrigger,
+} from '@/components/ui/dialog'
 import { logConnectorEvent } from '@/hooks/useConnectorLogs'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/hooks/useAuth'
-import { FlaskConical, Loader2, Play, Trash2 } from 'lucide-react'
+import {
+  FlaskConical, Loader2, Play, Trash2, Pencil, Plus, ArrowUp, ArrowDown,
+  X, Save, RotateCcw,
+} from 'lucide-react'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 
-type Scenario = 'repos_synced' | 'ipfs_deploy_success' | 'ipfs_deploy_failure' | 'oauth_lifecycle' | 'rate_limit' | 'mixed'
 type StatusOverride = 'auto' | 'success' | 'error' | 'warning' | 'info'
+type StepStatus = 'success' | 'error' | 'info' | 'warning'
 
 interface Step {
   eventType: string
   message: string
-  status: 'success' | 'error' | 'info' | 'warning'
+  status: StepStatus
   metadata?: Record<string, unknown>
-  delayMs: number // delay before this step
+  delayMs: number
 }
 
-const SCENARIOS: Record<Scenario, { label: string; description: string; steps: Step[] }> = {
+interface ScenarioDef {
+  label: string
+  description: string
+  steps: Step[]
+  custom?: boolean
+}
+
+const BUILTIN_SCENARIOS: Record<string, ScenarioDef> = {
   repos_synced: {
     label: 'Sincronização de Repositórios',
     description: 'Busca → processamento → sucesso',
@@ -93,20 +109,174 @@ const SCENARIOS: Record<Scenario, { label: string; description: string; steps: S
   },
 }
 
+const STORAGE_KEY = 'kubo:custom-log-scenarios'
+
+function loadCustomScenarios(): Record<string, ScenarioDef> {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw) as Record<string, ScenarioDef>
+    return Object.fromEntries(
+      Object.entries(parsed).map(([k, v]) => [k, { ...v, custom: true }])
+    )
+  } catch {
+    return {}
+  }
+}
+
+function saveCustomScenarios(scenarios: Record<string, ScenarioDef>) {
+  const cleaned = Object.fromEntries(
+    Object.entries(scenarios).map(([k, v]) => {
+      const { custom: _custom, ...rest } = v
+      return [k, rest]
+    })
+  )
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned))
+}
+
+const statusColor = (s: StepStatus) =>
+  s === 'success' ? 'text-emerald-500' :
+  s === 'error' ? 'text-destructive' :
+  s === 'warning' ? 'text-amber-500' : 'text-blue-500'
+
 interface LogSimulatorProps {
   connectorSlug: string
 }
 
 export function LogSimulator({ connectorSlug }: LogSimulatorProps) {
   const { user } = useAuth()
-  const [scenario, setScenario] = useState<Scenario>('repos_synced')
+  const [customScenarios, setCustomScenarios] = useState<Record<string, ScenarioDef>>(() => loadCustomScenarios())
+  const allScenarios = useMemo(
+    () => ({ ...BUILTIN_SCENARIOS, ...customScenarios }),
+    [customScenarios]
+  )
+
+  const [scenarioKey, setScenarioKey] = useState<string>('repos_synced')
   const [statusOverride, setStatusOverride] = useState<StatusOverride>('auto')
-  const [speed, setSpeed] = useState([1]) // 1x default
+  const [speed, setSpeed] = useState([1])
   const [running, setRunning] = useState(false)
   const [progress, setProgress] = useState(0)
   const [clearing, setClearing] = useState(false)
 
-  const current = SCENARIOS[scenario]
+  // Editor state
+  const [editorOpen, setEditorOpen] = useState(false)
+  const [editLabel, setEditLabel] = useState('')
+  const [editDescription, setEditDescription] = useState('')
+  const [editSteps, setEditSteps] = useState<Step[]>([])
+
+  const current = allScenarios[scenarioKey] ?? BUILTIN_SCENARIOS.repos_synced
+
+  useEffect(() => {
+    saveCustomScenarios(customScenarios)
+  }, [customScenarios])
+
+  const openEditor = (mode: 'edit' | 'new') => {
+    if (mode === 'new') {
+      setEditLabel('Novo Cenário')
+      setEditDescription('Descreva o fluxo aqui')
+      setEditSteps([
+        { eventType: 'custom_event', message: 'Primeiro evento', status: 'info', delayMs: 0 },
+      ])
+    } else {
+      setEditLabel(current.label)
+      setEditDescription(current.description)
+      setEditSteps(current.steps.map(s => ({ ...s })))
+    }
+    setEditorOpen(true)
+  }
+
+  const updateStep = (index: number, patch: Partial<Step>) => {
+    setEditSteps(prev => prev.map((s, i) => i === index ? { ...s, ...patch } : s))
+  }
+
+  const addStep = () => {
+    setEditSteps(prev => [
+      ...prev,
+      { eventType: 'custom_event', message: 'Novo evento', status: 'info', delayMs: 1000 },
+    ])
+  }
+
+  const removeStep = (index: number) => {
+    setEditSteps(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const moveStep = (index: number, direction: -1 | 1) => {
+    setEditSteps(prev => {
+      const next = [...prev]
+      const target = index + direction
+      if (target < 0 || target >= next.length) return prev
+      ;[next[index], next[target]] = [next[target], next[index]]
+      return next
+    })
+  }
+
+  const handleSaveCustom = () => {
+    if (!editLabel.trim()) {
+      toast.error('Dê um nome ao cenário')
+      return
+    }
+    if (editSteps.length === 0) {
+      toast.error('Adicione pelo menos um passo')
+      return
+    }
+    const key = `custom_${editLabel.toLowerCase().replace(/[^a-z0-9]+/g, '_').slice(0, 40)}_${Date.now().toString(36)}`
+    const def: ScenarioDef = {
+      label: editLabel.trim(),
+      description: editDescription.trim() || 'Cenário personalizado',
+      steps: editSteps,
+      custom: true,
+    }
+    setCustomScenarios(prev => ({ ...prev, [key]: def }))
+    setScenarioKey(key)
+    setEditorOpen(false)
+    toast.success(`Cenário "${def.label}" salvo`)
+  }
+
+  const handleRunOnce = async () => {
+    // Run from the editor without saving — just executes editSteps
+    setEditorOpen(false)
+    await runSteps(editSteps, editLabel || 'Cenário customizado')
+  }
+
+  const handleDeleteCustom = (key: string) => {
+    setCustomScenarios(prev => {
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
+    if (scenarioKey === key) setScenarioKey('repos_synced')
+    toast.success('Cenário personalizado removido')
+  }
+
+  const runSteps = async (steps: Step[], label: string) => {
+    if (steps.length === 0) return
+    setRunning(true)
+    setProgress(0)
+    const speedFactor = speed[0]
+    try {
+      for (let i = 0; i < steps.length; i++) {
+        const step = steps[i]
+        await new Promise(r => setTimeout(r, step.delayMs / speedFactor))
+        await logConnectorEvent({
+          connectorSlug,
+          eventType: step.eventType,
+          message: step.message,
+          status: statusOverride === 'auto' ? step.status : statusOverride,
+          metadata: { ...step.metadata, simulated: true, scenario: scenarioKey },
+        })
+        setProgress(((i + 1) / steps.length) * 100)
+      }
+      toast.success(`Cenário "${label}" executado (${steps.length} eventos)`)
+    } catch (err) {
+      toast.error('Erro ao gerar logs simulados')
+      console.error(err)
+    } finally {
+      setRunning(false)
+      setTimeout(() => setProgress(0), 800)
+    }
+  }
+
+  const handleRun = () => runSteps(current.steps, current.label)
 
   const handleClearSimulated = async () => {
     if (!user) return
@@ -126,35 +296,6 @@ export function LogSimulator({ connectorSlug }: LogSimulatorProps) {
     }
   }
 
-  const handleRun = async () => {
-    setRunning(true)
-    setProgress(0)
-    const steps = current.steps
-    const speedFactor = speed[0]
-
-    try {
-      for (let i = 0; i < steps.length; i++) {
-        const step = steps[i]
-        await new Promise(r => setTimeout(r, step.delayMs / speedFactor))
-        await logConnectorEvent({
-          connectorSlug,
-          eventType: step.eventType,
-          message: step.message,
-          status: statusOverride === 'auto' ? step.status : statusOverride,
-          metadata: { ...step.metadata, simulated: true, scenario },
-        })
-        setProgress(((i + 1) / steps.length) * 100)
-      }
-      toast.success(`Cenário "${current.label}" executado (${steps.length} eventos)`)
-    } catch (err) {
-      toast.error('Erro ao gerar logs simulados')
-      console.error(err)
-    } finally {
-      setRunning(false)
-      setTimeout(() => setProgress(0), 800)
-    }
-  }
-
   return (
     <Card className="border-dashed border-amber-500/40 bg-amber-500/[0.02]">
       <CardHeader>
@@ -170,15 +311,21 @@ export function LogSimulator({ connectorSlug }: LogSimulatorProps) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label className="text-xs">Cenário</Label>
-            <Select value={scenario} onValueChange={(v) => setScenario(v as Scenario)} disabled={running}>
+            <Select value={scenarioKey} onValueChange={setScenarioKey} disabled={running}>
               <SelectTrigger className="h-9">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {(Object.keys(SCENARIOS) as Scenario[]).map(key => (
-                  <SelectItem key={key} value={key}>
-                    {SCENARIOS[key].label}
-                  </SelectItem>
+                {Object.entries(BUILTIN_SCENARIOS).map(([key, s]) => (
+                  <SelectItem key={key} value={key}>{s.label}</SelectItem>
+                ))}
+                {Object.keys(customScenarios).length > 0 && (
+                  <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground/60 border-t border-border mt-1 pt-2">
+                    Personalizados
+                  </div>
+                )}
+                {Object.entries(customScenarios).map(([key, s]) => (
+                  <SelectItem key={key} value={key}>★ {s.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -205,28 +352,48 @@ export function LogSimulator({ connectorSlug }: LogSimulatorProps) {
             <Label className="text-xs">Velocidade</Label>
             <span className="text-xs text-muted-foreground">{speed[0]}x</span>
           </div>
-          <Slider
-            value={speed}
-            onValueChange={setSpeed}
-            min={0.5}
-            max={5}
-            step={0.5}
-            disabled={running}
-          />
+          <Slider value={speed} onValueChange={setSpeed} min={0.5} max={5} step={0.5} disabled={running} />
         </div>
 
         <div className="rounded-lg bg-secondary/30 p-3 text-xs">
-          <p className="font-medium text-foreground mb-1.5">{current.description}</p>
+          <div className="flex items-center justify-between mb-1.5 gap-2">
+            <p className="font-medium text-foreground">{current.description}</p>
+            <div className="flex gap-1 shrink-0">
+              <Button
+                variant="ghost" size="sm"
+                className="h-6 px-2 text-[10px]"
+                onClick={() => openEditor('edit')}
+                disabled={running}
+              >
+                <Pencil className="h-3 w-3 mr-1" /> Editar
+              </Button>
+              <Button
+                variant="ghost" size="sm"
+                className="h-6 px-2 text-[10px]"
+                onClick={() => openEditor('new')}
+                disabled={running}
+              >
+                <Plus className="h-3 w-3 mr-1" /> Novo
+              </Button>
+              {current.custom && (
+                <Button
+                  variant="ghost" size="sm"
+                  className="h-6 px-2 text-[10px] text-destructive hover:text-destructive"
+                  onClick={() => handleDeleteCustom(scenarioKey)}
+                  disabled={running}
+                >
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
+          </div>
           <div className="space-y-0.5 text-muted-foreground">
             {current.steps.map((s, i) => (
               <div key={i} className="flex items-center gap-1.5">
                 <span className="opacity-50">{i + 1}.</span>
-                <span className={
-                  s.status === 'success' ? 'text-emerald-500' :
-                  s.status === 'error' ? 'text-destructive' :
-                  s.status === 'warning' ? 'text-amber-500' : 'text-blue-500'
-                }>●</span>
+                <span className={statusColor(s.status)}>●</span>
                 <span className="truncate">{s.message}</span>
+                <span className="ml-auto text-[10px] opacity-50 shrink-0">+{s.delayMs}ms</span>
               </div>
             ))}
           </div>
@@ -243,12 +410,7 @@ export function LogSimulator({ connectorSlug }: LogSimulatorProps) {
         )}
 
         <div className="flex flex-col sm:flex-row gap-2">
-          <Button
-            onClick={handleRun}
-            disabled={running || clearing}
-            className="flex-1"
-            variant="outline"
-          >
+          <Button onClick={handleRun} disabled={running || clearing} className="flex-1" variant="outline">
             {running ? (
               <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> Gerando logs... ({Math.round(progress)}%)</>
             ) : (
@@ -263,11 +425,7 @@ export function LogSimulator({ connectorSlug }: LogSimulatorProps) {
                 disabled={running || clearing}
                 className="sm:w-auto border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
               >
-                {clearing ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-                ) : (
-                  <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-                )}
+                {clearing ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Trash2 className="h-3.5 w-3.5 mr-1.5" />}
                 Limpar simulados
               </Button>
             </AlertDialogTrigger>
@@ -275,7 +433,7 @@ export function LogSimulator({ connectorSlug }: LogSimulatorProps) {
               <AlertDialogHeader>
                 <AlertDialogTitle>Limpar logs simulados?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Apenas os logs gerados pelo simulador (com <code className="text-xs bg-secondary px-1 py-0.5 rounded">simulated: true</code>) serão excluídos deste conector. Logs reais de OAuth, sincronização e deploys serão preservados.
+                  Apenas os logs gerados pelo simulador (com <code className="text-xs bg-secondary px-1 py-0.5 rounded">simulated: true</code>) serão excluídos deste conector. Logs reais serão preservados.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -293,6 +451,129 @@ export function LogSimulator({ connectorSlug }: LogSimulatorProps) {
           </AlertDialog>
         </div>
       </CardContent>
+
+      {/* Editor Dialog */}
+      <Dialog open={editorOpen} onOpenChange={setEditorOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-4 w-4 text-amber-500" />
+              Editor de Cenário
+            </DialogTitle>
+            <DialogDescription>
+              Personalize a sequência de eventos. Salve como cenário customizado ou execute uma vez sem salvar.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Nome</Label>
+                <Input value={editLabel} onChange={e => setEditLabel(e.target.value)} className="h-9" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Descrição</Label>
+                <Input value={editDescription} onChange={e => setEditDescription(e.target.value)} className="h-9" />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">Passos ({editSteps.length})</Label>
+                <Button variant="ghost" size="sm" onClick={addStep} className="h-7 text-xs">
+                  <Plus className="h-3 w-3 mr-1" /> Adicionar passo
+                </Button>
+              </div>
+
+              <AnimatePresence initial={false}>
+                {editSteps.map((step, i) => (
+                  <motion.div
+                    key={i}
+                    layout
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    className="rounded-lg border border-border bg-secondary/20 p-3 space-y-2"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono text-muted-foreground w-6">#{i + 1}</span>
+                      <span className={cn('text-base leading-none', statusColor(step.status))}>●</span>
+                      <Input
+                        value={step.message}
+                        onChange={e => updateStep(i, { message: e.target.value })}
+                        placeholder="Mensagem do log"
+                        className="h-8 flex-1 text-xs"
+                      />
+                      <div className="flex gap-0.5 shrink-0">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => moveStep(i, -1)} disabled={i === 0}>
+                          <ArrowUp className="h-3 w-3" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => moveStep(i, 1)} disabled={i === editSteps.length - 1}>
+                          <ArrowDown className="h-3 w-3" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => removeStep(i)}>
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 pl-8">
+                      <div className="space-y-1">
+                        <Label className="text-[10px] text-muted-foreground">Tipo</Label>
+                        <Input
+                          value={step.eventType}
+                          onChange={e => updateStep(i, { eventType: e.target.value })}
+                          placeholder="event_type"
+                          className="h-7 text-xs font-mono"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] text-muted-foreground">Status</Label>
+                        <Select value={step.status} onValueChange={(v) => updateStep(i, { status: v as StepStatus })}>
+                          <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="success">Sucesso</SelectItem>
+                            <SelectItem value="error">Erro</SelectItem>
+                            <SelectItem value="warning">Aviso</SelectItem>
+                            <SelectItem value="info">Info</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] text-muted-foreground">Atraso (ms)</Label>
+                        <Input
+                          type="number" min={0} step={100}
+                          value={step.delayMs}
+                          onChange={e => updateStep(i, { delayMs: Math.max(0, parseInt(e.target.value) || 0) })}
+                          className="h-7 text-xs"
+                        />
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+
+              {editSteps.length === 0 && (
+                <p className="text-xs text-muted-foreground text-center py-6">
+                  Nenhum passo. Adicione um para começar.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="ghost" onClick={() => setEditorOpen(false)}>
+              <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Cancelar
+            </Button>
+            <Button variant="outline" onClick={handleRunOnce} disabled={editSteps.length === 0}>
+              <Play className="h-3.5 w-3.5 mr-1.5" /> Executar sem salvar
+            </Button>
+            <Button onClick={handleSaveCustom} disabled={editSteps.length === 0 || !editLabel.trim()}>
+              <Save className="h-3.5 w-3.5 mr-1.5" /> Salvar cenário
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   )
 }
