@@ -12,11 +12,13 @@ import {
 } from '@/components/ui/alert-dialog'
 import { getConnectorBySlug } from '@/lib/connectorsConfig'
 import { useGitHubConnection } from '@/hooks/useGitHubConnection'
+import { useAuth } from '@/hooks/useAuth'
 import {
   ArrowLeft, CheckCircle, XCircle, ExternalLink, Copy,
   RefreshCw, Unplug, Loader2, Clock, Activity, Trash2,
 } from 'lucide-react'
 import GitHubReposList from '@/components/connectors/GitHubReposList'
+import { LogSimulator } from '@/components/connectors/LogSimulator'
 import { useConnectorLogs, logConnectorEvent } from '@/hooks/useConnectorLogs'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -29,6 +31,8 @@ export default function ConnectorDetailPage() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
   const connector = getConnectorBySlug(slug || '')
+  const { user } = useAuth()
+  const isAdmin = user?.email === 'kuboprotocol@gmail.com'
 
   // Real GitHub OAuth hook
   const github = useGitHubConnection()
@@ -253,6 +257,9 @@ export default function ConnectorDetailPage() {
 
         {/* GitHub Repos */}
         {isGitHub && isConnected && <GitHubReposList />}
+
+        {/* Log Simulator (admin only) */}
+        {isAdmin && slug && <LogSimulator connectorSlug={slug} />}
 
         {/* Activity — sempre que houver logs */}
         {(isConnected || logs.length > 0) && (
