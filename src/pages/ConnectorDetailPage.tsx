@@ -31,6 +31,8 @@ export default function ConnectorDetailPage() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
   const connector = getConnectorBySlug(slug || '')
+  const { user } = useAuth()
+  const isAdmin = user?.email === 'kuboprotocol@gmail.com'
 
   // Real GitHub OAuth hook
   const github = useGitHubConnection()
