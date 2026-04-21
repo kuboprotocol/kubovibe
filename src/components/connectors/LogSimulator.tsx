@@ -8,8 +8,15 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { Slider } from '@/components/ui/slider'
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 import { logConnectorEvent } from '@/hooks/useConnectorLogs'
-import { FlaskConical, Loader2, Play } from 'lucide-react'
+import { supabase } from '@/integrations/supabase/client'
+import { useAuth } from '@/hooks/useAuth'
+import { FlaskConical, Loader2, Play, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 type Scenario = 'repos_synced' | 'ipfs_deploy_success' | 'ipfs_deploy_failure' | 'oauth_lifecycle' | 'rate_limit' | 'mixed'
