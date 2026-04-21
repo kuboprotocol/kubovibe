@@ -8,8 +8,15 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { Slider } from '@/components/ui/slider'
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 import { logConnectorEvent } from '@/hooks/useConnectorLogs'
-import { FlaskConical, Loader2, Play } from 'lucide-react'
+import { supabase } from '@/integrations/supabase/client'
+import { useAuth } from '@/hooks/useAuth'
+import { FlaskConical, Loader2, Play, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 type Scenario = 'repos_synced' | 'ipfs_deploy_success' | 'ipfs_deploy_failure' | 'oauth_lifecycle' | 'rate_limit' | 'mixed'
@@ -91,13 +98,33 @@ interface LogSimulatorProps {
 }
 
 export function LogSimulator({ connectorSlug }: LogSimulatorProps) {
+  const { user } = useAuth()
   const [scenario, setScenario] = useState<Scenario>('repos_synced')
   const [statusOverride, setStatusOverride] = useState<StatusOverride>('auto')
   const [speed, setSpeed] = useState([1]) // 1x default
   const [running, setRunning] = useState(false)
   const [progress, setProgress] = useState(0)
+  const [clearing, setClearing] = useState(false)
 
   const current = SCENARIOS[scenario]
+
+  const handleClearSimulated = async () => {
+    if (!user) return
+    setClearing(true)
+    const { error, count } = await supabase
+      .from('connector_activity_logs')
+      .delete({ count: 'exact' })
+      .eq('user_id', user.id)
+      .eq('connector_slug', connectorSlug)
+      .filter('metadata->>simulated', 'eq', 'true')
+    setClearing(false)
+    if (error) {
+      toast.error('Erro ao limpar logs simulados')
+      console.error(error)
+    } else {
+      toast.success(`${count ?? 0} log(s) simulado(s) removido(s)`)
+    }
+  }
 
   const handleRun = async () => {
     setRunning(true)
@@ -215,18 +242,56 @@ export function LogSimulator({ connectorSlug }: LogSimulatorProps) {
           </div>
         )}
 
-        <Button
-          onClick={handleRun}
-          disabled={running}
-          className="w-full"
-          variant="outline"
-        >
-          {running ? (
-            <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> Gerando logs... ({Math.round(progress)}%)</>
-          ) : (
-            <><Play className="h-3.5 w-3.5 mr-1.5" /> Executar cenário ({current.steps.length} eventos)</>
-          )}
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Button
+            onClick={handleRun}
+            disabled={running || clearing}
+            className="flex-1"
+            variant="outline"
+          >
+            {running ? (
+              <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> Gerando logs... ({Math.round(progress)}%)</>
+            ) : (
+              <><Play className="h-3.5 w-3.5 mr-1.5" /> Executar cenário ({current.steps.length} eventos)</>
+            )}
+          </Button>
+
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="outline"
+                disabled={running || clearing}
+                className="sm:w-auto border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              >
+                {clearing ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                ) : (
+                  <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                )}
+                Limpar simulados
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Limpar logs simulados?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Apenas os logs gerados pelo simulador (com <code className="text-xs bg-secondary px-1 py-0.5 rounded">simulated: true</code>) serão excluídos deste conector. Logs reais de OAuth, sincronização e deploys serão preservados.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={clearing}>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleClearSimulated}
+                  disabled={clearing}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  {clearing ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Trash2 className="h-3.5 w-3.5 mr-1.5" />}
+                  Excluir simulados
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
       </CardContent>
     </Card>
   )
