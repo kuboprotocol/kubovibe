@@ -242,18 +242,56 @@ export function LogSimulator({ connectorSlug }: LogSimulatorProps) {
           </div>
         )}
 
-        <Button
-          onClick={handleRun}
-          disabled={running}
-          className="w-full"
-          variant="outline"
-        >
-          {running ? (
-            <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> Gerando logs... ({Math.round(progress)}%)</>
-          ) : (
-            <><Play className="h-3.5 w-3.5 mr-1.5" /> Executar cenário ({current.steps.length} eventos)</>
-          )}
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Button
+            onClick={handleRun}
+            disabled={running || clearing}
+            className="flex-1"
+            variant="outline"
+          >
+            {running ? (
+              <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> Gerando logs... ({Math.round(progress)}%)</>
+            ) : (
+              <><Play className="h-3.5 w-3.5 mr-1.5" /> Executar cenário ({current.steps.length} eventos)</>
+            )}
+          </Button>
+
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="outline"
+                disabled={running || clearing}
+                className="sm:w-auto border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              >
+                {clearing ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                ) : (
+                  <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                )}
+                Limpar simulados
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Limpar logs simulados?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Apenas os logs gerados pelo simulador (com <code className="text-xs bg-secondary px-1 py-0.5 rounded">simulated: true</code>) serão excluídos deste conector. Logs reais de OAuth, sincronização e deploys serão preservados.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={clearing}>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleClearSimulated}
+                  disabled={clearing}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  {clearing ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Trash2 className="h-3.5 w-3.5 mr-1.5" />}
+                  Excluir simulados
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
       </CardContent>
     </Card>
   )
