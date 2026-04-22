@@ -14,6 +14,10 @@ export default function AuthPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const refCode = searchParams.get('ref') || ''
+  const redirectParam = searchParams.get('redirect') || ''
+  // Only allow internal paths (must start with single "/") to prevent open redirects
+  const safeRedirect =
+    redirectParam.startsWith('/') && !redirectParam.startsWith('//') ? redirectParam : '/dashboard'
   const { user, loading } = useAuth()
   const [isLogin, setIsLogin] = useState(true)
   const [email, setEmail] = useState('')
@@ -24,12 +28,12 @@ export default function AuthPage() {
   const [resetEmail, setResetEmail] = useState('')
 
   useEffect(() => {
-    if (!loading && user) navigate('/dashboard')
-  }, [user, loading, navigate])
+    if (!loading && user) navigate(safeRedirect, { replace: true })
+  }, [user, loading, navigate, safeRedirect])
 
   const handleGoogleLogin = async () => {
     const { error } = await lovable.auth.signInWithOAuth('google', {
-      redirect_uri: window.location.origin,
+      redirect_uri: `${window.location.origin}${safeRedirect}`,
     })
     if (error) toast.error('Erro ao entrar com Google')
   }
@@ -59,14 +63,14 @@ export default function AuthPage() {
       if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
-        navigate('/dashboard')
+        navigate(safeRedirect, { replace: true })
       } else {
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
             data: { display_name: displayName, ...(refCode ? { referral_code: refCode } : {}) },
-            emailRedirectTo: window.location.origin,
+            emailRedirectTo: `${window.location.origin}${safeRedirect}`,
           },
         })
         if (error) throw error
@@ -82,7 +86,7 @@ export default function AuthPage() {
           },
         }).catch(() => {})
 
-        navigate('/dashboard')
+        navigate(safeRedirect, { replace: true })
       }
     } catch (err: any) {
       const msg = err.message || 'Erro na autenticação'
