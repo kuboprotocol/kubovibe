@@ -33,7 +33,7 @@ export default function AuthPage() {
 
   const handleGoogleLogin = async () => {
     const { error } = await lovable.auth.signInWithOAuth('google', {
-      redirect_uri: window.location.origin,
+      redirect_uri: `${window.location.origin}${safeRedirect}`,
     })
     if (error) toast.error('Erro ao entrar com Google')
   }
