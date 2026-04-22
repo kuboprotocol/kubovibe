@@ -4,102 +4,96 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import type { Session, User } from '@supabase/supabase-js'
 
-// ---- Mock the Supabase client BEFORE importing anything that uses it ----
-type AuthChangeCb = (event: string, session: Session | null) => void
+// ---- Mock the Supabase client (factory is hoisted; keep it self-contained) ----
+vi.mock('@/integrations/supabase/client', () => {
+  type AuthChangeCb = (event: string, session: Session | null) => void
+  const state: { session: Session | null; listeners: AuthChangeCb[] } = {
+    session: null,
+    listeners: [],
+  }
 
-const authState: {
-  session: Session | null
-  listeners: AuthChangeCb[]
-} = {
-  session: null,
-  listeners: [],
-}
+  const fakeUser = {
+    id: 'user-test-1',
+    email: 'tester@example.com',
+    app_metadata: {},
+    user_metadata: {},
+    aud: 'authenticated',
+    created_at: new Date().toISOString(),
+  } as unknown as User
 
-const fakeUser: User = {
-  id: 'user-test-1',
-  email: 'tester@example.com',
-  app_metadata: {},
-  user_metadata: {},
-  aud: 'authenticated',
-  created_at: new Date().toISOString(),
-} as User
+  const fakeSession: Session = {
+    access_token: 'fake-access',
+    refresh_token: 'fake-refresh',
+    expires_in: 3600,
+    expires_at: Math.floor(Date.now() / 1000) + 3600,
+    token_type: 'bearer',
+    user: fakeUser,
+  }
 
-const fakeSession: Session = {
-  access_token: 'fake-access',
-  refresh_token: 'fake-refresh',
-  expires_in: 3600,
-  expires_at: Math.floor(Date.now() / 1000) + 3600,
-  token_type: 'bearer',
-  user: fakeUser,
-}
+  const signInWithPassword = vi.fn(async () => {
+    state.session = fakeSession
+    state.listeners.forEach((cb) => cb('SIGNED_IN', fakeSession))
+    return { data: { session: fakeSession, user: fakeUser }, error: null }
+  })
 
-const signInWithPassword = vi.fn(async () => {
-  authState.session = fakeSession
-  authState.listeners.forEach((cb) => cb('SIGNED_IN', fakeSession))
-  return { data: { session: fakeSession, user: fakeUser }, error: null }
-})
-
-const signUp = vi.fn(async () => ({ data: { session: null, user: fakeUser }, error: null }))
-const signOut = vi.fn(async () => {
-  authState.session = null
-  authState.listeners.forEach((cb) => cb('SIGNED_OUT', null))
-  return { error: null }
-})
-const resetPasswordForEmail = vi.fn(async () => ({ data: {}, error: null }))
-
-vi.mock('@/integrations/supabase/client', () => ({
-  supabase: {
-    auth: {
-      getSession: vi.fn(async () => ({ data: { session: authState.session }, error: null })),
-      onAuthStateChange: (cb: AuthChangeCb) => {
-        authState.listeners.push(cb)
-        return {
-          data: {
-            subscription: {
-              unsubscribe: () => {
-                authState.listeners = authState.listeners.filter((l) => l !== cb)
+  return {
+    supabase: {
+      __testState: state,
+      __resetTestState: () => {
+        state.session = null
+        state.listeners = []
+      },
+      auth: {
+        getSession: vi.fn(async () => ({ data: { session: state.session }, error: null })),
+        onAuthStateChange: (cb: AuthChangeCb) => {
+          state.listeners.push(cb)
+          return {
+            data: {
+              subscription: {
+                unsubscribe: () => {
+                  state.listeners = state.listeners.filter((l) => l !== cb)
+                },
               },
             },
-          },
-        }
+          }
+        },
+        signInWithPassword,
+        signUp: vi.fn(async () => ({ data: { session: null, user: fakeUser }, error: null })),
+        signOut: vi.fn(async () => {
+          state.session = null
+          state.listeners.forEach((cb) => cb('SIGNED_OUT', null))
+          return { error: null }
+        }),
+        resetPasswordForEmail: vi.fn(async () => ({ data: {}, error: null })),
       },
-      signInWithPassword,
-      signUp,
-      signOut,
-      resetPasswordForEmail,
+      functions: { invoke: vi.fn(async () => ({ data: null, error: null })) },
+      from: vi.fn(() => ({
+        select: vi.fn().mockReturnThis(),
+        insert: vi.fn().mockReturnThis(),
+        update: vi.fn().mockReturnThis(),
+        delete: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        single: vi.fn(async () => ({ data: null, error: null })),
+        maybeSingle: vi.fn(async () => ({ data: null, error: null })),
+      })),
     },
-    functions: {
-      invoke: vi.fn(async () => ({ data: null, error: null })),
-    },
-    from: vi.fn(() => ({
-      select: vi.fn().mockReturnThis(),
-      insert: vi.fn().mockReturnThis(),
-      update: vi.fn().mockReturnThis(),
-      delete: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      single: vi.fn(async () => ({ data: null, error: null })),
-      maybeSingle: vi.fn(async () => ({ data: null, error: null })),
-    })),
-  },
-}))
+  }
+})
 
 vi.mock('@/integrations/lovable/index', () => ({
-  lovable: {
-    auth: {
-      signInWithOAuth: vi.fn(async () => ({ error: null })),
-    },
-  },
+  lovable: { auth: { signInWithOAuth: vi.fn(async () => ({ error: null })) } },
 }))
 
-// Stub the destination page so we don't pull in heavy ConnectorDetailPage deps
+// Stub destination — keeps the test focused on redirect logic
 const ConnectorDetailStub = () => (
   <div data-testid="connector-detail">Detalhe do conector GitHub</div>
 )
 
-// ---- Now import the real pieces under test ----
+// Now import the real pieces under test (after mocks are registered)
 import { AuthProvider } from '@/hooks/useAuth'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import AuthPage from '@/pages/AuthPage'
+import { supabase } from '@/integrations/supabase/client'
 
 function renderApp(initialPath: string) {
   return render(
@@ -124,42 +118,43 @@ function renderApp(initialPath: string) {
 
 describe('Redirect flow: /connectors/github → /auth → /connectors/github', () => {
   beforeEach(() => {
-    authState.session = null
-    authState.listeners = []
-    vi.clearAllMocks()
+    // Reset shared mock state between tests
+    ;(supabase as unknown as { __resetTestState: () => void }).__resetTestState()
   })
 
   it('redirects unauthenticated user from /connectors/github to /auth with redirect param', async () => {
     renderApp('/connectors/github')
 
-    // Should show the AuthPage with the protection banner mentioning the redirect target
+    // AuthPage form renders
     await waitFor(() => {
       expect(screen.getByPlaceholderText('Email')).toBeInTheDocument()
     })
 
-    // Banner mentions /connectors path (Conectores-specific message)
-    expect(
-      screen.getByText((_, node) => node?.textContent?.includes('/connectors/github') ?? false),
-    ).toBeInTheDocument()
+    // Banner mentions the protected destination path
+    await waitFor(() => {
+      expect(
+        screen.getByText((_, node) =>
+          Boolean(node?.textContent?.includes('/connectors/github')),
+        ),
+      ).toBeInTheDocument()
+    })
   })
 
   it('returns to /connectors/github after successful login', async () => {
     const user = userEvent.setup()
     renderApp('/connectors/github')
 
-    // Wait for AuthPage
     const emailInput = await screen.findByPlaceholderText('Email')
     const passwordInput = screen.getByPlaceholderText('Senha')
 
     await user.type(emailInput, 'tester@example.com')
     await user.type(passwordInput, 'password123')
 
-    const submit = screen.getByRole('button', { name: /entrar na conta/i })
-    await user.click(submit)
+    await user.click(screen.getByRole('button', { name: /entrar na conta/i }))
 
     // Login was called with the typed credentials
     await waitFor(() => {
-      expect(signInWithPassword).toHaveBeenCalledWith({
+      expect(supabase.auth.signInWithPassword).toHaveBeenCalledWith({
         email: 'tester@example.com',
         password: 'password123',
       })
@@ -173,7 +168,6 @@ describe('Redirect flow: /connectors/github → /auth → /connectors/github', (
 
   it('rejects open-redirect attempts (//evil.com) and falls back to /dashboard', async () => {
     const user = userEvent.setup()
-    // Path doesn't matter — we pass a malicious redirect via /auth directly
     renderApp('/auth?redirect=//evil.com/phish')
 
     const emailInput = await screen.findByPlaceholderText('Email')
@@ -181,7 +175,6 @@ describe('Redirect flow: /connectors/github → /auth → /connectors/github', (
     await user.type(screen.getByPlaceholderText('Senha'), 'password123')
     await user.click(screen.getByRole('button', { name: /entrar na conta/i }))
 
-    // Should land on the safe fallback, NOT navigate externally
     await waitFor(() => {
       expect(screen.getByTestId('dashboard')).toBeInTheDocument()
     })
