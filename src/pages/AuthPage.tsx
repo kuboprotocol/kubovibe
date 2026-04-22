@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client'
 import { lovable } from '@/integrations/lovable/index'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Loader2, Mail, Lock, User, ArrowRight, KeyRound } from 'lucide-react'
+import { Loader2, Mail, Lock, User, ArrowRight, KeyRound, ShieldAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/useAuth'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -178,7 +178,36 @@ export default function AuthPage() {
                 </p>
               </div>
 
-              {/* Google login */}
+              {redirectParam && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mb-5 flex items-start gap-3 rounded-xl border border-primary/30 bg-primary/5 p-3.5"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <ShieldAlert className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                  <div className="text-xs text-foreground/90 leading-relaxed">
+                    {safeRedirect.startsWith('/connectors') ? (
+                      <>
+                        A área de <span className="font-semibold text-primary">Conectores</span> é protegida.
+                        Faça login para continuar e voltaremos automaticamente para{' '}
+                        <code className="px-1 py-0.5 rounded bg-secondary/70 text-[11px] font-mono text-foreground">
+                          {safeRedirect}
+                        </code>.
+                      </>
+                    ) : (
+                      <>
+                        Esta página é protegida. Faça login para continuar e voltaremos automaticamente para{' '}
+                        <code className="px-1 py-0.5 rounded bg-secondary/70 text-[11px] font-mono text-foreground">
+                          {safeRedirect}
+                        </code>.
+                      </>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+
               <Button
                 variant="outline"
                 className="w-full h-12 rounded-xl mb-4 gap-3 text-sm font-medium border-border/50 hover:bg-secondary/80"
