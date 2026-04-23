@@ -160,12 +160,13 @@ export function LogSimulator({ connectorSlug, onRunFilterChange, initialRunId }:
   const [progress, setProgress] = useState(0)
   const [clearing, setClearing] = useState(false)
 
-  // Run history (this connector, this session) — for filtering by runId
-  interface RunRecord { id: string; label: string; startedAt: number; eventCount: number }
+  // Run history (this connector) — for filtering by runId
+  interface RunRecord { id: string; label: string; startedAt: number; eventCount: number; fromDb?: boolean; mine?: boolean }
   const [runs, setRuns] = useState<RunRecord[]>(() =>
     initialRunId ? [{ id: initialRunId, label: 'Run compartilhado', startedAt: Date.now(), eventCount: 0 }] : []
   )
   const [selectedRunId, setSelectedRunId] = useState<string>(initialRunId ?? 'all')
+  const [loadingRuns, setLoadingRuns] = useState(false)
 
   // Sync external URL changes (back/forward) into local selection
   useEffect(() => {
