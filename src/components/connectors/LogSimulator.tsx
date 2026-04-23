@@ -23,7 +23,7 @@ import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/hooks/useAuth'
 import {
   FlaskConical, Loader2, Play, Trash2, Pencil, Plus, ArrowUp, ArrowDown,
-  X, Save, RotateCcw, Filter,
+  X, Save, RotateCcw, Filter, Database, Users,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
