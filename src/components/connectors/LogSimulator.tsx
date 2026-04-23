@@ -23,7 +23,7 @@ import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/hooks/useAuth'
 import {
   FlaskConical, Loader2, Play, Trash2, Pencil, Plus, ArrowUp, ArrowDown,
-  X, Save, RotateCcw, Filter,
+  X, Save, RotateCcw, Filter, Database, Users,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -160,12 +160,13 @@ export function LogSimulator({ connectorSlug, onRunFilterChange, initialRunId }:
   const [progress, setProgress] = useState(0)
   const [clearing, setClearing] = useState(false)
 
-  // Run history (this connector, this session) — for filtering by runId
-  interface RunRecord { id: string; label: string; startedAt: number; eventCount: number }
+  // Run history (this connector) — for filtering by runId
+  interface RunRecord { id: string; label: string; startedAt: number; eventCount: number; fromDb?: boolean; mine?: boolean }
   const [runs, setRuns] = useState<RunRecord[]>(() =>
     initialRunId ? [{ id: initialRunId, label: 'Run compartilhado', startedAt: Date.now(), eventCount: 0 }] : []
   )
   const [selectedRunId, setSelectedRunId] = useState<string>(initialRunId ?? 'all')
+  const [loadingRuns, setLoadingRuns] = useState(false)
 
   // Sync external URL changes (back/forward) into local selection
   useEffect(() => {
@@ -331,21 +332,67 @@ export function LogSimulator({ connectorSlug, onRunFilterChange, initialRunId }:
   const handleClearByRun = async () => {
     if (!user || selectedRunId === 'all') return
     setClearing(true)
-    const { error, count } = await supabase
-      .from('connector_activity_logs')
-      .delete({ count: 'exact' })
-      .eq('user_id', user.id)
-      .eq('connector_slug', connectorSlug)
-      .filter('metadata->>runId', 'eq', selectedRunId)
+    const selected = runs.find(r => r.id === selectedRunId)
+    const needsAdmin = selected?.mine === false
+    let deletedCount = 0
+    let error: unknown = null
+
+    if (needsAdmin) {
+      const { data, error: rpcErr } = await supabase.rpc('admin_clear_connector_run', {
+        _connector_slug: connectorSlug,
+        _run_id: selectedRunId,
+      })
+      error = rpcErr
+      deletedCount = (data as number | null) ?? 0
+    } else {
+      const { error: delErr, count } = await supabase
+        .from('connector_activity_logs')
+        .delete({ count: 'exact' })
+        .eq('user_id', user.id)
+        .eq('connector_slug', connectorSlug)
+        .filter('metadata->>runId', 'eq', selectedRunId)
+      error = delErr
+      deletedCount = count ?? 0
+    }
     setClearing(false)
     if (error) {
       toast.error('Erro ao limpar logs do run')
       console.error(error)
       return
     }
-    toast.success(`${count ?? 0} log(s) do run ${selectedRunId.slice(0, 8)} removido(s)`)
+    toast.success(`${deletedCount} log(s) do run ${selectedRunId.slice(0, 8)} removido(s)`)
     setRuns(prev => prev.filter(r => r.id !== selectedRunId))
     setSelectedRunId('all')
+  }
+
+  const loadDbRuns = async () => {
+    setLoadingRuns(true)
+    const { data, error } = await supabase.rpc('admin_list_connector_runs', {
+      _connector_slug: connectorSlug,
+      _limit: 50,
+    })
+    setLoadingRuns(false)
+    if (error) {
+      toast.error('Erro ao carregar runs do banco (apenas admin)')
+      console.error(error)
+      return
+    }
+    type Row = { run_id: string; run_label: string; event_count: number; started_at: string; user_id: string; is_mine: boolean }
+    const rows = (data as Row[] | null) ?? []
+    const dbRuns: RunRecord[] = rows.map(r => ({
+      id: r.run_id,
+      label: r.run_label,
+      startedAt: new Date(r.started_at).getTime(),
+      eventCount: Number(r.event_count) || 0,
+      fromDb: true,
+      mine: r.is_mine,
+    }))
+    // Merge: DB rows are source of truth; keep current selection if still present
+    setRuns(prev => {
+      const sessionOnly = prev.filter(p => !dbRuns.some(d => d.id === p.id))
+      return [...dbRuns, ...sessionOnly]
+    })
+    toast.success(`${dbRuns.length} run(s) carregados do banco`)
   }
 
   return (
@@ -461,70 +508,96 @@ export function LogSimulator({ connectorSlug, onRunFilterChange, initialRunId }:
           </div>
         )}
 
-        {runs.length > 0 && (
-          <div className="rounded-lg border border-border bg-secondary/20 p-3 space-y-2">
-            <div className="flex items-center gap-2">
-              <Filter className="h-3.5 w-3.5 text-muted-foreground" />
-              <Label className="text-xs">Filtrar por execução (runId)</Label>
-              {selectedRunId !== 'all' && (
-                <Badge variant="secondary" className="ml-auto font-mono text-[10px]">
-                  {selectedRunId.slice(0, 8)}
-                </Badge>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <Select value={selectedRunId} onValueChange={setSelectedRunId} disabled={running || clearing}>
-                <SelectTrigger className="h-8 text-xs flex-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os runs ({runs.length})</SelectItem>
-                  {runs.map(r => (
-                    <SelectItem key={r.id} value={r.id} className="text-xs">
-                      <span className="font-mono opacity-60">{r.id.slice(0, 8)}</span>
-                      {' · '}{r.label} · {r.eventCount} ev · {new Date(r.startedAt).toLocaleTimeString()}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    variant="outline" size="sm"
-                    disabled={selectedRunId === 'all' || running || clearing}
-                    className="h-8 border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive text-xs"
-                  >
-                    <Trash2 className="h-3 w-3 mr-1" /> Limpar este run
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Limpar logs deste run?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Apenas os logs do run <code className="text-xs bg-secondary px-1 py-0.5 rounded font-mono">{selectedRunId.slice(0, 8)}</code> serão removidos. Outros runs e logs reais permanecem intactos.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel disabled={clearing}>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={handleClearByRun}
-                      disabled={clearing}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    >
-                      {clearing ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Trash2 className="h-3.5 w-3.5 mr-1.5" />}
-                      Excluir run
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
-            <p className="text-[10px] text-muted-foreground">
-              {selectedRunId === 'all'
-                ? 'Mostrando todos os logs do conector. Selecione um run para isolar.'
-                : 'O painel de logs será filtrado para este runId apenas.'}
-            </p>
+        <div className="rounded-lg border border-border bg-secondary/20 p-3 space-y-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+            <Label className="text-xs">Filtrar por execução (runId)</Label>
+            {selectedRunId !== 'all' && (
+              <Badge variant="secondary" className="font-mono text-[10px]">
+                {selectedRunId.slice(0, 8)}
+              </Badge>
+            )}
+            <Button
+              variant="ghost" size="sm"
+              onClick={loadDbRuns}
+              disabled={loadingRuns || running || clearing}
+              className="ml-auto h-7 px-2 text-[11px]"
+            >
+              {loadingRuns
+                ? <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                : <Database className="h-3 w-3 mr-1" />}
+              Carregar do banco
+            </Button>
           </div>
-        )}
+
+          {runs.length === 0 ? (
+            <p className="text-[11px] text-muted-foreground py-2">
+              Nenhum run nesta sessão. Execute um cenário ou clique em <strong>Carregar do banco</strong> para listar runs anteriores (admin).
+            </p>
+          ) : (
+            <>
+              <div className="flex gap-2">
+                <Select value={selectedRunId} onValueChange={setSelectedRunId} disabled={running || clearing}>
+                  <SelectTrigger className="h-8 text-xs flex-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os runs ({runs.length})</SelectItem>
+                    {runs.map(r => (
+                      <SelectItem key={r.id} value={r.id} className="text-xs">
+                        <span className="font-mono opacity-60">{r.id.slice(0, 8)}</span>
+                        {' · '}{r.label} · {r.eventCount} ev · {new Date(r.startedAt).toLocaleTimeString()}
+                        {r.fromDb && r.mine === false && ' · 👥 outra sessão'}
+                        {r.fromDb && r.mine && ' · 💾 banco'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="outline" size="sm"
+                      disabled={selectedRunId === 'all' || running || clearing}
+                      className="h-8 border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive text-xs"
+                    >
+                      <Trash2 className="h-3 w-3 mr-1" /> Limpar este run
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Limpar logs deste run?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Apenas os logs do run <code className="text-xs bg-secondary px-1 py-0.5 rounded font-mono">{selectedRunId.slice(0, 8)}</code> serão removidos.
+                        {runs.find(r => r.id === selectedRunId)?.mine === false && (
+                          <span className="block mt-2 text-amber-600">
+                            <Users className="h-3 w-3 inline mr-1" />
+                            Este run pertence a outra sessão/usuário. Será removido via privilégio de admin.
+                          </span>
+                        )}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel disabled={clearing}>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleClearByRun}
+                        disabled={clearing}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        {clearing ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Trash2 className="h-3.5 w-3.5 mr-1.5" />}
+                        Excluir run
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                {selectedRunId === 'all'
+                  ? 'Mostrando todos os logs do conector. Selecione um run para isolar.'
+                  : 'O painel de logs será filtrado para este runId apenas.'}
+              </p>
+            </>
+          )}
+        </div>
 
         <div className="flex flex-col sm:flex-row gap-2">
           <Button onClick={handleRun} disabled={running || clearing} className="flex-1" variant="outline">
