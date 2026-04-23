@@ -142,9 +142,10 @@ const statusColor = (s: StepStatus) =>
 interface LogSimulatorProps {
   connectorSlug: string
   onRunFilterChange?: (runId: string | null) => void
+  initialRunId?: string | null
 }
 
-export function LogSimulator({ connectorSlug, onRunFilterChange }: LogSimulatorProps) {
+export function LogSimulator({ connectorSlug, onRunFilterChange, initialRunId }: LogSimulatorProps) {
   const { user } = useAuth()
   const [customScenarios, setCustomScenarios] = useState<Record<string, ScenarioDef>>(() => loadCustomScenarios())
   const allScenarios = useMemo(
@@ -161,8 +162,21 @@ export function LogSimulator({ connectorSlug, onRunFilterChange }: LogSimulatorP
 
   // Run history (this connector, this session) — for filtering by runId
   interface RunRecord { id: string; label: string; startedAt: number; eventCount: number }
-  const [runs, setRuns] = useState<RunRecord[]>([])
-  const [selectedRunId, setSelectedRunId] = useState<string>('all')
+  const [runs, setRuns] = useState<RunRecord[]>(() =>
+    initialRunId ? [{ id: initialRunId, label: 'Run compartilhado', startedAt: Date.now(), eventCount: 0 }] : []
+  )
+  const [selectedRunId, setSelectedRunId] = useState<string>(initialRunId ?? 'all')
+
+  // Sync external URL changes (back/forward) into local selection
+  useEffect(() => {
+    const next = initialRunId ?? 'all'
+    setSelectedRunId(prev => (prev === next ? prev : next))
+    if (initialRunId) {
+      setRuns(prev => prev.some(r => r.id === initialRunId)
+        ? prev
+        : [{ id: initialRunId, label: 'Run compartilhado', startedAt: Date.now(), eventCount: 0 }, ...prev])
+    }
+  }, [initialRunId])
 
   // Editor state
   const [editorOpen, setEditorOpen] = useState(false)

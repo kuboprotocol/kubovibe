@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -37,9 +37,34 @@ export default function ConnectorDetailPage() {
   // Real GitHub OAuth hook
   const github = useGitHubConnection()
   const { logs, loading: logsLoading, clearLogs } = useConnectorLogs(slug || '')
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const runFilter = searchParams.get('run')
+  const statusFromUrl = (searchParams.get('status') as StatusFilter | null) ?? 'all'
+  const [statusFilter, setStatusFilterState] = useState<StatusFilter>(statusFromUrl)
   const [clearing, setClearing] = useState(false)
-  const [runFilter, setRunFilter] = useState<string | null>(null)
+
+  // Keep status filter in sync with URL when it changes externally (back/forward, paste)
+  useEffect(() => {
+    if (statusFromUrl !== statusFilter) setStatusFilterState(statusFromUrl)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFromUrl])
+
+  const setStatusFilter = (next: StatusFilter) => {
+    setStatusFilterState(next)
+    setSearchParams(prev => {
+      const sp = new URLSearchParams(prev)
+      if (next === 'all') sp.delete('status'); else sp.set('status', next)
+      return sp
+    }, { replace: true })
+  }
+
+  const setRunFilter = useCallback((next: string | null) => {
+    setSearchParams(prev => {
+      const sp = new URLSearchParams(prev)
+      if (!next) sp.delete('run'); else sp.set('run', next)
+      return sp
+    }, { replace: true })
+  }, [setSearchParams])
 
   const filteredLogs = useMemo(() => {
     let out = logs
@@ -267,7 +292,7 @@ export default function ConnectorDetailPage() {
         {isGitHub && isConnected && <GitHubReposList />}
 
         {/* Log Simulator (admin only) */}
-        {isAdmin && slug && <LogSimulator connectorSlug={slug} onRunFilterChange={setRunFilter} />}
+        {isAdmin && slug && <LogSimulator connectorSlug={slug} onRunFilterChange={setRunFilter} initialRunId={runFilter} />}
 
         {/* Activity — sempre que houver logs */}
         {(isConnected || logs.length > 0) && (
@@ -306,6 +331,28 @@ export default function ConnectorDetailPage() {
               )}
             </CardHeader>
             <CardContent>
+              {runFilter && (
+                <div className="mb-3 flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs">
+                  <span className="text-muted-foreground">Filtrando run:</span>
+                  <code className="font-mono text-foreground">{runFilter.slice(0, 8)}…</code>
+                  <span className="text-muted-foreground ml-1">({filteredLogs.length} log{filteredLogs.length === 1 ? '' : 's'})</span>
+                  <Button
+                    variant="ghost" size="sm" className="ml-auto h-6 px-2 text-[11px]"
+                    onClick={() => {
+                      navigator.clipboard.writeText(window.location.href)
+                      toast.success('Link copiado para a área de transferência')
+                    }}
+                  >
+                    <Copy className="h-3 w-3 mr-1" /> Copiar link
+                  </Button>
+                  <Button
+                    variant="ghost" size="sm" className="h-6 px-2 text-[11px]"
+                    onClick={() => setRunFilter(null)}
+                  >
+                    Limpar filtro
+                  </Button>
+                </div>
+              )}
               {/* Filter chips */}
               {logs.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mb-4">
