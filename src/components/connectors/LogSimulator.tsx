@@ -176,6 +176,10 @@ export function LogSimulator({ connectorSlug, onRunFilterChange }: LogSimulatorP
     saveCustomScenarios(customScenarios)
   }, [customScenarios])
 
+  useEffect(() => {
+    onRunFilterChange?.(selectedRunId === 'all' ? null : selectedRunId)
+  }, [selectedRunId, onRunFilterChange])
+
   const openEditor = (mode: 'edit' | 'new') => {
     if (mode === 'new') {
       setEditLabel('Novo Cenário')
