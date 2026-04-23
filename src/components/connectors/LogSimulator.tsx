@@ -158,6 +158,11 @@ export function LogSimulator({ connectorSlug }: LogSimulatorProps) {
   const [progress, setProgress] = useState(0)
   const [clearing, setClearing] = useState(false)
 
+  // Run history (this connector, this session) — for filtering by runId
+  interface RunRecord { id: string; label: string; startedAt: number; eventCount: number }
+  const [runs, setRuns] = useState<RunRecord[]>([])
+  const [selectedRunId, setSelectedRunId] = useState<string>('all')
+
   // Editor state
   const [editorOpen, setEditorOpen] = useState(false)
   const [editLabel, setEditLabel] = useState('')
