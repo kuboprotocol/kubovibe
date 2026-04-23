@@ -141,9 +141,10 @@ const statusColor = (s: StepStatus) =>
 
 interface LogSimulatorProps {
   connectorSlug: string
+  onRunFilterChange?: (runId: string | null) => void
 }
 
-export function LogSimulator({ connectorSlug }: LogSimulatorProps) {
+export function LogSimulator({ connectorSlug, onRunFilterChange }: LogSimulatorProps) {
   const { user } = useAuth()
   const [customScenarios, setCustomScenarios] = useState<Record<string, ScenarioDef>>(() => loadCustomScenarios())
   const allScenarios = useMemo(
