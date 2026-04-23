@@ -442,6 +442,71 @@ export function LogSimulator({ connectorSlug }: LogSimulatorProps) {
           </div>
         )}
 
+        {runs.length > 0 && (
+          <div className="rounded-lg border border-border bg-secondary/20 p-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+              <Label className="text-xs">Filtrar por execução (runId)</Label>
+              {selectedRunId !== 'all' && (
+                <Badge variant="secondary" className="ml-auto font-mono text-[10px]">
+                  {selectedRunId.slice(0, 8)}
+                </Badge>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Select value={selectedRunId} onValueChange={setSelectedRunId} disabled={running || clearing}>
+                <SelectTrigger className="h-8 text-xs flex-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os runs ({runs.length})</SelectItem>
+                  {runs.map(r => (
+                    <SelectItem key={r.id} value={r.id} className="text-xs">
+                      <span className="font-mono opacity-60">{r.id.slice(0, 8)}</span>
+                      {' · '}{r.label} · {r.eventCount} ev · {new Date(r.startedAt).toLocaleTimeString()}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="outline" size="sm"
+                    disabled={selectedRunId === 'all' || running || clearing}
+                    className="h-8 border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive text-xs"
+                  >
+                    <Trash2 className="h-3 w-3 mr-1" /> Limpar este run
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Limpar logs deste run?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Apenas os logs do run <code className="text-xs bg-secondary px-1 py-0.5 rounded font-mono">{selectedRunId.slice(0, 8)}</code> serão removidos. Outros runs e logs reais permanecem intactos.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={clearing}>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleClearByRun}
+                      disabled={clearing}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      {clearing ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Trash2 className="h-3.5 w-3.5 mr-1.5" />}
+                      Excluir run
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+            <p className="text-[10px] text-muted-foreground">
+              {selectedRunId === 'all'
+                ? 'Mostrando todos os logs do conector. Selecione um run para isolar.'
+                : 'O painel de logs será filtrado para este runId apenas.'}
+            </p>
+          </div>
+        )}
+
         <div className="flex flex-col sm:flex-row gap-2">
           <Button onClick={handleRun} disabled={running || clearing} className="flex-1" variant="outline">
             {running ? (
