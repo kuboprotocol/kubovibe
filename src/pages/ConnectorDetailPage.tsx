@@ -267,7 +267,7 @@ export default function ConnectorDetailPage() {
         {isGitHub && isConnected && <GitHubReposList />}
 
         {/* Log Simulator (admin only) */}
-        {isAdmin && slug && <LogSimulator connectorSlug={slug} />}
+        {isAdmin && slug && <LogSimulator connectorSlug={slug} onRunFilterChange={setRunFilter} />}
 
         {/* Activity — sempre que houver logs */}
         {(isConnected || logs.length > 0) && (
