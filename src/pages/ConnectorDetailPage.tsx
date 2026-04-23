@@ -39,11 +39,19 @@ export default function ConnectorDetailPage() {
   const { logs, loading: logsLoading, clearLogs } = useConnectorLogs(slug || '')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [clearing, setClearing] = useState(false)
+  const [runFilter, setRunFilter] = useState<string | null>(null)
 
-  const filteredLogs = useMemo(
-    () => statusFilter === 'all' ? logs : logs.filter(l => l.status === statusFilter),
-    [logs, statusFilter]
-  )
+  const filteredLogs = useMemo(() => {
+    let out = logs
+    if (statusFilter !== 'all') out = out.filter(l => l.status === statusFilter)
+    if (runFilter) {
+      out = out.filter(l => {
+        const meta = l.metadata as { runId?: string } | null
+        return meta?.runId === runFilter
+      })
+    }
+    return out
+  }, [logs, statusFilter, runFilter])
 
   const handleClearLogs = async () => {
     setClearing(true)
