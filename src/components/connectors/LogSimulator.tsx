@@ -258,6 +258,10 @@ export function LogSimulator({ connectorSlug }: LogSimulatorProps) {
     setRunning(true)
     setProgress(0)
     const speedFactor = speed[0]
+    const runId = (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
+      ? crypto.randomUUID()
+      : `run_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
+    const startedAt = Date.now()
     try {
       for (let i = 0; i < steps.length; i++) {
         const step = steps[i]
@@ -267,11 +271,13 @@ export function LogSimulator({ connectorSlug }: LogSimulatorProps) {
           eventType: step.eventType,
           message: step.message,
           status: statusOverride === 'auto' ? step.status : statusOverride,
-          metadata: { ...step.metadata, simulated: true, scenario: scenarioKey },
+          metadata: { ...step.metadata, simulated: true, scenario: scenarioKey, runId, runLabel: label },
         })
         setProgress(((i + 1) / steps.length) * 100)
       }
-      toast.success(`Cenário "${label}" executado (${steps.length} eventos)`)
+      setRuns(prev => [{ id: runId, label, startedAt, eventCount: steps.length }, ...prev].slice(0, 20))
+      setSelectedRunId(runId)
+      toast.success(`Cenário "${label}" executado (${steps.length} eventos) • run ${runId.slice(0, 8)}`)
     } catch (err) {
       toast.error('Erro ao gerar logs simulados')
       console.error(err)
@@ -298,7 +304,29 @@ export function LogSimulator({ connectorSlug }: LogSimulatorProps) {
       console.error(error)
     } else {
       toast.success(`${count ?? 0} log(s) simulado(s) removido(s)`)
+      setRuns([])
+      setSelectedRunId('all')
     }
+  }
+
+  const handleClearByRun = async () => {
+    if (!user || selectedRunId === 'all') return
+    setClearing(true)
+    const { error, count } = await supabase
+      .from('connector_activity_logs')
+      .delete({ count: 'exact' })
+      .eq('user_id', user.id)
+      .eq('connector_slug', connectorSlug)
+      .filter('metadata->>runId', 'eq', selectedRunId)
+    setClearing(false)
+    if (error) {
+      toast.error('Erro ao limpar logs do run')
+      console.error(error)
+      return
+    }
+    toast.success(`${count ?? 0} log(s) do run ${selectedRunId.slice(0, 8)} removido(s)`)
+    setRuns(prev => prev.filter(r => r.id !== selectedRunId))
+    setSelectedRunId('all')
   }
 
   return (
