@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -37,9 +37,34 @@ export default function ConnectorDetailPage() {
   // Real GitHub OAuth hook
   const github = useGitHubConnection()
   const { logs, loading: logsLoading, clearLogs } = useConnectorLogs(slug || '')
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const runFilter = searchParams.get('run')
+  const statusFromUrl = (searchParams.get('status') as StatusFilter | null) ?? 'all'
+  const [statusFilter, setStatusFilterState] = useState<StatusFilter>(statusFromUrl)
   const [clearing, setClearing] = useState(false)
-  const [runFilter, setRunFilter] = useState<string | null>(null)
+
+  // Keep status filter in sync with URL when it changes externally (back/forward, paste)
+  useEffect(() => {
+    if (statusFromUrl !== statusFilter) setStatusFilterState(statusFromUrl)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFromUrl])
+
+  const setStatusFilter = (next: StatusFilter) => {
+    setStatusFilterState(next)
+    setSearchParams(prev => {
+      const sp = new URLSearchParams(prev)
+      if (next === 'all') sp.delete('status'); else sp.set('status', next)
+      return sp
+    }, { replace: true })
+  }
+
+  const setRunFilter = useCallback((next: string | null) => {
+    setSearchParams(prev => {
+      const sp = new URLSearchParams(prev)
+      if (!next) sp.delete('run'); else sp.set('run', next)
+      return sp
+    }, { replace: true })
+  }, [setSearchParams])
 
   const filteredLogs = useMemo(() => {
     let out = logs
