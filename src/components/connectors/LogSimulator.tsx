@@ -332,21 +332,67 @@ export function LogSimulator({ connectorSlug, onRunFilterChange, initialRunId }:
   const handleClearByRun = async () => {
     if (!user || selectedRunId === 'all') return
     setClearing(true)
-    const { error, count } = await supabase
-      .from('connector_activity_logs')
-      .delete({ count: 'exact' })
-      .eq('user_id', user.id)
-      .eq('connector_slug', connectorSlug)
-      .filter('metadata->>runId', 'eq', selectedRunId)
+    const selected = runs.find(r => r.id === selectedRunId)
+    const needsAdmin = selected?.mine === false
+    let deletedCount = 0
+    let error: unknown = null
+
+    if (needsAdmin) {
+      const { data, error: rpcErr } = await supabase.rpc('admin_clear_connector_run', {
+        _connector_slug: connectorSlug,
+        _run_id: selectedRunId,
+      })
+      error = rpcErr
+      deletedCount = (data as number | null) ?? 0
+    } else {
+      const { error: delErr, count } = await supabase
+        .from('connector_activity_logs')
+        .delete({ count: 'exact' })
+        .eq('user_id', user.id)
+        .eq('connector_slug', connectorSlug)
+        .filter('metadata->>runId', 'eq', selectedRunId)
+      error = delErr
+      deletedCount = count ?? 0
+    }
     setClearing(false)
     if (error) {
       toast.error('Erro ao limpar logs do run')
       console.error(error)
       return
     }
-    toast.success(`${count ?? 0} log(s) do run ${selectedRunId.slice(0, 8)} removido(s)`)
+    toast.success(`${deletedCount} log(s) do run ${selectedRunId.slice(0, 8)} removido(s)`)
     setRuns(prev => prev.filter(r => r.id !== selectedRunId))
     setSelectedRunId('all')
+  }
+
+  const loadDbRuns = async () => {
+    setLoadingRuns(true)
+    const { data, error } = await supabase.rpc('admin_list_connector_runs', {
+      _connector_slug: connectorSlug,
+      _limit: 50,
+    })
+    setLoadingRuns(false)
+    if (error) {
+      toast.error('Erro ao carregar runs do banco (apenas admin)')
+      console.error(error)
+      return
+    }
+    type Row = { run_id: string; run_label: string; event_count: number; started_at: string; user_id: string; is_mine: boolean }
+    const rows = (data as Row[] | null) ?? []
+    const dbRuns: RunRecord[] = rows.map(r => ({
+      id: r.run_id,
+      label: r.run_label,
+      startedAt: new Date(r.started_at).getTime(),
+      eventCount: Number(r.event_count) || 0,
+      fromDb: true,
+      mine: r.is_mine,
+    }))
+    // Merge: DB rows are source of truth; keep current selection if still present
+    setRuns(prev => {
+      const sessionOnly = prev.filter(p => !dbRuns.some(d => d.id === p.id))
+      return [...dbRuns, ...sessionOnly]
+    })
+    toast.success(`${dbRuns.length} run(s) carregados do banco`)
   }
 
   return (
