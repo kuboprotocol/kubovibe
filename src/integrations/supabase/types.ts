@@ -606,6 +606,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_clear_connector_run: {
+        Args: { _connector_slug: string; _run_id: string }
+        Returns: number
+      }
+      admin_list_connector_runs: {
+        Args: { _connector_slug: string; _limit?: number }
+        Returns: {
+          event_count: number
+          is_mine: boolean
+          run_id: string
+          run_label: string
+          started_at: string
+          user_id: string
+        }[]
+      }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
@@ -614,6 +629,7 @@ export type Database = {
         Args: { payload: Json; queue_name: string }
         Returns: number
       }
+      is_kubo_admin: { Args: never; Returns: boolean }
       move_to_dlq: {
         Args: {
           dlq_name: string
