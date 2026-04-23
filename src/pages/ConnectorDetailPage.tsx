@@ -331,6 +331,28 @@ export default function ConnectorDetailPage() {
               )}
             </CardHeader>
             <CardContent>
+              {runFilter && (
+                <div className="mb-3 flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs">
+                  <span className="text-muted-foreground">Filtrando run:</span>
+                  <code className="font-mono text-foreground">{runFilter.slice(0, 8)}…</code>
+                  <span className="text-muted-foreground ml-1">({filteredLogs.length} log{filteredLogs.length === 1 ? '' : 's'})</span>
+                  <Button
+                    variant="ghost" size="sm" className="ml-auto h-6 px-2 text-[11px]"
+                    onClick={() => {
+                      navigator.clipboard.writeText(window.location.href)
+                      toast.success('Link copiado para a área de transferência')
+                    }}
+                  >
+                    <Copy className="h-3 w-3 mr-1" /> Copiar link
+                  </Button>
+                  <Button
+                    variant="ghost" size="sm" className="h-6 px-2 text-[11px]"
+                    onClick={() => setRunFilter(null)}
+                  >
+                    Limpar filtro
+                  </Button>
+                </div>
+              )}
               {/* Filter chips */}
               {logs.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mb-4">
