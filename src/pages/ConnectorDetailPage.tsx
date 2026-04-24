@@ -66,6 +66,15 @@ export default function ConnectorDetailPage() {
     }, { replace: true })
   }, [setSearchParams])
 
+  const dbRunsActive = searchParams.get('runs') === 'db'
+  const setDbRunsActive = useCallback((active: boolean) => {
+    setSearchParams(prev => {
+      const sp = new URLSearchParams(prev)
+      if (active) sp.set('runs', 'db'); else sp.delete('runs')
+      return sp
+    }, { replace: true })
+  }, [setSearchParams])
+
   const filteredLogs = useMemo(() => {
     let out = logs
     if (statusFilter !== 'all') out = out.filter(l => l.status === statusFilter)
