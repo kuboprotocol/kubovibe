@@ -15,7 +15,7 @@ import { useGitHubConnection } from '@/hooks/useGitHubConnection'
 import { useAuth } from '@/hooks/useAuth'
 import {
   ArrowLeft, CheckCircle, XCircle, ExternalLink, Copy,
-  RefreshCw, Unplug, Loader2, Clock, Activity, Trash2, Share2,
+  RefreshCw, Unplug, Loader2, Clock, Activity, Trash2, Share2, RotateCcw,
 } from 'lucide-react'
 import GitHubReposList from '@/components/connectors/GitHubReposList'
 import { LogSimulator } from '@/components/connectors/LogSimulator'
@@ -352,6 +352,18 @@ export default function ConnectorDetailPage() {
                 <Activity className="h-4 w-4 text-primary" /> Atividade Recente
               </CardTitle>
               <div className="flex items-center gap-1">
+                {canResetFilters && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleResetFilters}
+                    className="h-8 text-xs text-muted-foreground hover:text-foreground"
+                    title="Limpa ?run= e ?runs=db (mantém ?status=)"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                    Resetar filtros
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   size="sm"
