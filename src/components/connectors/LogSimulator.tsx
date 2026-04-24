@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -398,14 +398,15 @@ export function LogSimulator({ connectorSlug, onRunFilterChange, initialRunId, d
     if (!silent) toast.success(`${dbRuns.length} run(s) carregados do banco`)
   }
 
-  // Auto-load DB runs when the URL says we should (shared link, back/forward)
-  const dbAutoloadedRef = useState({ done: false })[0]
+  // Auto-restore "loaded from DB" state on back/forward without showing toasts.
+  // The button's spinner will appear naturally because loadDbRuns toggles loadingRuns.
+  const dbAutoloadedRef = useRef(false)
   useEffect(() => {
-    if (dbRunsActive && !dbAutoloadedRef.done) {
-      dbAutoloadedRef.done = true
+    if (dbRunsActive && !dbAutoloadedRef.current && !loadingRuns) {
+      dbAutoloadedRef.current = true
       void loadDbRuns(true)
     }
-    if (!dbRunsActive) dbAutoloadedRef.done = false
+    if (!dbRunsActive) dbAutoloadedRef.current = false
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dbRunsActive, connectorSlug])
 
