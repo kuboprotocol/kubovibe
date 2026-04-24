@@ -88,13 +88,36 @@ export default function ConnectorDetailPage() {
 
   const handleShareSlice = useCallback(async () => {
     const url = buildShareUrl()
+    const activeFilters = [
+      runFilter && `run=${runFilter.slice(0, 8)}…`,
+      statusFilter !== 'all' && `status=${statusFilter}`,
+      dbRunsActive && 'runs=db',
+    ].filter(Boolean) as string[]
+    const count = activeFilters.length
     try {
       await navigator.clipboard.writeText(url)
-      toast.success(hasActiveSlice ? 'Recorte copiado!' : 'Link da página copiado (sem filtros ativos)')
+      const title = count === 0
+        ? 'Link copiado (sem filtros ativos)'
+        : `Recorte copiado · ${count} filtro${count === 1 ? '' : 's'}`
+      toast.success(title, {
+        description: (
+          <div className="space-y-1">
+            {count > 0 && (
+              <div className="text-[11px] text-muted-foreground">
+                {activeFilters.join(' · ')}
+              </div>
+            )}
+            <div className="font-mono text-[11px] break-all text-foreground/80">
+              {url}
+            </div>
+          </div>
+        ),
+        duration: 5000,
+      })
     } catch {
       toast.error('Não foi possível copiar o link')
     }
-  }, [buildShareUrl, hasActiveSlice])
+  }, [buildShareUrl, runFilter, statusFilter, dbRunsActive])
 
   const canResetFilters = Boolean(runFilter) || dbRunsActive
 
