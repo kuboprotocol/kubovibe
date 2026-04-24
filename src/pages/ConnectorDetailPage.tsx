@@ -123,13 +123,23 @@ export default function ConnectorDetailPage() {
 
   const handleResetFilters = useCallback(() => {
     if (!canResetFilters) return
+    const removed: string[] = []
+    if (runFilter) removed.push('?run=')
+    if (dbRunsActive) removed.push('?runs=db')
     setSearchParams(prev => {
       const sp = new URLSearchParams(prev)
       sp.delete('run')
       sp.delete('runs')
       return sp
     }, { replace: true })
-  }, [canResetFilters, setSearchParams])
+    // Silent confirmation: low-priority info toast, no error variant.
+    toast(`Filtros resetados · ${removed.join(' e ')} removido${removed.length === 1 ? '' : 's'}`, {
+      description: statusFilter !== 'all'
+        ? `Filtro padrão restaurado. Mantido: ?status=${statusFilter}`
+        : 'Filtro padrão restaurado.',
+      duration: 2500,
+    })
+  }, [canResetFilters, runFilter, dbRunsActive, statusFilter, setSearchParams])
 
   const filteredLogs = useMemo(() => {
     let out = logs
