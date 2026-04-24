@@ -96,6 +96,18 @@ export default function ConnectorDetailPage() {
     }
   }, [buildShareUrl, hasActiveSlice])
 
+  const canResetFilters = Boolean(runFilter) || dbRunsActive
+
+  const handleResetFilters = useCallback(() => {
+    if (!canResetFilters) return
+    setSearchParams(prev => {
+      const sp = new URLSearchParams(prev)
+      sp.delete('run')
+      sp.delete('runs')
+      return sp
+    }, { replace: true })
+  }, [canResetFilters, setSearchParams])
+
   const filteredLogs = useMemo(() => {
     let out = logs
     if (statusFilter !== 'all') out = out.filter(l => l.status === statusFilter)
