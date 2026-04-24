@@ -533,7 +533,7 @@ export function LogSimulator({ connectorSlug, onRunFilterChange, initialRunId, d
             )}
             <Button
               variant="ghost" size="sm"
-              onClick={loadDbRuns}
+              onClick={() => loadDbRuns(false)}
               disabled={loadingRuns || running || clearing}
               className="ml-auto h-7 px-2 text-[11px]"
             >
