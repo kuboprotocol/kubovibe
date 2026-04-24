@@ -339,34 +339,54 @@ export default function ConnectorDetailPage() {
               <CardTitle className="text-lg flex items-center gap-2">
                 <Activity className="h-4 w-4 text-primary" /> Atividade Recente
               </CardTitle>
-              {logs.length > 0 && (
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive h-8">
-                      <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Limpar
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Limpar histórico de logs?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Todos os {logs.length} registros de atividade do conector <strong>{connector.name}</strong> serão permanentemente excluídos. Esta ação não pode ser desfeita.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel disabled={clearing}>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={handleClearLogs}
-                        disabled={clearing}
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      >
-                        {clearing ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Trash2 className="h-3.5 w-3.5 mr-1.5" />}
-                        Limpar tudo
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              )}
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleShareSlice}
+                  className={cn(
+                    'h-8 text-xs',
+                    hasActiveSlice ? 'text-primary hover:text-primary' : 'text-muted-foreground'
+                  )}
+                  title={hasActiveSlice ? 'Copiar URL com filtros normalizados' : 'Copiar URL da página (sem filtros)'}
+                >
+                  <Share2 className="h-3.5 w-3.5 mr-1.5" />
+                  Compartilhar recorte
+                  {hasActiveSlice && (
+                    <Badge variant="secondary" className="ml-1.5 h-4 px-1 text-[9px] bg-primary/15 text-primary border-primary/30">
+                      {[runFilter && 'run', statusFilter !== 'all' && 'status', dbRunsActive && 'banco'].filter(Boolean).length}
+                    </Badge>
+                  )}
+                </Button>
+                {logs.length > 0 && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive h-8">
+                        <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Limpar
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Limpar histórico de logs?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Todos os {logs.length} registros de atividade do conector <strong>{connector.name}</strong> serão permanentemente excluídos. Esta ação não pode ser desfeita.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel disabled={clearing}>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={handleClearLogs}
+                          disabled={clearing}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          {clearing ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Trash2 className="h-3.5 w-3.5 mr-1.5" />}
+                          Limpar tudo
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {runFilter && (
@@ -376,10 +396,7 @@ export default function ConnectorDetailPage() {
                   <span className="text-muted-foreground ml-1">({filteredLogs.length} log{filteredLogs.length === 1 ? '' : 's'})</span>
                   <Button
                     variant="ghost" size="sm" className="ml-auto h-6 px-2 text-[11px]"
-                    onClick={() => {
-                      navigator.clipboard.writeText(window.location.href)
-                      toast.success('Link copiado para a área de transferência')
-                    }}
+                    onClick={handleShareSlice}
                   >
                     <Copy className="h-3 w-3 mr-1" /> Copiar link
                   </Button>
