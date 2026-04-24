@@ -75,6 +75,27 @@ export default function ConnectorDetailPage() {
     }, { replace: true })
   }, [setSearchParams])
 
+  const hasActiveSlice = Boolean(runFilter) || statusFilter !== 'all' || dbRunsActive
+
+  const buildShareUrl = useCallback(() => {
+    const sp = new URLSearchParams()
+    if (runFilter) sp.set('run', runFilter)
+    if (statusFilter !== 'all') sp.set('status', statusFilter)
+    if (dbRunsActive) sp.set('runs', 'db')
+    const qs = sp.toString()
+    return `${window.location.origin}${window.location.pathname}${qs ? `?${qs}` : ''}`
+  }, [runFilter, statusFilter, dbRunsActive])
+
+  const handleShareSlice = useCallback(async () => {
+    const url = buildShareUrl()
+    try {
+      await navigator.clipboard.writeText(url)
+      toast.success(hasActiveSlice ? 'Recorte copiado!' : 'Link da página copiado (sem filtros ativos)')
+    } catch {
+      toast.error('Não foi possível copiar o link')
+    }
+  }, [buildShareUrl, hasActiveSlice])
+
   const filteredLogs = useMemo(() => {
     let out = logs
     if (statusFilter !== 'all') out = out.filter(l => l.status === statusFilter)
