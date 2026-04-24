@@ -301,7 +301,15 @@ export default function ConnectorDetailPage() {
         {isGitHub && isConnected && <GitHubReposList />}
 
         {/* Log Simulator (admin only) */}
-        {isAdmin && slug && <LogSimulator connectorSlug={slug} onRunFilterChange={setRunFilter} initialRunId={runFilter} />}
+        {isAdmin && slug && (
+          <LogSimulator
+            connectorSlug={slug}
+            onRunFilterChange={setRunFilter}
+            initialRunId={runFilter}
+            dbRunsActive={dbRunsActive}
+            onDbRunsActiveChange={setDbRunsActive}
+          />
+        )}
 
         {/* Activity — sempre que houver logs */}
         {(isConnected || logs.length > 0) && (
