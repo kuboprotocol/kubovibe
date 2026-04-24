@@ -15,7 +15,7 @@ import { useGitHubConnection } from '@/hooks/useGitHubConnection'
 import { useAuth } from '@/hooks/useAuth'
 import {
   ArrowLeft, CheckCircle, XCircle, ExternalLink, Copy,
-  RefreshCw, Unplug, Loader2, Clock, Activity, Trash2,
+  RefreshCw, Unplug, Loader2, Clock, Activity, Trash2, Share2,
 } from 'lucide-react'
 import GitHubReposList from '@/components/connectors/GitHubReposList'
 import { LogSimulator } from '@/components/connectors/LogSimulator'
