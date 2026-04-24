@@ -143,9 +143,11 @@ interface LogSimulatorProps {
   connectorSlug: string
   onRunFilterChange?: (runId: string | null) => void
   initialRunId?: string | null
+  dbRunsActive?: boolean
+  onDbRunsActiveChange?: (active: boolean) => void
 }
 
-export function LogSimulator({ connectorSlug, onRunFilterChange, initialRunId }: LogSimulatorProps) {
+export function LogSimulator({ connectorSlug, onRunFilterChange, initialRunId, dbRunsActive, onDbRunsActiveChange }: LogSimulatorProps) {
   const { user } = useAuth()
   const [customScenarios, setCustomScenarios] = useState<Record<string, ScenarioDef>>(() => loadCustomScenarios())
   const allScenarios = useMemo(
@@ -365,7 +367,7 @@ export function LogSimulator({ connectorSlug, onRunFilterChange, initialRunId }:
     setSelectedRunId('all')
   }
 
-  const loadDbRuns = async () => {
+  const loadDbRuns = async (silent = false) => {
     setLoadingRuns(true)
     const { data, error } = await supabase.rpc('admin_list_connector_runs', {
       _connector_slug: connectorSlug,
@@ -373,7 +375,7 @@ export function LogSimulator({ connectorSlug, onRunFilterChange, initialRunId }:
     })
     setLoadingRuns(false)
     if (error) {
-      toast.error('Erro ao carregar runs do banco (apenas admin)')
+      if (!silent) toast.error('Erro ao carregar runs do banco (apenas admin)')
       console.error(error)
       return
     }
@@ -392,8 +394,20 @@ export function LogSimulator({ connectorSlug, onRunFilterChange, initialRunId }:
       const sessionOnly = prev.filter(p => !dbRuns.some(d => d.id === p.id))
       return [...dbRuns, ...sessionOnly]
     })
-    toast.success(`${dbRuns.length} run(s) carregados do banco`)
+    onDbRunsActiveChange?.(true)
+    if (!silent) toast.success(`${dbRuns.length} run(s) carregados do banco`)
   }
+
+  // Auto-load DB runs when the URL says we should (shared link, back/forward)
+  const dbAutoloadedRef = useState({ done: false })[0]
+  useEffect(() => {
+    if (dbRunsActive && !dbAutoloadedRef.done) {
+      dbAutoloadedRef.done = true
+      void loadDbRuns(true)
+    }
+    if (!dbRunsActive) dbAutoloadedRef.done = false
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dbRunsActive, connectorSlug])
 
   return (
     <Card className="border-dashed border-amber-500/40 bg-amber-500/[0.02]">
@@ -519,7 +533,7 @@ export function LogSimulator({ connectorSlug, onRunFilterChange, initialRunId }:
             )}
             <Button
               variant="ghost" size="sm"
-              onClick={loadDbRuns}
+              onClick={() => loadDbRuns(false)}
               disabled={loadingRuns || running || clearing}
               className="ml-auto h-7 px-2 text-[11px]"
             >
