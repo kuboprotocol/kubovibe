@@ -403,7 +403,7 @@ export default function ConnectorDetailPage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={handleShareSlice}
+                  onClick={handleOpenShare}
                   className={cn(
                     'h-8 text-xs',
                     hasActiveSlice ? 'text-primary hover:text-primary' : 'text-muted-foreground'
@@ -456,7 +456,7 @@ export default function ConnectorDetailPage() {
                   <span className="text-muted-foreground ml-1">({filteredLogs.length} log{filteredLogs.length === 1 ? '' : 's'})</span>
                   <Button
                     variant="ghost" size="sm" className="ml-auto h-6 px-2 text-[11px]"
-                    onClick={handleShareSlice}
+                    onClick={handleOpenShare}
                   >
                     <Copy className="h-3 w-3 mr-1" /> Copiar link
                   </Button>
