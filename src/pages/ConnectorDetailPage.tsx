@@ -10,6 +10,10 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { getConnectorBySlug } from '@/lib/connectorsConfig'
 import { useGitHubConnection } from '@/hooks/useGitHubConnection'
 import { useAuth } from '@/hooks/useAuth'
@@ -86,14 +90,21 @@ export default function ConnectorDetailPage() {
     return `${window.location.origin}${window.location.pathname}${qs ? `?${qs}` : ''}`
   }, [runFilter, statusFilter, dbRunsActive])
 
-  const handleShareSlice = useCallback(async () => {
+  const [shareOpen, setShareOpen] = useState(false)
+
+  const activeFilterChips = useMemo(() => ([
+    runFilter ? { key: 'run', label: 'run', value: `${runFilter.slice(0, 8)}…` } : null,
+    statusFilter !== 'all' ? { key: 'status', label: 'status', value: statusFilter } : null,
+    dbRunsActive ? { key: 'runs', label: 'runs', value: 'db' } : null,
+  ].filter(Boolean) as { key: string; label: string; value: string }[]), [runFilter, statusFilter, dbRunsActive])
+
+  const handleOpenShare = useCallback(() => {
+    setShareOpen(true)
+  }, [])
+
+  const handleConfirmCopy = useCallback(async () => {
     const url = buildShareUrl()
-    const activeFilters = [
-      runFilter && `run=${runFilter.slice(0, 8)}…`,
-      statusFilter !== 'all' && `status=${statusFilter}`,
-      dbRunsActive && 'runs=db',
-    ].filter(Boolean) as string[]
-    const count = activeFilters.length
+    const count = activeFilterChips.length
     try {
       await navigator.clipboard.writeText(url)
       const title = count === 0
@@ -101,23 +112,15 @@ export default function ConnectorDetailPage() {
         : `Recorte copiado · ${count} filtro${count === 1 ? '' : 's'}`
       toast.success(title, {
         description: (
-          <div className="space-y-1">
-            {count > 0 && (
-              <div className="text-[11px] text-muted-foreground">
-                {activeFilters.join(' · ')}
-              </div>
-            )}
-            <div className="font-mono text-[11px] break-all text-foreground/80">
-              {url}
-            </div>
-          </div>
+          <div className="font-mono text-[11px] break-all text-foreground/80">{url}</div>
         ),
-        duration: 5000,
+        duration: 4000,
       })
+      setShareOpen(false)
     } catch {
       toast.error('Não foi possível copiar o link')
     }
-  }, [buildShareUrl, runFilter, statusFilter, dbRunsActive])
+  }, [buildShareUrl, activeFilterChips])
 
   const canResetFilters = Boolean(runFilter) || dbRunsActive
 
