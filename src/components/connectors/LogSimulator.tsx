@@ -143,9 +143,11 @@ interface LogSimulatorProps {
   connectorSlug: string
   onRunFilterChange?: (runId: string | null) => void
   initialRunId?: string | null
+  dbRunsActive?: boolean
+  onDbRunsActiveChange?: (active: boolean) => void
 }
 
-export function LogSimulator({ connectorSlug, onRunFilterChange, initialRunId }: LogSimulatorProps) {
+export function LogSimulator({ connectorSlug, onRunFilterChange, initialRunId, dbRunsActive, onDbRunsActiveChange }: LogSimulatorProps) {
   const { user } = useAuth()
   const [customScenarios, setCustomScenarios] = useState<Record<string, ScenarioDef>>(() => loadCustomScenarios())
   const allScenarios = useMemo(
