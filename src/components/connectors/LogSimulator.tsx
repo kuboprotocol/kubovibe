@@ -367,7 +367,7 @@ export function LogSimulator({ connectorSlug, onRunFilterChange, initialRunId, d
     setSelectedRunId('all')
   }
 
-  const loadDbRuns = async () => {
+  const loadDbRuns = async (silent = false) => {
     setLoadingRuns(true)
     const { data, error } = await supabase.rpc('admin_list_connector_runs', {
       _connector_slug: connectorSlug,
@@ -375,7 +375,7 @@ export function LogSimulator({ connectorSlug, onRunFilterChange, initialRunId, d
     })
     setLoadingRuns(false)
     if (error) {
-      toast.error('Erro ao carregar runs do banco (apenas admin)')
+      if (!silent) toast.error('Erro ao carregar runs do banco (apenas admin)')
       console.error(error)
       return
     }
@@ -394,8 +394,20 @@ export function LogSimulator({ connectorSlug, onRunFilterChange, initialRunId, d
       const sessionOnly = prev.filter(p => !dbRuns.some(d => d.id === p.id))
       return [...dbRuns, ...sessionOnly]
     })
-    toast.success(`${dbRuns.length} run(s) carregados do banco`)
+    onDbRunsActiveChange?.(true)
+    if (!silent) toast.success(`${dbRuns.length} run(s) carregados do banco`)
   }
+
+  // Auto-load DB runs when the URL says we should (shared link, back/forward)
+  const dbAutoloadedRef = useState({ done: false })[0]
+  useEffect(() => {
+    if (dbRunsActive && !dbAutoloadedRef.done) {
+      dbAutoloadedRef.done = true
+      void loadDbRuns(true)
+    }
+    if (!dbRunsActive) dbAutoloadedRef.done = false
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dbRunsActive, connectorSlug])
 
   return (
     <Card className="border-dashed border-amber-500/40 bg-amber-500/[0.02]">
