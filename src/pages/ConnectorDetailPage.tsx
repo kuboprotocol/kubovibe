@@ -527,6 +527,68 @@ export default function ConnectorDetailPage() {
           </Card>
         )}
       </motion.div>
+
+      {/* Share preview dialog */}
+      <Dialog open={shareOpen} onOpenChange={setShareOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Share2 className="h-4 w-4 text-primary" />
+              Compartilhar recorte
+            </DialogTitle>
+            <DialogDescription>
+              Revise os filtros incluídos antes de copiar a URL.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Filter chips */}
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-2">
+                Filtros incluídos ({activeFilterChips.length})
+              </p>
+              {activeFilterChips.length === 0 ? (
+                <p className="text-xs text-muted-foreground italic">
+                  Nenhum filtro ativo — o link aponta para a página padrão do conector.
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {activeFilterChips.map(chip => (
+                    <Badge
+                      key={chip.key}
+                      variant="secondary"
+                      className="bg-primary/10 text-primary border-primary/30 font-mono text-[11px] gap-1"
+                    >
+                      <span className="opacity-70">{chip.label}=</span>
+                      <span>{chip.value}</span>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* URL preview */}
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-2">
+                Preview da URL
+              </p>
+              <div className="rounded-md border border-border bg-secondary/40 p-3 font-mono text-[11px] text-foreground break-all">
+                {buildShareUrl()}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="ghost" onClick={() => setShareOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleConfirmCopy}>
+              <Copy className="h-3.5 w-3.5 mr-1.5" />
+              Copiar link
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
