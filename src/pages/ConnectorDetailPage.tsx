@@ -738,8 +738,14 @@ export default function ConnectorDetailPage() {
                     )}
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent side="top" className="max-w-xs text-xs">
-                  Copia a URL sem fechar este diálogo — útil para revisar antes de compartilhar.
+                <TooltipContent
+                  side="top"
+                  align="center"
+                  sideOffset={6}
+                  collisionPadding={12}
+                  className="max-w-[min(20rem,calc(100vw-2rem))] text-xs leading-snug whitespace-normal break-words"
+                >
+                  Copia a URL sem fechar este diálogo — útil para revisar antes de compartilhar. Use “Copiar e fechar” para sair.
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
