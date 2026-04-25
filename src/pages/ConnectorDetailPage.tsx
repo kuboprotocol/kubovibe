@@ -601,9 +601,26 @@ export default function ConnectorDetailPage() {
             <Button variant="ghost" onClick={() => setShareOpen(false)}>
               Cancelar
             </Button>
+            <Button
+              variant="outline"
+              onClick={handleCopyOnly}
+              title="Copia a URL sem fechar este diálogo"
+            >
+              {justCopied ? (
+                <>
+                  <Check className="h-3.5 w-3.5 mr-1.5 text-primary" />
+                  Copiado
+                </>
+              ) : (
+                <>
+                  <Copy className="h-3.5 w-3.5 mr-1.5" />
+                  Copiar URL
+                </>
+              )}
+            </Button>
             <Button onClick={handleConfirmCopy}>
               <Copy className="h-3.5 w-3.5 mr-1.5" />
-              Copiar link
+              Copiar e fechar
             </Button>
           </DialogFooter>
         </DialogContent>
