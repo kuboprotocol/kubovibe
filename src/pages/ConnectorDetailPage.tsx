@@ -489,6 +489,59 @@ export default function ConnectorDetailPage() {
           />
         )}
 
+        {/* Undo banner — persists after toast expires */}
+        {undoSnapshot && (
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            className="rounded-lg border border-primary/30 bg-primary/5 p-3 flex items-center justify-between gap-3 flex-wrap"
+            role="status"
+            aria-live="polite"
+          >
+            <div className="flex items-start gap-2 text-sm flex-1 min-w-0">
+              <RotateCcw className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+              <div className="min-w-0">
+                <div className="font-medium text-foreground">
+                  Filtros resetados — você pode desfazer
+                </div>
+                <div className="text-xs text-muted-foreground mt-0.5 flex flex-wrap items-center gap-1.5">
+                  <span>Removido:</span>
+                  {undoSnapshot.run && (
+                    <code className="font-mono px-1 py-0.5 rounded bg-destructive/10 text-destructive text-[10px]">
+                      ?run={undoSnapshot.run.slice(0, 8)}…
+                    </code>
+                  )}
+                  {undoSnapshot.runsDb && (
+                    <code className="font-mono px-1 py-0.5 rounded bg-destructive/10 text-destructive text-[10px]">
+                      ?runs=db
+                    </code>
+                  )}
+                  <span>· expira em {undoSecondsLeft}s</span>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => { setUndoSnapshot(null); setUndoSecondsLeft(0) }}
+                className="h-8 text-xs"
+              >
+                Dispensar
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => handleRestoreSnapshot(undoSnapshot)}
+                className="h-8 text-xs"
+              >
+                <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                Restaurar
+              </Button>
+            </div>
+          </motion.div>
+        )}
+
         {/* Activity — sempre que houver logs */}
         {(isConnected || logs.length > 0) && (
           <Card>
