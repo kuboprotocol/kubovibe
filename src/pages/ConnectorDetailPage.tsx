@@ -126,7 +126,7 @@ export default function ConnectorDetailPage() {
       }
       setPasteState(pasteConfirmed ? 'verified' : 'unverified')
 
-
+      const baseTitle = count === 0
         ? 'Link copiado (sem filtros ativos)'
         : `Recorte copiado · ${count} filtro${count === 1 ? '' : 's'}`
       const title = pasteConfirmed ? `${baseTitle} ✓ colagem confirmada` : baseTitle
