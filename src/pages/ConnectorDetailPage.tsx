@@ -103,6 +103,7 @@ export default function ConnectorDetailPage() {
 
   const handleOpenShare = useCallback(() => {
     setJustCopied(false)
+    setPasteState('idle')
     setShareOpen(true)
   }, [])
 
