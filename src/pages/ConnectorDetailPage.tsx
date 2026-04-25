@@ -134,24 +134,53 @@ export default function ConnectorDetailPage() {
   const handleCopyOnly = useCallback(() => copyShareUrl({ keepOpen: true }), [copyShareUrl])
 
   const canResetFilters = Boolean(runFilter) || dbRunsActive
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
 
-  const handleResetFilters = useCallback(() => {
+  const handleRequestReset = useCallback(() => {
     if (!canResetFilters) return
+    setResetConfirmOpen(true)
+  }, [canResetFilters])
+
+  const handleConfirmReset = useCallback(() => {
+    if (!canResetFilters) return
+    // Snapshot of params we are about to remove (to allow restore).
+    const snapshot = {
+      run: runFilter || null,
+      runsDb: dbRunsActive,
+    }
     const removed: string[] = []
-    if (runFilter) removed.push('?run=')
-    if (dbRunsActive) removed.push('?runs=db')
+    if (snapshot.run) removed.push('?run=')
+    if (snapshot.runsDb) removed.push('?runs=db')
+
     setSearchParams(prev => {
       const sp = new URLSearchParams(prev)
       sp.delete('run')
       sp.delete('runs')
       return sp
     }, { replace: true })
-    // Silent confirmation: low-priority info toast, no error variant.
+
+    setResetConfirmOpen(false)
+
     toast(`Filtros resetados · ${removed.join(' e ')} removido${removed.length === 1 ? '' : 's'}`, {
       description: statusFilter !== 'all'
         ? `Filtro padrão restaurado. Mantido: ?status=${statusFilter}`
         : 'Filtro padrão restaurado.',
-      duration: 2500,
+      duration: 5000,
+      action: {
+        label: 'Restaurar',
+        onClick: () => {
+          setSearchParams(prev => {
+            const sp = new URLSearchParams(prev)
+            if (snapshot.run) sp.set('run', snapshot.run)
+            if (snapshot.runsDb) sp.set('runs', 'db')
+            return sp
+          }, { replace: true })
+          toast.success('Filtros restaurados', {
+            description: removed.join(' e ') + ' reaplicado' + (removed.length === 1 ? '' : 's'),
+            duration: 2500,
+          })
+        },
+      },
     })
   }, [canResetFilters, runFilter, dbRunsActive, statusFilter, setSearchParams])
 
@@ -405,7 +434,7 @@ export default function ConnectorDetailPage() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={handleResetFilters}
+                      onClick={handleRequestReset}
                       className="h-8 text-xs text-muted-foreground hover:text-foreground gap-1.5"
                       title={`Remove ${removableCount} filtro${removableCount === 1 ? '' : 's'}: ${[runFilter && '?run=', dbRunsActive && '?runs=db'].filter(Boolean).join(' e ')} (mantém ?status=)`}
                     >
@@ -689,6 +718,60 @@ export default function ConnectorDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Reset filters confirmation */}
+      <AlertDialog open={resetConfirmOpen} onOpenChange={setResetConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <RotateCcw className="h-4 w-4 text-destructive" />
+              Resetar filtros?
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm">
+                <p>Os seguintes parâmetros serão removidos da URL:</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {runFilter && (
+                    <Badge
+                      variant="secondary"
+                      className="font-mono text-[11px] gap-1 bg-destructive/10 text-destructive border-destructive/30"
+                    >
+                      <span className="opacity-70">?run=</span>
+                      <span>{runFilter.slice(0, 8)}…</span>
+                    </Badge>
+                  )}
+                  {dbRunsActive && (
+                    <Badge
+                      variant="secondary"
+                      className="font-mono text-[11px] gap-1 bg-destructive/10 text-destructive border-destructive/30"
+                    >
+                      <span>?runs=db</span>
+                    </Badge>
+                  )}
+                </div>
+                {statusFilter !== 'all' && (
+                  <p className="text-xs text-muted-foreground">
+                    Mantido:{' '}
+                    <code className="font-mono px-1 py-0.5 rounded bg-primary/10 text-primary">
+                      ?status={statusFilter}
+                    </code>
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Você poderá desfazer pelo botão “Restaurar” no toast logo após confirmar.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmReset}>
+              <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+              Resetar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
