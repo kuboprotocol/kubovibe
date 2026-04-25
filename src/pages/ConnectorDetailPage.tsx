@@ -18,7 +18,7 @@ import { getConnectorBySlug } from '@/lib/connectorsConfig'
 import { useGitHubConnection } from '@/hooks/useGitHubConnection'
 import { useAuth } from '@/hooks/useAuth'
 import {
-  ArrowLeft, CheckCircle, XCircle, ExternalLink, Copy,
+  ArrowLeft, CheckCircle, XCircle, ExternalLink, Copy, Check,
   RefreshCw, Unplug, Loader2, Clock, Activity, Trash2, Share2, RotateCcw,
 } from 'lucide-react'
 import GitHubReposList from '@/components/connectors/GitHubReposList'
@@ -91,6 +91,7 @@ export default function ConnectorDetailPage() {
   }, [runFilter, statusFilter, dbRunsActive])
 
   const [shareOpen, setShareOpen] = useState(false)
+  const [justCopied, setJustCopied] = useState(false)
 
   const activeFilterChips = useMemo(() => ([
     runFilter ? { key: 'run', label: 'run', value: `${runFilter.slice(0, 8)}…` } : null,
@@ -99,10 +100,11 @@ export default function ConnectorDetailPage() {
   ].filter(Boolean) as { key: string; label: string; value: string }[]), [runFilter, statusFilter, dbRunsActive])
 
   const handleOpenShare = useCallback(() => {
+    setJustCopied(false)
     setShareOpen(true)
   }, [])
 
-  const handleConfirmCopy = useCallback(async () => {
+  const copyShareUrl = useCallback(async (opts: { keepOpen: boolean }) => {
     const url = buildShareUrl()
     const count = activeFilterChips.length
     try {
@@ -114,13 +116,21 @@ export default function ConnectorDetailPage() {
         description: (
           <div className="font-mono text-[11px] break-all text-foreground/80">{url}</div>
         ),
-        duration: 4000,
+        duration: opts.keepOpen ? 2500 : 4000,
       })
-      setShareOpen(false)
+      if (opts.keepOpen) {
+        setJustCopied(true)
+        setTimeout(() => setJustCopied(false), 2000)
+      } else {
+        setShareOpen(false)
+      }
     } catch {
       toast.error('Não foi possível copiar o link')
     }
   }, [buildShareUrl, activeFilterChips])
+
+  const handleConfirmCopy = useCallback(() => copyShareUrl({ keepOpen: false }), [copyShareUrl])
+  const handleCopyOnly = useCallback(() => copyShareUrl({ keepOpen: true }), [copyShareUrl])
 
   const canResetFilters = Boolean(runFilter) || dbRunsActive
 
@@ -591,9 +601,26 @@ export default function ConnectorDetailPage() {
             <Button variant="ghost" onClick={() => setShareOpen(false)}>
               Cancelar
             </Button>
+            <Button
+              variant="outline"
+              onClick={handleCopyOnly}
+              title="Copia a URL sem fechar este diálogo"
+            >
+              {justCopied ? (
+                <>
+                  <Check className="h-3.5 w-3.5 mr-1.5 text-primary" />
+                  Copiado
+                </>
+              ) : (
+                <>
+                  <Copy className="h-3.5 w-3.5 mr-1.5" />
+                  Copiar URL
+                </>
+              )}
+            </Button>
             <Button onClick={handleConfirmCopy}>
               <Copy className="h-3.5 w-3.5 mr-1.5" />
-              Copiar link
+              Copiar e fechar
             </Button>
           </DialogFooter>
         </DialogContent>
