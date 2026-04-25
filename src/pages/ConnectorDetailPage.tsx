@@ -388,18 +388,27 @@ export default function ConnectorDetailPage() {
                 <Activity className="h-4 w-4 text-primary" /> Atividade Recente
               </CardTitle>
               <div className="flex items-center gap-1">
-                {canResetFilters && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleResetFilters}
-                    className="h-8 text-xs text-muted-foreground hover:text-foreground"
-                    title="Limpa ?run= e ?runs=db (mantém ?status=)"
-                  >
-                    <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
-                    Resetar filtros
-                  </Button>
-                )}
+                {canResetFilters && (() => {
+                  const removableCount = (runFilter ? 1 : 0) + (dbRunsActive ? 1 : 0)
+                  return (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleResetFilters}
+                      className="h-8 text-xs text-muted-foreground hover:text-foreground gap-1.5"
+                      title={`Remove ${removableCount} filtro${removableCount === 1 ? '' : 's'}: ${[runFilter && '?run=', dbRunsActive && '?runs=db'].filter(Boolean).join(' e ')} (mantém ?status=)`}
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      Resetar filtros
+                      <Badge
+                        variant="secondary"
+                        className="h-4 min-w-4 px-1 text-[10px] leading-none rounded-full bg-primary/15 text-primary border-primary/20"
+                      >
+                        {removableCount}
+                      </Badge>
+                    </Button>
+                  )
+                })()}
                 <Button
                   variant="ghost"
                   size="sm"
