@@ -718,6 +718,60 @@ export default function ConnectorDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Reset filters confirmation */}
+      <AlertDialog open={resetConfirmOpen} onOpenChange={setResetConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <RotateCcw className="h-4 w-4 text-destructive" />
+              Resetar filtros?
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm">
+                <p>Os seguintes parâmetros serão removidos da URL:</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {runFilter && (
+                    <Badge
+                      variant="secondary"
+                      className="font-mono text-[11px] gap-1 bg-destructive/10 text-destructive border-destructive/30"
+                    >
+                      <span className="opacity-70">?run=</span>
+                      <span>{runFilter.slice(0, 8)}…</span>
+                    </Badge>
+                  )}
+                  {dbRunsActive && (
+                    <Badge
+                      variant="secondary"
+                      className="font-mono text-[11px] gap-1 bg-destructive/10 text-destructive border-destructive/30"
+                    >
+                      <span>?runs=db</span>
+                    </Badge>
+                  )}
+                </div>
+                {statusFilter !== 'all' && (
+                  <p className="text-xs text-muted-foreground">
+                    Mantido:{' '}
+                    <code className="font-mono px-1 py-0.5 rounded bg-primary/10 text-primary">
+                      ?status={statusFilter}
+                    </code>
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Você poderá desfazer pelo botão “Restaurar” no toast logo após confirmar.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmReset}>
+              <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+              Resetar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
