@@ -110,19 +110,51 @@ export default function ConnectorDetailPage() {
     const count = activeFilterChips.length
     try {
       await navigator.clipboard.writeText(url)
-      const title = count === 0
+
+      // Verify clipboard actually received the value (when API is available).
+      let pasteConfirmed = false
+      try {
+        if (navigator.clipboard.readText) {
+          const readBack = await navigator.clipboard.readText()
+          pasteConfirmed = readBack === url
+        }
+      } catch {
+        // readText may be blocked (no permission / focus) — fall back silently.
+        pasteConfirmed = false
+      }
+
+      const baseTitle = count === 0
         ? 'Link copiado (sem filtros ativos)'
         : `Recorte copiado · ${count} filtro${count === 1 ? '' : 's'}`
-      toast.success(title, {
-        description: (
-          <div className="font-mono text-[11px] break-all text-foreground/80">{url}</div>
-        ),
-        duration: opts.keepOpen ? 2500 : 4000,
-      })
+      const title = pasteConfirmed ? `${baseTitle} ✓ colagem confirmada` : baseTitle
+
       if (opts.keepOpen) {
+        toast.success(title, {
+          description: (
+            <div className="space-y-1.5">
+              <div className="font-mono text-[11px] break-all text-foreground/80">{url}</div>
+              <div className="text-[11px] text-muted-foreground">
+                Diálogo continua aberto. Use <span className="font-medium text-foreground">“Copiar e fechar”</span> se quiser sair.
+              </div>
+            </div>
+          ),
+          duration: 2500,
+          action: {
+            label: 'Copiar e fechar',
+            onClick: () => {
+              setShareOpen(false)
+            },
+          },
+        })
         setJustCopied(true)
         setTimeout(() => setJustCopied(false), 2000)
       } else {
+        toast.success(title, {
+          description: (
+            <div className="font-mono text-[11px] break-all text-foreground/80">{url}</div>
+          ),
+          duration: 4000,
+        })
         setShareOpen(false)
       }
     } catch {
@@ -706,8 +738,14 @@ export default function ConnectorDetailPage() {
                     )}
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent side="top" className="max-w-xs text-xs">
-                  Copia a URL sem fechar este diálogo — útil para revisar antes de compartilhar.
+                <TooltipContent
+                  side="top"
+                  align="center"
+                  sideOffset={6}
+                  collisionPadding={12}
+                  className="max-w-[min(20rem,calc(100vw-2rem))] text-xs leading-snug whitespace-normal break-words"
+                >
+                  Copia a URL sem fechar este diálogo — útil para revisar antes de compartilhar. Use “Copiar e fechar” para sair.
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
