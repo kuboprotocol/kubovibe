@@ -134,24 +134,53 @@ export default function ConnectorDetailPage() {
   const handleCopyOnly = useCallback(() => copyShareUrl({ keepOpen: true }), [copyShareUrl])
 
   const canResetFilters = Boolean(runFilter) || dbRunsActive
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
 
-  const handleResetFilters = useCallback(() => {
+  const handleRequestReset = useCallback(() => {
     if (!canResetFilters) return
+    setResetConfirmOpen(true)
+  }, [canResetFilters])
+
+  const handleConfirmReset = useCallback(() => {
+    if (!canResetFilters) return
+    // Snapshot of params we are about to remove (to allow restore).
+    const snapshot = {
+      run: runFilter || null,
+      runsDb: dbRunsActive,
+    }
     const removed: string[] = []
-    if (runFilter) removed.push('?run=')
-    if (dbRunsActive) removed.push('?runs=db')
+    if (snapshot.run) removed.push('?run=')
+    if (snapshot.runsDb) removed.push('?runs=db')
+
     setSearchParams(prev => {
       const sp = new URLSearchParams(prev)
       sp.delete('run')
       sp.delete('runs')
       return sp
     }, { replace: true })
-    // Silent confirmation: low-priority info toast, no error variant.
+
+    setResetConfirmOpen(false)
+
     toast(`Filtros resetados · ${removed.join(' e ')} removido${removed.length === 1 ? '' : 's'}`, {
       description: statusFilter !== 'all'
         ? `Filtro padrão restaurado. Mantido: ?status=${statusFilter}`
         : 'Filtro padrão restaurado.',
-      duration: 2500,
+      duration: 5000,
+      action: {
+        label: 'Restaurar',
+        onClick: () => {
+          setSearchParams(prev => {
+            const sp = new URLSearchParams(prev)
+            if (snapshot.run) sp.set('run', snapshot.run)
+            if (snapshot.runsDb) sp.set('runs', 'db')
+            return sp
+          }, { replace: true })
+          toast.success('Filtros restaurados', {
+            description: removed.join(' e ') + ' reaplicado' + (removed.length === 1 ? '' : 's'),
+            duration: 2500,
+          })
+        },
+      },
     })
   }, [canResetFilters, runFilter, dbRunsActive, statusFilter, setSearchParams])
 
