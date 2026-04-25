@@ -91,6 +91,7 @@ export default function ConnectorDetailPage() {
   }, [runFilter, statusFilter, dbRunsActive])
 
   const [shareOpen, setShareOpen] = useState(false)
+  const [justCopied, setJustCopied] = useState(false)
 
   const activeFilterChips = useMemo(() => ([
     runFilter ? { key: 'run', label: 'run', value: `${runFilter.slice(0, 8)}…` } : null,
@@ -99,10 +100,11 @@ export default function ConnectorDetailPage() {
   ].filter(Boolean) as { key: string; label: string; value: string }[]), [runFilter, statusFilter, dbRunsActive])
 
   const handleOpenShare = useCallback(() => {
+    setJustCopied(false)
     setShareOpen(true)
   }, [])
 
-  const handleConfirmCopy = useCallback(async () => {
+  const copyShareUrl = useCallback(async (opts: { keepOpen: boolean }) => {
     const url = buildShareUrl()
     const count = activeFilterChips.length
     try {
@@ -114,13 +116,21 @@ export default function ConnectorDetailPage() {
         description: (
           <div className="font-mono text-[11px] break-all text-foreground/80">{url}</div>
         ),
-        duration: 4000,
+        duration: opts.keepOpen ? 2500 : 4000,
       })
-      setShareOpen(false)
+      if (opts.keepOpen) {
+        setJustCopied(true)
+        setTimeout(() => setJustCopied(false), 2000)
+      } else {
+        setShareOpen(false)
+      }
     } catch {
       toast.error('Não foi possível copiar o link')
     }
   }, [buildShareUrl, activeFilterChips])
+
+  const handleConfirmCopy = useCallback(() => copyShareUrl({ keepOpen: false }), [copyShareUrl])
+  const handleCopyOnly = useCallback(() => copyShareUrl({ keepOpen: true }), [copyShareUrl])
 
   const canResetFilters = Boolean(runFilter) || dbRunsActive
 
