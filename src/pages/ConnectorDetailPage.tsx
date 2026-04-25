@@ -572,16 +572,71 @@ export default function ConnectorDetailPage() {
                 </p>
               ) : (
                 <div className="flex flex-wrap gap-1.5">
-                  {activeFilterChips.map(chip => (
-                    <Badge
-                      key={chip.key}
-                      variant="secondary"
-                      className="bg-primary/10 text-primary border-primary/30 font-mono text-[11px] gap-1"
-                    >
-                      <span className="opacity-70">{chip.label}=</span>
-                      <span>{chip.value}</span>
-                    </Badge>
-                  ))}
+                  {activeFilterChips.map(chip => {
+                    const removable = chip.key === 'run' || chip.key === 'runs'
+                    return (
+                      <Badge
+                        key={chip.key}
+                        variant="secondary"
+                        className={cn(
+                          'font-mono text-[11px] gap-1',
+                          removable
+                            ? 'bg-destructive/10 text-destructive border-destructive/30'
+                            : 'bg-primary/10 text-primary border-primary/30'
+                        )}
+                        title={
+                          removable
+                            ? `Será removido ao clicar em "Resetar filtros" (?${chip.key}=${chip.value})`
+                            : 'Mantido após "Resetar filtros"'
+                        }
+                      >
+                        <span className="opacity-70">{chip.label}=</span>
+                        <span>{chip.value}</span>
+                        {removable && <RotateCcw className="h-2.5 w-2.5 ml-0.5" />}
+                      </Badge>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* Reset filters legend */}
+              {canResetFilters && (
+                <div className="mt-3 rounded-md border border-destructive/30 bg-destructive/5 p-2.5">
+                  <div className="flex items-start gap-2">
+                    <RotateCcw className="h-3.5 w-3.5 text-destructive mt-0.5 shrink-0" />
+                    <div className="text-[11px] text-foreground/80 leading-relaxed">
+                      <span className="font-medium text-destructive">
+                        “Resetar filtros” removerá:
+                      </span>{' '}
+                      {[
+                        runFilter && (
+                          <code key="run" className="font-mono px-1 py-0.5 rounded bg-destructive/10 text-destructive mx-0.5">
+                            ?run={runFilter.slice(0, 8)}…
+                          </code>
+                        ),
+                        dbRunsActive && (
+                          <code key="runs" className="font-mono px-1 py-0.5 rounded bg-destructive/10 text-destructive mx-0.5">
+                            ?runs=db
+                          </code>
+                        ),
+                      ].filter(Boolean).reduce((acc: any[], el, i, arr) => {
+                        acc.push(el)
+                        if (i < arr.length - 1) acc.push(<span key={`sep-${i}`}> e </span>)
+                        return acc
+                      }, [])}
+                      {statusFilter !== 'all' && (
+                        <>
+                          {' '}
+                          <span className="text-muted-foreground">
+                            · mantém{' '}
+                            <code className="font-mono px-1 py-0.5 rounded bg-primary/10 text-primary">
+                              ?status={statusFilter}
+                            </code>
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
