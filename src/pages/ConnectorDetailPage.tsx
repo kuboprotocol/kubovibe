@@ -170,6 +170,9 @@ export default function ConnectorDetailPage() {
 
   const canResetFilters = Boolean(runFilter) || dbRunsActive
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
+  const [undoSnapshot, setUndoSnapshot] = useState<{ run: string | null; runsDb: boolean; removed: string[] } | null>(null)
+  const [undoSecondsLeft, setUndoSecondsLeft] = useState(0)
+  const UNDO_DURATION_MS = 15000
 
   const handleRequestReset = useCallback(() => {
     if (!canResetFilters) return
