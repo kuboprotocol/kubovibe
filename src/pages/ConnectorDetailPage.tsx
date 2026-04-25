@@ -179,16 +179,31 @@ export default function ConnectorDetailPage() {
     setResetConfirmOpen(true)
   }, [canResetFilters])
 
+  const handleRestoreSnapshot = useCallback((snapshot: { run: string | null; runsDb: boolean; removed: string[] }) => {
+    setSearchParams(prev => {
+      const sp = new URLSearchParams(prev)
+      if (snapshot.run) sp.set('run', snapshot.run)
+      if (snapshot.runsDb) sp.set('runs', 'db')
+      return sp
+    }, { replace: true })
+    setUndoSnapshot(null)
+    setUndoSecondsLeft(0)
+    toast.success('Filtros restaurados', {
+      description: snapshot.removed.join(' e ') + ' reaplicado' + (snapshot.removed.length === 1 ? '' : 's'),
+      duration: 2500,
+    })
+  }, [setSearchParams])
+
   const handleConfirmReset = useCallback(() => {
     if (!canResetFilters) return
-    // Snapshot of params we are about to remove (to allow restore).
     const snapshot = {
       run: runFilter || null,
       runsDb: dbRunsActive,
+      removed: [
+        runFilter ? '?run=' : null,
+        dbRunsActive ? '?runs=db' : null,
+      ].filter(Boolean) as string[],
     }
-    const removed: string[] = []
-    if (snapshot.run) removed.push('?run=')
-    if (snapshot.runsDb) removed.push('?runs=db')
 
     setSearchParams(prev => {
       const sp = new URLSearchParams(prev)
@@ -198,29 +213,45 @@ export default function ConnectorDetailPage() {
     }, { replace: true })
 
     setResetConfirmOpen(false)
+    setUndoSnapshot(snapshot)
+    setUndoSecondsLeft(Math.round(UNDO_DURATION_MS / 1000))
 
-    toast(`Filtros resetados · ${removed.join(' e ')} removido${removed.length === 1 ? '' : 's'}`, {
+    toast(`Filtros resetados · ${snapshot.removed.join(' e ')} removido${snapshot.removed.length === 1 ? '' : 's'}`, {
       description: statusFilter !== 'all'
-        ? `Filtro padrão restaurado. Mantido: ?status=${statusFilter}`
-        : 'Filtro padrão restaurado.',
-      duration: 5000,
+        ? `Filtro padrão restaurado. Mantido: ?status=${statusFilter}. Banner de desfazer disponível abaixo.`
+        : 'Filtro padrão restaurado. Banner de desfazer disponível abaixo.',
+      duration: 4000,
       action: {
         label: 'Restaurar',
-        onClick: () => {
-          setSearchParams(prev => {
-            const sp = new URLSearchParams(prev)
-            if (snapshot.run) sp.set('run', snapshot.run)
-            if (snapshot.runsDb) sp.set('runs', 'db')
-            return sp
-          }, { replace: true })
-          toast.success('Filtros restaurados', {
-            description: removed.join(' e ') + ' reaplicado' + (removed.length === 1 ? '' : 's'),
-            duration: 2500,
-          })
-        },
+        onClick: () => handleRestoreSnapshot(snapshot),
       },
     })
-  }, [canResetFilters, runFilter, dbRunsActive, statusFilter, setSearchParams])
+  }, [canResetFilters, runFilter, dbRunsActive, statusFilter, setSearchParams, handleRestoreSnapshot])
+
+  // Countdown for undo banner
+  useEffect(() => {
+    if (!undoSnapshot) return
+    const startedAt = Date.now()
+    const tick = setInterval(() => {
+      const elapsed = Date.now() - startedAt
+      const remaining = Math.max(0, Math.ceil((UNDO_DURATION_MS - elapsed) / 1000))
+      setUndoSecondsLeft(remaining)
+      if (remaining <= 0) {
+        setUndoSnapshot(null)
+        clearInterval(tick)
+      }
+    }, 250)
+    return () => clearInterval(tick)
+  }, [undoSnapshot])
+
+  // Cancel undo if user manually re-applies any of the removed filters.
+  useEffect(() => {
+    if (!undoSnapshot) return
+    if ((undoSnapshot.run && runFilter === undoSnapshot.run) || (undoSnapshot.runsDb && dbRunsActive)) {
+      setUndoSnapshot(null)
+      setUndoSecondsLeft(0)
+    }
+  }, [runFilter, dbRunsActive, undoSnapshot])
 
   const filteredLogs = useMemo(() => {
     let out = logs
