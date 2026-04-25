@@ -804,7 +804,38 @@ export default function ConnectorDetailPage() {
             </div>
           </div>
 
-          <DialogFooter className="gap-2 sm:gap-2">
+          <DialogFooter className="gap-2 sm:gap-2 sm:justify-between items-center">
+            <div className="flex items-center min-h-[1.5rem]">
+              {pasteState !== 'idle' && (
+                <Badge
+                  variant="secondary"
+                  className={cn(
+                    'gap-1 text-[11px]',
+                    pasteState === 'verified'
+                      ? 'bg-primary/10 text-primary border-primary/30'
+                      : 'bg-muted text-muted-foreground border-border'
+                  )}
+                  title={
+                    pasteState === 'verified'
+                      ? 'Conteúdo da área de transferência verificado'
+                      : 'Não foi possível ler de volta a área de transferência (permissão/foco)'
+                  }
+                >
+                  {pasteState === 'verified' ? (
+                    <>
+                      <Check className="h-3 w-3" />
+                      Colagem verificada
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3 w-3" />
+                      Copiado (não verificado)
+                    </>
+                  )}
+                </Badge>
+              )}
+            </div>
+            <div className="flex items-center gap-2 flex-wrap justify-end">
             <Button variant="ghost" onClick={() => setShareOpen(false)}>
               Cancelar
             </Button>
