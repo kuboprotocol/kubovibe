@@ -14,6 +14,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { getConnectorBySlug } from '@/lib/connectorsConfig'
 import { useGitHubConnection } from '@/hooks/useGitHubConnection'
 import { useAuth } from '@/hooks/useAuth'
