@@ -93,6 +93,7 @@ export default function ConnectorDetailPage() {
 
   const [shareOpen, setShareOpen] = useState(false)
   const [justCopied, setJustCopied] = useState(false)
+  const [pasteState, setPasteState] = useState<'idle' | 'verified' | 'unverified'>('idle')
 
   const activeFilterChips = useMemo(() => ([
     runFilter ? { key: 'run', label: 'run', value: `${runFilter.slice(0, 8)}…` } : null,
