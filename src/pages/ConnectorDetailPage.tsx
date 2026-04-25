@@ -434,7 +434,7 @@ export default function ConnectorDetailPage() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={handleResetFilters}
+                      onClick={handleRequestReset}
                       className="h-8 text-xs text-muted-foreground hover:text-foreground gap-1.5"
                       title={`Remove ${removableCount} filtro${removableCount === 1 ? '' : 's'}: ${[runFilter && '?run=', dbRunsActive && '?runs=db'].filter(Boolean).join(' e ')} (mantém ?status=)`}
                     >
