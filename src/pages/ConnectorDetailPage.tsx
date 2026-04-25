@@ -93,6 +93,7 @@ export default function ConnectorDetailPage() {
 
   const [shareOpen, setShareOpen] = useState(false)
   const [justCopied, setJustCopied] = useState(false)
+  const [pasteState, setPasteState] = useState<'idle' | 'verified' | 'unverified'>('idle')
 
   const activeFilterChips = useMemo(() => ([
     runFilter ? { key: 'run', label: 'run', value: `${runFilter.slice(0, 8)}…` } : null,
@@ -102,6 +103,7 @@ export default function ConnectorDetailPage() {
 
   const handleOpenShare = useCallback(() => {
     setJustCopied(false)
+    setPasteState('idle')
     setShareOpen(true)
   }, [])
 
@@ -122,6 +124,7 @@ export default function ConnectorDetailPage() {
         // readText may be blocked (no permission / focus) — fall back silently.
         pasteConfirmed = false
       }
+      setPasteState(pasteConfirmed ? 'verified' : 'unverified')
 
       const baseTitle = count === 0
         ? 'Link copiado (sem filtros ativos)'
@@ -167,22 +170,40 @@ export default function ConnectorDetailPage() {
 
   const canResetFilters = Boolean(runFilter) || dbRunsActive
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
+  const [undoSnapshot, setUndoSnapshot] = useState<{ run: string | null; runsDb: boolean; removed: string[] } | null>(null)
+  const [undoSecondsLeft, setUndoSecondsLeft] = useState(0)
+  const UNDO_DURATION_MS = 15000
 
   const handleRequestReset = useCallback(() => {
     if (!canResetFilters) return
     setResetConfirmOpen(true)
   }, [canResetFilters])
 
+  const handleRestoreSnapshot = useCallback((snapshot: { run: string | null; runsDb: boolean; removed: string[] }) => {
+    setSearchParams(prev => {
+      const sp = new URLSearchParams(prev)
+      if (snapshot.run) sp.set('run', snapshot.run)
+      if (snapshot.runsDb) sp.set('runs', 'db')
+      return sp
+    }, { replace: true })
+    setUndoSnapshot(null)
+    setUndoSecondsLeft(0)
+    toast.success('Filtros restaurados', {
+      description: snapshot.removed.join(' e ') + ' reaplicado' + (snapshot.removed.length === 1 ? '' : 's'),
+      duration: 2500,
+    })
+  }, [setSearchParams])
+
   const handleConfirmReset = useCallback(() => {
     if (!canResetFilters) return
-    // Snapshot of params we are about to remove (to allow restore).
     const snapshot = {
       run: runFilter || null,
       runsDb: dbRunsActive,
+      removed: [
+        runFilter ? '?run=' : null,
+        dbRunsActive ? '?runs=db' : null,
+      ].filter(Boolean) as string[],
     }
-    const removed: string[] = []
-    if (snapshot.run) removed.push('?run=')
-    if (snapshot.runsDb) removed.push('?runs=db')
 
     setSearchParams(prev => {
       const sp = new URLSearchParams(prev)
@@ -192,29 +213,45 @@ export default function ConnectorDetailPage() {
     }, { replace: true })
 
     setResetConfirmOpen(false)
+    setUndoSnapshot(snapshot)
+    setUndoSecondsLeft(Math.round(UNDO_DURATION_MS / 1000))
 
-    toast(`Filtros resetados · ${removed.join(' e ')} removido${removed.length === 1 ? '' : 's'}`, {
+    toast(`Filtros resetados · ${snapshot.removed.join(' e ')} removido${snapshot.removed.length === 1 ? '' : 's'}`, {
       description: statusFilter !== 'all'
-        ? `Filtro padrão restaurado. Mantido: ?status=${statusFilter}`
-        : 'Filtro padrão restaurado.',
-      duration: 5000,
+        ? `Filtro padrão restaurado. Mantido: ?status=${statusFilter}. Banner de desfazer disponível abaixo.`
+        : 'Filtro padrão restaurado. Banner de desfazer disponível abaixo.',
+      duration: 4000,
       action: {
         label: 'Restaurar',
-        onClick: () => {
-          setSearchParams(prev => {
-            const sp = new URLSearchParams(prev)
-            if (snapshot.run) sp.set('run', snapshot.run)
-            if (snapshot.runsDb) sp.set('runs', 'db')
-            return sp
-          }, { replace: true })
-          toast.success('Filtros restaurados', {
-            description: removed.join(' e ') + ' reaplicado' + (removed.length === 1 ? '' : 's'),
-            duration: 2500,
-          })
-        },
+        onClick: () => handleRestoreSnapshot(snapshot),
       },
     })
-  }, [canResetFilters, runFilter, dbRunsActive, statusFilter, setSearchParams])
+  }, [canResetFilters, runFilter, dbRunsActive, statusFilter, setSearchParams, handleRestoreSnapshot])
+
+  // Countdown for undo banner
+  useEffect(() => {
+    if (!undoSnapshot) return
+    const startedAt = Date.now()
+    const tick = setInterval(() => {
+      const elapsed = Date.now() - startedAt
+      const remaining = Math.max(0, Math.ceil((UNDO_DURATION_MS - elapsed) / 1000))
+      setUndoSecondsLeft(remaining)
+      if (remaining <= 0) {
+        setUndoSnapshot(null)
+        clearInterval(tick)
+      }
+    }, 250)
+    return () => clearInterval(tick)
+  }, [undoSnapshot])
+
+  // Cancel undo if user manually re-applies any of the removed filters.
+  useEffect(() => {
+    if (!undoSnapshot) return
+    if ((undoSnapshot.run && runFilter === undoSnapshot.run) || (undoSnapshot.runsDb && dbRunsActive)) {
+      setUndoSnapshot(null)
+      setUndoSecondsLeft(0)
+    }
+  }, [runFilter, dbRunsActive, undoSnapshot])
 
   const filteredLogs = useMemo(() => {
     let out = logs
@@ -450,6 +487,59 @@ export default function ConnectorDetailPage() {
             dbRunsActive={dbRunsActive}
             onDbRunsActiveChange={setDbRunsActive}
           />
+        )}
+
+        {/* Undo banner — persists after toast expires */}
+        {undoSnapshot && (
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            className="rounded-lg border border-primary/30 bg-primary/5 p-3 flex items-center justify-between gap-3 flex-wrap"
+            role="status"
+            aria-live="polite"
+          >
+            <div className="flex items-start gap-2 text-sm flex-1 min-w-0">
+              <RotateCcw className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+              <div className="min-w-0">
+                <div className="font-medium text-foreground">
+                  Filtros resetados — você pode desfazer
+                </div>
+                <div className="text-xs text-muted-foreground mt-0.5 flex flex-wrap items-center gap-1.5">
+                  <span>Removido:</span>
+                  {undoSnapshot.run && (
+                    <code className="font-mono px-1 py-0.5 rounded bg-destructive/10 text-destructive text-[10px]">
+                      ?run={undoSnapshot.run.slice(0, 8)}…
+                    </code>
+                  )}
+                  {undoSnapshot.runsDb && (
+                    <code className="font-mono px-1 py-0.5 rounded bg-destructive/10 text-destructive text-[10px]">
+                      ?runs=db
+                    </code>
+                  )}
+                  <span>· expira em {undoSecondsLeft}s</span>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => { setUndoSnapshot(null); setUndoSecondsLeft(0) }}
+                className="h-8 text-xs"
+              >
+                Dispensar
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => handleRestoreSnapshot(undoSnapshot)}
+                className="h-8 text-xs"
+              >
+                <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                Restaurar
+              </Button>
+            </div>
+          </motion.div>
         )}
 
         {/* Activity — sempre que houver logs */}
@@ -714,7 +804,38 @@ export default function ConnectorDetailPage() {
             </div>
           </div>
 
-          <DialogFooter className="gap-2 sm:gap-2">
+          <DialogFooter className="gap-2 sm:gap-2 sm:justify-between items-center">
+            <div className="flex items-center min-h-[1.5rem]">
+              {pasteState !== 'idle' && (
+                <Badge
+                  variant="secondary"
+                  className={cn(
+                    'gap-1 text-[11px]',
+                    pasteState === 'verified'
+                      ? 'bg-primary/10 text-primary border-primary/30'
+                      : 'bg-muted text-muted-foreground border-border'
+                  )}
+                  title={
+                    pasteState === 'verified'
+                      ? 'Conteúdo da área de transferência verificado'
+                      : 'Não foi possível ler de volta a área de transferência (permissão/foco)'
+                  }
+                >
+                  {pasteState === 'verified' ? (
+                    <>
+                      <Check className="h-3 w-3" />
+                      Colagem verificada
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3 w-3" />
+                      Copiado (não verificado)
+                    </>
+                  )}
+                </Badge>
+              )}
+            </div>
+            <div className="flex items-center gap-2 flex-wrap justify-end">
             <Button variant="ghost" onClick={() => setShareOpen(false)}>
               Cancelar
             </Button>
@@ -753,6 +874,7 @@ export default function ConnectorDetailPage() {
               <Copy className="h-3.5 w-3.5 mr-1.5" />
               Copiar e fechar
             </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
