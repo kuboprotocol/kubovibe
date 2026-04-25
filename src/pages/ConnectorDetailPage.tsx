@@ -14,6 +14,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { getConnectorBySlug } from '@/lib/connectorsConfig'
 import { useGitHubConnection } from '@/hooks/useGitHubConnection'
 import { useAuth } from '@/hooks/useAuth'
@@ -656,23 +657,31 @@ export default function ConnectorDetailPage() {
             <Button variant="ghost" onClick={() => setShareOpen(false)}>
               Cancelar
             </Button>
-            <Button
-              variant="outline"
-              onClick={handleCopyOnly}
-              title="Copia a URL sem fechar este diálogo"
-            >
-              {justCopied ? (
-                <>
-                  <Check className="h-3.5 w-3.5 mr-1.5 text-primary" />
-                  Copiado
-                </>
-              ) : (
-                <>
-                  <Copy className="h-3.5 w-3.5 mr-1.5" />
-                  Copiar URL
-                </>
-              )}
-            </Button>
+            <TooltipProvider delayDuration={150}>
+              <Tooltip open={justCopied ? false : undefined}>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    onClick={handleCopyOnly}
+                  >
+                    {justCopied ? (
+                      <>
+                        <Check className="h-3.5 w-3.5 mr-1.5 text-primary" />
+                        Copiado
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3.5 w-3.5 mr-1.5" />
+                        Copiar URL
+                      </>
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs text-xs">
+                  Copia a URL sem fechar este diálogo — útil para revisar antes de compartilhar.
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             <Button onClick={handleConfirmCopy}>
               <Copy className="h-3.5 w-3.5 mr-1.5" />
               Copiar e fechar
