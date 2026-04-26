@@ -308,10 +308,9 @@ export default function ConnectorDetailPage() {
       const isUndo = (e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && (e.key === 'z' || e.key === 'Z')
       if (!isUndo) return
 
-      // Skip while a Radix dialog/alert-dialog/popover is open — let the focused
-      // surface handle its own undo (e.g. text fields inside the share modal).
-      if (document.querySelector('[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]')) return
-
+      // Allow the shortcut even when the share modal/alert-dialog is open.
+      // We still block it when focus is inside a text field, so the user's
+      // native undo on inputs is preserved.
       const target = e.target as HTMLElement | null
       if (target) {
         const tag = target.tagName
@@ -324,7 +323,7 @@ export default function ConnectorDetailPage() {
           role === 'textbox' ||
           role === 'combobox' ||
           role === 'searchbox' ||
-          target.closest('[contenteditable="true"], [role="textbox"], [role="dialog"], [role="alertdialog"]') !== null
+          target.closest('[contenteditable="true"], [role="textbox"]') !== null
         if (isEditable) return
       }
 
