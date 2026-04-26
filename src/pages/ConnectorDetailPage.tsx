@@ -260,7 +260,7 @@ export default function ConnectorDetailPage() {
     } catch {
       toast.error('Não foi possível copiar o link')
     }
-  }, [buildShareUrl, activeFilterChips])
+  }, [buildShareUrl, activeFilterChips, setPasteStateWithTTL])
 
   const handleConfirmCopy = useCallback(() => copyShareUrl({ keepOpen: false }), [copyShareUrl])
   const handleCopyOnly = useCallback(() => copyShareUrl({ keepOpen: true }), [copyShareUrl])
