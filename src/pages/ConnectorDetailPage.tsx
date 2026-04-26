@@ -93,7 +93,24 @@ export default function ConnectorDetailPage() {
 
   const [shareOpen, setShareOpen] = useState(false)
   const [justCopied, setJustCopied] = useState(false)
-  const [pasteState, setPasteState] = useState<'idle' | 'verified' | 'unverified'>('idle')
+  const pasteStorageKey = `connector-paste-state:${slug ?? 'unknown'}`
+  const [pasteState, setPasteState] = useState<'idle' | 'verified' | 'unverified'>(() => {
+    if (typeof window === 'undefined') return 'idle'
+    try {
+      const stored = window.sessionStorage.getItem(pasteStorageKey)
+      if (stored === 'verified' || stored === 'unverified') return stored
+    } catch { /* sessionStorage may be unavailable */ }
+    return 'idle'
+  })
+
+  // Persist paste state across modal reopens (per-connector).
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      if (pasteState === 'idle') window.sessionStorage.removeItem(pasteStorageKey)
+      else window.sessionStorage.setItem(pasteStorageKey, pasteState)
+    } catch { /* ignore quota / privacy mode */ }
+  }, [pasteState, pasteStorageKey])
 
   const activeFilterChips = useMemo(() => ([
     runFilter ? { key: 'run', label: 'run', value: `${runFilter.slice(0, 8)}…` } : null,
@@ -103,7 +120,7 @@ export default function ConnectorDetailPage() {
 
   const handleOpenShare = useCallback(() => {
     setJustCopied(false)
-    setPasteState('idle')
+    // Keep last pasteState so the badge persists across reopens.
     setShareOpen(true)
   }, [])
 
@@ -252,6 +269,25 @@ export default function ConnectorDetailPage() {
       setUndoSecondsLeft(0)
     }
   }, [runFilter, dbRunsActive, undoSnapshot])
+
+  // Keyboard shortcut: Ctrl/Cmd+Z restores the snapshot while the undo banner is visible.
+  useEffect(() => {
+    if (!undoSnapshot) return
+    const handler = (e: KeyboardEvent) => {
+      const isUndo = (e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && (e.key === 'z' || e.key === 'Z')
+      if (!isUndo) return
+      const target = e.target as HTMLElement | null
+      // Don't hijack undo while the user is typing in inputs / textareas / contenteditable.
+      if (target) {
+        const tag = target.tagName
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable) return
+      }
+      e.preventDefault()
+      handleRestoreSnapshot(undoSnapshot)
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [undoSnapshot, handleRestoreSnapshot])
 
   const filteredLogs = useMemo(() => {
     let out = logs
@@ -518,6 +554,7 @@ export default function ConnectorDetailPage() {
                     </code>
                   )}
                   <span>· expira em {undoSecondsLeft}s</span>
+                  <span className="hidden sm:inline">· atalho <kbd className="px-1 py-0.5 rounded border bg-background text-[10px] font-mono">Ctrl/Cmd+Z</kbd></span>
                 </div>
               </div>
             </div>
