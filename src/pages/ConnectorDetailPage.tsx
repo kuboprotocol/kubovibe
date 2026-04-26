@@ -270,6 +270,25 @@ export default function ConnectorDetailPage() {
     }
   }, [runFilter, dbRunsActive, undoSnapshot])
 
+  // Keyboard shortcut: Ctrl/Cmd+Z restores the snapshot while the undo banner is visible.
+  useEffect(() => {
+    if (!undoSnapshot) return
+    const handler = (e: KeyboardEvent) => {
+      const isUndo = (e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && (e.key === 'z' || e.key === 'Z')
+      if (!isUndo) return
+      const target = e.target as HTMLElement | null
+      // Don't hijack undo while the user is typing in inputs / textareas / contenteditable.
+      if (target) {
+        const tag = target.tagName
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable) return
+      }
+      e.preventDefault()
+      handleRestoreSnapshot(undoSnapshot)
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [undoSnapshot, handleRestoreSnapshot])
+
   const filteredLogs = useMemo(() => {
     let out = logs
     if (statusFilter !== 'all') out = out.filter(l => l.status === statusFilter)
