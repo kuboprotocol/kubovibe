@@ -221,7 +221,7 @@ export default function ConnectorDetailPage() {
         // readText may be blocked (no permission / focus) — fall back silently.
         pasteConfirmed = false
       }
-      setPasteState(pasteConfirmed ? 'verified' : 'unverified')
+      setPasteStateWithTTL(pasteConfirmed ? 'verified' : 'unverified')
 
       const baseTitle = count === 0
         ? 'Link copiado (sem filtros ativos)'
