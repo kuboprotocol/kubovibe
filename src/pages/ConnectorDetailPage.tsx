@@ -93,7 +93,24 @@ export default function ConnectorDetailPage() {
 
   const [shareOpen, setShareOpen] = useState(false)
   const [justCopied, setJustCopied] = useState(false)
-  const [pasteState, setPasteState] = useState<'idle' | 'verified' | 'unverified'>('idle')
+  const pasteStorageKey = `connector-paste-state:${slug ?? 'unknown'}`
+  const [pasteState, setPasteState] = useState<'idle' | 'verified' | 'unverified'>(() => {
+    if (typeof window === 'undefined') return 'idle'
+    try {
+      const stored = window.sessionStorage.getItem(pasteStorageKey)
+      if (stored === 'verified' || stored === 'unverified') return stored
+    } catch { /* sessionStorage may be unavailable */ }
+    return 'idle'
+  })
+
+  // Persist paste state across modal reopens (per-connector).
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      if (pasteState === 'idle') window.sessionStorage.removeItem(pasteStorageKey)
+      else window.sessionStorage.setItem(pasteStorageKey, pasteState)
+    } catch { /* ignore quota / privacy mode */ }
+  }, [pasteState, pasteStorageKey])
 
   const activeFilterChips = useMemo(() => ([
     runFilter ? { key: 'run', label: 'run', value: `${runFilter.slice(0, 8)}…` } : null,
