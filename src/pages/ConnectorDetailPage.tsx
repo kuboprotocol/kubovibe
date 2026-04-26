@@ -612,8 +612,8 @@ export default function ConnectorDetailPage() {
           />
         )}
 
-        {/* Undo banner — persists after toast expires */}
-        {undoSnapshot && (
+        {/* Undo banner — persists after toast expires; hidden while a modal is open. */}
+        {undoBannerVisible && undoSnapshot && (
           <motion.div
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
@@ -641,7 +641,10 @@ export default function ConnectorDetailPage() {
                     </code>
                   )}
                   <span>· expira em {undoSecondsLeft}s</span>
-                  <span className="hidden sm:inline">· atalho <kbd className="px-1 py-0.5 rounded border bg-background text-[10px] font-mono">Ctrl/Cmd+Z</kbd></span>
+                  <span className="hidden sm:inline">
+                    · atalhos <kbd className="px-1 py-0.5 rounded border bg-background text-[10px] font-mono">Ctrl/Cmd+Z</kbd>
+                    {' '}restaurar · <kbd className="px-1 py-0.5 rounded border bg-background text-[10px] font-mono">Esc</kbd> dispensar
+                  </span>
                 </div>
               </div>
             </div>
@@ -649,14 +652,14 @@ export default function ConnectorDetailPage() {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => { setUndoSnapshot(null); setUndoSecondsLeft(0) }}
+                onClick={() => dismissUndoBanner('manual')}
                 className="h-8 text-xs"
               >
                 Dispensar
               </Button>
               <Button
                 size="sm"
-                onClick={() => handleRestoreSnapshot(undoSnapshot)}
+                onClick={() => handleRestoreWithLog(undoSnapshot, 'button')}
                 className="h-8 text-xs"
               >
                 <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
