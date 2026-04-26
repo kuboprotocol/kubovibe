@@ -554,6 +554,7 @@ export default function ConnectorDetailPage() {
                     </code>
                   )}
                   <span>· expira em {undoSecondsLeft}s</span>
+                  <span className="hidden sm:inline">· atalho <kbd className="px-1 py-0.5 rounded border bg-background text-[10px] font-mono">Ctrl/Cmd+Z</kbd></span>
                 </div>
               </div>
             </div>
