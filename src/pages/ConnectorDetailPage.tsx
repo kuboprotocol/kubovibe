@@ -269,18 +269,34 @@ export default function ConnectorDetailPage() {
       duration: 4000,
       action: {
         label: 'Restaurar',
-        onClick: () => handleRestoreSnapshot(snapshot),
+        onClick: () => {
+          logConnectorEvent({
+            connectorSlug: slug ?? 'unknown',
+            eventType: 'filters_reset_undone',
+            status: 'success',
+            message: 'Reset de filtros desfeito via toast',
+            metadata: { source: 'toast', restored: snapshot.removed },
+          }).catch(() => { /* non-blocking */ })
+          handleRestoreSnapshot(snapshot)
+        },
       },
     })
-  }, [canResetFilters, runFilter, dbRunsActive, statusFilter, setSearchParams, handleRestoreSnapshot])
+  }, [canResetFilters, runFilter, dbRunsActive, statusFilter, setSearchParams, handleRestoreSnapshot, slug])
 
-  // Countdown for undo banner
+  // Hide the undo banner while any sharing/confirmation dialog is open.
+  // Snapshot is preserved; banner reappears when modals close.
+  const anyDialogOpen = shareOpen || resetConfirmOpen
+  const undoBannerVisible = Boolean(undoSnapshot) && !anyDialogOpen
+
+  // Countdown for undo banner — paused while modals cover it.
   useEffect(() => {
     if (!undoSnapshot) return
+    if (anyDialogOpen) return
     const startedAt = Date.now()
+    const startingSeconds = undoSecondsLeft > 0 ? undoSecondsLeft : Math.round(UNDO_DURATION_MS / 1000)
     const tick = setInterval(() => {
       const elapsed = Date.now() - startedAt
-      const remaining = Math.max(0, Math.ceil((UNDO_DURATION_MS - elapsed) / 1000))
+      const remaining = Math.max(0, startingSeconds - Math.ceil(elapsed / 1000))
       setUndoSecondsLeft(remaining)
       if (remaining <= 0) {
         setUndoSnapshot(null)
@@ -288,7 +304,8 @@ export default function ConnectorDetailPage() {
       }
     }, 250)
     return () => clearInterval(tick)
-  }, [undoSnapshot])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [undoSnapshot, anyDialogOpen])
 
   // Cancel undo if user manually re-applies any of the removed filters.
   useEffect(() => {
@@ -299,23 +316,46 @@ export default function ConnectorDetailPage() {
     }
   }, [runFilter, dbRunsActive, undoSnapshot])
 
-  // Keyboard shortcut: Ctrl/Cmd+Z restores the snapshot while the undo banner is visible.
-  // Restricted by focus: ignored when typing, when a modal/dialog is open, or when an
-  // editable/interactive control owns focus.
-  useEffect(() => {
-    if (!undoSnapshot) return
-    const handler = (e: KeyboardEvent) => {
-      const isUndo = (e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && (e.key === 'z' || e.key === 'Z')
-      if (!isUndo) return
+  // Centralized dismiss + audit logging helpers.
+  const dismissUndoBanner = useCallback((reason: 'manual' | 'esc' | 'expired' | 'restored' | 'reapplied') => {
+    if (undoSnapshot) {
+      logConnectorEvent({
+        connectorSlug: slug ?? 'unknown',
+        eventType: 'filters_undo_banner_dismissed',
+        status: 'info',
+        message: `Banner de desfazer dispensado (${reason})`,
+        metadata: { reason, removed: undoSnapshot.removed },
+      }).catch(() => { /* non-blocking */ })
+    }
+    setUndoSnapshot(null)
+    setUndoSecondsLeft(0)
+  }, [undoSnapshot, slug])
 
-      // Allow the shortcut even when the share modal/alert-dialog is open.
-      // We still block it when focus is inside a text field, so the user's
-      // native undo on inputs is preserved.
+  const handleRestoreWithLog = useCallback((snapshot: { run: string | null; runsDb: boolean; removed: string[] }, source: 'button' | 'shortcut' | 'toast') => {
+    logConnectorEvent({
+      connectorSlug: slug ?? 'unknown',
+      eventType: 'filters_reset_undone',
+      status: 'success',
+      message: `Reset de filtros desfeito via ${source}`,
+      metadata: { source, restored: snapshot.removed },
+    }).catch(() => { /* non-blocking */ })
+    handleRestoreSnapshot(snapshot)
+  }, [handleRestoreSnapshot, slug])
+
+
+  // Keyboard shortcuts:
+  //  - Ctrl/Cmd+Z → restore snapshot while undo banner is visible
+  //  - Esc        → dismiss the undo banner (only when no modal owns Esc)
+  // Both gated by undoBannerVisible so they never fire while modals cover the banner.
+  useEffect(() => {
+    if (!undoBannerVisible || !undoSnapshot) return
+    const handler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null
-      if (target) {
+      const isEditableTarget = (() => {
+        if (!target) return false
         const tag = target.tagName
         const role = target.getAttribute('role')
-        const isEditable =
+        return (
           tag === 'INPUT' ||
           tag === 'TEXTAREA' ||
           tag === 'SELECT' ||
@@ -324,15 +364,26 @@ export default function ConnectorDetailPage() {
           role === 'combobox' ||
           role === 'searchbox' ||
           target.closest('[contenteditable="true"], [role="textbox"]') !== null
-        if (isEditable) return
+        )
+      })()
+
+      const isUndo = (e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && (e.key === 'z' || e.key === 'Z')
+      if (isUndo) {
+        if (isEditableTarget) return
+        e.preventDefault()
+        handleRestoreWithLog(undoSnapshot, 'shortcut')
+        return
       }
 
-      e.preventDefault()
-      handleRestoreSnapshot(undoSnapshot)
+      if (e.key === 'Escape' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        if (isEditableTarget) return
+        e.preventDefault()
+        dismissUndoBanner('esc')
+      }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [undoSnapshot, handleRestoreSnapshot])
+  }, [undoBannerVisible, undoSnapshot, handleRestoreWithLog, dismissUndoBanner])
 
   const filteredLogs = useMemo(() => {
     let out = logs
@@ -570,8 +621,8 @@ export default function ConnectorDetailPage() {
           />
         )}
 
-        {/* Undo banner — persists after toast expires */}
-        {undoSnapshot && (
+        {/* Undo banner — persists after toast expires; hidden while a modal is open. */}
+        {undoBannerVisible && undoSnapshot && (
           <motion.div
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
@@ -599,7 +650,10 @@ export default function ConnectorDetailPage() {
                     </code>
                   )}
                   <span>· expira em {undoSecondsLeft}s</span>
-                  <span className="hidden sm:inline">· atalho <kbd className="px-1 py-0.5 rounded border bg-background text-[10px] font-mono">Ctrl/Cmd+Z</kbd></span>
+                  <span className="hidden sm:inline">
+                    · atalhos <kbd className="px-1 py-0.5 rounded border bg-background text-[10px] font-mono">Ctrl/Cmd+Z</kbd>
+                    {' '}restaurar · <kbd className="px-1 py-0.5 rounded border bg-background text-[10px] font-mono">Esc</kbd> dispensar
+                  </span>
                 </div>
               </div>
             </div>
@@ -607,14 +661,14 @@ export default function ConnectorDetailPage() {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => { setUndoSnapshot(null); setUndoSecondsLeft(0) }}
+                onClick={() => dismissUndoBanner('manual')}
                 className="h-8 text-xs"
               >
                 Dispensar
               </Button>
               <Button
                 size="sm"
-                onClick={() => handleRestoreSnapshot(undoSnapshot)}
+                onClick={() => handleRestoreWithLog(undoSnapshot, 'button')}
                 className="h-8 text-xs"
               >
                 <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
