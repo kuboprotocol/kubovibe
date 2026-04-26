@@ -992,7 +992,7 @@ export default function ConnectorDetailPage() {
           </div>
 
           <DialogFooter className="gap-2 sm:gap-2 sm:justify-between items-center">
-            <div className="flex items-center min-h-[1.5rem]">
+            <div className="flex items-center gap-2 min-h-[1.5rem] flex-wrap">
               {pasteState !== 'idle' && (
                 <Badge
                   variant="secondary"
@@ -1020,6 +1020,15 @@ export default function ConnectorDetailPage() {
                     </>
                   )}
                 </Badge>
+              )}
+              {pasteState !== 'idle' && pasteSecondsLeft > 0 && (
+                <span
+                  className="text-[10px] font-mono text-muted-foreground tabular-nums"
+                  title="Tempo restante até o estado de colagem expirar (reabra o modal para renovar)"
+                  aria-label={`Estado de colagem expira em ${formatPasteCountdown(pasteSecondsLeft)}`}
+                >
+                  expira em {formatPasteCountdown(pasteSecondsLeft)}
+                </span>
               )}
             </div>
             <div className="flex items-center gap-2 flex-wrap justify-end">
