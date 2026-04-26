@@ -281,7 +281,7 @@ export default function ConnectorDetailPage() {
         },
       },
     })
-  }, [canResetFilters, runFilter, dbRunsActive, statusFilter, setSearchParams, handleRestoreSnapshot])
+  }, [canResetFilters, runFilter, dbRunsActive, statusFilter, setSearchParams, handleRestoreSnapshot, slug])
 
   // Hide the undo banner while any sharing/confirmation dialog is open.
   // Snapshot is preserved; banner reappears when modals close.
