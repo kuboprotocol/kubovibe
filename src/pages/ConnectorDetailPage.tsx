@@ -269,7 +269,16 @@ export default function ConnectorDetailPage() {
       duration: 4000,
       action: {
         label: 'Restaurar',
-        onClick: () => handleRestoreSnapshot(snapshot),
+        onClick: () => {
+          logConnectorEvent({
+            connectorSlug: slug ?? 'unknown',
+            eventType: 'filters_reset_undone',
+            status: 'success',
+            message: 'Reset de filtros desfeito via toast',
+            metadata: { source: 'toast', restored: snapshot.removed },
+          }).catch(() => { /* non-blocking */ })
+          handleRestoreSnapshot(snapshot)
+        },
       },
     })
   }, [canResetFilters, runFilter, dbRunsActive, statusFilter, setSearchParams, handleRestoreSnapshot])
