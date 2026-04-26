@@ -271,17 +271,34 @@ export default function ConnectorDetailPage() {
   }, [runFilter, dbRunsActive, undoSnapshot])
 
   // Keyboard shortcut: Ctrl/Cmd+Z restores the snapshot while the undo banner is visible.
+  // Restricted by focus: ignored when typing, when a modal/dialog is open, or when an
+  // editable/interactive control owns focus.
   useEffect(() => {
     if (!undoSnapshot) return
     const handler = (e: KeyboardEvent) => {
       const isUndo = (e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && (e.key === 'z' || e.key === 'Z')
       if (!isUndo) return
+
+      // Skip while a Radix dialog/alert-dialog/popover is open — let the focused
+      // surface handle its own undo (e.g. text fields inside the share modal).
+      if (document.querySelector('[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]')) return
+
       const target = e.target as HTMLElement | null
-      // Don't hijack undo while the user is typing in inputs / textareas / contenteditable.
       if (target) {
         const tag = target.tagName
-        if (tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable) return
+        const role = target.getAttribute('role')
+        const isEditable =
+          tag === 'INPUT' ||
+          tag === 'TEXTAREA' ||
+          tag === 'SELECT' ||
+          target.isContentEditable ||
+          role === 'textbox' ||
+          role === 'combobox' ||
+          role === 'searchbox' ||
+          target.closest('[contenteditable="true"], [role="textbox"], [role="dialog"], [role="alertdialog"]') !== null
+        if (isEditable) return
       }
+
       e.preventDefault()
       handleRestoreSnapshot(undoSnapshot)
     }
