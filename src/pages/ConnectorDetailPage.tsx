@@ -274,13 +274,20 @@ export default function ConnectorDetailPage() {
     })
   }, [canResetFilters, runFilter, dbRunsActive, statusFilter, setSearchParams, handleRestoreSnapshot])
 
-  // Countdown for undo banner
+  // Hide the undo banner while any sharing/confirmation dialog is open.
+  // Snapshot is preserved; banner reappears when modals close.
+  const anyDialogOpen = shareOpen || resetConfirmOpen
+  const undoBannerVisible = Boolean(undoSnapshot) && !anyDialogOpen
+
+  // Countdown for undo banner — paused while modals cover it.
   useEffect(() => {
     if (!undoSnapshot) return
+    if (anyDialogOpen) return
     const startedAt = Date.now()
+    const startingSeconds = undoSecondsLeft > 0 ? undoSecondsLeft : Math.round(UNDO_DURATION_MS / 1000)
     const tick = setInterval(() => {
       const elapsed = Date.now() - startedAt
-      const remaining = Math.max(0, Math.ceil((UNDO_DURATION_MS - elapsed) / 1000))
+      const remaining = Math.max(0, startingSeconds - Math.ceil(elapsed / 1000))
       setUndoSecondsLeft(remaining)
       if (remaining <= 0) {
         setUndoSnapshot(null)
@@ -288,7 +295,8 @@ export default function ConnectorDetailPage() {
       }
     }, 250)
     return () => clearInterval(tick)
-  }, [undoSnapshot])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [undoSnapshot, anyDialogOpen])
 
   // Cancel undo if user manually re-applies any of the removed filters.
   useEffect(() => {
@@ -298,6 +306,33 @@ export default function ConnectorDetailPage() {
       setUndoSecondsLeft(0)
     }
   }, [runFilter, dbRunsActive, undoSnapshot])
+
+  // Centralized dismiss + audit logging helpers.
+  const dismissUndoBanner = useCallback((reason: 'manual' | 'esc' | 'expired' | 'restored' | 'reapplied') => {
+    if (undoSnapshot) {
+      logConnectorEvent({
+        connectorSlug: slug ?? 'unknown',
+        eventType: 'filters_undo_banner_dismissed',
+        status: 'info',
+        message: `Banner de desfazer dispensado (${reason})`,
+        metadata: { reason, removed: undoSnapshot.removed },
+      }).catch(() => { /* non-blocking */ })
+    }
+    setUndoSnapshot(null)
+    setUndoSecondsLeft(0)
+  }, [undoSnapshot, slug])
+
+  const handleRestoreWithLog = useCallback((snapshot: { run: string | null; runsDb: boolean; removed: string[] }, source: 'button' | 'shortcut' | 'toast') => {
+    logConnectorEvent({
+      connectorSlug: slug ?? 'unknown',
+      eventType: 'filters_reset_undone',
+      status: 'success',
+      message: `Reset de filtros desfeito via ${source}`,
+      metadata: { source, restored: snapshot.removed },
+    }).catch(() => { /* non-blocking */ })
+    handleRestoreSnapshot(snapshot)
+  }, [handleRestoreSnapshot, slug])
+
 
   // Keyboard shortcut: Ctrl/Cmd+Z restores the snapshot while the undo banner is visible.
   // Restricted by focus: ignored when typing, when a modal/dialog is open, or when an
