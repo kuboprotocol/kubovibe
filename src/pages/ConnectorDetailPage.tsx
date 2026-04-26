@@ -94,23 +94,52 @@ export default function ConnectorDetailPage() {
   const [shareOpen, setShareOpen] = useState(false)
   const [justCopied, setJustCopied] = useState(false)
   const pasteStorageKey = `connector-paste-state:${slug ?? 'unknown'}`
-  const [pasteState, setPasteState] = useState<'idle' | 'verified' | 'unverified'>(() => {
+  const PASTE_TTL_MS = 10 * 60 * 1000 // 10 minutes
+  const readPersistedPaste = useCallback((): 'idle' | 'verified' | 'unverified' => {
     if (typeof window === 'undefined') return 'idle'
     try {
-      const stored = window.sessionStorage.getItem(pasteStorageKey)
-      if (stored === 'verified' || stored === 'unverified') return stored
-    } catch { /* sessionStorage may be unavailable */ }
-    return 'idle'
-  })
+      const raw = window.sessionStorage.getItem(pasteStorageKey)
+      if (!raw) return 'idle'
+      // Backward-compat: previously we stored just the string.
+      if (raw === 'verified' || raw === 'unverified') return raw
+      const parsed = JSON.parse(raw) as { state?: string; ts?: number }
+      if (!parsed?.state || typeof parsed.ts !== 'number') return 'idle'
+      const expired = Date.now() - parsed.ts > PASTE_TTL_MS
+      if (expired) {
+        // Per spec: when persistence expires, downgrade to 'unverified'.
+        window.sessionStorage.setItem(pasteStorageKey, JSON.stringify({ state: 'unverified', ts: Date.now() }))
+        return 'unverified'
+      }
+      return parsed.state === 'verified' ? 'verified' : 'unverified'
+    } catch { return 'idle' }
+  }, [pasteStorageKey])
 
-  // Persist paste state across modal reopens (per-connector).
+  const [pasteState, setPasteState] = useState<'idle' | 'verified' | 'unverified'>(() => readPersistedPaste())
+
+  // Persist paste state with timestamp for TTL-based expiration.
   useEffect(() => {
     if (typeof window === 'undefined') return
     try {
       if (pasteState === 'idle') window.sessionStorage.removeItem(pasteStorageKey)
-      else window.sessionStorage.setItem(pasteStorageKey, pasteState)
+      else window.sessionStorage.setItem(pasteStorageKey, JSON.stringify({ state: pasteState, ts: Date.now() }))
     } catch { /* ignore quota / privacy mode */ }
   }, [pasteState, pasteStorageKey])
+
+  // Auto-expire the persisted paste state after 10 minutes.
+  useEffect(() => {
+    if (pasteState !== 'verified') return
+    const timer = setTimeout(() => {
+      setPasteState('unverified')
+    }, PASTE_TTL_MS)
+    return () => clearTimeout(timer)
+  }, [pasteState])
+
+  // Re-check persisted state when the share modal opens (covers reloads + tab return).
+  useEffect(() => {
+    if (!shareOpen) return
+    const fresh = readPersistedPaste()
+    setPasteState(prev => (prev === fresh ? prev : fresh))
+  }, [shareOpen, readPersistedPaste])
 
   const activeFilterChips = useMemo(() => ([
     runFilter ? { key: 'run', label: 'run', value: `${runFilter.slice(0, 8)}…` } : null,
