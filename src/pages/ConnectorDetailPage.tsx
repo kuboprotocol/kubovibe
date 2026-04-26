@@ -334,23 +334,19 @@ export default function ConnectorDetailPage() {
   }, [handleRestoreSnapshot, slug])
 
 
-  // Keyboard shortcut: Ctrl/Cmd+Z restores the snapshot while the undo banner is visible.
-  // Restricted by focus: ignored when typing, when a modal/dialog is open, or when an
-  // editable/interactive control owns focus.
+  // Keyboard shortcuts:
+  //  - Ctrl/Cmd+Z → restore snapshot while undo banner is visible
+  //  - Esc        → dismiss the undo banner (only when no modal owns Esc)
+  // Both gated by undoBannerVisible so they never fire while modals cover the banner.
   useEffect(() => {
-    if (!undoSnapshot) return
+    if (!undoBannerVisible || !undoSnapshot) return
     const handler = (e: KeyboardEvent) => {
-      const isUndo = (e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && (e.key === 'z' || e.key === 'Z')
-      if (!isUndo) return
-
-      // Allow the shortcut even when the share modal/alert-dialog is open.
-      // We still block it when focus is inside a text field, so the user's
-      // native undo on inputs is preserved.
       const target = e.target as HTMLElement | null
-      if (target) {
+      const isEditableTarget = (() => {
+        if (!target) return false
         const tag = target.tagName
         const role = target.getAttribute('role')
-        const isEditable =
+        return (
           tag === 'INPUT' ||
           tag === 'TEXTAREA' ||
           tag === 'SELECT' ||
@@ -359,15 +355,26 @@ export default function ConnectorDetailPage() {
           role === 'combobox' ||
           role === 'searchbox' ||
           target.closest('[contenteditable="true"], [role="textbox"]') !== null
-        if (isEditable) return
+        )
+      })()
+
+      const isUndo = (e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && (e.key === 'z' || e.key === 'Z')
+      if (isUndo) {
+        if (isEditableTarget) return
+        e.preventDefault()
+        handleRestoreWithLog(undoSnapshot, 'shortcut')
+        return
       }
 
-      e.preventDefault()
-      handleRestoreSnapshot(undoSnapshot)
+      if (e.key === 'Escape' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        if (isEditableTarget) return
+        e.preventDefault()
+        dismissUndoBanner('esc')
+      }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [undoSnapshot, handleRestoreSnapshot])
+  }, [undoBannerVisible, undoSnapshot, handleRestoreWithLog, dismissUndoBanner])
 
   const filteredLogs = useMemo(() => {
     let out = logs
