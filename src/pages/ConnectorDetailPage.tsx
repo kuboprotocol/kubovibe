@@ -120,7 +120,7 @@ export default function ConnectorDetailPage() {
 
   const handleOpenShare = useCallback(() => {
     setJustCopied(false)
-    setPasteState('idle')
+    // Keep last pasteState so the badge persists across reopens.
     setShareOpen(true)
   }, [])
 
