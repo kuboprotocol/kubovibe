@@ -407,8 +407,8 @@ export default function ConnectorDetailPage() {
 
   // Keyboard shortcuts:
   //  - Ctrl/Cmd+Z → restore snapshot while undo banner is visible
-  //  - Esc        → dismiss the undo banner (only when no modal owns Esc)
-  // Both gated by undoBannerVisible so they never fire while modals cover the banner.
+  //  - Esc        → dismiss the undo banner (only when NO modal is open, so
+  //                 it never steals Esc from share / reset confirm dialogs)
   useEffect(() => {
     if (!undoBannerVisible || !undoSnapshot) return
     const handler = (e: KeyboardEvent) => {
@@ -428,6 +428,10 @@ export default function ConnectorDetailPage() {
           target.closest('[contenteditable="true"], [role="textbox"]') !== null
         )
       })()
+
+      // If any modal is open, do not intercept keys — let the dialog own focus/Esc.
+      const modalOpen = document.querySelector('[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]') !== null
+      if (modalOpen) return
 
       const isUndo = (e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && (e.key === 'z' || e.key === 'Z')
       if (isUndo) {
