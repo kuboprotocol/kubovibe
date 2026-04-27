@@ -139,7 +139,7 @@ export default function ConnectorDetailPage() {
   useEffect(() => {
     if (typeof window === 'undefined') return
     try {
-      if (pasteState === 'idle' || !pasteExpiresAt) {
+      if (pasteState === 'idle' || pasteState === 'expired' || !pasteExpiresAt) {
         window.sessionStorage.removeItem(pasteStorageKey)
       } else {
         window.sessionStorage.setItem(pasteStorageKey, JSON.stringify({ state: pasteState, expiresAt: pasteExpiresAt }))
