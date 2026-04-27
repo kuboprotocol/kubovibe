@@ -377,30 +377,79 @@ export default function ConnectorDetailPage() {
   const anyDialogOpen = shareOpen || resetConfirmOpen
   const undoBannerVisible = Boolean(undoSnapshot) && !resetConfirmOpen
 
-  // Countdown for undo banner — only paused while reset confirm dialog is open.
+  // Absolute deadline (epoch ms) so manual "Renovar" can simply move it forward
+  // without restarting the interval. Pauses by capturing remaining ms when
+  // `resetConfirmOpen` flips on, and rebuilds a deadline on flip off.
+  const [undoDeadline, setUndoDeadline] = useState<number | null>(null)
+  const [undoPausedMs, setUndoPausedMs] = useState<number | null>(null)
+
+  // (Re)build the deadline whenever a new snapshot arrives.
+  useEffect(() => {
+    if (!undoSnapshot) {
+      setUndoDeadline(null)
+      setUndoPausedMs(null)
+      return
+    }
+    if (undoDeadline === null && undoPausedMs === null) {
+      setUndoDeadline(Date.now() + UNDO_DURATION_MS)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [undoSnapshot])
+
+  // Pause when reset-confirm opens; resume when it closes.
   useEffect(() => {
     if (!undoSnapshot) return
-    if (resetConfirmOpen) return
-    const startedAt = Date.now()
-    const startingSeconds = undoSecondsLeft > 0 ? undoSecondsLeft : Math.round(UNDO_DURATION_MS / 1000)
+    if (resetConfirmOpen) {
+      // Capture remaining ms then clear deadline.
+      if (undoDeadline !== null) {
+        setUndoPausedMs(Math.max(0, undoDeadline - Date.now()))
+        setUndoDeadline(null)
+      }
+    } else if (undoPausedMs !== null) {
+      setUndoDeadline(Date.now() + undoPausedMs)
+      setUndoPausedMs(null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetConfirmOpen, undoSnapshot])
+
+  // Tick — single interval driven by deadline.
+  useEffect(() => {
+    if (!undoSnapshot || undoDeadline === null) return
+    const compute = () => Math.max(0, Math.ceil((undoDeadline - Date.now()) / 1000))
+    setUndoSecondsLeft(compute())
     const tick = setInterval(() => {
-      const elapsed = Date.now() - startedAt
-      const remaining = Math.max(0, startingSeconds - Math.ceil(elapsed / 1000))
+      const remaining = compute()
       setUndoSecondsLeft(remaining)
       if (remaining <= 0) {
-        setUndoSnapshot(null)
         clearInterval(tick)
+        dismissUndoBanner('expired')
       }
     }, 250)
     return () => clearInterval(tick)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [undoSnapshot, resetConfirmOpen])
+  }, [undoSnapshot, undoDeadline])
 
-  // Manual TTL reset for the undo banner (e.g. user hovers/focuses Restaurar).
+  // Manual TTL reset — extend deadline back to full duration.
   const resetUndoTTL = useCallback(() => {
     if (!undoSnapshot) return
+    if (resetConfirmOpen) {
+      setUndoPausedMs(UNDO_DURATION_MS)
+    } else {
+      setUndoDeadline(Date.now() + UNDO_DURATION_MS)
+    }
     setUndoSecondsLeft(Math.round(UNDO_DURATION_MS / 1000))
-  }, [undoSnapshot])
+    logConnectorEvent({
+      connectorSlug: slug ?? 'unknown',
+      eventType: 'filters_undo_banner_renewed',
+      status: 'info',
+      message: 'TTL do banner de desfazer reiniciado manualmente',
+      metadata: { removed: undoSnapshot.removed },
+    }).catch(() => { /* non-blocking */ })
+    toast.success('Contador reiniciado', {
+      description: `Você tem mais ${Math.round(UNDO_DURATION_MS / 1000)}s para restaurar.`,
+      duration: 1800,
+    })
+  }, [undoSnapshot, resetConfirmOpen, slug])
 
   // Cancel undo if user manually re-applies any of the removed filters.
   useEffect(() => {
