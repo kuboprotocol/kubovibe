@@ -1028,30 +1028,24 @@ export default function ConnectorDetailPage() {
                   variant="secondary"
                   className={cn(
                     'gap-1 text-[11px]',
-                    pasteState === 'verified'
-                      ? 'bg-primary/10 text-primary border-primary/30'
-                      : 'bg-muted text-muted-foreground border-border'
+                    pasteState === 'verified' && 'bg-primary/10 text-primary border-primary/30',
+                    pasteState === 'unverified' && 'bg-muted text-muted-foreground border-border',
+                    pasteState === 'expired' && 'bg-destructive/10 text-destructive border-destructive/30'
                   )}
                   title={
                     pasteState === 'verified'
                       ? 'Conteúdo da área de transferência verificado'
-                      : 'Não foi possível ler de volta a área de transferência (permissão/foco)'
+                      : pasteState === 'expired'
+                        ? 'Estado de colagem expirou — copie novamente para revalidar'
+                        : 'Não foi possível ler de volta a área de transferência (permissão/foco)'
                   }
                 >
-                  {pasteState === 'verified' ? (
-                    <>
-                      <Check className="h-3 w-3" />
-                      Colagem verificada
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-3 w-3" />
-                      Copiado (não verificado)
-                    </>
-                  )}
+                  {pasteState === 'verified' && (<><Check className="h-3 w-3" /> Colagem verificada</>)}
+                  {pasteState === 'unverified' && (<><Copy className="h-3 w-3" /> Copiado (não verificado)</>)}
+                  {pasteState === 'expired' && (<><Clock className="h-3 w-3" /> Colagem expirada</>)}
                 </Badge>
               )}
-              {pasteState !== 'idle' && pasteSecondsLeft > 0 && (
+              {pasteState !== 'idle' && pasteState !== 'expired' && pasteSecondsLeft > 0 && (
                 <span
                   className="text-[10px] font-mono text-muted-foreground tabular-nums"
                   title="Tempo restante até o estado de colagem expirar (reabra o modal para renovar)"
