@@ -150,7 +150,7 @@ export default function ConnectorDetailPage() {
   // Live countdown for the paste badge — ticks every second while modal is open
   // (cheaper than ticking always; the persisted expiresAt covers reopens).
   useEffect(() => {
-    if (!pasteExpiresAt || pasteState === 'idle') {
+    if (!pasteExpiresAt || pasteState === 'idle' || pasteState === 'expired') {
       setPasteSecondsLeft(0)
       return
     }
@@ -161,10 +161,14 @@ export default function ConnectorDetailPage() {
       const remaining = compute()
       setPasteSecondsLeft(remaining)
       if (remaining <= 0) {
-        // Per spec: on expiration, vanish completely (back to idle).
-        setPasteState('idle')
+        // Show "expired" status briefly, then vanish completely.
+        setPasteState('expired')
         setPasteExpiresAt(null)
         clearInterval(tick)
+        // Auto-clear expired badge after 4s
+        window.setTimeout(() => {
+          setPasteState(prev => (prev === 'expired' ? 'idle' : prev))
+        }, 4000)
       }
     }, 1000)
     return () => clearInterval(tick)
