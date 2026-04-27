@@ -129,9 +129,9 @@ export default function ConnectorDetailPage() {
   )
 
   // Whenever pasteState changes (new copy attempt), set a fresh TTL.
-  const setPasteStateWithTTL = useCallback((next: 'idle' | 'verified' | 'unverified') => {
+  const setPasteStateWithTTL = useCallback((next: 'idle' | 'verified' | 'unverified' | 'expired') => {
     setPasteState(next)
-    if (next === 'idle') setPasteExpiresAt(null)
+    if (next === 'idle' || next === 'expired') setPasteExpiresAt(null)
     else setPasteExpiresAt(Date.now() + PASTE_TTL_MS)
   }, [])
 
