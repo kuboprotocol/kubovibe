@@ -122,7 +122,7 @@ export default function ConnectorDetailPage() {
   }, [pasteStorageKey])
 
   const initialPersisted = useMemo(() => readPersistedPaste(), [readPersistedPaste])
-  const [pasteState, setPasteState] = useState<'idle' | 'verified' | 'unverified'>(initialPersisted?.state ?? 'idle')
+  const [pasteState, setPasteState] = useState<'idle' | 'verified' | 'unverified' | 'expired'>(initialPersisted?.state ?? 'idle')
   const [pasteExpiresAt, setPasteExpiresAt] = useState<number | null>(initialPersisted?.expiresAt ?? null)
   const [pasteSecondsLeft, setPasteSecondsLeft] = useState<number>(() =>
     initialPersisted ? Math.max(0, Math.ceil((initialPersisted.expiresAt - Date.now()) / 1000)) : 0
