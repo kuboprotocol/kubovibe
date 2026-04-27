@@ -98,28 +98,34 @@ export default function ConnectorDetailPage() {
 
   type PersistedPaste = { state: 'verified' | 'unverified'; expiresAt: number } | null
 
-  const readPersistedPaste = useCallback((): PersistedPaste => {
+  const readPersistedPasteRaw = useCallback((): { state: 'verified' | 'unverified'; expiresAt: number; expired: boolean } | null => {
     if (typeof window === 'undefined') return null
     try {
       const raw = window.sessionStorage.getItem(pasteStorageKey)
       if (!raw) return null
       // Backward-compat: previously stored just the state string, or {state, ts}.
       if (raw === 'verified' || raw === 'unverified') {
-        return { state: raw, expiresAt: Date.now() + PASTE_TTL_MS }
+        return { state: raw, expiresAt: Date.now() + PASTE_TTL_MS, expired: false }
       }
       const parsed = JSON.parse(raw) as { state?: string; ts?: number; expiresAt?: number }
       if (!parsed?.state) return null
       const expiresAt = typeof parsed.expiresAt === 'number'
         ? parsed.expiresAt
         : (typeof parsed.ts === 'number' ? parsed.ts + PASTE_TTL_MS : 0)
-      if (Date.now() >= expiresAt) {
-        window.sessionStorage.removeItem(pasteStorageKey)
-        return null
-      }
       const state = parsed.state === 'verified' ? 'verified' : 'unverified'
-      return { state, expiresAt }
+      return { state, expiresAt, expired: Date.now() >= expiresAt }
     } catch { return null }
   }, [pasteStorageKey])
+
+  const readPersistedPaste = useCallback((): PersistedPaste => {
+    const raw = readPersistedPasteRaw()
+    if (!raw) return null
+    if (raw.expired) {
+      try { window.sessionStorage.removeItem(pasteStorageKey) } catch { /* noop */ }
+      return null
+    }
+    return { state: raw.state, expiresAt: raw.expiresAt }
+  }, [readPersistedPasteRaw, pasteStorageKey])
 
   const initialPersisted = useMemo(() => readPersistedPaste(), [readPersistedPaste])
   const [pasteState, setPasteState] = useState<'idle' | 'verified' | 'unverified' | 'expired'>(initialPersisted?.state ?? 'idle')
@@ -127,6 +133,27 @@ export default function ConnectorDetailPage() {
   const [pasteSecondsLeft, setPasteSecondsLeft] = useState<number>(() =>
     initialPersisted ? Math.max(0, Math.ceil((initialPersisted.expiresAt - Date.now()) / 1000)) : 0
   )
+
+  // On mount: if a persisted paste state was already expired by the time the
+  // page loaded (e.g. user reloads after 11 min), surface a brief "expired"
+  // badge + toast instead of silently dropping it.
+  useEffect(() => {
+    const raw = readPersistedPasteRaw()
+    if (raw && raw.expired) {
+      try { window.sessionStorage.removeItem(pasteStorageKey) } catch { /* noop */ }
+      setPasteState('expired')
+      setPasteExpiresAt(null)
+      toast.info('Estado de colagem expirou', {
+        description: 'O TTL de 10 min terminou enquanto a página estava fechada.',
+        duration: 3500,
+      })
+      const timer = window.setTimeout(() => {
+        setPasteState(prev => (prev === 'expired' ? 'idle' : prev))
+      }, 4000)
+      return () => window.clearTimeout(timer)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Whenever pasteState changes (new copy attempt), set a fresh TTL.
   const setPasteStateWithTTL = useCallback((next: 'idle' | 'verified' | 'unverified' | 'expired') => {
@@ -147,8 +174,8 @@ export default function ConnectorDetailPage() {
     } catch { /* ignore quota / privacy mode */ }
   }, [pasteState, pasteExpiresAt, pasteStorageKey])
 
-  // Live countdown for the paste badge — ticks every second while modal is open
-  // (cheaper than ticking always; the persisted expiresAt covers reopens).
+  // Live countdown for the paste badge — ticks every second so persisted
+  // state expires correctly even without reopening the modal.
   useEffect(() => {
     if (!pasteExpiresAt || pasteState === 'idle' || pasteState === 'expired') {
       setPasteSecondsLeft(0)
@@ -156,7 +183,6 @@ export default function ConnectorDetailPage() {
     }
     const compute = () => Math.max(0, Math.ceil((pasteExpiresAt - Date.now()) / 1000))
     setPasteSecondsLeft(compute())
-    if (!shareOpen) return // only tick while user can see it
     const tick = setInterval(() => {
       const remaining = compute()
       setPasteSecondsLeft(remaining)
@@ -165,7 +191,14 @@ export default function ConnectorDetailPage() {
         setPasteState('expired')
         setPasteExpiresAt(null)
         clearInterval(tick)
-        // Auto-clear expired badge after 4s
+        // Notify user (only meaningful while modal is visible).
+        if (shareOpen) {
+          toast.info('Estado de colagem expirou', {
+            description: 'Copie a URL novamente para revalidar (TTL de 10 min).',
+            duration: 3500,
+          })
+        }
+        // Auto-clear expired badge after 4s.
         window.setTimeout(() => {
           setPasteState(prev => (prev === 'expired' ? 'idle' : prev))
         }, 4000)
