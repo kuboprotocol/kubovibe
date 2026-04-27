@@ -122,16 +122,16 @@ export default function ConnectorDetailPage() {
   }, [pasteStorageKey])
 
   const initialPersisted = useMemo(() => readPersistedPaste(), [readPersistedPaste])
-  const [pasteState, setPasteState] = useState<'idle' | 'verified' | 'unverified'>(initialPersisted?.state ?? 'idle')
+  const [pasteState, setPasteState] = useState<'idle' | 'verified' | 'unverified' | 'expired'>(initialPersisted?.state ?? 'idle')
   const [pasteExpiresAt, setPasteExpiresAt] = useState<number | null>(initialPersisted?.expiresAt ?? null)
   const [pasteSecondsLeft, setPasteSecondsLeft] = useState<number>(() =>
     initialPersisted ? Math.max(0, Math.ceil((initialPersisted.expiresAt - Date.now()) / 1000)) : 0
   )
 
   // Whenever pasteState changes (new copy attempt), set a fresh TTL.
-  const setPasteStateWithTTL = useCallback((next: 'idle' | 'verified' | 'unverified') => {
+  const setPasteStateWithTTL = useCallback((next: 'idle' | 'verified' | 'unverified' | 'expired') => {
     setPasteState(next)
-    if (next === 'idle') setPasteExpiresAt(null)
+    if (next === 'idle' || next === 'expired') setPasteExpiresAt(null)
     else setPasteExpiresAt(Date.now() + PASTE_TTL_MS)
   }, [])
 
@@ -139,7 +139,7 @@ export default function ConnectorDetailPage() {
   useEffect(() => {
     if (typeof window === 'undefined') return
     try {
-      if (pasteState === 'idle' || !pasteExpiresAt) {
+      if (pasteState === 'idle' || pasteState === 'expired' || !pasteExpiresAt) {
         window.sessionStorage.removeItem(pasteStorageKey)
       } else {
         window.sessionStorage.setItem(pasteStorageKey, JSON.stringify({ state: pasteState, expiresAt: pasteExpiresAt }))
@@ -150,7 +150,7 @@ export default function ConnectorDetailPage() {
   // Live countdown for the paste badge — ticks every second while modal is open
   // (cheaper than ticking always; the persisted expiresAt covers reopens).
   useEffect(() => {
-    if (!pasteExpiresAt || pasteState === 'idle') {
+    if (!pasteExpiresAt || pasteState === 'idle' || pasteState === 'expired') {
       setPasteSecondsLeft(0)
       return
     }
@@ -161,10 +161,14 @@ export default function ConnectorDetailPage() {
       const remaining = compute()
       setPasteSecondsLeft(remaining)
       if (remaining <= 0) {
-        // Per spec: on expiration, vanish completely (back to idle).
-        setPasteState('idle')
+        // Show "expired" status briefly, then vanish completely.
+        setPasteState('expired')
         setPasteExpiresAt(null)
         clearInterval(tick)
+        // Auto-clear expired badge after 4s
+        window.setTimeout(() => {
+          setPasteState(prev => (prev === 'expired' ? 'idle' : prev))
+        }, 4000)
       }
     }, 1000)
     return () => clearInterval(tick)
@@ -334,15 +338,16 @@ export default function ConnectorDetailPage() {
     })
   }, [canResetFilters, runFilter, dbRunsActive, statusFilter, setSearchParams, handleRestoreSnapshot, slug])
 
-  // Hide the undo banner while any sharing/confirmation dialog is open.
-  // Snapshot is preserved; banner reappears when modals close.
+  // Banner persists across share modal open/close — only the reset confirm
+  // dialog (which can re-trigger reset) hides it. The countdown keeps ticking
+  // while the share modal is open so the user doesn't lose context.
   const anyDialogOpen = shareOpen || resetConfirmOpen
-  const undoBannerVisible = Boolean(undoSnapshot) && !anyDialogOpen
+  const undoBannerVisible = Boolean(undoSnapshot) && !resetConfirmOpen
 
-  // Countdown for undo banner — paused while modals cover it.
+  // Countdown for undo banner — only paused while reset confirm dialog is open.
   useEffect(() => {
     if (!undoSnapshot) return
-    if (anyDialogOpen) return
+    if (resetConfirmOpen) return
     const startedAt = Date.now()
     const startingSeconds = undoSecondsLeft > 0 ? undoSecondsLeft : Math.round(UNDO_DURATION_MS / 1000)
     const tick = setInterval(() => {
@@ -356,7 +361,13 @@ export default function ConnectorDetailPage() {
     }, 250)
     return () => clearInterval(tick)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [undoSnapshot, anyDialogOpen])
+  }, [undoSnapshot, resetConfirmOpen])
+
+  // Manual TTL reset for the undo banner (e.g. user hovers/focuses Restaurar).
+  const resetUndoTTL = useCallback(() => {
+    if (!undoSnapshot) return
+    setUndoSecondsLeft(Math.round(UNDO_DURATION_MS / 1000))
+  }, [undoSnapshot])
 
   // Cancel undo if user manually re-applies any of the removed filters.
   useEffect(() => {
@@ -396,8 +407,8 @@ export default function ConnectorDetailPage() {
 
   // Keyboard shortcuts:
   //  - Ctrl/Cmd+Z → restore snapshot while undo banner is visible
-  //  - Esc        → dismiss the undo banner (only when no modal owns Esc)
-  // Both gated by undoBannerVisible so they never fire while modals cover the banner.
+  //  - Esc        → dismiss the undo banner (only when NO modal is open, so
+  //                 it never steals Esc from share / reset confirm dialogs)
   useEffect(() => {
     if (!undoBannerVisible || !undoSnapshot) return
     const handler = (e: KeyboardEvent) => {
@@ -417,6 +428,10 @@ export default function ConnectorDetailPage() {
           target.closest('[contenteditable="true"], [role="textbox"]') !== null
         )
       })()
+
+      // If any modal is open, do not intercept keys — let the dialog own focus/Esc.
+      const modalOpen = document.querySelector('[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]') !== null
+      if (modalOpen) return
 
       const isUndo = (e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && (e.key === 'z' || e.key === 'Z')
       if (isUndo) {
@@ -700,7 +715,12 @@ export default function ConnectorDetailPage() {
                       ?runs=db
                     </code>
                   )}
-                  <span>· expira em {undoSecondsLeft}s</span>
+                  <span className="tabular-nums">
+                    · expira em <span className="font-mono text-foreground">{undoSecondsLeft}s</span>
+                  </span>
+                  {shareOpen && (
+                    <span className="text-[10px] italic text-muted-foreground/70">(continua contando)</span>
+                  )}
                   <span className="hidden sm:inline">
                     · atalhos <kbd className="px-1 py-0.5 rounded border bg-background text-[10px] font-mono">Ctrl/Cmd+Z</kbd>
                     {' '}restaurar · <kbd className="px-1 py-0.5 rounded border bg-background text-[10px] font-mono">Esc</kbd> dispensar
@@ -709,6 +729,16 @@ export default function ConnectorDetailPage() {
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={resetUndoTTL}
+                className="h-8 text-xs"
+                title="Reiniciar contador de 15s"
+              >
+                <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                Renovar
+              </Button>
               <Button
                 size="sm"
                 variant="outline"
@@ -998,30 +1028,24 @@ export default function ConnectorDetailPage() {
                   variant="secondary"
                   className={cn(
                     'gap-1 text-[11px]',
-                    pasteState === 'verified'
-                      ? 'bg-primary/10 text-primary border-primary/30'
-                      : 'bg-muted text-muted-foreground border-border'
+                    pasteState === 'verified' && 'bg-primary/10 text-primary border-primary/30',
+                    pasteState === 'unverified' && 'bg-muted text-muted-foreground border-border',
+                    pasteState === 'expired' && 'bg-destructive/10 text-destructive border-destructive/30'
                   )}
                   title={
                     pasteState === 'verified'
                       ? 'Conteúdo da área de transferência verificado'
-                      : 'Não foi possível ler de volta a área de transferência (permissão/foco)'
+                      : pasteState === 'expired'
+                        ? 'Estado de colagem expirou — copie novamente para revalidar'
+                        : 'Não foi possível ler de volta a área de transferência (permissão/foco)'
                   }
                 >
-                  {pasteState === 'verified' ? (
-                    <>
-                      <Check className="h-3 w-3" />
-                      Colagem verificada
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-3 w-3" />
-                      Copiado (não verificado)
-                    </>
-                  )}
+                  {pasteState === 'verified' && (<><Check className="h-3 w-3" /> Colagem verificada</>)}
+                  {pasteState === 'unverified' && (<><Copy className="h-3 w-3" /> Copiado (não verificado)</>)}
+                  {pasteState === 'expired' && (<><Clock className="h-3 w-3" /> Colagem expirada</>)}
                 </Badge>
               )}
-              {pasteState !== 'idle' && pasteSecondsLeft > 0 && (
+              {pasteState !== 'idle' && pasteState !== 'expired' && pasteSecondsLeft > 0 && (
                 <span
                   className="text-[10px] font-mono text-muted-foreground tabular-nums"
                   title="Tempo restante até o estado de colagem expirar (reabra o modal para renovar)"
