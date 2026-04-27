@@ -338,15 +338,16 @@ export default function ConnectorDetailPage() {
     })
   }, [canResetFilters, runFilter, dbRunsActive, statusFilter, setSearchParams, handleRestoreSnapshot, slug])
 
-  // Hide the undo banner while any sharing/confirmation dialog is open.
-  // Snapshot is preserved; banner reappears when modals close.
+  // Banner persists across share modal open/close — only the reset confirm
+  // dialog (which can re-trigger reset) hides it. The countdown keeps ticking
+  // while the share modal is open so the user doesn't lose context.
   const anyDialogOpen = shareOpen || resetConfirmOpen
-  const undoBannerVisible = Boolean(undoSnapshot) && !anyDialogOpen
+  const undoBannerVisible = Boolean(undoSnapshot) && !resetConfirmOpen
 
-  // Countdown for undo banner — paused while modals cover it.
+  // Countdown for undo banner — only paused while reset confirm dialog is open.
   useEffect(() => {
     if (!undoSnapshot) return
-    if (anyDialogOpen) return
+    if (resetConfirmOpen) return
     const startedAt = Date.now()
     const startingSeconds = undoSecondsLeft > 0 ? undoSecondsLeft : Math.round(UNDO_DURATION_MS / 1000)
     const tick = setInterval(() => {
@@ -360,7 +361,13 @@ export default function ConnectorDetailPage() {
     }, 250)
     return () => clearInterval(tick)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [undoSnapshot, anyDialogOpen])
+  }, [undoSnapshot, resetConfirmOpen])
+
+  // Manual TTL reset for the undo banner (e.g. user hovers/focuses Restaurar).
+  const resetUndoTTL = useCallback(() => {
+    if (!undoSnapshot) return
+    setUndoSecondsLeft(Math.round(UNDO_DURATION_MS / 1000))
+  }, [undoSnapshot])
 
   // Cancel undo if user manually re-applies any of the removed filters.
   useEffect(() => {
