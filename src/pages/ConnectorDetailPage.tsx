@@ -715,7 +715,12 @@ export default function ConnectorDetailPage() {
                       ?runs=db
                     </code>
                   )}
-                  <span>· expira em {undoSecondsLeft}s</span>
+                  <span className="tabular-nums">
+                    · expira em <span className="font-mono text-foreground">{undoSecondsLeft}s</span>
+                  </span>
+                  {shareOpen && (
+                    <span className="text-[10px] italic text-muted-foreground/70">(continua contando)</span>
+                  )}
                   <span className="hidden sm:inline">
                     · atalhos <kbd className="px-1 py-0.5 rounded border bg-background text-[10px] font-mono">Ctrl/Cmd+Z</kbd>
                     {' '}restaurar · <kbd className="px-1 py-0.5 rounded border bg-background text-[10px] font-mono">Esc</kbd> dispensar
