@@ -98,28 +98,34 @@ export default function ConnectorDetailPage() {
 
   type PersistedPaste = { state: 'verified' | 'unverified'; expiresAt: number } | null
 
-  const readPersistedPaste = useCallback((): PersistedPaste => {
+  const readPersistedPasteRaw = useCallback((): { state: 'verified' | 'unverified'; expiresAt: number; expired: boolean } | null => {
     if (typeof window === 'undefined') return null
     try {
       const raw = window.sessionStorage.getItem(pasteStorageKey)
       if (!raw) return null
       // Backward-compat: previously stored just the state string, or {state, ts}.
       if (raw === 'verified' || raw === 'unverified') {
-        return { state: raw, expiresAt: Date.now() + PASTE_TTL_MS }
+        return { state: raw, expiresAt: Date.now() + PASTE_TTL_MS, expired: false }
       }
       const parsed = JSON.parse(raw) as { state?: string; ts?: number; expiresAt?: number }
       if (!parsed?.state) return null
       const expiresAt = typeof parsed.expiresAt === 'number'
         ? parsed.expiresAt
         : (typeof parsed.ts === 'number' ? parsed.ts + PASTE_TTL_MS : 0)
-      if (Date.now() >= expiresAt) {
-        window.sessionStorage.removeItem(pasteStorageKey)
-        return null
-      }
       const state = parsed.state === 'verified' ? 'verified' : 'unverified'
-      return { state, expiresAt }
+      return { state, expiresAt, expired: Date.now() >= expiresAt }
     } catch { return null }
   }, [pasteStorageKey])
+
+  const readPersistedPaste = useCallback((): PersistedPaste => {
+    const raw = readPersistedPasteRaw()
+    if (!raw) return null
+    if (raw.expired) {
+      try { window.sessionStorage.removeItem(pasteStorageKey) } catch { /* noop */ }
+      return null
+    }
+    return { state: raw.state, expiresAt: raw.expiresAt }
+  }, [readPersistedPasteRaw, pasteStorageKey])
 
   const initialPersisted = useMemo(() => readPersistedPaste(), [readPersistedPaste])
   const [pasteState, setPasteState] = useState<'idle' | 'verified' | 'unverified' | 'expired'>(initialPersisted?.state ?? 'idle')
