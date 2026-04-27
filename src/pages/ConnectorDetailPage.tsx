@@ -731,6 +731,16 @@ export default function ConnectorDetailPage() {
             <div className="flex items-center gap-2 shrink-0">
               <Button
                 size="sm"
+                variant="ghost"
+                onClick={resetUndoTTL}
+                className="h-8 text-xs"
+                title="Reiniciar contador de 15s"
+              >
+                <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                Renovar
+              </Button>
+              <Button
+                size="sm"
                 variant="outline"
                 onClick={() => dismissUndoBanner('manual')}
                 className="h-8 text-xs"
