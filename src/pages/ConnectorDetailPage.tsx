@@ -769,77 +769,107 @@ export default function ConnectorDetailPage() {
           />
         )}
 
-        {/* Undo banner — persists after toast expires; hidden while a modal is open. */}
-        {undoBannerVisible && undoSnapshot && (
-          <motion.div
-            initial={{ opacity: 0, y: -6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            className="rounded-lg border border-primary/30 bg-primary/5 p-3 flex items-center justify-between gap-3 flex-wrap"
-            role="status"
-            aria-live="polite"
-          >
-            <div className="flex items-start gap-2 text-sm flex-1 min-w-0">
-              <RotateCcw className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-              <div className="min-w-0">
-                <div className="font-medium text-foreground">
-                  Filtros resetados — você pode desfazer
-                </div>
-                <div className="text-xs text-muted-foreground mt-0.5 flex flex-wrap items-center gap-1.5">
-                  <span>Removido:</span>
-                  {undoSnapshot.run && (
-                    <code className="font-mono px-1 py-0.5 rounded bg-destructive/10 text-destructive text-[10px]">
-                      ?run={undoSnapshot.run.slice(0, 8)}…
-                    </code>
-                  )}
-                  {undoSnapshot.runsDb && (
-                    <code className="font-mono px-1 py-0.5 rounded bg-destructive/10 text-destructive text-[10px]">
-                      ?runs=db
-                    </code>
-                  )}
-                  <span className="tabular-nums">
-                    · expira em <span className="font-mono text-foreground">{undoSecondsLeft}s</span>
-                  </span>
-                  {shareOpen && (
-                    <span className="text-[10px] italic text-muted-foreground/70">(continua contando)</span>
-                  )}
-                  <span className="hidden sm:inline">
-                    · atalhos <kbd className="px-1 py-0.5 rounded border bg-background text-[10px] font-mono">Ctrl/Cmd+Z</kbd>
-                    {' '}restaurar · <kbd className="px-1 py-0.5 rounded border bg-background text-[10px] font-mono">Esc</kbd> dispensar
-                  </span>
+        {/* Undo banner — persists after toast expires; hidden only by reset confirm dialog. */}
+        {undoBannerVisible && undoSnapshot && (() => {
+          const totalSeconds = Math.round(UNDO_DURATION_MS / 1000)
+          const progressPct = Math.max(0, Math.min(100, (undoSecondsLeft / totalSeconds) * 100))
+          const isUrgent = undoSecondsLeft > 0 && undoSecondsLeft <= 5
+          const isPaused = resetConfirmOpen
+          return (
+            <motion.div
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              className={cn(
+                'rounded-lg border p-3 flex items-center justify-between gap-3 flex-wrap relative overflow-hidden transition-colors',
+                isUrgent
+                  ? 'border-destructive/40 bg-destructive/5'
+                  : 'border-primary/30 bg-primary/5'
+              )}
+              role="status"
+              aria-live="polite"
+            >
+              {/* Progress bar (TTL visualization) */}
+              <div
+                className={cn(
+                  'absolute bottom-0 left-0 h-0.5 transition-all duration-200 ease-linear',
+                  isUrgent ? 'bg-destructive' : 'bg-primary'
+                )}
+                style={{ width: `${progressPct}%` }}
+                aria-hidden
+              />
+
+              <div className="flex items-start gap-2 text-sm flex-1 min-w-0">
+                <RotateCcw className={cn('h-4 w-4 mt-0.5 shrink-0', isUrgent ? 'text-destructive' : 'text-primary')} />
+                <div className="min-w-0">
+                  <div className="font-medium text-foreground flex items-center gap-1.5 flex-wrap">
+                    Filtros resetados — você pode desfazer
+                    <span
+                      className={cn(
+                        'font-mono tabular-nums text-[11px] px-1.5 py-0.5 rounded border',
+                        isUrgent
+                          ? 'bg-destructive/10 text-destructive border-destructive/30 animate-pulse'
+                          : 'bg-background text-foreground border-border'
+                      )}
+                      aria-label={`Expira em ${undoSecondsLeft} segundos`}
+                    >
+                      {isPaused ? '⏸ pausado' : `${undoSecondsLeft}s`}
+                    </span>
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-0.5 flex flex-wrap items-center gap-1.5">
+                    <span>Removido:</span>
+                    {undoSnapshot.run && (
+                      <code className="font-mono px-1 py-0.5 rounded bg-destructive/10 text-destructive text-[10px]">
+                        ?run={undoSnapshot.run.slice(0, 8)}…
+                      </code>
+                    )}
+                    {undoSnapshot.runsDb && (
+                      <code className="font-mono px-1 py-0.5 rounded bg-destructive/10 text-destructive text-[10px]">
+                        ?runs=db
+                      </code>
+                    )}
+                    {shareOpen && (
+                      <span className="text-[10px] italic text-muted-foreground/70">(continua contando sob o modal)</span>
+                    )}
+                    <span className="hidden sm:inline">
+                      · atalhos <kbd className="px-1 py-0.5 rounded border bg-background text-[10px] font-mono">Ctrl/Cmd+Z</kbd>
+                      {' '}restaurar · <kbd className="px-1 py-0.5 rounded border bg-background text-[10px] font-mono">Esc</kbd> dispensar
+                      {anyDialogOpen && <span className="ml-1 italic text-muted-foreground/70">· atalhos pausados</span>}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={resetUndoTTL}
-                className="h-8 text-xs"
-                title="Reiniciar contador de 15s"
-              >
-                <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-                Renovar
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => dismissUndoBanner('manual')}
-                className="h-8 text-xs"
-              >
-                Dispensar
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => handleRestoreWithLog(undoSnapshot, 'button')}
-                className="h-8 text-xs"
-              >
-                <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
-                Restaurar
-              </Button>
-            </div>
-          </motion.div>
-        )}
+              <div className="flex items-center gap-2 shrink-0">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={resetUndoTTL}
+                  className="h-8 text-xs"
+                  title={`Reiniciar contador para ${totalSeconds}s`}
+                >
+                  <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                  Renovar
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => dismissUndoBanner('manual')}
+                  className="h-8 text-xs"
+                >
+                  Dispensar
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => handleRestoreWithLog(undoSnapshot, 'button')}
+                  className="h-8 text-xs"
+                >
+                  <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                  Restaurar
+                </Button>
+              </div>
+            </motion.div>
+          )
+        })()}
 
         {/* Activity — sempre que houver logs */}
         {(isConnected || logs.length > 0) && (
