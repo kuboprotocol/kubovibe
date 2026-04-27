@@ -147,8 +147,8 @@ export default function ConnectorDetailPage() {
     } catch { /* ignore quota / privacy mode */ }
   }, [pasteState, pasteExpiresAt, pasteStorageKey])
 
-  // Live countdown for the paste badge — ticks every second while modal is open
-  // (cheaper than ticking always; the persisted expiresAt covers reopens).
+  // Live countdown for the paste badge — ticks every second so persisted
+  // state expires correctly even without reopening the modal.
   useEffect(() => {
     if (!pasteExpiresAt || pasteState === 'idle' || pasteState === 'expired') {
       setPasteSecondsLeft(0)
@@ -156,7 +156,6 @@ export default function ConnectorDetailPage() {
     }
     const compute = () => Math.max(0, Math.ceil((pasteExpiresAt - Date.now()) / 1000))
     setPasteSecondsLeft(compute())
-    if (!shareOpen) return // only tick while user can see it
     const tick = setInterval(() => {
       const remaining = compute()
       setPasteSecondsLeft(remaining)
@@ -165,7 +164,14 @@ export default function ConnectorDetailPage() {
         setPasteState('expired')
         setPasteExpiresAt(null)
         clearInterval(tick)
-        // Auto-clear expired badge after 4s
+        // Notify user (only meaningful while modal is visible).
+        if (shareOpen) {
+          toast.info('Estado de colagem expirou', {
+            description: 'Copie a URL novamente para revalidar (TTL de 10 min).',
+            duration: 3500,
+          })
+        }
+        // Auto-clear expired badge after 4s.
         window.setTimeout(() => {
           setPasteState(prev => (prev === 'expired' ? 'idle' : prev))
         }, 4000)
