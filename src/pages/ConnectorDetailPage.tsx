@@ -1187,10 +1187,25 @@ export default function ConnectorDetailPage() {
                   {pasteState === 'expired' && (<><Clock className="h-3 w-3" /> Colagem expirada</>)}
                 </Badge>
               )}
+              {pasteState !== 'idle' && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={renewPasteTTL}
+                  data-testid="renew-paste-ttl"
+                  className="h-6 px-2 text-[10px] gap-1 text-muted-foreground hover:text-foreground"
+                  title="Renovar o TTL de 10 minutos sem precisar copiar a URL novamente"
+                  aria-label="Renovar TTL da colagem"
+                >
+                  <RefreshCw className="h-3 w-3" />
+                  Renovar TTL
+                </Button>
+              )}
               {pasteState !== 'idle' && pasteState !== 'expired' && pasteSecondsLeft > 0 && (
                 <span
                   className="text-[10px] font-mono text-muted-foreground tabular-nums"
-                  title="Tempo restante até o estado de colagem expirar (reabra o modal para renovar)"
+                  title="Tempo restante até o estado de colagem expirar (use Renovar TTL para estender)"
                   aria-label={`Estado de colagem expira em ${formatPasteCountdown(pasteSecondsLeft)}`}
                 >
                   expira em {formatPasteCountdown(pasteSecondsLeft)}
