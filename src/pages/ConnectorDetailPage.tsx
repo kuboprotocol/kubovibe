@@ -1226,8 +1226,9 @@ export default function ConnectorDetailPage() {
                   onClick={renewPasteTTL}
                   data-testid="renew-paste-ttl"
                   className="h-6 px-2 text-[10px] gap-1 text-muted-foreground hover:text-foreground"
-                  title="Renovar o TTL de 10 minutos sem precisar copiar a URL novamente"
-                  aria-label="Renovar TTL da colagem"
+                  title="Renovar o TTL de 10 minutos sem copiar a URL novamente (Ctrl/Cmd+Shift+R)"
+                  aria-keyshortcuts="Control+Shift+R Meta+Shift+R"
+                  aria-label="Renovar TTL da colagem (Ctrl ou Cmd + Shift + R)"
                 >
                   <RefreshCw className="h-3 w-3" />
                   Renovar TTL
