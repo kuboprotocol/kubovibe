@@ -332,6 +332,37 @@ export default function ConnectorDetailPage() {
     })
   }, [pasteState, pasteStorageKey, PASTE_TTL_MS, slug])
 
+  // Keyboard shortcut: Ctrl/Cmd+Shift+R renews the paste-state TTL without
+  // moving focus away from whatever the user is interacting with (works even
+  // while the share dialog is open, since the badge lives inside it).
+  // Skips when the badge is idle or when typing inside an editable field, so
+  // it never collides with form input. preventDefault stops the browser's
+  // hard-reload binding from firing.
+  useEffect(() => {
+    if (pasteState === 'idle') return
+    const handler = (e: KeyboardEvent) => {
+      const isCombo = (e.metaKey || e.ctrlKey) && e.shiftKey && !e.altKey && (e.key === 'r' || e.key === 'R')
+      if (!isCombo) return
+      const target = e.target as HTMLElement | null
+      if (target) {
+        const tag = target.tagName
+        const role = target.getAttribute('role')
+        const editable = (
+          tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' ||
+          target.isContentEditable ||
+          role === 'textbox' || role === 'combobox' || role === 'searchbox' ||
+          target.closest('[contenteditable="true"], [role="textbox"]') !== null
+        )
+        if (editable) return
+      }
+      e.preventDefault()
+      e.stopPropagation()
+      renewPasteTTL()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [pasteState, renewPasteTTL])
+
   const canResetFilters = Boolean(runFilter) || dbRunsActive
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
   const [undoSnapshot, setUndoSnapshot] = useState<{ run: string | null; runsDb: boolean; removed: string[] } | null>(null)
