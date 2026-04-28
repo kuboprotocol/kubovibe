@@ -302,6 +302,30 @@ export default function ConnectorDetailPage() {
   const handleConfirmCopy = useCallback(() => copyShareUrl({ keepOpen: false }), [copyShareUrl])
   const handleCopyOnly = useCallback(() => copyShareUrl({ keepOpen: true }), [copyShareUrl])
 
+  // Quick re-validation: extends the 10-minute TTL without forcing the user
+  // to copy the URL again. Persists the refreshed deadline to sessionStorage
+  // so a page reload keeps the badge alive.
+  const renewPasteTTL = useCallback(() => {
+    if (pasteState === 'idle') return
+    const refreshed = Date.now() + PASTE_TTL_MS
+    // If the badge had expired, treat the renewal as an "unverified" revalidation
+    // (we cannot re-confirm the clipboard contents without a fresh copy).
+    const nextState = pasteState === 'expired' ? 'unverified' : pasteState
+    setPasteState(nextState)
+    setPasteExpiresAt(refreshed)
+    try {
+      window.sessionStorage.setItem(
+        pasteStorageKey,
+        JSON.stringify({ state: nextState, expiresAt: refreshed }),
+      )
+    } catch { /* storage may be unavailable */ }
+    logConnectorEvent?.('filters_paste_ttl_renewed', { state: nextState })
+    toast.success('TTL renovado', {
+      description: 'Estado de colagem revalidado por mais 10 minutos.',
+      duration: 2200,
+    })
+  }, [pasteState, pasteStorageKey, PASTE_TTL_MS])
+
   const canResetFilters = Boolean(runFilter) || dbRunsActive
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
   const [undoSnapshot, setUndoSnapshot] = useState<{ run: string | null; runsDb: boolean; removed: string[] } | null>(null)
