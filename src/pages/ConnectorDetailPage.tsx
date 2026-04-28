@@ -330,7 +330,7 @@ export default function ConnectorDetailPage() {
       description: 'Estado de colagem revalidado por mais 10 minutos.',
       duration: 2200,
     })
-  }, [pasteState, pasteStorageKey, PASTE_TTL_MS])
+  }, [pasteState, pasteStorageKey, PASTE_TTL_MS, slug])
 
   const canResetFilters = Boolean(runFilter) || dbRunsActive
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
