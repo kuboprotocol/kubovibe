@@ -302,6 +302,36 @@ export default function ConnectorDetailPage() {
   const handleConfirmCopy = useCallback(() => copyShareUrl({ keepOpen: false }), [copyShareUrl])
   const handleCopyOnly = useCallback(() => copyShareUrl({ keepOpen: true }), [copyShareUrl])
 
+  // Quick re-validation: extends the 10-minute TTL without forcing the user
+  // to copy the URL again. Persists the refreshed deadline to sessionStorage
+  // so a page reload keeps the badge alive.
+  const renewPasteTTL = useCallback(() => {
+    if (pasteState === 'idle') return
+    const refreshed = Date.now() + PASTE_TTL_MS
+    // If the badge had expired, treat the renewal as an "unverified" revalidation
+    // (we cannot re-confirm the clipboard contents without a fresh copy).
+    const nextState = pasteState === 'expired' ? 'unverified' : pasteState
+    setPasteState(nextState)
+    setPasteExpiresAt(refreshed)
+    try {
+      window.sessionStorage.setItem(
+        pasteStorageKey,
+        JSON.stringify({ state: nextState, expiresAt: refreshed }),
+      )
+    } catch { /* storage may be unavailable */ }
+    logConnectorEvent({
+      connectorSlug: slug ?? 'unknown',
+      eventType: 'filters_paste_ttl_renewed',
+      status: 'info',
+      message: 'TTL da colagem renovado manualmente sem nova cópia',
+      metadata: { state: nextState, expiresAt: refreshed },
+    }).catch(() => { /* non-blocking */ })
+    toast.success('TTL renovado', {
+      description: 'Estado de colagem revalidado por mais 10 minutos.',
+      duration: 2200,
+    })
+  }, [pasteState, pasteStorageKey, PASTE_TTL_MS, slug])
+
   const canResetFilters = Boolean(runFilter) || dbRunsActive
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
   const [undoSnapshot, setUndoSnapshot] = useState<{ run: string | null; runsDb: boolean; removed: string[] } | null>(null)
@@ -1157,10 +1187,25 @@ export default function ConnectorDetailPage() {
                   {pasteState === 'expired' && (<><Clock className="h-3 w-3" /> Colagem expirada</>)}
                 </Badge>
               )}
+              {pasteState !== 'idle' && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={renewPasteTTL}
+                  data-testid="renew-paste-ttl"
+                  className="h-6 px-2 text-[10px] gap-1 text-muted-foreground hover:text-foreground"
+                  title="Renovar o TTL de 10 minutos sem precisar copiar a URL novamente"
+                  aria-label="Renovar TTL da colagem"
+                >
+                  <RefreshCw className="h-3 w-3" />
+                  Renovar TTL
+                </Button>
+              )}
               {pasteState !== 'idle' && pasteState !== 'expired' && pasteSecondsLeft > 0 && (
                 <span
                   className="text-[10px] font-mono text-muted-foreground tabular-nums"
-                  title="Tempo restante até o estado de colagem expirar (reabra o modal para renovar)"
+                  title="Tempo restante até o estado de colagem expirar (use Renovar TTL para estender)"
                   aria-label={`Estado de colagem expira em ${formatPasteCountdown(pasteSecondsLeft)}`}
                 >
                   expira em {formatPasteCountdown(pasteSecondsLeft)}
