@@ -319,7 +319,13 @@ export default function ConnectorDetailPage() {
         JSON.stringify({ state: nextState, expiresAt: refreshed }),
       )
     } catch { /* storage may be unavailable */ }
-    logConnectorEvent?.('filters_paste_ttl_renewed', { state: nextState })
+    logConnectorEvent({
+      connectorSlug: slug ?? 'unknown',
+      eventType: 'filters_paste_ttl_renewed',
+      status: 'info',
+      message: 'TTL da colagem renovado manualmente sem nova cópia',
+      metadata: { state: nextState, expiresAt: refreshed },
+    }).catch(() => { /* non-blocking */ })
     toast.success('TTL renovado', {
       description: 'Estado de colagem revalidado por mais 10 minutos.',
       duration: 2200,
