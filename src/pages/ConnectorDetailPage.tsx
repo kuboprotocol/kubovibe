@@ -344,7 +344,7 @@ export default function ConnectorDetailPage() {
       const isCombo = (e.metaKey || e.ctrlKey) && e.shiftKey && !e.altKey && (e.key === 'r' || e.key === 'R')
       if (!isCombo) return
       const target = e.target as HTMLElement | null
-      if (target) {
+      if (target && target instanceof HTMLElement) {
         const tag = target.tagName
         const role = target.getAttribute('role')
         const editable = (
