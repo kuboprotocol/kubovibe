@@ -879,6 +879,7 @@ export default function ConnectorDetailPage() {
                           : 'bg-background text-foreground border-border'
                       )}
                       aria-label={`Expira em ${undoSecondsLeft} segundos`}
+                      data-testid="undo-counter"
                     >
                       {isPaused ? '⏸ pausado' : `${undoSecondsLeft}s`}
                     </span>
