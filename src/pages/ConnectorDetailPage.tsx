@@ -914,6 +914,7 @@ export default function ConnectorDetailPage() {
                   onClick={resetUndoTTL}
                   className="h-8 text-xs"
                   title={`Reiniciar contador para ${totalSeconds}s`}
+                  data-testid="undo-renew-button"
                 >
                   <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
                   Renovar
