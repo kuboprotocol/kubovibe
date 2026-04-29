@@ -1,22 +1,20 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { render, screen, act, fireEvent } from '@testing-library/react'
+import { render, screen, act, fireEvent, within } from '@testing-library/react'
 import { useEffect, useState, useCallback } from 'react'
 
 /**
  * UI integration tests for the undo banner's "Renovar" button.
  *
- * Uses a faithful harness that mirrors the production implementation in
- * ConnectorDetailPage:
+ * Mirrors production:
  *   - absolute deadline (epoch ms) drives the countdown
  *   - 250ms interval recomputes secondsLeft = ceil((deadline - now) / 1000)
  *   - progress bar width = clamp(secondsLeft / total * 100, 0..100)
  *   - "Renovar" sets deadline = now + UNDO_DURATION_MS and snaps secondsLeft
  *
- * Verifies that:
- *  1. The "Renovar" button is rendered and enabled in the banner.
- *  2. Clicking it immediately updates the on-screen counter back to 15s.
- *  3. The progress bar width snaps back to 100% in the same render.
- *  4. After the renew, the timer keeps decreasing on subsequent ticks.
+ * Now leverages the production `data-testid` hooks
+ * (`undo-banner`, `undo-counter`, `undo-progress-bar`, `undo-renew-button`)
+ * and asserts both inline width style and numeric `data-progress-pct`
+ * for precise width validation.
  */
 
 const UNDO_DURATION_MS = 15_000
@@ -41,9 +39,10 @@ function UndoBannerHarness() {
   const progressPct = Math.max(0, Math.min(100, (secondsLeft / TOTAL_SECONDS) * 100))
 
   return (
-    <div role="status" aria-live="polite">
+    <div role="status" aria-live="polite" data-testid="undo-banner">
       <div
         data-testid="undo-progress-bar"
+        data-progress-pct={progressPct}
         style={{ width: `${progressPct}%` }}
         aria-hidden
       />
@@ -55,6 +54,7 @@ function UndoBannerHarness() {
       </span>
       <button
         type="button"
+        data-testid="undo-renew-button"
         onClick={resetUndoTTL}
         title={`Reiniciar contador para ${TOTAL_SECONDS}s`}
       >
@@ -64,10 +64,12 @@ function UndoBannerHarness() {
   )
 }
 
-const getProgressWidth = () => {
-  const bar = screen.getByTestId('undo-progress-bar') as HTMLElement
-  return parseFloat(bar.style.width)
-}
+const getBar = () => screen.getByTestId('undo-progress-bar') as HTMLElement
+const getCounter = () => screen.getByTestId('undo-counter')
+const getRenew = () => screen.getByTestId('undo-renew-button')
+
+const getProgressWidthPct = () => parseFloat(getBar().style.width)
+const getProgressDataPct = () => parseFloat(getBar().getAttribute('data-progress-pct') || 'NaN')
 
 describe('Undo banner — Renovar button (UI integration)', () => {
   beforeEach(() => {
@@ -78,78 +80,84 @@ describe('Undo banner — Renovar button (UI integration)', () => {
     vi.useRealTimers()
   })
 
-  it('renders the "Renovar" button enabled inside the banner', () => {
+  it('renders banner with all expected testids and the renew button enabled', () => {
     render(<UndoBannerHarness />)
-    const btn = screen.getByRole('button', { name: /renovar/i })
-    expect(btn).toBeInTheDocument()
+    const banner = screen.getByTestId('undo-banner')
+    expect(banner).toBeInTheDocument()
+    expect(within(banner).getByTestId('undo-counter')).toBeInTheDocument()
+    expect(within(banner).getByTestId('undo-progress-bar')).toBeInTheDocument()
+    const btn = within(banner).getByTestId('undo-renew-button')
     expect(btn).toBeEnabled()
-    expect(btn).not.toHaveAttribute('aria-disabled', 'true')
     expect(btn).toHaveAttribute('title', expect.stringContaining(`${TOTAL_SECONDS}s`))
+    expect(btn).toHaveTextContent(/renovar/i)
   })
 
-  it('initial render shows full counter (15s) and 100% progress bar', () => {
+  it('initial render shows full counter text and 100% width (style + data attr)', () => {
     render(<UndoBannerHarness />)
-    expect(screen.getByTestId('undo-counter')).toHaveTextContent('15s')
-    expect(getProgressWidth()).toBe(100)
+    expect(getCounter()).toHaveTextContent(`${TOTAL_SECONDS}s`)
+    expect(getBar().style.width).toBe('100%')
+    expect(getProgressWidthPct()).toBe(100)
+    expect(getProgressDataPct()).toBe(100)
   })
 
-  it('updates counter and progress bar immediately when "Renovar" is clicked', () => {
+  it('counter and progress width snap back instantly when "Renovar" is clicked', () => {
     render(<UndoBannerHarness />)
 
-    // Let 10 seconds pass → 5s remaining, ~33% bar.
-    act(() => { vi.advanceTimersByTime(10_000) })
-    expect(screen.getByTestId('undo-counter')).toHaveTextContent('5s')
-    expect(getProgressWidth()).toBeCloseTo((5 / 15) * 100, 1)
+    act(() => { vi.advanceTimersByTime(10_000) }) // 5s left → ~33.33% width
+    expect(getCounter()).toHaveTextContent('5s')
+    expect(getProgressWidthPct()).toBeCloseTo((5 / TOTAL_SECONDS) * 100, 5)
+    expect(getProgressDataPct()).toBeCloseTo((5 / TOTAL_SECONDS) * 100, 5)
 
-    // Click Renovar — both UI signals must snap back in the same paint.
-    const btn = screen.getByRole('button', { name: /renovar/i })
-    act(() => { fireEvent.click(btn) })
+    act(() => { fireEvent.click(getRenew()) })
 
-    expect(screen.getByTestId('undo-counter')).toHaveTextContent('15s')
-    expect(screen.getByTestId('undo-counter')).toHaveAttribute(
-      'aria-label',
-      `Expira em ${TOTAL_SECONDS} segundos`,
-    )
-    expect(getProgressWidth()).toBe(100)
+    expect(getCounter()).toHaveTextContent(`${TOTAL_SECONDS}s`)
+    expect(getCounter()).toHaveAttribute('aria-label', `Expira em ${TOTAL_SECONDS} segundos`)
+    expect(getBar().style.width).toBe('100%')
+    expect(getProgressWidthPct()).toBe(100)
+    expect(getProgressDataPct()).toBe(100)
   })
 
-  it('after Renovar, the counter resumes ticking from the new deadline', () => {
+  it('after Renovar, the counter and width resume ticking from the new deadline', () => {
     render(<UndoBannerHarness />)
-    act(() => { vi.advanceTimersByTime(12_000) }) // 3s left
-    expect(screen.getByTestId('undo-counter')).toHaveTextContent('3s')
+    act(() => { vi.advanceTimersByTime(12_000) })
+    expect(getCounter()).toHaveTextContent('3s')
 
-    act(() => { fireEvent.click(screen.getByRole('button', { name: /renovar/i })) })
-    expect(screen.getByTestId('undo-counter')).toHaveTextContent('15s')
-    expect(getProgressWidth()).toBe(100)
+    act(() => { fireEvent.click(getRenew()) })
+    expect(getCounter()).toHaveTextContent(`${TOTAL_SECONDS}s`)
+    expect(getProgressWidthPct()).toBe(100)
 
-    // Advance 5s into the renewed window: 10s left, bar ~66%.
-    act(() => { vi.advanceTimersByTime(5_000) })
-    expect(screen.getByTestId('undo-counter')).toHaveTextContent('10s')
-    expect(getProgressWidth()).toBeCloseTo((10 / 15) * 100, 1)
+    act(() => { vi.advanceTimersByTime(5_000) }) // 10s left → ~66.66%
+    const expected = (10 / TOTAL_SECONDS) * 100
+    expect(getCounter()).toHaveTextContent('10s')
+    expect(getProgressWidthPct()).toBeCloseTo(expected, 5)
+    expect(getProgressDataPct()).toBeCloseTo(expected, 5)
+    // style.width string must mirror the numeric data attribute exactly.
+    expect(getBar().style.width).toBe(`${expected}%`)
   })
 
-  it('successive Renovar clicks always restart the counter and bar to full', () => {
+  it('successive Renovar clicks always restart counter text and width to 100%', () => {
     render(<UndoBannerHarness />)
-    const btn = screen.getByRole('button', { name: /renovar/i })
-
     for (let i = 0; i < 3; i++) {
       act(() => { vi.advanceTimersByTime(8_000) })
-      act(() => { fireEvent.click(btn) })
-      expect(screen.getByTestId('undo-counter')).toHaveTextContent('15s')
-      expect(getProgressWidth()).toBe(100)
+      act(() => { fireEvent.click(getRenew()) })
+      expect(getCounter()).toHaveTextContent(`${TOTAL_SECONDS}s`)
+      expect(getBar().style.width).toBe('100%')
+      expect(getProgressDataPct()).toBe(100)
     }
   })
 
-  it('the button stays enabled even after the counter reaches 0 before renew', () => {
+  it('renew button stays enabled after counter reaches 0 and restores full state', () => {
     render(<UndoBannerHarness />)
     act(() => { vi.advanceTimersByTime(15_000) })
-    expect(screen.getByTestId('undo-counter')).toHaveTextContent('0s')
-    expect(getProgressWidth()).toBe(0)
+    expect(getCounter()).toHaveTextContent('0s')
+    expect(getBar().style.width).toBe('0%')
+    expect(getProgressDataPct()).toBe(0)
 
-    const btn = screen.getByRole('button', { name: /renovar/i })
+    const btn = getRenew()
     expect(btn).toBeEnabled()
     act(() => { fireEvent.click(btn) })
-    expect(screen.getByTestId('undo-counter')).toHaveTextContent('15s')
-    expect(getProgressWidth()).toBe(100)
+    expect(getCounter()).toHaveTextContent(`${TOTAL_SECONDS}s`)
+    expect(getBar().style.width).toBe('100%')
+    expect(getProgressDataPct()).toBe(100)
   })
 })
