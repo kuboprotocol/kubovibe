@@ -849,6 +849,10 @@ export default function ConnectorDetailPage() {
               )}
               role="status"
               aria-live="polite"
+              data-testid="undo-banner"
+              data-paused={isPaused ? 'true' : 'false'}
+              data-urgent={isUrgent ? 'true' : 'false'}
+              data-seconds-left={undoSecondsLeft}
             >
               {/* Progress bar (TTL visualization) */}
               <div
@@ -858,6 +862,8 @@ export default function ConnectorDetailPage() {
                 )}
                 style={{ width: `${progressPct}%` }}
                 aria-hidden
+                data-testid="undo-progress-bar"
+                data-progress-pct={progressPct}
               />
 
               <div className="flex items-start gap-2 text-sm flex-1 min-w-0">
@@ -873,6 +879,7 @@ export default function ConnectorDetailPage() {
                           : 'bg-background text-foreground border-border'
                       )}
                       aria-label={`Expira em ${undoSecondsLeft} segundos`}
+                      data-testid="undo-counter"
                     >
                       {isPaused ? '⏸ pausado' : `${undoSecondsLeft}s`}
                     </span>
@@ -907,6 +914,7 @@ export default function ConnectorDetailPage() {
                   onClick={resetUndoTTL}
                   className="h-8 text-xs"
                   title={`Reiniciar contador para ${totalSeconds}s`}
+                  data-testid="undo-renew-button"
                 >
                   <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
                   Renovar
