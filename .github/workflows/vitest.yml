@@ -1,0 +1,30 @@
+name: Vitest
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  vitest:
+    name: Vitest (RTL redirect-flow + unit tests)
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run redirect-flow tests
+        run: npx vitest run src/test/redirect-flow.test.tsx --reporter=verbose
+
+      - name: Run full Vitest suite
+        run: npm test -- --reporter=verbose
