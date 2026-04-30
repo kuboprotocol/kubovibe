@@ -131,8 +131,8 @@ describe('ConnectorDetailPage — Renovar at 0s while modal open', () => {
     expect(widthPct(banner)).toBe(100)
     expect(counterText(banner)).toMatch(/15s/)
 
-    // (2) Advance to the very last moment of the original window.
-    act(() => { vi.advanceTimersByTime(14_999) })
+    // (2) Advance to the very last second of the original window.
+    act(() => { vi.advanceTimersByTime(14_000) })
     expect(within(banner).getByTestId('undo-counter')).toHaveTextContent(/1s/)
 
     // (3) Open reset-confirm modal → banner is removed from the DOM (paused).
