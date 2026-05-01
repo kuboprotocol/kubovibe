@@ -365,9 +365,33 @@ export default function ConnectorDetailPage() {
 
   const canResetFilters = Boolean(runFilter) || dbRunsActive
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
-  const [undoSnapshot, setUndoSnapshot] = useState<{ run: string | null; runsDb: boolean; removed: string[] } | null>(null)
-  const [undoSecondsLeft, setUndoSecondsLeft] = useState(0)
   const UNDO_DURATION_MS = 15000
+  const undoStorageKey = `connector-undo:${slug ?? 'unknown'}`
+
+  // Hydrate snapshot + deadline from sessionStorage so the undo banner
+  // survives page reloads while still respecting the original TTL.
+  const hydrated = useMemo(() => {
+    if (typeof window === 'undefined') return { snapshot: null as null | { run: string | null; runsDb: boolean; removed: string[] }, deadline: null as number | null }
+    try {
+      const raw = window.sessionStorage.getItem(undoStorageKey)
+      if (!raw) return { snapshot: null, deadline: null }
+      const parsed = JSON.parse(raw) as { snapshot: { run: string | null; runsDb: boolean; removed: string[] }; deadline: number }
+      if (!parsed?.snapshot || typeof parsed.deadline !== 'number') return { snapshot: null, deadline: null }
+      if (parsed.deadline <= Date.now()) {
+        window.sessionStorage.removeItem(undoStorageKey)
+        return { snapshot: null, deadline: null }
+      }
+      return { snapshot: parsed.snapshot, deadline: parsed.deadline }
+    } catch {
+      return { snapshot: null, deadline: null }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const [undoSnapshot, setUndoSnapshot] = useState<{ run: string | null; runsDb: boolean; removed: string[] } | null>(hydrated.snapshot)
+  const [undoSecondsLeft, setUndoSecondsLeft] = useState(
+    hydrated.deadline ? Math.max(0, Math.ceil((hydrated.deadline - Date.now()) / 1000)) : 0,
+  )
 
   const handleRequestReset = useCallback(() => {
     if (!canResetFilters) return
