@@ -465,8 +465,6 @@ export default function ConnectorDetailPage() {
   // Absolute deadline (epoch ms) so manual "Renovar" can simply move it forward
   // without restarting the interval. Pauses by capturing remaining ms when
   // `resetConfirmOpen` flips on, and rebuilds a deadline on flip off.
-  const [undoDeadline, setUndoDeadline] = useState<number | null>(null)
-  const [undoPausedMs, setUndoPausedMs] = useState<number | null>(null)
 
   const [undoDeadline, setUndoDeadline] = useState<number | null>(hydrated.deadline)
   const [undoPausedMs, setUndoPausedMs] = useState<number | null>(null)
