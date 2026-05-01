@@ -95,7 +95,8 @@ const STORAGE_KEY = 'connector-undo:github'
 
 describe('ConnectorDetailPage — undo banner persists across reload', () => {
   beforeEach(() => {
-    vi.useFakeTimers()
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date('2026-04-28T12:00:00Z'))
     window.sessionStorage.clear()
   })
 
