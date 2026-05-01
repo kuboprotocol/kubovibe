@@ -368,17 +368,18 @@ export default function ConnectorDetailPage() {
   const UNDO_DURATION_MS = 15000
   const undoStorageKey = `connector-undo:${slug ?? 'unknown'}`
 
-  // Hydrate snapshot + deadline from sessionStorage so the undo banner
-  // survives page reloads while still respecting the original TTL.
+  // Hydrate snapshot + deadline from localStorage so the undo banner
+  // survives full browser restarts and is shared across tabs (the storage
+  // event listener below keeps tabs in sync in real time).
   const hydrated = useMemo(() => {
     if (typeof window === 'undefined') return { snapshot: null as null | { run: string | null; runsDb: boolean; removed: string[] }, deadline: null as number | null }
     try {
-      const raw = window.sessionStorage.getItem(undoStorageKey)
+      const raw = window.localStorage.getItem(undoStorageKey)
       if (!raw) return { snapshot: null, deadline: null }
       const parsed = JSON.parse(raw) as { snapshot: { run: string | null; runsDb: boolean; removed: string[] }; deadline: number }
       if (!parsed?.snapshot || typeof parsed.deadline !== 'number') return { snapshot: null, deadline: null }
       if (parsed.deadline <= Date.now()) {
-        window.sessionStorage.removeItem(undoStorageKey)
+        window.localStorage.removeItem(undoStorageKey)
         return { snapshot: null, deadline: null }
       }
       return { snapshot: parsed.snapshot, deadline: parsed.deadline }
