@@ -177,4 +177,54 @@ describe('ConnectorDetailPage — undo banner persists across reload', () => {
     expect(screen.queryByTestId('undo-banner')).toBeNull()
     expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull()
   })
+
+  it('cross-tab sync: receiving a storage event from another tab restores the banner', async () => {
+    renderPage('/connectors/github')
+    expect(screen.queryByTestId('undo-banner')).toBeNull()
+
+    // Simulate another tab writing a fresh snapshot to localStorage.
+    const futureDeadline = Date.now() + 12_000
+    const payload = JSON.stringify({
+      snapshot: { run: 'feedface00000000', runsDb: false, removed: ['?run='] },
+      deadline: futureDeadline,
+    })
+    window.localStorage.setItem(STORAGE_KEY, payload)
+
+    act(() => {
+      window.dispatchEvent(
+        new StorageEvent('storage', {
+          key: STORAGE_KEY,
+          newValue: payload,
+          oldValue: null,
+          storageArea: window.localStorage,
+        }),
+      )
+    })
+
+    const restored = await screen.findByTestId('undo-banner')
+    const seconds = Number(within(restored).getByTestId('undo-counter').textContent!.replace(/\D/g, ''))
+    expect(seconds).toBeGreaterThanOrEqual(11)
+    expect(seconds).toBeLessThanOrEqual(12)
+  })
+
+  it('cross-tab sync: receiving a clear event from another tab dismisses the banner locally', async () => {
+    renderPage()
+    await openUndoBanner()
+    expect(screen.queryByTestId('undo-banner')).not.toBeNull()
+
+    // Another tab clears the entry → simulate the storage event.
+    window.localStorage.removeItem(STORAGE_KEY)
+    act(() => {
+      window.dispatchEvent(
+        new StorageEvent('storage', {
+          key: STORAGE_KEY,
+          newValue: null,
+          oldValue: 'whatever',
+          storageArea: window.localStorage,
+        }),
+      )
+    })
+
+    expect(screen.queryByTestId('undo-banner')).toBeNull()
+  })
 })
