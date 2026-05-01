@@ -365,9 +365,33 @@ export default function ConnectorDetailPage() {
 
   const canResetFilters = Boolean(runFilter) || dbRunsActive
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
-  const [undoSnapshot, setUndoSnapshot] = useState<{ run: string | null; runsDb: boolean; removed: string[] } | null>(null)
-  const [undoSecondsLeft, setUndoSecondsLeft] = useState(0)
   const UNDO_DURATION_MS = 15000
+  const undoStorageKey = `connector-undo:${slug ?? 'unknown'}`
+
+  // Hydrate snapshot + deadline from sessionStorage so the undo banner
+  // survives page reloads while still respecting the original TTL.
+  const hydrated = useMemo(() => {
+    if (typeof window === 'undefined') return { snapshot: null as null | { run: string | null; runsDb: boolean; removed: string[] }, deadline: null as number | null }
+    try {
+      const raw = window.sessionStorage.getItem(undoStorageKey)
+      if (!raw) return { snapshot: null, deadline: null }
+      const parsed = JSON.parse(raw) as { snapshot: { run: string | null; runsDb: boolean; removed: string[] }; deadline: number }
+      if (!parsed?.snapshot || typeof parsed.deadline !== 'number') return { snapshot: null, deadline: null }
+      if (parsed.deadline <= Date.now()) {
+        window.sessionStorage.removeItem(undoStorageKey)
+        return { snapshot: null, deadline: null }
+      }
+      return { snapshot: parsed.snapshot, deadline: parsed.deadline }
+    } catch {
+      return { snapshot: null, deadline: null }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const [undoSnapshot, setUndoSnapshot] = useState<{ run: string | null; runsDb: boolean; removed: string[] } | null>(hydrated.snapshot)
+  const [undoSecondsLeft, setUndoSecondsLeft] = useState(
+    hydrated.deadline ? Math.max(0, Math.ceil((hydrated.deadline - Date.now()) / 1000)) : 0,
+  )
 
   const handleRequestReset = useCallback(() => {
     if (!canResetFilters) return
@@ -441,8 +465,22 @@ export default function ConnectorDetailPage() {
   // Absolute deadline (epoch ms) so manual "Renovar" can simply move it forward
   // without restarting the interval. Pauses by capturing remaining ms when
   // `resetConfirmOpen` flips on, and rebuilds a deadline on flip off.
-  const [undoDeadline, setUndoDeadline] = useState<number | null>(null)
+
+  const [undoDeadline, setUndoDeadline] = useState<number | null>(hydrated.deadline)
   const [undoPausedMs, setUndoPausedMs] = useState<number | null>(null)
+
+  // Persist snapshot + active deadline so a page reload restores the banner
+  // exactly where the user left it (subject to remaining TTL).
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      if (undoSnapshot && undoDeadline !== null) {
+        window.sessionStorage.setItem(undoStorageKey, JSON.stringify({ snapshot: undoSnapshot, deadline: undoDeadline }))
+      } else if (!undoSnapshot) {
+        window.sessionStorage.removeItem(undoStorageKey)
+      }
+    } catch { /* ignore quota errors */ }
+  }, [undoSnapshot, undoDeadline, undoStorageKey])
 
   // (Re)build the deadline whenever a new snapshot arrives.
   useEffect(() => {
