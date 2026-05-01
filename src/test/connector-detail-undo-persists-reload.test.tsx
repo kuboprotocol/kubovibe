@@ -124,8 +124,10 @@ describe('ConnectorDetailPage — undo banner persists across reload', () => {
     unmount()
     expect(screen.queryByTestId('undo-banner')).toBeNull()
 
-    // Re-mount on the same route — sessionStorage survives.
-    renderPage()
+    // Re-mount on the same connector route. The reset cleared `?run=` from
+    // the URL before the "reload", so the new mount must not re-cancel the
+    // restored snapshot via the "user reapplied filter" effect.
+    renderPage('/connectors/github')
     const restored = await screen.findByTestId('undo-banner')
 
     // Must NOT reset to a fresh 15s window — should resume around 9s left.
