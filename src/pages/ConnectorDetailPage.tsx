@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
@@ -368,17 +368,18 @@ export default function ConnectorDetailPage() {
   const UNDO_DURATION_MS = 15000
   const undoStorageKey = `connector-undo:${slug ?? 'unknown'}`
 
-  // Hydrate snapshot + deadline from sessionStorage so the undo banner
-  // survives page reloads while still respecting the original TTL.
+  // Hydrate snapshot + deadline from localStorage so the undo banner
+  // survives full browser restarts and is shared across tabs (the storage
+  // event listener below keeps tabs in sync in real time).
   const hydrated = useMemo(() => {
     if (typeof window === 'undefined') return { snapshot: null as null | { run: string | null; runsDb: boolean; removed: string[] }, deadline: null as number | null }
     try {
-      const raw = window.sessionStorage.getItem(undoStorageKey)
+      const raw = window.localStorage.getItem(undoStorageKey)
       if (!raw) return { snapshot: null, deadline: null }
       const parsed = JSON.parse(raw) as { snapshot: { run: string | null; runsDb: boolean; removed: string[] }; deadline: number }
       if (!parsed?.snapshot || typeof parsed.deadline !== 'number') return { snapshot: null, deadline: null }
       if (parsed.deadline <= Date.now()) {
-        window.sessionStorage.removeItem(undoStorageKey)
+        window.localStorage.removeItem(undoStorageKey)
         return { snapshot: null, deadline: null }
       }
       return { snapshot: parsed.snapshot, deadline: parsed.deadline }
@@ -469,18 +470,58 @@ export default function ConnectorDetailPage() {
   const [undoDeadline, setUndoDeadline] = useState<number | null>(hydrated.deadline)
   const [undoPausedMs, setUndoPausedMs] = useState<number | null>(null)
 
-  // Persist snapshot + active deadline so a page reload restores the banner
-  // exactly where the user left it (subject to remaining TTL).
+  // Persist snapshot + active deadline so a page reload (and other open tabs)
+  // can restore the banner exactly where the user left it. Writes are skipped
+  // when the value is sourced from another tab to avoid storage echo loops.
+  const skipNextWriteRef = useRef(false)
   useEffect(() => {
     if (typeof window === 'undefined') return
+    if (skipNextWriteRef.current) {
+      skipNextWriteRef.current = false
+      return
+    }
     try {
       if (undoSnapshot && undoDeadline !== null) {
-        window.sessionStorage.setItem(undoStorageKey, JSON.stringify({ snapshot: undoSnapshot, deadline: undoDeadline }))
+        window.localStorage.setItem(undoStorageKey, JSON.stringify({ snapshot: undoSnapshot, deadline: undoDeadline }))
       } else if (!undoSnapshot) {
-        window.sessionStorage.removeItem(undoStorageKey)
+        window.localStorage.removeItem(undoStorageKey)
       }
     } catch { /* ignore quota errors */ }
   }, [undoSnapshot, undoDeadline, undoStorageKey])
+
+  // Cross-tab sync: react to localStorage changes from other tabs/windows.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== undoStorageKey || e.storageArea !== window.localStorage) return
+      skipNextWriteRef.current = true
+      if (!e.newValue) {
+        // Cleared in another tab → dismiss locally.
+        setUndoSnapshot(null)
+        setUndoDeadline(null)
+        setUndoPausedMs(null)
+        setUndoSecondsLeft(0)
+        return
+      }
+      try {
+        const parsed = JSON.parse(e.newValue) as { snapshot: { run: string | null; runsDb: boolean; removed: string[] }; deadline: number }
+        if (!parsed?.snapshot || typeof parsed.deadline !== 'number') return
+        if (parsed.deadline <= Date.now()) {
+          setUndoSnapshot(null)
+          setUndoDeadline(null)
+          setUndoPausedMs(null)
+          setUndoSecondsLeft(0)
+          return
+        }
+        setUndoSnapshot(parsed.snapshot)
+        setUndoDeadline(parsed.deadline)
+        setUndoPausedMs(null)
+        setUndoSecondsLeft(Math.max(0, Math.ceil((parsed.deadline - Date.now()) / 1000)))
+      } catch { /* ignore malformed payloads */ }
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [undoStorageKey])
 
   // (Re)build the deadline whenever a new snapshot arrives.
   useEffect(() => {

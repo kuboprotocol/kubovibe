@@ -4,12 +4,12 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom'
 
 /**
  * Verifies the undo banner survives a page reload by hydrating the snapshot
- * and remaining TTL from sessionStorage.
+ * and remaining TTL from localStorage.
  *
  * Flow:
  *   1. Mount page, trigger reset → undo banner with 15s window appears.
  *   2. Advance fake timers by 6s (banner shows ~9s remaining).
- *   3. Unmount the tree (simulating navigation/reload — sessionStorage persists).
+ *   3. Unmount the tree (simulating navigation/reload — localStorage persists).
  *   4. Remount the page on the same route.
  *   5. Banner must reappear immediately with ~9s remaining (not a fresh 15s).
  *   6. After remaining TTL elapses, banner auto-dismisses.
@@ -97,12 +97,12 @@ describe('ConnectorDetailPage — undo banner persists across reload', () => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     vi.setSystemTime(new Date('2026-04-28T12:00:00Z'))
-    window.sessionStorage.clear()
+    window.localStorage.clear()
   })
 
   afterEach(() => {
     vi.useRealTimers()
-    window.sessionStorage.clear()
+    window.localStorage.clear()
   })
 
   it('restores the banner with the remaining TTL after a reload', async () => {
@@ -111,8 +111,8 @@ describe('ConnectorDetailPage — undo banner persists across reload', () => {
     const banner = await openUndoBanner()
     expect(within(banner).getByTestId('undo-counter')).toHaveTextContent(/15s/)
 
-    // Persisted to sessionStorage with snapshot + future deadline.
-    const stored = JSON.parse(window.sessionStorage.getItem(STORAGE_KEY)!)
+    // Persisted to localStorage with snapshot + future deadline.
+    const stored = JSON.parse(window.localStorage.getItem(STORAGE_KEY)!)
     expect(stored.snapshot.removed).toContain('?run=')
     expect(stored.deadline).toBeGreaterThan(Date.now())
 
@@ -145,12 +145,12 @@ describe('ConnectorDetailPage — undo banner persists across reload', () => {
     // Burn the rest of the TTL — banner should auto-dismiss at zero.
     act(() => { vi.advanceTimersByTime(7_000) })
     expect(screen.queryByTestId('undo-banner')).toBeNull()
-    expect(window.sessionStorage.getItem(STORAGE_KEY)).toBeNull()
+    expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull()
   })
 
   it('discards an expired persisted entry on mount', async () => {
     // Pre-seed an already-expired snapshot.
-    window.sessionStorage.setItem(
+    window.localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
         snapshot: { run: 'abcdef1234567890', runsDb: false, removed: ['?run='] },
@@ -162,19 +162,69 @@ describe('ConnectorDetailPage — undo banner persists across reload', () => {
 
     // Banner must NOT appear, and the stale entry must be cleared.
     expect(screen.queryByTestId('undo-banner')).toBeNull()
-    expect(window.sessionStorage.getItem(STORAGE_KEY)).toBeNull()
+    expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull()
   })
 
   it('clears the persisted entry when the user dismisses the banner', async () => {
     renderPage()
     await openUndoBanner()
-    expect(window.sessionStorage.getItem(STORAGE_KEY)).not.toBeNull()
+    expect(window.localStorage.getItem(STORAGE_KEY)).not.toBeNull()
 
     const banner = await screen.findByTestId('undo-banner')
     const dismissBtn = within(banner).getByRole('button', { name: /^dispensar$/i })
     act(() => { fireEvent.click(dismissBtn) })
 
     expect(screen.queryByTestId('undo-banner')).toBeNull()
-    expect(window.sessionStorage.getItem(STORAGE_KEY)).toBeNull()
+    expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull()
+  })
+
+  it('cross-tab sync: receiving a storage event from another tab restores the banner', async () => {
+    renderPage('/connectors/github')
+    expect(screen.queryByTestId('undo-banner')).toBeNull()
+
+    // Simulate another tab writing a fresh snapshot to localStorage.
+    const futureDeadline = Date.now() + 12_000
+    const payload = JSON.stringify({
+      snapshot: { run: 'feedface00000000', runsDb: false, removed: ['?run='] },
+      deadline: futureDeadline,
+    })
+    window.localStorage.setItem(STORAGE_KEY, payload)
+
+    act(() => {
+      window.dispatchEvent(
+        new StorageEvent('storage', {
+          key: STORAGE_KEY,
+          newValue: payload,
+          oldValue: null,
+          storageArea: window.localStorage,
+        }),
+      )
+    })
+
+    const restored = await screen.findByTestId('undo-banner')
+    const seconds = Number(within(restored).getByTestId('undo-counter').textContent!.replace(/\D/g, ''))
+    expect(seconds).toBeGreaterThanOrEqual(11)
+    expect(seconds).toBeLessThanOrEqual(12)
+  })
+
+  it('cross-tab sync: receiving a clear event from another tab dismisses the banner locally', async () => {
+    renderPage()
+    await openUndoBanner()
+    expect(screen.queryByTestId('undo-banner')).not.toBeNull()
+
+    // Another tab clears the entry → simulate the storage event.
+    window.localStorage.removeItem(STORAGE_KEY)
+    act(() => {
+      window.dispatchEvent(
+        new StorageEvent('storage', {
+          key: STORAGE_KEY,
+          newValue: null,
+          oldValue: 'whatever',
+          storageArea: window.localStorage,
+        }),
+      )
+    })
+
+    expect(screen.queryByTestId('undo-banner')).toBeNull()
   })
 })
