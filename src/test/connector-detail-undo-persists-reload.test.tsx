@@ -167,8 +167,8 @@ describe('ConnectorDetailPage — undo banner persists across reload', () => {
     await openUndoBanner()
     expect(window.sessionStorage.getItem(STORAGE_KEY)).not.toBeNull()
 
-    const dismissBtn = await screen.findByRole('button', { name: /dispensar banner/i })
-    act(() => { fireEvent.click(dismissBtn) })
+    const banner = await screen.findByTestId('undo-banner')
+    const dismissBtn = within(banner).getByRole('button', { name: /^dispensar$/i })
 
     expect(screen.queryByTestId('undo-banner')).toBeNull()
     expect(window.sessionStorage.getItem(STORAGE_KEY)).toBeNull()
