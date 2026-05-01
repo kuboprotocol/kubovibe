@@ -468,6 +468,22 @@ export default function ConnectorDetailPage() {
   const [undoDeadline, setUndoDeadline] = useState<number | null>(null)
   const [undoPausedMs, setUndoPausedMs] = useState<number | null>(null)
 
+  const [undoDeadline, setUndoDeadline] = useState<number | null>(hydrated.deadline)
+  const [undoPausedMs, setUndoPausedMs] = useState<number | null>(null)
+
+  // Persist snapshot + active deadline so a page reload restores the banner
+  // exactly where the user left it (subject to remaining TTL).
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      if (undoSnapshot && undoDeadline !== null) {
+        window.sessionStorage.setItem(undoStorageKey, JSON.stringify({ snapshot: undoSnapshot, deadline: undoDeadline }))
+      } else if (!undoSnapshot) {
+        window.sessionStorage.removeItem(undoStorageKey)
+      }
+    } catch { /* ignore quota errors */ }
+  }, [undoSnapshot, undoDeadline, undoStorageKey])
+
   // (Re)build the deadline whenever a new snapshot arrives.
   useEffect(() => {
     if (!undoSnapshot) {
