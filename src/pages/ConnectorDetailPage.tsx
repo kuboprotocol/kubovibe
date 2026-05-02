@@ -916,7 +916,7 @@ export default function ConnectorDetailPage() {
           const totalSeconds = Math.round(UNDO_DURATION_MS / 1000)
           const progressPct = Math.max(0, Math.min(100, (undoSecondsLeft / totalSeconds) * 100))
           const isUrgent = undoSecondsLeft > 0 && undoSecondsLeft <= 5
-          const isPaused = resetConfirmOpen
+          const isPaused = resetConfirmOpen || dismissConfirmOpen
           return (
             <motion.div
               initial={{ opacity: 0, y: -6 }}
