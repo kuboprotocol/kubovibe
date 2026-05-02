@@ -1003,8 +1003,10 @@ export default function ConnectorDetailPage() {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => dismissUndoBanner('manual')}
+                  onClick={() => setDismissConfirmOpen(true)}
                   className="h-8 text-xs"
+                  data-testid="undo-dismiss-button"
+                  title="Dispensar o banner de desfazer (pede confirmação)"
                 >
                   Dispensar
                 </Button>
