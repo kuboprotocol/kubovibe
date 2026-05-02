@@ -46,13 +46,13 @@ test.describe('ConnectorDetailPage — Renovar stays clickable across reset-dial
     await page.waitForURL('**/connectors/github**', { timeout: 15_000 })
 
     // 3. Trigger the undo banner: click "Resetar filtros", then confirm.
-    const resetTrigger = page.getByRole('button', { name: /resetar filtros/i })
+    const resetTrigger = page.getByTestId('reset-filters-trigger')
     await expect(resetTrigger).toBeVisible({ timeout: 15_000 })
     await resetTrigger.click()
 
-    const confirmDialog = page.getByRole('alertdialog')
+    const confirmDialog = page.getByTestId('reset-filters-dialog')
     await expect(confirmDialog).toBeVisible()
-    await confirmDialog.getByRole('button', { name: /^resetar$/i }).click()
+    await page.getByTestId('reset-filters-confirm').click()
 
     const banner = page.getByTestId('undo-banner')
     await expect(banner).toBeVisible({ timeout: 10_000 })
@@ -74,12 +74,12 @@ test.describe('ConnectorDetailPage — Renovar stays clickable across reset-dial
         window.dispatchEvent(new PopStateEvent('popstate'))
       }, `${RUN_SHA.slice(0, 8)}cycle${i.toString().padStart(2, '0')}`)
 
-      const trigger = page.getByRole('button', { name: /resetar filtros/i })
+      const trigger = page.getByTestId('reset-filters-trigger')
       await expect(trigger, `cycle ${i}: trigger visible`).toBeVisible({ timeout: 5_000 })
 
       // Open dialog.
       await trigger.click()
-      const dialog = page.getByRole('alertdialog')
+      const dialog = page.getByTestId('reset-filters-dialog')
       await expect(dialog, `cycle ${i}: dialog open`).toBeVisible()
 
       // While dialog is open, Renovar must still be visible & enabled.
@@ -87,7 +87,7 @@ test.describe('ConnectorDetailPage — Renovar stays clickable across reset-dial
       await expect(renew, `cycle ${i}: Renovar enabled while dialog open`).toBeEnabled()
 
       // Close dialog via Cancel.
-      await dialog.getByRole('button', { name: /^cancelar$/i }).click()
+      await page.getByTestId('reset-filters-cancel').click()
       await expect(dialog, `cycle ${i}: dialog closed`).toBeHidden()
 
       // After closing, Renovar must still be visible, enabled, and clickable.
