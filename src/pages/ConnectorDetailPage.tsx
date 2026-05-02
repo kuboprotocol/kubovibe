@@ -668,7 +668,7 @@ export default function ConnectorDetailPage() {
       if (e.key === 'Escape' && !e.metaKey && !e.ctrlKey && !e.altKey) {
         if (isEditableTarget) return
         e.preventDefault()
-        dismissUndoBanner('esc')
+        setDismissConfirmOpen(true)
       }
     }
     window.addEventListener('keydown', handler)
