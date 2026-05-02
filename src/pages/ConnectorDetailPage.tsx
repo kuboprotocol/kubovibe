@@ -365,6 +365,7 @@ export default function ConnectorDetailPage() {
 
   const canResetFilters = Boolean(runFilter) || dbRunsActive
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
+  const [dismissConfirmOpen, setDismissConfirmOpen] = useState(false)
   const UNDO_DURATION_MS = 15000
   const undoStorageKey = `connector-undo:${slug ?? 'unknown'}`
 
