@@ -461,7 +461,7 @@ export default function ConnectorDetailPage() {
   // Banner persists across share modal open/close — only the reset confirm
   // dialog (which can re-trigger reset) hides it. The countdown keeps ticking
   // while the share modal is open so the user doesn't lose context.
-  const anyDialogOpen = shareOpen || resetConfirmOpen
+  const anyDialogOpen = shareOpen || resetConfirmOpen || dismissConfirmOpen
   const undoBannerVisible = Boolean(undoSnapshot) && !resetConfirmOpen
 
   // Absolute deadline (epoch ms) so manual "Renovar" can simply move it forward
