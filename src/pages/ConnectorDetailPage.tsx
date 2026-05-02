@@ -1432,6 +1432,64 @@ export default function ConnectorDetailPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Undo banner dismiss confirmation — prevents accidental dismiss.
+          TTL is paused while this dialog is open (see pauseTTL effect). */}
+      <AlertDialog open={dismissConfirmOpen} onOpenChange={setDismissConfirmOpen}>
+        <AlertDialogContent data-testid="undo-dismiss-confirm">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <XCircle className="h-4 w-4 text-destructive" />
+              Dispensar banner de desfazer?
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm">
+                <p>
+                  Você perderá a possibilidade de restaurar os filtros removidos.
+                  Esta ação não pode ser desfeita.
+                </p>
+                {undoSnapshot && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {undoSnapshot.run && (
+                      <Badge
+                        variant="secondary"
+                        className="font-mono text-[11px] gap-1 bg-destructive/10 text-destructive border-destructive/30"
+                      >
+                        <span className="opacity-70">?run=</span>
+                        <span>{undoSnapshot.run.slice(0, 8)}…</span>
+                      </Badge>
+                    )}
+                    {undoSnapshot.runsDb && (
+                      <Badge
+                        variant="secondary"
+                        className="font-mono text-[11px] gap-1 bg-destructive/10 text-destructive border-destructive/30"
+                      >
+                        <span>?runs=db</span>
+                      </Badge>
+                    )}
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Dica: o contador permanece pausado enquanto este aviso está aberto.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="undo-dismiss-cancel">Manter banner</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="undo-dismiss-confirm-button"
+              onClick={() => {
+                dismissUndoBanner('manual')
+                setDismissConfirmOpen(false)
+              }}
+            >
+              <XCircle className="h-3.5 w-3.5 mr-1.5" />
+              Dispensar mesmo assim
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
