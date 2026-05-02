@@ -1382,7 +1382,7 @@ export default function ConnectorDetailPage() {
 
       {/* Reset filters confirmation */}
       <AlertDialog open={resetConfirmOpen} onOpenChange={setResetConfirmOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent data-testid="reset-filters-dialog">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <RotateCcw className="h-4 w-4 text-destructive" />
@@ -1425,8 +1425,8 @@ export default function ConnectorDetailPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmReset}>
+            <AlertDialogCancel data-testid="reset-filters-cancel">Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmReset} data-testid="reset-filters-confirm">
               <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
               Resetar
             </AlertDialogAction>
