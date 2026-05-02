@@ -165,7 +165,7 @@ describe('ConnectorDetailPage — undo banner persists across reload', () => {
     expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull()
   })
 
-  it('clears the persisted entry when the user dismisses the banner', async () => {
+  it('clears the persisted entry when the user dismisses the banner (with confirm)', async () => {
     renderPage()
     await openUndoBanner()
     expect(window.localStorage.getItem(STORAGE_KEY)).not.toBeNull()
@@ -173,6 +173,12 @@ describe('ConnectorDetailPage — undo banner persists across reload', () => {
     const banner = await screen.findByTestId('undo-banner')
     const dismissBtn = within(banner).getByRole('button', { name: /^dispensar$/i })
     act(() => { fireEvent.click(dismissBtn) })
+
+    // Banner stays visible; a confirmation dialog must appear first.
+    expect(screen.queryByTestId('undo-banner')).not.toBeNull()
+    const confirm = await screen.findByTestId('undo-dismiss-confirm')
+    const confirmBtn = within(confirm).getByTestId('undo-dismiss-confirm-button')
+    act(() => { fireEvent.click(confirmBtn) })
 
     expect(screen.queryByTestId('undo-banner')).toBeNull()
     expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull()

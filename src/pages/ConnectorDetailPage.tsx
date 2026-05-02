@@ -365,6 +365,7 @@ export default function ConnectorDetailPage() {
 
   const canResetFilters = Boolean(runFilter) || dbRunsActive
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
+  const [dismissConfirmOpen, setDismissConfirmOpen] = useState(false)
   const UNDO_DURATION_MS = 15000
   const undoStorageKey = `connector-undo:${slug ?? 'unknown'}`
 
@@ -460,7 +461,7 @@ export default function ConnectorDetailPage() {
   // Banner persists across share modal open/close — only the reset confirm
   // dialog (which can re-trigger reset) hides it. The countdown keeps ticking
   // while the share modal is open so the user doesn't lose context.
-  const anyDialogOpen = shareOpen || resetConfirmOpen
+  const anyDialogOpen = shareOpen || resetConfirmOpen || dismissConfirmOpen
   const undoBannerVisible = Boolean(undoSnapshot) && !resetConfirmOpen
 
   // Absolute deadline (epoch ms) so manual "Renovar" can simply move it forward
@@ -536,10 +537,11 @@ export default function ConnectorDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [undoSnapshot])
 
-  // Pause when reset-confirm opens; resume when it closes.
+  // Pause when reset-confirm OR dismiss-confirm opens; resume when both close.
+  const pauseTTL = resetConfirmOpen || dismissConfirmOpen
   useEffect(() => {
     if (!undoSnapshot) return
-    if (resetConfirmOpen) {
+    if (pauseTTL) {
       // Capture remaining ms then clear deadline.
       if (undoDeadline !== null) {
         setUndoPausedMs(Math.max(0, undoDeadline - Date.now()))
@@ -550,7 +552,7 @@ export default function ConnectorDetailPage() {
       setUndoPausedMs(null)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resetConfirmOpen, undoSnapshot])
+  }, [pauseTTL, undoSnapshot])
 
   // Tick — single interval driven by deadline.
   useEffect(() => {
@@ -666,7 +668,7 @@ export default function ConnectorDetailPage() {
       if (e.key === 'Escape' && !e.metaKey && !e.ctrlKey && !e.altKey) {
         if (isEditableTarget) return
         e.preventDefault()
-        dismissUndoBanner('esc')
+        setDismissConfirmOpen(true)
       }
     }
     window.addEventListener('keydown', handler)
@@ -914,7 +916,7 @@ export default function ConnectorDetailPage() {
           const totalSeconds = Math.round(UNDO_DURATION_MS / 1000)
           const progressPct = Math.max(0, Math.min(100, (undoSecondsLeft / totalSeconds) * 100))
           const isUrgent = undoSecondsLeft > 0 && undoSecondsLeft <= 5
-          const isPaused = resetConfirmOpen
+          const isPaused = resetConfirmOpen || dismissConfirmOpen
           return (
             <motion.div
               initial={{ opacity: 0, y: -6 }}
@@ -1001,8 +1003,10 @@ export default function ConnectorDetailPage() {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => dismissUndoBanner('manual')}
+                  onClick={() => setDismissConfirmOpen(true)}
                   className="h-8 text-xs"
+                  data-testid="undo-dismiss-button"
+                  title="Dispensar o banner de desfazer (pede confirmação)"
                 >
                   Dispensar
                 </Button>
@@ -1424,6 +1428,64 @@ export default function ConnectorDetailPage() {
             <AlertDialogAction onClick={handleConfirmReset}>
               <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
               Resetar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Undo banner dismiss confirmation — prevents accidental dismiss.
+          TTL is paused while this dialog is open (see pauseTTL effect). */}
+      <AlertDialog open={dismissConfirmOpen} onOpenChange={setDismissConfirmOpen}>
+        <AlertDialogContent data-testid="undo-dismiss-confirm">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <XCircle className="h-4 w-4 text-destructive" />
+              Dispensar banner de desfazer?
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm">
+                <p>
+                  Você perderá a possibilidade de restaurar os filtros removidos.
+                  Esta ação não pode ser desfeita.
+                </p>
+                {undoSnapshot && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {undoSnapshot.run && (
+                      <Badge
+                        variant="secondary"
+                        className="font-mono text-[11px] gap-1 bg-destructive/10 text-destructive border-destructive/30"
+                      >
+                        <span className="opacity-70">?run=</span>
+                        <span>{undoSnapshot.run.slice(0, 8)}…</span>
+                      </Badge>
+                    )}
+                    {undoSnapshot.runsDb && (
+                      <Badge
+                        variant="secondary"
+                        className="font-mono text-[11px] gap-1 bg-destructive/10 text-destructive border-destructive/30"
+                      >
+                        <span>?runs=db</span>
+                      </Badge>
+                    )}
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Dica: o contador permanece pausado enquanto este aviso está aberto.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="undo-dismiss-cancel">Manter banner</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="undo-dismiss-confirm-button"
+              onClick={() => {
+                dismissUndoBanner('manual')
+                setDismissConfirmOpen(false)
+              }}
+            >
+              <XCircle className="h-3.5 w-3.5 mr-1.5" />
+              Dispensar mesmo assim
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
