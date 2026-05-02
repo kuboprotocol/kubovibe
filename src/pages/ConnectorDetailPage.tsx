@@ -1040,6 +1040,7 @@ export default function ConnectorDetailPage() {
                       onClick={handleRequestReset}
                       className="h-8 text-xs text-muted-foreground hover:text-foreground gap-1.5"
                       title={`Remove ${removableCount} filtro${removableCount === 1 ? '' : 's'}: ${[runFilter && '?run=', dbRunsActive && '?runs=db'].filter(Boolean).join(' e ')} (mantém ?status=)`}
+                      data-testid="reset-filters-trigger"
                     >
                       <RotateCcw className="h-3.5 w-3.5" />
                       Resetar filtros
