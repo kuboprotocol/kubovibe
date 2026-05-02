@@ -537,10 +537,11 @@ export default function ConnectorDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [undoSnapshot])
 
-  // Pause when reset-confirm opens; resume when it closes.
+  // Pause when reset-confirm OR dismiss-confirm opens; resume when both close.
+  const pauseTTL = resetConfirmOpen || dismissConfirmOpen
   useEffect(() => {
     if (!undoSnapshot) return
-    if (resetConfirmOpen) {
+    if (pauseTTL) {
       // Capture remaining ms then clear deadline.
       if (undoDeadline !== null) {
         setUndoPausedMs(Math.max(0, undoDeadline - Date.now()))
@@ -551,7 +552,7 @@ export default function ConnectorDetailPage() {
       setUndoPausedMs(null)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resetConfirmOpen, undoSnapshot])
+  }, [pauseTTL, undoSnapshot])
 
   // Tick — single interval driven by deadline.
   useEffect(() => {
