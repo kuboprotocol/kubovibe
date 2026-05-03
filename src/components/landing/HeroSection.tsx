@@ -179,10 +179,12 @@ export default function HeroSection() {
                 variant="hero"
                 size="sm"
                 onClick={handleGenerate}
+                disabled={generating}
                 className="rounded-xl px-6 gap-2"
               >
-                Gerar
-                <ArrowRight className="h-4 w-4" />
+                {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                {generating ? 'Gerando...' : 'Gerar'}
+                {!generating && <ArrowRight className="h-4 w-4" />}
               </Button>
             </div>
           </div>
