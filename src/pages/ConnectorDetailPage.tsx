@@ -1023,6 +1023,9 @@ export default function ConnectorDetailPage() {
                   className="h-8 text-xs"
                   title={`Reiniciar contador para ${totalSeconds}s`}
                   data-testid="undo-renew-button"
+                  id="undo-renew-button"
+                  aria-label="Renovar contador do banner de desfazer"
+                  aria-keyshortcuts="Control+R"
                 >
                   <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
                   Renovar
@@ -1030,10 +1033,13 @@ export default function ConnectorDetailPage() {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => setDismissConfirmOpen(true)}
+                  onClick={() => openDismissModal('button')}
                   className="h-8 text-xs"
                   data-testid="undo-dismiss-button"
-                  title="Dispensar o banner de desfazer (pede confirmação)"
+                  id="undo-dismiss-button"
+                  aria-label="Dispensar banner de desfazer (Esc para confirmar, Shift+Esc para dispensar direto)"
+                  aria-keyshortcuts="Escape Shift+Escape"
+                  title="Dispensar (Esc = confirma, Shift+Esc = direto)"
                 >
                   Dispensar
                 </Button>
