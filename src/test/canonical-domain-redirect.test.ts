@@ -88,23 +88,27 @@ describe('Canonical-domain redirect: lovable.app → kubovibe.dev', () => {
       replaceMock = vi.fn()
     })
     afterEach(() => {
-      // @ts-expect-error restore
-      window.location = originalLocation
+      Object.defineProperty(window, 'location', {
+        configurable: true,
+        value: originalLocation,
+        writable: true,
+      })
     })
 
     function stubLocation(href: string) {
       const u = new URL(href)
-      // @ts-expect-error override read-only location for the test
-      delete window.location
-      // @ts-expect-error inject mock
-      window.location = {
-        href: u.href,
-        hostname: u.hostname,
-        pathname: u.pathname,
-        search: u.search,
-        hash: u.hash,
-        replace: replaceMock,
-      }
+      Object.defineProperty(window, 'location', {
+        configurable: true,
+        writable: true,
+        value: {
+          href: u.href,
+          hostname: u.hostname,
+          pathname: u.pathname,
+          search: u.search,
+          hash: u.hash,
+          replace: replaceMock,
+        },
+      })
     }
 
     function runRedirect() {
