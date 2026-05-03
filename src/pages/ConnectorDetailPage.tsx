@@ -1469,7 +1469,16 @@ export default function ConnectorDetailPage() {
 
       {/* Undo banner dismiss confirmation — prevents accidental dismiss.
           TTL is paused while this dialog is open (see pauseTTL effect). */}
-      <AlertDialog open={dismissConfirmOpen} onOpenChange={setDismissConfirmOpen}>
+      <AlertDialog
+        open={dismissConfirmOpen}
+        onOpenChange={(next) => {
+          // If closing without confirm-button (esc/overlay) → log cancel.
+          if (!next && dismissConfirmOpen) {
+            logDismissModal('cancelled', 'overlay')
+          }
+          setDismissConfirmOpen(next)
+        }}
+      >
         <AlertDialogContent data-testid="undo-dismiss-confirm">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
@@ -1485,35 +1494,35 @@ export default function ConnectorDetailPage() {
                 {undoSnapshot && (
                   <div className="flex flex-wrap gap-1.5">
                     {undoSnapshot.run && (
-                      <Badge
-                        variant="secondary"
-                        className="font-mono text-[11px] gap-1 bg-destructive/10 text-destructive border-destructive/30"
-                      >
+                      <Badge variant="secondary" className="font-mono text-[11px] gap-1 bg-destructive/10 text-destructive border-destructive/30">
                         <span className="opacity-70">?run=</span>
                         <span>{undoSnapshot.run.slice(0, 8)}…</span>
                       </Badge>
                     )}
                     {undoSnapshot.runsDb && (
-                      <Badge
-                        variant="secondary"
-                        className="font-mono text-[11px] gap-1 bg-destructive/10 text-destructive border-destructive/30"
-                      >
+                      <Badge variant="secondary" className="font-mono text-[11px] gap-1 bg-destructive/10 text-destructive border-destructive/30">
                         <span>?runs=db</span>
                       </Badge>
                     )}
                   </div>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  Dica: o contador permanece pausado enquanto este aviso está aberto.
+                  Dica: o contador permanece pausado. Use <kbd className="px-1 py-0.5 rounded border bg-background text-[10px] font-mono">Shift+Esc</kbd> para dispensar direto sem este aviso.
                 </p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel data-testid="undo-dismiss-cancel">Manter banner</AlertDialogCancel>
+            <AlertDialogCancel
+              data-testid="undo-dismiss-cancel"
+              onClick={() => logDismissModal('cancelled', 'button')}
+            >
+              Manter banner
+            </AlertDialogCancel>
             <AlertDialogAction
               data-testid="undo-dismiss-confirm-button"
               onClick={() => {
+                logDismissModal('confirmed', 'button')
                 dismissUndoBanner('manual')
                 setDismissConfirmOpen(false)
               }}
