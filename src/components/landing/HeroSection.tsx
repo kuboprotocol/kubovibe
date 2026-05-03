@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import { ArrowRight, Zap, Globe, Palette } from 'lucide-react'
+import { ArrowRight, Zap, Loader2, Globe, Palette } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import logoImg from '@/assets/logo-kubovibe.png'
 import PromptAttachMenu from '@/components/landing/PromptAttachMenu'
+import { supabase } from '@/integrations/supabase/client'
+import { useAuth } from '@/hooks/useAuth'
 
 // Sugestões em linguagem natural — sem jargão técnico (Web2 ou Web3).
 // O orquestrador detecta a stack por trás. O usuário só descreve a ideia.
@@ -21,7 +23,9 @@ export default function HeroSection() {
   const [prompt, setPrompt] = useState('')
   const [attachedFile, setAttachedFile] = useState<File | null>(null)
   const [references, setReferences] = useState<string[]>([])
+  const [generating, setGenerating] = useState(false)
   const navigate = useNavigate()
+  const { user } = useAuth()
 
   const handleAttachFile = (file: File) => {
     setAttachedFile(file)
@@ -30,21 +34,15 @@ export default function HeroSection() {
 
   const handleScreenshot = async () => {
     try {
-      // Request screen capture
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: true })
       const video = document.createElement('video')
       video.srcObject = stream
       await video.play()
-      
       const canvas = document.createElement('canvas')
       canvas.width = video.videoWidth
       canvas.height = video.videoHeight
       canvas.getContext('2d')?.drawImage(video, 0, 0)
-      
-      // Stop the stream
       stream.getTracks().forEach(track => track.stop())
-      
-      // Convert to blob and create file
       canvas.toBlob((blob) => {
         if (blob) {
           const file = new File([blob], `screenshot-${Date.now()}.png`, { type: 'image/png' })
@@ -62,9 +60,30 @@ export default function HeroSection() {
     toast.success('Referência adicionada!')
   }
 
-  const handleGenerate = () => {
-    if (prompt.trim()) {
-      navigate('/builder', { state: { initialPrompt: prompt.trim() } })
+  // Conecta o botão Gerar ao orquestrador (Camada 2). Se o usuário não está
+  // logado, redireciona para /auth preservando o prompt para retomar depois.
+  const handleGenerate = async () => {
+    const text = prompt.trim()
+    if (!text) return
+    if (!user) {
+      navigate('/auth', { state: { initialPrompt: text, redirectTo: '/' } })
+      return
+    }
+    setGenerating(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('orchestrator', {
+        body: { prompt: text },
+      })
+      if (error) throw error
+      if (!data?.plan_id) throw new Error('Plano sem ID')
+      toast.success('Plano gerado!')
+      navigate(`/plan/${data.plan_id}`)
+    } catch (e) {
+      console.error(e)
+      const msg = e instanceof Error ? e.message : 'Falha ao gerar plano'
+      toast.error(msg)
+    } finally {
+      setGenerating(false)
     }
   }
 
@@ -160,10 +179,12 @@ export default function HeroSection() {
                 variant="hero"
                 size="sm"
                 onClick={handleGenerate}
+                disabled={generating}
                 className="rounded-xl px-6 gap-2"
               >
-                Gerar
-                <ArrowRight className="h-4 w-4" />
+                {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                {generating ? 'Gerando...' : 'Gerar'}
+                {!generating && <ArrowRight className="h-4 w-4" />}
               </Button>
             </div>
           </div>
