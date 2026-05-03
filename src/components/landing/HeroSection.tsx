@@ -7,10 +7,14 @@ import { toast } from 'sonner'
 import logoImg from '@/assets/logo-kubovibe.png'
 import PromptAttachMenu from '@/components/landing/PromptAttachMenu'
 
+// Sugestões em linguagem natural — sem jargão técnico (Web2 ou Web3).
+// O orquestrador detecta a stack por trás. O usuário só descreve a ideia.
 const suggestions = [
-  'A food delivery app with live tracking',
-  'Portfolio website with dark mode',
-  'SaaS dashboard with analytics',
+  'Um app estilo Nubank com login e carteira digital',
+  'Marketplace de NFTs com pagamento em cripto',
+  'Loja online com fidelidade em tokens',
+  'Dashboard SaaS com analytics em tempo real',
+  'Rede social com recompensas para criadores',
 ]
 
 export default function HeroSection() {
