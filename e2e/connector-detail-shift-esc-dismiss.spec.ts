@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { trackConnectorEvents } from './helpers/analytics'
 import { ConnectorDetailPage } from './helpers/connectorDetail.page'
 import { waitForDialogState, expectActionable } from './helpers/waits'
 
