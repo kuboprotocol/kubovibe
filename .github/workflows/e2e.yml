@@ -9,7 +9,7 @@ on:
 
 jobs:
   playwright:
-    name: Playwright (chromium)
+    name: Playwright (chromium, main suite)
     timeout-minutes: 20
     runs-on: ubuntu-latest
     steps:
@@ -23,17 +23,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Playwright browsers
+      - name: Install Playwright Chromium (with system libs)
         run: npx playwright install --with-deps chromium
 
-      - name: Run Playwright tests
+      - name: Run Playwright tests (excluding split redirect-cache suites)
         env:
           TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
           TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
           VITE_SUPABASE_PROJECT_ID: ${{ secrets.VITE_SUPABASE_PROJECT_ID }}
-        run: npx playwright test --project=chromium
+        run: npx playwright test --project=chromium --grep-invert "(hash preservation across cached 301|fuzz #)"
 
       - name: Upload Playwright report
         if: always()
@@ -42,6 +42,66 @@ jobs:
           name: playwright-report-chromium
           path: playwright-report/
           retention-days: 14
+
+  redirect-hash-suite:
+    name: Redirect hash matrix (chromium)
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Playwright Chromium (with system libs)
+        run: npx playwright install --with-deps chromium
+      - name: Run hash-preservation matrix only
+        run: npx playwright test --project=chromium e2e/canonical-domain-redirect-cache.spec.ts --grep "hash preservation across cached 301"
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-hash
+          path: playwright-report/
+          retention-days: 14
+
+  redirect-fuzz-suite:
+    name: Redirect fuzz suite (chromium)
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    env:
+      # Override in workflow_dispatch / repo vars to replay a specific seed run.
+      FUZZ_SEED_BASE: ${{ vars.FUZZ_SEED_BASE || '12648430' }}
+      FUZZ_COUNT: ${{ vars.FUZZ_COUNT || '12' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Playwright Chromium (with system libs)
+        run: npx playwright install --with-deps chromium
+      - name: Run fuzz suite (deterministic seeds)
+        run: npx playwright test --project=chromium e2e/canonical-domain-redirect-cache.spec.ts --grep "fuzz #"
+      - name: Upload Playwright report (with persisted fuzz seeds)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-fuzz
+          path: playwright-report/
+          retention-days: 30
+      - name: Upload fuzz seed manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-seeds
+          path: playwright-report/fuzz-seeds.json
+          retention-days: 90
+          if-no-files-found: warn
 
   redirect-cache-cross-browser:
     name: Redirect cache (${{ matrix.project }})
@@ -69,8 +129,8 @@ jobs:
       - name: Install Playwright browser (${{ matrix.browser }})
         run: npx playwright install --with-deps ${{ matrix.browser }}
 
-      - name: Run canonical-domain redirect cache spec
-        run: npx playwright test --project=${{ matrix.project }} e2e/canonical-domain-redirect-cache.spec.ts
+      - name: Run canonical-domain redirect cache spec (excluding fuzz)
+        run: npx playwright test --project=${{ matrix.project }} e2e/canonical-domain-redirect-cache.spec.ts --grep-invert "fuzz #"
 
       - name: Upload Playwright report
         if: always()
