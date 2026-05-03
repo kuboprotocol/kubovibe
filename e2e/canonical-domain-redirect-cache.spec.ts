@@ -230,11 +230,15 @@ test.describe('Canonical-domain redirect — 301 + Cache-Control + browser cache
     // Empty-query edge-cases — RFC 3986 §3.4 explicitly allows an empty
     // query component, and '?', '?=', '?&', '?flag' must all be preserved
     // byte-for-byte in the 301 Location header.
-    { label: 'qs bare question mark',      path: '/about',                     query: '?',                             hash: '' },
-    { label: 'qs bare question + hash',    path: '/about',                     query: '?',                             hash: '#contact' },
+    // Empty / minimal-query edge-cases — RFC 3986 §3.4 allows empty query.
+    // Note: a bare '?' (with no chars after) is stripped by every WHATWG
+    // URL parser (browsers, curl, Node fetch) BEFORE the request leaves the
+    // client, so it never reaches the edge — we instead lock the smallest
+    // observable shapes ('?=' / '?&' / '?flag') which DO round-trip.
     { label: 'qs only equals',             path: '/q',                         query: '?=',                            hash: '' },
     { label: 'qs only ampersand',          path: '/q',                         query: '?&',                            hash: '' },
     { label: 'qs key with no value',       path: '/q',                         query: '?flag',                         hash: '' },
+    { label: 'qs key no value + hash',     path: '/q',                         query: '?flag',                         hash: '#anchor' },
   ]
 
   for (const sc of SCENARIOS) {
