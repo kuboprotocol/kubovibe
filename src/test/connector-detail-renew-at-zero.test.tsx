@@ -88,10 +88,10 @@ function renderPage(initialPath = '/connectors/github?run=abcdef1234567890') {
 }
 
 async function openUndoBanner() {
-  const resetBtn = await screen.findByRole('button', { name: /resetar filtros/i })
+  const resetBtn = await screen.findByTestId('reset-filters-trigger')
   act(() => { fireEvent.click(resetBtn) })
-  const dialog = await screen.findByRole('alertdialog')
-  const confirmBtn = within(dialog).getByRole('button', { name: /^resetar$/i })
+  const dialog = await screen.findByTestId('reset-filters-dialog')
+  const confirmBtn = within(dialog).getByTestId('reset-filters-confirm')
   act(() => { fireEvent.click(confirmBtn) })
   return await screen.findByTestId('undo-banner')
 }
@@ -155,10 +155,10 @@ describe('ConnectorDetailPage — Renovar at 0s keeps banner alive for full rene
     // If the trigger no longer applies (filters already cleared), this assertion
     // documents the production rule that the banner stays alive through the
     // entire 15s window after reset, even when the user lingers on the page.
-    const triggers = screen.queryAllByRole('button', { name: /resetar filtros/i })
+    const triggers = screen.queryAllByTestId('reset-filters-trigger')
     if (triggers.length > 0) {
       act(() => { fireEvent.click(triggers[0]) })
-      const dialog = await screen.findByRole('alertdialog')
+      const dialog = await screen.findByTestId('reset-filters-dialog')
       // Banner is hidden while the modal is open (paused).
       expect(screen.queryByTestId('undo-banner')).toBeNull()
 
@@ -167,7 +167,7 @@ describe('ConnectorDetailPage — Renovar at 0s keeps banner alive for full rene
       expect(screen.queryByTestId('undo-banner')).toBeNull()
 
       // Cancel the modal → banner returns with the previously captured 5s.
-      const cancelBtn = within(dialog).getByRole('button', { name: /cancelar/i })
+      const cancelBtn = within(dialog).getByTestId('reset-filters-cancel')
       act(() => { fireEvent.click(cancelBtn) })
       const resumed = await screen.findByTestId('undo-banner')
       expect(within(resumed).getByTestId('undo-counter')).toHaveTextContent(/5s/)

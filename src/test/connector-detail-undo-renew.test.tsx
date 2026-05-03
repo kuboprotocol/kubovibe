@@ -85,13 +85,11 @@ function renderPage(initialPath = '/connectors/github?run=abcdef1234567890') {
 
 async function openUndoBanner() {
   // Click "Resetar filtros" → opens confirm dialog → click "Resetar"
-  const resetBtn = await screen.findByRole('button', { name: /resetar filtros/i })
+  const resetBtn = await screen.findByTestId('reset-filters-trigger')
   act(() => { fireEvent.click(resetBtn) })
 
-  // Confirm dialog action button (also labelled "Resetar")
-  const confirmBtn = await screen.findByRole('alertdialog').then(d =>
-    within(d).getByRole('button', { name: /^resetar$/i })
-  )
+  const dialog = await screen.findByTestId('reset-filters-dialog')
+  const confirmBtn = within(dialog).getByTestId('reset-filters-confirm')
   act(() => { fireEvent.click(confirmBtn) })
 
   return await screen.findByTestId('undo-banner')
