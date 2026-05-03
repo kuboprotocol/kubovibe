@@ -129,7 +129,7 @@ export default function HeroSection() {
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Describe your app idea..."
+              placeholder="Descreva o app que você quer. Exemplo: 'Quero um app estilo Nubank com login e carteira'"
               className="w-full resize-none bg-transparent px-5 pt-5 pb-16 text-foreground placeholder:text-muted-foreground focus:outline-none text-base min-h-[130px] font-sans"
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
