@@ -16,6 +16,8 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 const URL = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const ANON = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined
+// Secret compartilhada com a edge function rls-test-create-user
+const TEST_SECRET = (import.meta.env.VITE_RLS_TEST_SECRET ?? process.env.RLS_TEST_SECRET) as string | undefined
 const PASSWORD = 'Test!Pass123#secure'
 
 const rnd = () => Math.random().toString(36).slice(2, 10)
@@ -23,8 +25,25 @@ const mkEmail = () => `rls+${Date.now()}-${rnd()}@example.com`
 
 type User = { client: SupabaseClient; userId: string; email: string }
 
+async function createConfirmedUser(): Promise<User | null> {
+  if (!URL || !ANON || !TEST_SECRET) return null
+  const r = await fetch(`${URL}/functions/v1/rls-test-create-user`, {
+    method: 'POST',
+    headers: { 'x-test-secret': TEST_SECRET, apikey: ANON, Authorization: `Bearer ${ANON}` },
+  })
+  if (!r.ok) return null
+  const body = await r.json() as { user_id: string; email: string; access_token: string; refresh_token: string }
+  const client = createClient(URL, ANON, { auth: { persistSession: false, autoRefreshToken: false } })
+  await client.auth.setSession({ access_token: body.access_token, refresh_token: body.refresh_token })
+  return { client, userId: body.user_id, email: body.email }
+}
+
 async function signUpUser(): Promise<User | null> {
   if (!URL || !ANON) return null
+  // Preferir o caminho confirmado (edge function) quando disponível
+  const confirmed = await createConfirmedUser()
+  if (confirmed) return confirmed
+
   const email = mkEmail()
   const client = createClient(URL, ANON, {
     auth: { persistSession: false, autoRefreshToken: false },
