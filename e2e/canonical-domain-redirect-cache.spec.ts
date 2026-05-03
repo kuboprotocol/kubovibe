@@ -184,6 +184,15 @@ test.describe('Canonical-domain redirect — 301 + Cache-Control + browser cache
     { label: 'path + query + hash',        path: '/connectors/github',         query: '?run=abc123',       hash: '#section-2' },
     { label: 'multi-segment + qs + hash',  path: '/app/proj-123/meu-app',      query: '?ref=email&t=1',    hash: '#top' },
     { label: 'encoded path + qs',          path: '/app/My%20Project',          query: '?q=hello%20world&x=%26', hash: '' },
+    // Broader encoded-query matrix — exercises the full pct-encoded charset
+    // (RFC 3986 §2.1) that real users paste into share links.
+    { label: 'qs encoded ampersand',       path: '/search',                    query: '?q=a%26b%3Dc',      hash: '' },
+    { label: 'qs plus as space',           path: '/search',                    query: '?q=a+b&x=1',        hash: '' },
+    { label: 'qs encoded slash',           path: '/app/My%20Project',          query: '?token=abc%2Fdef',  hash: '' },
+    { label: 'qs unicode (utf-8 pct)',     path: '/buscar',                    query: '?q=caf%C3%A9',      hash: '#resultados' },
+    { label: 'qs array brackets',          path: '/app/proj/run',              query: '?ids%5B%5D=1&ids%5B%5D=2', hash: '' },
+    { label: 'qs json blob',               path: '/api/echo',                  query: '?payload=%7B%22a%22%3A1%7D', hash: '' },
+    { label: 'qs trailing empty + hash',   path: '/list',                      query: '?tag=&page=2',      hash: '#row=42' },
   ]
 
   for (const sc of SCENARIOS) {
