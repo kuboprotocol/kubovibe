@@ -23,6 +23,19 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
+    // Cross-browser validation: only the canonical-domain cache spec runs in
+    // Firefox + WebKit so we lock the 301 + Cache-Control contract across the
+    // three engines without paying the full e2e suite cost on every browser.
+    {
+      name: 'firefox-redirect-cache',
+      testMatch: /canonical-domain-redirect-cache\.spec\.ts/,
+      use: { ...devices['Desktop Firefox'] },
+    },
+    {
+      name: 'webkit-redirect-cache',
+      testMatch: /canonical-domain-redirect-cache\.spec\.ts/,
+      use: { ...devices['Desktop Safari'] },
+    },
   ],
   webServer: {
     command: 'npm run dev',
