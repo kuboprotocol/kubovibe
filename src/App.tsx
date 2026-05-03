@@ -27,6 +27,17 @@ import EmailDashboardPage from "./pages/EmailDashboardPage";
 
 const queryClient = new QueryClient();
 
+// Canonical-domain redirect: any traffic landing on the lovable.app fallback
+// hostname is bounced to the branded custom domain. Production-safe (only fires
+// in the browser and only when the host actually contains "lovable.app").
+if (typeof window !== 'undefined') {
+  const host = window.location.hostname
+  if (/(^|\.)lovable\.app$/i.test(host) && !host.startsWith('id-preview--')) {
+    const target = `https://kubovibe.dev${window.location.pathname}${window.location.search}${window.location.hash}`
+    window.location.replace(target)
+  }
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
