@@ -18,45 +18,74 @@ import type { AddressInfo } from 'node:net'
  */
 
 const CACHE_CONTROL = 'public, max-age=31536000, immutable'
+const ETAG = '"redir-v1"'
+// Stable Last-Modified anchored to a fixed point in the past so revalidation
+// is deterministic across runs and matches what a real CDN would emit.
+const LAST_MODIFIED = new Date('2024-01-01T00:00:00Z').toUTCString()
 
-type Hit = { url: string; method: string; ifNoneMatch?: string; ifModifiedSince?: string }
+type Hit = {
+  url: string
+  method: string
+  ifNoneMatch?: string
+  ifModifiedSince?: string
+  status: number
+  responseHeaders: Record<string, string>
+}
 
 /** Boots a local HTTP server that mimics the edge redirect rule. */
 function startEdge(): Promise<{ url: string; close: () => Promise<void>; hits: Hit[] }> {
   const hits: Hit[] = []
   const server = http.createServer((req, res) => {
-    const inm = req.headers['if-none-match']
-    const ims = req.headers['if-modified-since']
-    hits.push({
+    const inm = typeof req.headers['if-none-match'] === 'string' ? (req.headers['if-none-match'] as string) : undefined
+    const ims =
+      typeof req.headers['if-modified-since'] === 'string' ? (req.headers['if-modified-since'] as string) : undefined
+    const hit: Hit = {
       url: req.url ?? '/',
       method: req.method ?? 'GET',
-      ifNoneMatch: typeof inm === 'string' ? inm : undefined,
-      ifModifiedSince: typeof ims === 'string' ? ims : undefined,
-    })
+      ifNoneMatch: inm,
+      ifModifiedSince: ims,
+      status: 0,
+      responseHeaders: {},
+    }
+    hits.push(hit)
+
+    const send = (status: number, headers: Record<string, string>, body?: string) => {
+      hit.status = status
+      hit.responseHeaders = headers
+      res.writeHead(status, headers)
+      res.end(body)
+    }
+
     if (req.url?.startsWith('/redir/')) {
-      // Honor conditional revalidation so WebKit/Firefox stay redirected on
-      // a 304 just as they would in production.
-      if (inm === '"redir-v1"') {
-        res.writeHead(304, { 'Cache-Control': CACHE_CONTROL, ETag: '"redir-v1"' })
-        res.end()
+      // Conditional revalidation → 304 with the SAME ETag + Last-Modified +
+      // Cache-Control as the original 301 (RFC 9111 §4.3.4 / §4.3.5).
+      const imsMatches = ims !== undefined && new Date(ims).getTime() >= new Date(LAST_MODIFIED).getTime()
+      if (inm === ETAG || imsMatches) {
+        send(304, {
+          'Cache-Control': CACHE_CONTROL,
+          ETag: ETAG,
+          'Last-Modified': LAST_MODIFIED,
+        })
         return
       }
-      res.writeHead(301, {
+      send(301, {
         Location: `/dest${req.url.slice('/redir'.length)}`,
         'Cache-Control': CACHE_CONTROL,
-        ETag: '"redir-v1"',
+        ETag: ETAG,
+        'Last-Modified': LAST_MODIFIED,
         Date: new Date().toUTCString(),
       })
-      res.end()
       return
     }
     if (req.url?.startsWith('/dest')) {
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' })
-      res.end('<!doctype html><html><body><main id="ok">canonical</main></body></html>')
+      send(
+        200,
+        { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' },
+        '<!doctype html><html><body><main id="ok">canonical</main></body></html>',
+      )
       return
     }
-    res.writeHead(404)
-    res.end()
+    send(404, {})
   })
   return new Promise((resolve) => {
     server.listen(0, '127.0.0.1', () => {
@@ -107,8 +136,9 @@ test.describe('Canonical-domain redirect — 301 + Cache-Control + browser cache
 
     // Cross-browser contract: either the browser served the 301 fully from
     // cache (no extra hit), OR it issued a conditional revalidation that
-    // must carry If-None-Match / If-Modified-Since (i.e. NOT a fresh GET).
-    // A naked re-GET with no validators means caching is broken.
+    // must carry If-None-Match / If-Modified-Since AND receive a 304 with
+    // coherent ETag/Last-Modified echoed back. A naked re-GET (200/301 with
+    // no validators) means caching is broken.
     const hits = redirHits()
     expect(hits.length, `at most one extra revalidation allowed; hits: ${JSON.stringify(hits)}`).toBeLessThanOrEqual(2)
     if (hits.length === 2) {
@@ -117,9 +147,64 @@ test.describe('Canonical-domain redirect — 301 + Cache-Control + browser cache
         Boolean(second.ifNoneMatch || second.ifModifiedSince),
         `second hit must be a conditional revalidation, got: ${JSON.stringify(second)}`,
       ).toBe(true)
+      expect(second.status, 'revalidation must respond 304 Not Modified').toBe(304)
+      // ETag/Last-Modified must round-trip on the 304 so the browser can
+      // keep the cached 301 fresh (RFC 9111 §4.3.4).
+      expect(second.responseHeaders['ETag'] ?? second.responseHeaders['etag']).toBe(ETAG)
+      expect(second.responseHeaders['Last-Modified'] ?? second.responseHeaders['last-modified']).toBe(LAST_MODIFIED)
+      // If the client sent If-None-Match it must echo our ETag verbatim.
+      if (second.ifNoneMatch) {
+        expect(second.ifNoneMatch).toContain(ETAG)
+      }
     }
 
     await context.close()
+    await edge.close()
+  })
+
+  test('conditional revalidation: 304 echoes coherent ETag + Last-Modified', async ({ request }) => {
+    // Drives revalidation directly (browser-independent) so the 304 contract
+    // is locked even when the user-agent decides not to revalidate.
+    const edge = await startEdge()
+
+    // Sanity: warm fetch returns 301 with validators.
+    const warm = await request.fetch(`${edge.url}/redir/x?q=1`, { maxRedirects: 0 })
+    expect(warm.status()).toBe(301)
+    const warmHeaders = warm.headers()
+    expect(warmHeaders['etag']).toBe(ETAG)
+    expect(warmHeaders['last-modified']).toBe(LAST_MODIFIED)
+    expect(warmHeaders['cache-control']).toBe(CACHE_CONTROL)
+    expect(warmHeaders['location']).toBe('/dest/x?q=1')
+
+    // If-None-Match → 304 with same ETag + Last-Modified, no body.
+    const inm = await request.fetch(`${edge.url}/redir/x?q=1`, {
+      maxRedirects: 0,
+      headers: { 'If-None-Match': ETAG },
+    })
+    expect(inm.status()).toBe(304)
+    const inmH = inm.headers()
+    expect(inmH['etag'], 'ETag must round-trip on 304').toBe(ETAG)
+    expect(inmH['last-modified'], 'Last-Modified must round-trip on 304').toBe(LAST_MODIFIED)
+    expect(inmH['cache-control'], 'Cache-Control must round-trip on 304').toBe(CACHE_CONTROL)
+    expect((await inm.body()).length, '304 must have an empty body').toBe(0)
+
+    // If-Modified-Since (≥ Last-Modified) → 304 too.
+    const ims = await request.fetch(`${edge.url}/redir/x?q=1`, {
+      maxRedirects: 0,
+      headers: { 'If-Modified-Since': LAST_MODIFIED },
+    })
+    expect(ims.status()).toBe(304)
+    expect(ims.headers()['etag']).toBe(ETAG)
+    expect(ims.headers()['last-modified']).toBe(LAST_MODIFIED)
+
+    // Stale If-Modified-Since (older than Last-Modified) → fresh 301.
+    const stale = await request.fetch(`${edge.url}/redir/x?q=1`, {
+      maxRedirects: 0,
+      headers: { 'If-Modified-Since': new Date('2000-01-01T00:00:00Z').toUTCString() },
+    })
+    expect(stale.status()).toBe(301)
+    expect(stale.headers()['etag']).toBe(ETAG)
+
     await edge.close()
   })
 
