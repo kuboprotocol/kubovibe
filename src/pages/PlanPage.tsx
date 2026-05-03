@@ -412,21 +412,41 @@ export default function PlanPage() {
             )}
 
             {deployment ? (
-              <div className="border border-emerald-500/30 rounded-md p-4 bg-emerald-500/5 space-y-2">
+              <div className="border border-emerald-500/30 rounded-md p-4 bg-emerald-500/5 space-y-3">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <div className="flex items-center gap-2 font-medium text-emerald-400 text-sm">
                     <CheckCircle2 className="h-4 w-4" /> Deploy concluído
                   </div>
-                  <Badge variant="outline" className="border-emerald-500/40 text-emerald-300">Sepolia · success</Badge>
+                  <div className="flex gap-2 items-center">
+                    <Badge variant="outline" className="border-emerald-500/40 text-emerald-300">Sepolia · success</Badge>
+                    <Button size="sm" variant="ghost" onClick={deployContract} disabled={deploying} className="h-7 text-xs gap-1">
+                      {deploying ? <Loader2 className="h-3 w-3 animate-spin" /> : <Rocket className="h-3 w-3" />}
+                      Re-deploy
+                    </Button>
+                  </div>
                 </div>
                 <div className="grid md:grid-cols-2 gap-2 text-xs">
-                  <Field label="Contract" value={deployment.contract_address} href={deployment.explorer_url ?? undefined} />
-                  <Field label="Tx hash" value={deployment.tx_hash} href={deployment.explorer_url?.replace('/address/', '/tx/').replace(deployment.contract_address, deployment.tx_hash) ?? undefined} />
-                  <Field label="Block" value={String(deployment.block_number ?? '-')} />
+                  <Field label="Contract" value={deployment.contract_address} href={`https://sepolia.etherscan.io/address/${deployment.contract_address}`} />
+                  <Field label="Tx hash" value={deployment.tx_hash} href={`https://sepolia.etherscan.io/tx/${deployment.tx_hash}`} />
+                  <Field label="Block" value={String(deployment.block_number ?? '-')} href={deployment.block_number ? `https://sepolia.etherscan.io/block/${deployment.block_number}` : undefined} />
                   <Field label="Gas used" value={deployment.gas_used ?? '-'} />
                 </div>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <a href={`https://sepolia.etherscan.io/address/${deployment.contract_address}`} target="_blank" rel="noreferrer">
+                    <Button size="sm" variant="outline" className="gap-1 h-7 text-xs"><ExternalLink className="h-3 w-3" /> Contrato no Etherscan</Button>
+                  </a>
+                  <a href={`https://sepolia.etherscan.io/tx/${deployment.tx_hash}`} target="_blank" rel="noreferrer">
+                    <Button size="sm" variant="outline" className="gap-1 h-7 text-xs"><ExternalLink className="h-3 w-3" /> Transação no Etherscan</Button>
+                  </a>
+                  {deployment.events.length > 0 && (
+                    <Button size="sm" variant="outline" className="gap-1 h-7 text-xs"
+                      onClick={() => downloadFile(`events-${deployment.tx_hash.slice(0, 10)}.json`, JSON.stringify(deployment.events, null, 2), 'application/json')}>
+                      <Download className="h-3 w-3" /> Exportar eventos (JSON)
+                    </Button>
+                  )}
+                </div>
                 {deployment.events.length > 0 && (
-                  <div className="pt-2">
+                  <div className="pt-1">
                     <div className="text-xs text-muted-foreground mb-2">Eventos emitidos ({deployment.events.length})</div>
                     <ul className="space-y-1.5">
                       {deployment.events.map((ev, i) => (
@@ -448,7 +468,12 @@ export default function PlanPage() {
                 )}
               </div>
             ) : contract ? (
-              <Badge variant="outline" className="text-xs">Status: <span className="ml-1 text-amber-400">aguardando deploy</span></Badge>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="text-xs">Status: <span className="ml-1 text-amber-400">aguardando deploy</span></Badge>
+                <Button size="sm" variant="ghost" onClick={deployContract} disabled={deploying} className="h-7 text-xs gap-1">
+                  {deploying ? <Loader2 className="h-3 w-3 animate-spin" /> : <Rocket className="h-3 w-3" />} Tentar novamente
+                </Button>
+              </div>
             ) : null}
           </CardContent>
         </Card>
