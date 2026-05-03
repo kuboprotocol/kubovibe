@@ -144,7 +144,7 @@ export default function AuthPage() {
                     className={inputClasses}
                   />
                 </div>
-                <Button type="submit" variant="hero" className="w-full h-12 rounded-xl text-sm font-semibold gap-2" disabled={submitting}>
+                <Button type="submit" data-testid="auth-recover-submit" variant="hero" className="w-full h-12 rounded-xl text-sm font-semibold gap-2" disabled={submitting}>
                   {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
                   Enviar link de recuperação
                 </Button>
@@ -308,7 +308,7 @@ export default function AuthPage() {
                   </div>
                 )}
 
-                <Button type="submit" variant="hero" className="w-full h-12 rounded-xl text-sm font-semibold gap-2" disabled={submitting}>
+                <Button type="submit" data-testid="auth-submit" variant="hero" className="w-full h-12 rounded-xl text-sm font-semibold gap-2" disabled={submitting}>
                   {submitting ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
