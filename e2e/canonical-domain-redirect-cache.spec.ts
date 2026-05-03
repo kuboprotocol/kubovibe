@@ -139,13 +139,25 @@ test.describe('Canonical-domain redirect — 301 + Cache-Control + browser cache
     })
 
     // ---------- 1st navigation: hit edge → 301 → /dest/page ----------
-    await page.goto(`${edge.url}/redir/page?x=1`, { waitUntil: 'domcontentloaded' })
-    expect(page.url()).toBe(`${edge.url}/dest/page?x=1`)
+    // Includes a #fragment to lock browser-side hash preservation across the
+    // 301: per RFC 7231 §7.1.2 / WHATWG Fetch, when the Location has no own
+    // fragment the original request fragment is reattached after the redirect.
+    await page.goto(`${edge.url}/redir/page?x=1#anchor-1`, { waitUntil: 'domcontentloaded' })
+    expect(page.url()).toBe(`${edge.url}/dest/page?x=1#anchor-1`)
+    // Also assert in-page so we cover renderers that don't surface the hash
+    // on page.url() consistently across engines.
+    expect(await page.evaluate(() => window.location.hash)).toBe('#anchor-1')
     expect(seenRedirectStatuses, 'first hit must be 301').toContain(301)
     expect(cacheHeaders[0]).toBe(CACHE_CONTROL)
+    // 301 body must always be empty (when the runtime exposes it).
+    for (const size of redirectBodySizes) {
+      expect(size, '301 redirect body must be empty').toBe(0)
+    }
 
     const redirHits = () => edge.hits.filter((h) => h.url.startsWith('/redir/'))
     expect(redirHits().length, 'first navigation should hit the redirect endpoint exactly once').toBe(1)
+    // Fragment must NOT be sent on the wire (RFC 3986 §3.5).
+    expect(redirHits()[0].url).not.toContain('#')
 
     // ---------- 2nd navigation: cache must short-circuit ----------
     await page.goto('about:blank')
