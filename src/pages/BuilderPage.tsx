@@ -564,7 +564,16 @@ export default function BuilderPage() {
                 {/* Loading overlay — sits on top of everything */}
                 {showLoading && (
                   <div className="absolute inset-0 z-20">
-                    <AILoadingAnimation isVisible={showLoading} chatLanguage={chatLanguage} />
+                    <AILoadingAnimation
+                      isVisible={showLoading}
+                      chatLanguage={chatLanguage}
+                      isReady={!isLoading && !!generatedCode}
+                      onSkip={() => {
+                        setShowLoading(false)
+                        pendingSaveRef.current?.()
+                        pendingSaveRef.current = null
+                      }}
+                    />
                   </div>
                 )}
               {generatedCode && !showLoading ? (
