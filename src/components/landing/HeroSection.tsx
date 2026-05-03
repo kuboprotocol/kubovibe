@@ -104,9 +104,9 @@ export default function HeroSection() {
           transition={{ duration: 0.5, delay: 0.1 }}
           className="text-4xl md:text-6xl font-display font-bold text-foreground leading-[1.1] tracking-tight"
         >
-          Turn ideas into
+          Transforme ideias em
           <br />
-          <span className="hero-highlight">real products</span>
+          <span className="hero-highlight">produtos reais</span>
         </motion.h1>
 
         <motion.p
@@ -115,7 +115,7 @@ export default function HeroSection() {
           transition={{ duration: 0.5, delay: 0.2 }}
           className="mt-6 text-lg text-muted-foreground max-w-lg mx-auto leading-relaxed"
         >
-          Describe your vision and watch it come to life. No coding, no templates — just your imagination.
+          Descreva sua ideia em português comum. Nós cuidamos do resto — Web2, Web3, carteira, contratos. Você não precisa saber nada disso.
         </motion.p>
 
         {/* Prompt input */}
