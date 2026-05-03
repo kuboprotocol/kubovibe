@@ -161,8 +161,9 @@ test.describe('Canonical-domain redirect — 301 + Cache-Control + browser cache
 
     // ---------- 2nd navigation: cache must short-circuit ----------
     await page.goto('about:blank')
-    await page.goto(`${edge.url}/redir/page?x=1`, { waitUntil: 'domcontentloaded' })
-    expect(page.url()).toBe(`${edge.url}/dest/page?x=1`)
+    await page.goto(`${edge.url}/redir/page?x=1#anchor-1`, { waitUntil: 'domcontentloaded' })
+    expect(page.url()).toBe(`${edge.url}/dest/page?x=1#anchor-1`)
+    expect(await page.evaluate(() => window.location.hash)).toBe('#anchor-1')
 
     // Cross-browser contract: either the browser served the 301 fully from
     // cache (no extra hit), OR it issued a conditional revalidation that
