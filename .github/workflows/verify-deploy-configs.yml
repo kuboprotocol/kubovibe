@@ -47,8 +47,8 @@ jobs:
           node -e "
             const c = JSON.parse(require('fs').readFileSync('vercel.json','utf8'));
             const r = (c.redirects || []).find(x =>
-              (x.has || []).some(h => h.type === 'host' && /lovable\.app/.test(h.value)) &&
-              /kubovibe\.dev/.test(x.destination) &&
+              (x.has || []).some(h => h.type === 'host' && h.value.replace(/\\\\/g,'').includes('lovable.app')) &&
+              x.destination.includes('kubovibe.dev') &&
               x.permanent === true
             );
             if (!r) { console.error('Missing 301 *.lovable.app → kubovibe.dev redirect in vercel.json'); process.exit(1); }
