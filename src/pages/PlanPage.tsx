@@ -75,6 +75,7 @@ export default function PlanPage() {
   const [loading, setLoading] = useState(true)
   const [contract, setContract] = useState<GeneratedContract | null>(null)
   const [deployment, setDeployment] = useState<Deployment | null>(null)
+  const [history, setHistory] = useState<Deployment[]>([])
   const [generatingContract, setGeneratingContract] = useState(false)
   const [deploying, setDeploying] = useState(false)
   const [deployError, setDeployError] = useState<string | null>(null)
