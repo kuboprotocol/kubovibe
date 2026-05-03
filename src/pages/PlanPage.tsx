@@ -441,24 +441,6 @@ export default function PlanPage() {
                   <div className="flex gap-2 items-center">
                     <Badge variant="outline" className="border-emerald-500/40 text-emerald-300">Sepolia · success</Badge>
                     <Button size="sm" variant="ghost" onClick={deployContract} disabled={deploying} className="h-7 text-xs gap-1">
-                      {deploying ? <Loader2 className="h-3 w-3 animate-spin" /> : <Rocket className="h-3 w-3" />}
-                      Re-deploy
-                    </Button>
-                  </div>
-                </div>
-                <div className="grid md:grid-cols-2 gap-2 text-xs">
-                  <Field label="Contract" value={deployment.contract_address} href={`https://sepolia.etherscan.io/address/${deployment.contract_address}`} />
-                  <Field label="Tx hash" value={deployment.tx_hash} href={`https://sepolia.etherscan.io/tx/${deployment.tx_hash}`} />
-                  <Field label="Block" value={String(deployment.block_number ?? '-')} href={deployment.block_number ? `https://sepolia.etherscan.io/block/${deployment.block_number}` : undefined} />
-                  <Field label="Gas used" value={deployment.gas_used ?? '-'} />
-                </div>
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <div className="flex items-center gap-2 font-medium text-emerald-400 text-sm">
-                    <CheckCircle2 className="h-4 w-4" /> Deploy concluído
-                  </div>
-                  <div className="flex gap-2 items-center">
-                    <Badge variant="outline" className="border-emerald-500/40 text-emerald-300">Sepolia · success</Badge>
-                    <Button size="sm" variant="ghost" onClick={deployContract} disabled={deploying} className="h-7 text-xs gap-1">
                       {deploying
                         ? <><Loader2 className="h-3 w-3 animate-spin" /> Enviando…</>
                         : <><Rocket className="h-3 w-3" /> Re-deploy</>}
