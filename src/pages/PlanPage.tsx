@@ -506,11 +506,18 @@ export default function PlanPage() {
                 )}
               </div>
             ) : contract ? (
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className="text-xs">Status: <span className="ml-1 text-amber-400">aguardando deploy</span></Badge>
-                <Button size="sm" variant="ghost" onClick={deployContract} disabled={deploying} className="h-7 text-xs gap-1">
-                  {deploying ? <Loader2 className="h-3 w-3 animate-spin" /> : <Rocket className="h-3 w-3" />} Tentar novamente
-                </Button>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="outline" className="text-xs">Status: <span className="ml-1 text-amber-400">aguardando deploy</span></Badge>
+                  <Button size="sm" variant="ghost" onClick={deployContract} disabled={deploying} className="h-7 text-xs gap-1">
+                    {deploying ? <><Loader2 className="h-3 w-3 animate-spin" /> Enviando…</> : <><Rocket className="h-3 w-3" /> Tentar novamente</>}
+                  </Button>
+                </div>
+                {deployError && (
+                  <div className="text-xs text-destructive bg-destructive/10 border border-destructive/30 rounded p-2">
+                    {deployError}
+                  </div>
+                )}
               </div>
             ) : null}
           </CardContent>
