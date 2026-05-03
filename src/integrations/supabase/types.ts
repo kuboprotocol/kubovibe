@@ -260,6 +260,45 @@ export type Database = {
         }
         Relationships: []
       }
+      orchestration_plans: {
+        Row: {
+          capabilities: string[]
+          created_at: string
+          id: string
+          intent: string
+          model: string
+          prompt: string
+          stack: Json
+          tasks: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          capabilities?: string[]
+          created_at?: string
+          id?: string
+          intent: string
+          model?: string
+          prompt: string
+          stack?: Json
+          tasks?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          capabilities?: string[]
+          created_at?: string
+          id?: string
+          intent?: string
+          model?: string
+          prompt?: string
+          stack?: Json
+          tasks?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
