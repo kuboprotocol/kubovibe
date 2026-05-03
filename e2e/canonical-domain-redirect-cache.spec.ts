@@ -23,6 +23,15 @@ const ETAG = '"redir-v1"'
 // is deterministic across runs and matches what a real CDN would emit.
 const LAST_MODIFIED = new Date('2024-01-01T00:00:00Z').toUTCString()
 
+/** Case-insensitive header lookup (RFC 9110 §5.1). */
+function headerCI(headers: Record<string, string | undefined>, name: string): string | undefined {
+  const target = name.toLowerCase()
+  for (const k of Object.keys(headers)) {
+    if (k.toLowerCase() === target) return headers[k]
+  }
+  return undefined
+}
+
 type Hit = {
   url: string
   method: string
