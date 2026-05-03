@@ -140,6 +140,68 @@ export type Database = {
         }
         Relationships: []
       }
+      contract_deployments: {
+        Row: {
+          abi: Json
+          block_number: number | null
+          chain_id: number
+          contract_address: string
+          contract_id: string
+          created_at: string
+          deployer_address: string
+          events: Json
+          explorer_url: string | null
+          gas_used: string | null
+          id: string
+          network: string
+          status: string
+          tx_hash: string
+          user_id: string
+        }
+        Insert: {
+          abi?: Json
+          block_number?: number | null
+          chain_id?: number
+          contract_address: string
+          contract_id: string
+          created_at?: string
+          deployer_address: string
+          events?: Json
+          explorer_url?: string | null
+          gas_used?: string | null
+          id?: string
+          network?: string
+          status?: string
+          tx_hash: string
+          user_id: string
+        }
+        Update: {
+          abi?: Json
+          block_number?: number | null
+          chain_id?: number
+          contract_address?: string
+          contract_id?: string
+          created_at?: string
+          deployer_address?: string
+          events?: Json
+          explorer_url?: string | null
+          gas_used?: string | null
+          id?: string
+          network?: string
+          status?: string
+          tx_hash?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_deployments_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "generated_contracts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_send_log: {
         Row: {
           created_at: string
