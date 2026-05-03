@@ -143,6 +143,13 @@ jobs:
             if [ "$location" != "$want" ]; then
               echo "::error::Bad Location for $src — want '$want', got '$location'"; fail=1; continue
             fi
+            # RFC 7231 §7.1.2: Location MUST NOT carry a fragment — UA reuses
+            # the original request URI's fragment after following the 301.
+            case "$location" in
+              *"#"*)
+                echo "::error::Location for $src must not contain '#' fragment — got '$location'"; fail=1; continue
+                ;;
+            esac
             if [ -z "$cc" ]; then
               echo "::error::Missing Cache-Control on 301 for $src"; fail=1; continue
             fi
