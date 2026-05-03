@@ -215,6 +215,26 @@ test.describe('Canonical-domain redirect — 301 + Cache-Control + browser cache
     { label: 'qs array brackets',          path: '/app/proj/run',              query: '?ids%5B%5D=1&ids%5B%5D=2', hash: '' },
     { label: 'qs json blob',               path: '/api/echo',                  query: '?payload=%7B%22a%22%3A1%7D', hash: '' },
     { label: 'qs trailing empty + hash',   path: '/list',                      query: '?tag=&page=2',      hash: '#row=42' },
+    // Reserved sub-delims / gen-delims (RFC 3986 §2.2) inside the query —
+    // some are legal raw, others must round-trip pct-encoded. The Location
+    // must echo the exact byte sequence we sent.
+    { label: 'qs raw colon',               path: '/api',                       query: '?range=10:20',                  hash: '' },
+    { label: 'qs encoded colon',           path: '/api',                       query: '?range=10%3A20',                hash: '' },
+    { label: 'qs raw semicolon',           path: '/filter',                    query: '?a=1;b=2',                      hash: '' },
+    { label: 'qs encoded semicolon',       path: '/filter',                    query: '?a=1%3Bb=2',                    hash: '' },
+    { label: 'qs raw comma',               path: '/list',                      query: '?ids=1,2,3',                    hash: '' },
+    { label: 'qs encoded comma',           path: '/list',                      query: '?ids=1%2C2%2C3',                hash: '' },
+    { label: 'qs reserved combo',          path: '/q',                         query: '?p=a:b;c,d=e',                  hash: '' },
+    { label: 'qs at sign + dollar',        path: '/q',                         query: '?email=u%40d.com&amt=%245',     hash: '' },
+    { label: 'qs paren + asterisk + tilde',path: '/q',                         query: "?fn=sum(1,2)&glob=*.ts&v=~1",   hash: '' },
+    // Empty-query edge-cases — RFC 3986 §3.4 explicitly allows an empty
+    // query component, and '?', '?=', '?&', '?flag' must all be preserved
+    // byte-for-byte in the 301 Location header.
+    { label: 'qs bare question mark',      path: '/about',                     query: '?',                             hash: '' },
+    { label: 'qs bare question + hash',    path: '/about',                     query: '?',                             hash: '#contact' },
+    { label: 'qs only equals',             path: '/q',                         query: '?=',                            hash: '' },
+    { label: 'qs only ampersand',          path: '/q',                         query: '?&',                            hash: '' },
+    { label: 'qs key with no value',       path: '/q',                         query: '?flag',                         hash: '' },
   ]
 
   for (const sc of SCENARIOS) {
