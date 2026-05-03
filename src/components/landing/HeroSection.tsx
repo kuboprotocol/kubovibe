@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import { ArrowRight, Zap, Loader2 } from 'lucide-react'
+import { ArrowRight, Zap, Loader2, Globe, Palette } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import logoImg from '@/assets/logo-kubovibe.png'
