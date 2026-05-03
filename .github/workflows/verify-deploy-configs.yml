@@ -82,44 +82,69 @@ jobs:
     # statically above; live curl needs the deployed edge to be up to date.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
-      - name: Curl sample *.lovable.app URL and assert 301 + Location
+      - name: Curl sample *.lovable.app URLs (301 + Location + validators + empty body)
         run: |
           set -euo pipefail
 
-          # Hash fragments are never sent in HTTP requests (RFC 3986 §3.5) so
-          # curl cannot observe them — that contract is covered by the
-          # Playwright e2e specs. Here we lock the server-side guarantees:
-          # status code, Location host/path, and query-string preservation.
+          # We lock four server-side guarantees per sample:
+          #   1. HTTP status is exactly 301
+          #   2. Location preserves host swap + path + query-string verbatim
+          #   3. Validator headers (ETag, Last-Modified, Cache-Control) are present
+          #   4. Response body is empty (no SPA shell leaking onto the 301)
+          # Hash fragments are stripped by curl before send (RFC 3986 §3.5);
+          # the Playwright spec covers browser-side hash preservation by
+          # asserting window.location.hash on the destination.
           SAMPLES=(
             "https://kubovibe.lovable.app/|https://kubovibe.dev/"
             "https://kubovibe.lovable.app/connectors/github|https://kubovibe.dev/connectors/github"
             "https://kubovibe.lovable.app/dashboard?ref=email&t=1|https://kubovibe.dev/dashboard?ref=email&t=1"
             "https://kubovibe.lovable.app/app/proj-123/meu-app?ref=email&t=1|https://kubovibe.dev/app/proj-123/meu-app?ref=email&t=1"
+            # Hash present on source — curl drops it, server must still 301
+            # to the bare path+query (browser will reattach the hash).
+            "https://kubovibe.lovable.app/pricing#enterprise|https://kubovibe.dev/pricing"
+            "https://kubovibe.lovable.app/dashboard?ref=email#section-2|https://kubovibe.dev/dashboard?ref=email"
+            # Encoded query matrix: spaces, ampersands, plus, slashes, unicode
+            "https://kubovibe.lovable.app/search?q=hello%20world|https://kubovibe.dev/search?q=hello%20world"
+            "https://kubovibe.lovable.app/search?q=a%26b%3Dc|https://kubovibe.dev/search?q=a%26b%3Dc"
+            "https://kubovibe.lovable.app/search?q=a+b&x=1|https://kubovibe.dev/search?q=a+b&x=1"
+            "https://kubovibe.lovable.app/app/My%20Project?token=abc%2Fdef|https://kubovibe.dev/app/My%20Project?token=abc%2Fdef"
+            "https://kubovibe.lovable.app/buscar?q=caf%C3%A9|https://kubovibe.dev/buscar?q=caf%C3%A9"
+            "https://kubovibe.lovable.app/app/proj/run?ids%5B%5D=1&ids%5B%5D=2|https://kubovibe.dev/app/proj/run?ids%5B%5D=1&ids%5B%5D=2"
           )
 
+          tmp=$(mktemp)
+          trap 'rm -f "$tmp"' EXIT
           fail=0
           for pair in "${SAMPLES[@]}"; do
             src="${pair%%|*}"
             want="${pair##*|}"
             echo "→ $src"
 
-            # -sS silent but show errors, -o /dev/null discard body, -D - dump headers,
-            # --max-time 15 cap latency, do NOT follow (-L) so we see the 301 itself.
-            headers=$(curl -sS -o /dev/null -D - --max-time 15 "$src" || true)
-            status=$(echo "$headers" | awk 'NR==1{print $2}')
-            location=$(echo "$headers" | awk 'BEGIN{IGNORECASE=1} /^location:/{sub(/\r$/,""); print $2}')
+            # -D dumps headers; -o writes body to file so we can size it.
+            headers=$(curl -sS -o "$tmp" -D - --max-time 15 "$src" || true)
+            status=$(echo "$headers"   | awk 'NR==1{print $2}')
+            location=$(echo "$headers" | awk 'BEGIN{IGNORECASE=1} /^location:/      {sub(/\r$/,""); sub(/^[Ll]ocation:[[:space:]]*/,""); print; exit}')
+            etag=$(echo "$headers"     | awk 'BEGIN{IGNORECASE=1} /^etag:/          {sub(/\r$/,""); sub(/^[Ee][Tt]ag:[[:space:]]*/,""); print; exit}')
+            lastmod=$(echo "$headers"  | awk 'BEGIN{IGNORECASE=1} /^last-modified:/ {sub(/\r$/,""); sub(/^[Ll]ast-[Mm]odified:[[:space:]]*/,""); print; exit}')
+            cc=$(echo "$headers"       | awk 'BEGIN{IGNORECASE=1} /^cache-control:/ {sub(/\r$/,""); sub(/^[Cc]ache-[Cc]ontrol:[[:space:]]*/,""); print; exit}')
+            body_size=$(wc -c < "$tmp" | tr -d ' ')
 
             if [ "$status" != "301" ]; then
-              echo "::error::Expected 301 from $src, got $status"
-              fail=1
-              continue
+              echo "::error::Expected 301 from $src, got $status"; fail=1; continue
             fi
             if [ "$location" != "$want" ]; then
-              echo "::error::Bad Location for $src — want '$want', got '$location'"
-              fail=1
-              continue
+              echo "::error::Bad Location for $src — want '$want', got '$location'"; fail=1; continue
             fi
-            echo "  ✓ 301 → $location"
+            if [ -z "$cc" ]; then
+              echo "::error::Missing Cache-Control on 301 for $src"; fail=1; continue
+            fi
+            if [ -z "$etag" ] && [ -z "$lastmod" ]; then
+              echo "::error::Missing both ETag and Last-Modified validators on 301 for $src"; fail=1; continue
+            fi
+            if [ "$body_size" -gt 0 ]; then
+              echo "::error::301 body must be empty for $src — got ${body_size} bytes"; fail=1; continue
+            fi
+            echo "  ✓ 301 → $location  [CC='$cc' ETag='$etag' LM='$lastmod' body=0]"
           done
 
           exit $fail
