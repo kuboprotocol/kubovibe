@@ -16,22 +16,14 @@ jobs:
       - uses: actions/checkout@v4
 
       # Node + built-in npm cache (keyed on package-lock.json).
+      # setup-node's built-in `cache: npm` already caches ~/.npm keyed on the
+      # lockfile hash. A separate actions/cache step on the same path would
+      # duplicate storage and add save/restore overhead with no real gain.
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
           cache-dependency-path: package-lock.json
-
-      # Explicit ~/.npm cache (npm package download cache). setup-node's
-      # built-in cache also covers this, but a dedicated entry with broader
-      # restore-keys speeds up additional/transitive downloads between runs.
-      - name: Cache ~/.npm (npm download cache)
-        uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-npm-cache-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-npm-cache-
 
       # Persistent Vite/Vitest caches: dependency pre-bundling and the
       # Vitest runner cache. Keyed on lockfile + config files so it is
