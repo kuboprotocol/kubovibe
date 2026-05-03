@@ -48,11 +48,16 @@ test.describe('ConnectorDetailPage — Renovar stays clickable across reset-dial
     // 3. Trigger the undo banner: click "Resetar filtros", then confirm.
     const resetTrigger = page.getByTestId('reset-filters-trigger')
     await expect(resetTrigger).toBeVisible({ timeout: 15_000 })
+    await expect(resetTrigger).toBeEnabled()
     await resetTrigger.click()
 
     const confirmDialog = page.getByTestId('reset-filters-dialog')
-    await expect(confirmDialog).toBeVisible()
+    // Deterministic: wait for Radix to actually flip data-state to "open"
+    // instead of relying on visibility (which can race against the open animation).
+    await expect(confirmDialog).toHaveAttribute('data-state', 'open', { timeout: 5_000 })
     await page.getByTestId('reset-filters-confirm').click()
+    // And wait for the dialog to fully detach from the DOM before continuing.
+    await expect(confirmDialog).toHaveCount(0, { timeout: 5_000 })
 
     const banner = page.getByTestId('undo-banner')
     await expect(banner).toBeVisible({ timeout: 10_000 })
@@ -60,45 +65,70 @@ test.describe('ConnectorDetailPage — Renovar stays clickable across reset-dial
     await expect(renew).toBeVisible()
     await expect(renew).toBeEnabled()
 
+    // Snapshot the initial counter so we can later assert it actually reset.
+    const counter = page.getByTestId('undo-counter')
+    await expect(counter).toBeVisible()
+
     // 4. Repeatedly open and close the Reset dialog. The trigger button is
     //    no longer visible (filters are already cleared), so we re-introduce
     //    a `?run=` param via the URL each cycle to make "Resetar filtros"
     //    available again — without unmounting the page.
     for (let i = 0; i < CYCLES; i++) {
       // Re-add a `?run=` filter so the Reset trigger reappears.
-      // Preserve the existing path; client-side router picks up the change.
-      await page.evaluate((sha) => {
+      const sha = `${RUN_SHA.slice(0, 8)}cycle${i.toString().padStart(2, '0')}`
+      await page.evaluate((s) => {
         const url = new URL(window.location.href)
-        url.searchParams.set('run', sha)
+        url.searchParams.set('run', s)
         window.history.pushState({}, '', url.toString())
         window.dispatchEvent(new PopStateEvent('popstate'))
-      }, `${RUN_SHA.slice(0, 8)}cycle${i.toString().padStart(2, '0')}`)
+      }, sha)
+
+      // Deterministic: wait for the URL to actually carry the new ?run= value
+      // before interacting — avoids racing the React router state update.
+      await page.waitForURL(
+        (url) => url.searchParams.get('run') === sha,
+        { timeout: 5_000 },
+      )
 
       const trigger = page.getByTestId('reset-filters-trigger')
-      await expect(trigger, `cycle ${i}: trigger visible`).toBeVisible({ timeout: 5_000 })
+      await expect(trigger, `cycle ${i}: trigger attached`).toHaveCount(1, { timeout: 5_000 })
+      await expect(trigger, `cycle ${i}: trigger visible`).toBeVisible()
+      await expect(trigger, `cycle ${i}: trigger enabled`).toBeEnabled()
 
-      // Open dialog.
+      // Open dialog and wait for the open data-state, not just visibility.
       await trigger.click()
       const dialog = page.getByTestId('reset-filters-dialog')
-      await expect(dialog, `cycle ${i}: dialog open`).toBeVisible()
+      await expect(dialog, `cycle ${i}: dialog data-state=open`).toHaveAttribute(
+        'data-state',
+        'open',
+        { timeout: 5_000 },
+      )
+      // Radix sets aria-hidden on siblings while modal is open — assert it so
+      // we know the focus trap is fully wired before clicking elsewhere.
+      const cancelBtn = page.getByTestId('reset-filters-cancel')
+      await expect(cancelBtn, `cycle ${i}: cancel button focusable`).toBeEnabled()
 
-      // While dialog is open, Renovar must still be visible & enabled.
+      // While dialog is open, Renovar must still be visible & enabled
+      // (it lives outside the modal — should never be blocked by the overlay).
       await expect(renew, `cycle ${i}: Renovar visible while dialog open`).toBeVisible()
       await expect(renew, `cycle ${i}: Renovar enabled while dialog open`).toBeEnabled()
 
-      // Close dialog via Cancel.
-      await page.getByTestId('reset-filters-cancel').click()
-      await expect(dialog, `cycle ${i}: dialog closed`).toBeHidden()
+      // Close dialog via Cancel and wait for full detach (Radix unmount + animation).
+      await cancelBtn.click()
+      await expect(dialog, `cycle ${i}: dialog detached`).toHaveCount(0, { timeout: 5_000 })
 
-      // After closing, Renovar must still be visible, enabled, and clickable.
+      // After closing, Renovar must still be visible, enabled, and actionable.
       await expect(renew, `cycle ${i}: Renovar visible after close`).toBeVisible()
       await expect(renew, `cycle ${i}: Renovar enabled after close`).toBeEnabled()
+      // pointer-events check — proves no leftover overlay is intercepting clicks.
+      const pointerBlocked = await renew.evaluate((el) =>
+        window.getComputedStyle(el).pointerEvents === 'none',
+      )
+      expect(pointerBlocked, `cycle ${i}: Renovar pointer-events not blocked`).toBe(false)
     }
 
     // 5. Final assertion: clicking Renovar resets the counter to the full window.
     await renew.click()
-    const counter = page.getByTestId('undo-counter')
-    await expect(counter).toBeVisible()
     // Counter shows "15s" right after a renew (modal is closed → live deadline).
     await expect(counter).toHaveText(/15s/, { timeout: 2_000 })
   })
