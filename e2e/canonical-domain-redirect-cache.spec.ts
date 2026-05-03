@@ -312,7 +312,122 @@ test.describe('Canonical-domain redirect — 301 + Cache-Control + browser cache
 
     expect(captured).toBeDefined()
     expect(captured).toMatch(/\bpublic\b/)
-    expect(captured).toMatch(/\bmax-age=\d{6,}\b/)
+    // Pin the exact 1-year max-age we promise in vercel.json / render.yaml so
+    // a regression to a shorter TTL fails this assert.
+    expect(captured).toMatch(/\bmax-age=31536000\b/)
     expect(captured).toMatch(/\bimmutable\b/)
+    // Must NOT advertise revalidation directives that would defeat the
+    // long-lived cache (no-cache / no-store / must-revalidate / s-maxage=0).
+    expect(captured).not.toMatch(/\b(no-cache|no-store|must-revalidate)\b/)
+    expect(captured).not.toMatch(/\bs-maxage=0\b/)
   })
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Hash-preservation matrix: the fragment is client-only (RFC 3986 §3.5) so
+  // the browser must reattach the original #fragment after a 301 whose
+  // Location has no fragment of its own (RFC 7231 §7.1.2 / WHATWG Fetch §4.4).
+  // We exercise empty, plain, percent-encoded, spaces, and '+' hashes across
+  // two navigations to also prove the hash survives the cached redirect.
+  // ───────────────────────────────────────────────────────────────────────────
+  type HashCase = { label: string; navHash: string; expectHash: string }
+  const HASH_CASES: HashCase[] = [
+    { label: 'empty hash (bare #)',     navHash: '#',                    expectHash: '' },
+    { label: 'simple anchor',           navHash: '#section-1',           expectHash: '#section-1' },
+    { label: 'pct-encoded equals',      navHash: '#sec%3D2',             expectHash: '#sec%3D2' },
+    { label: 'pct-encoded space',       navHash: '#a%20b',               expectHash: '#a%20b' },
+    { label: 'literal plus',            navHash: '#a+b',                 expectHash: '#a+b' },
+    { label: 'pct-encoded plus',        navHash: '#a%2Bb',               expectHash: '#a%2Bb' },
+    { label: 'pct-encoded slash',       navHash: '#path%2Fto',           expectHash: '#path%2Fto' },
+    { label: 'pct-encoded ampersand',   navHash: '#k%26v',               expectHash: '#k%26v' },
+    { label: 'utf-8 pct-encoded',       navHash: '#caf%C3%A9',           expectHash: '#caf%C3%A9' },
+    { label: 'mixed kv hash',           navHash: '#row=42&col=7',        expectHash: '#row=42&col=7' },
+  ]
+  for (const hc of HASH_CASES) {
+    test(`hash preservation across cached 301 — ${hc.label}`, async ({ browser }) => {
+      const edge = await startEdge()
+      const context = await browser.newContext()
+      const page = await context.newPage()
+      const target = `${edge.url}/redir/page?x=1${hc.navHash}`
+      const dest = `${edge.url}/dest/page?x=1${hc.expectHash}`
+
+      // 1st navigation — hash must reattach after the 301.
+      await page.goto(target, { waitUntil: 'domcontentloaded' })
+      expect(page.url(), 'first nav url').toBe(dest)
+      expect(await page.evaluate(() => window.location.hash)).toBe(hc.expectHash)
+      // Server must NEVER receive the fragment (RFC 3986 §3.5).
+      expect(edge.hits.every((h) => !h.url.includes('#'))).toBe(true)
+
+      // 2nd navigation — even when the 301 may be served from cache or via
+      // a 304 revalidation, the browser must still reattach the hash.
+      await page.goto('about:blank')
+      await page.goto(target, { waitUntil: 'domcontentloaded' })
+      expect(page.url(), 'second nav url').toBe(dest)
+      expect(await page.evaluate(() => window.location.hash)).toBe(hc.expectHash)
+      expect(edge.hits.every((h) => !h.url.includes('#'))).toBe(true)
+
+      await context.close()
+      await edge.close()
+    })
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Fuzz: random pct-encoded path / query / hash combinations. Exercises
+  // arbitrary RFC 3986 reserved + unreserved bytes to flush out edge-case
+  // bugs in URL parsing / Location echoing the curated matrix can miss.
+  // Deterministic seed → reproducible failures.
+  // ───────────────────────────────────────────────────────────────────────────
+  function makeRng(seed: number): () => number {
+    let s = seed >>> 0
+    return () => {
+      s = (s * 1664525 + 1013904223) >>> 0
+      return s / 0x100000000
+    }
+  }
+  // Restricted to bytes safe to embed raw in a URL component without
+  // tripping the WHATWG URL parser's normalisation (which would mutate the
+  // bytes before the request leaves the client and invalidate the test).
+  const PCT_BYTES = [
+    '%20', '%21', '%22', '%24', '%26', '%27', '%28', '%29', '%2A',
+    '%2B', '%2C', '%3A', '%3B', '%3D', '%40', '%5B', '%5D',
+    '%7B', '%7D', '%5E', '%60', '%C3%A9', '%E2%9C%93',
+  ]
+  const UNRESERVED = 'abcdefghijklmnopqrstuvwxyz0123456789-._~'
+  function fuzzComponent(rng: () => number, len: number): string {
+    let out = ''
+    for (let i = 0; i < len; i++) {
+      const r = rng()
+      if (r < 0.4) out += UNRESERVED[Math.floor(rng() * UNRESERVED.length)]
+      else out += PCT_BYTES[Math.floor(rng() * PCT_BYTES.length)]
+    }
+    return out
+  }
+
+  for (let i = 0; i < 12; i++) {
+    test(`fuzz #${i}: random pct-encoded path/query/hash round-trip`, async ({ request, browser }) => {
+      const rng = makeRng(0xC0FFEE + i * 7919)
+      const path = '/' + fuzzComponent(rng, 6) + '/' + fuzzComponent(rng, 4)
+      const query = '?' + fuzzComponent(rng, 4) + '=' + fuzzComponent(rng, 6) + '&n=' + i
+      const hash = '#' + fuzzComponent(rng, 5)
+      const edge = await startEdge()
+      const src = `${edge.url}/redir${path}${query}${hash}`
+      const expectedLocation = `/dest${path}${query}` // no hash on the wire
+
+      // ─ HTTP layer: 301 must echo path+query verbatim into Location ─
+      const fresh = await request.fetch(src, { maxRedirects: 0 })
+      expect(fresh.status(), `fuzz#${i} fresh status`).toBe(301)
+      expect(headerCI(fresh.headers(), 'Location'), `fuzz#${i} Location echo`).toBe(expectedLocation)
+      expect((await fresh.body()).length, `fuzz#${i} 301 body empty`).toBe(0)
+
+      // ─ Browser layer: hash must be reattached after the 301 ─
+      const ctx = await browser.newContext()
+      const page = await ctx.newPage()
+      await page.goto(src, { waitUntil: 'domcontentloaded' })
+      expect(page.url(), `fuzz#${i} browser url`).toBe(`${edge.url}${expectedLocation}${hash}`)
+      expect(await page.evaluate(() => window.location.hash), `fuzz#${i} window.location.hash`).toBe(hash)
+      expect(edge.hits.every((h) => !h.url.includes('#')), `fuzz#${i} no fragment on the wire`).toBe(true)
+
+      await ctx.close()
+      await edge.close()
+    })
+  }
 })
