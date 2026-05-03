@@ -41,10 +41,11 @@ beforeEach(() => {
   toastMock.error.mockReset()
   toastMock.warning.mockReset()
   toastMock.info.mockReset()
-  // @ts-expect-error redefining for test
-  delete window.location
-  // @ts-expect-error minimal location stub
-  window.location = { href: 'http://localhost/', pathname: '/', search: '' }
+  (window as unknown as { location: unknown }).location = {
+    href: 'http://localhost/',
+    pathname: '/',
+    search: '',
+  }
   vi.useFakeTimers()
 })
 
