@@ -40,6 +40,7 @@ type Deployment = {
   block_number: number | null
   gas_used: string | null
   explorer_url: string | null
+  created_at?: string
   events: Array<{ name?: string; args?: unknown[]; topics?: string[]; data?: string }>
 }
 
@@ -74,6 +75,7 @@ export default function PlanPage() {
   const [loading, setLoading] = useState(true)
   const [contract, setContract] = useState<GeneratedContract | null>(null)
   const [deployment, setDeployment] = useState<Deployment | null>(null)
+  const [history, setHistory] = useState<Deployment[]>([])
   const [generatingContract, setGeneratingContract] = useState(false)
   const [deploying, setDeploying] = useState(false)
   const [deployError, setDeployError] = useState<string | null>(null)
@@ -130,18 +132,21 @@ export default function PlanPage() {
         })
         const { data: deps } = await supabase
           .from('contract_deployments')
-          .select('id, contract_address, tx_hash, block_number, gas_used, explorer_url, events')
-          .eq('contract_id', c.id).order('created_at', { ascending: false }).limit(1)
-        if (!cancelled && deps && deps[0]) {
-          setDeployment({
-            id: deps[0].id,
-            contract_address: deps[0].contract_address,
-            tx_hash: deps[0].tx_hash,
-            block_number: deps[0].block_number,
-            gas_used: deps[0].gas_used,
-            explorer_url: deps[0].explorer_url,
-            events: (deps[0].events ?? []) as Deployment['events'],
-          })
+          .select('id, contract_address, tx_hash, block_number, gas_used, explorer_url, events, created_at')
+          .eq('contract_id', c.id).order('created_at', { ascending: false }).limit(20)
+        if (!cancelled && deps && deps.length) {
+          const mapped: Deployment[] = deps.map((d) => ({
+            id: d.id,
+            contract_address: d.contract_address,
+            tx_hash: d.tx_hash,
+            block_number: d.block_number,
+            gas_used: d.gas_used,
+            explorer_url: d.explorer_url,
+            created_at: d.created_at,
+            events: (d.events ?? []) as Deployment['events'],
+          }))
+          setHistory(mapped)
+          setDeployment(mapped[0])
         }
       }
       setLoading(false)
@@ -216,6 +221,36 @@ export default function PlanPage() {
     }
   }
 
+  async function refreshHistory() {
+    if (!contract) return
+    const { data: deps } = await supabase
+      .from('contract_deployments')
+      .select('id, contract_address, tx_hash, block_number, gas_used, explorer_url, events, created_at')
+      .eq('contract_id', contract.id).order('created_at', { ascending: false }).limit(20)
+    if (deps?.length) {
+      const mapped: Deployment[] = deps.map((d) => ({
+        id: d.id,
+        contract_address: d.contract_address,
+        tx_hash: d.tx_hash,
+        block_number: d.block_number,
+        gas_used: d.gas_used,
+        explorer_url: d.explorer_url,
+        created_at: d.created_at,
+        events: (d.events ?? []) as Deployment['events'],
+      }))
+      setHistory(mapped)
+      setDeployment(mapped[0])
+    }
+  }
+
+  // Polling: enquanto deploying, atualiza histórico a cada 3s para refletir novas linhas
+  useEffect(() => {
+    if (!deploying || !contract) return
+    const t = setInterval(() => { void refreshHistory() }, 3000)
+    return () => clearInterval(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deploying, contract?.id])
+
   async function deployContract() {
     if (!contract) return
     setDeploying(true)
@@ -230,16 +265,20 @@ export default function PlanPage() {
         if (data.error === 'deployer_not_configured') throw new Error('Deployer indisponível no momento. Tente novamente em instantes.')
         throw new Error(data.error)
       }
-      setDeployment({
+      const newDep: Deployment = {
         id: data.deployment_id,
         contract_address: data.contract_address,
         tx_hash: data.tx_hash,
         block_number: data.block_number,
         gas_used: data.gas_used,
         explorer_url: data.explorer_url,
+        created_at: new Date().toISOString(),
         events: data.events ?? [],
-      })
+      }
+      setDeployment(newDep)
+      setHistory((h) => [newDep, ...h.filter((x) => x.id !== newDep.id)].slice(0, 20))
       toast.success('Deploy concluído na Sepolia!', { id: toastId, description: `Tx ${String(data.tx_hash).slice(0, 10)}…` })
+      void refreshHistory()
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Falha no deploy'
       setDeployError(msg)
@@ -267,8 +306,19 @@ export default function PlanPage() {
 
   function exportPlan() {
     if (!plan) return
-    downloadFile(`kubo-plan-${plan.id.slice(0, 8)}.json`,
-      JSON.stringify({ plan, contract, deployment }, null, 2), 'application/json')
+    const payload = {
+      exported_at: new Date().toISOString(),
+      plan,
+      contract,
+      deployment,
+      deployments_history: history,
+      explorer_links: deployment ? {
+        contract: `https://sepolia.etherscan.io/address/${deployment.contract_address}`,
+        tx: `https://sepolia.etherscan.io/tx/${deployment.tx_hash}`,
+        block: deployment.block_number ? `https://sepolia.etherscan.io/block/${deployment.block_number}` : null,
+      } : null,
+    }
+    downloadFile(`kubo-plan-${plan.id.slice(0, 8)}.json`, JSON.stringify(payload, null, 2), 'application/json')
   }
 
   if (loading) {
@@ -482,6 +532,13 @@ export default function PlanPage() {
                       </Button>
                     </>
                   )}
+                  <Button size="sm" variant="outline" className="gap-1 h-7 text-xs"
+                    onClick={() => copy(
+                      `Contract: https://sepolia.etherscan.io/address/${deployment.contract_address}\nTx: https://sepolia.etherscan.io/tx/${deployment.tx_hash}${deployment.block_number ? `\nBlock: https://sepolia.etherscan.io/block/${deployment.block_number}` : ''}`,
+                      'Links Etherscan copiados',
+                    )}>
+                    <Copy className="h-3 w-3" /> Copiar links Etherscan
+                  </Button>
                 </div>
                 {deployment.events.length > 0 && (
                   <div className="pt-1">
@@ -520,6 +577,32 @@ export default function PlanPage() {
                 )}
               </div>
             ) : null}
+
+            {history.length > 1 && (
+              <div className="pt-2 border-t border-border/40">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs text-muted-foreground">Histórico de deploys ({history.length})</div>
+                  <Button size="sm" variant="ghost" onClick={refreshHistory} className="h-7 text-xs">Atualizar</Button>
+                </div>
+                <ul className="space-y-1.5 max-h-64 overflow-y-auto">
+                  {history.map((d) => {
+                    const isCurrent = deployment?.id === d.id
+                    return (
+                      <li key={d.id} className={`text-[11px] p-2 rounded font-mono flex items-center justify-between gap-2 ${isCurrent ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-muted/60'}`}>
+                        <button onClick={() => setDeployment(d)} className="text-left truncate hover:text-foreground">
+                          <span className="text-emerald-400">{d.tx_hash.slice(0, 10)}…{d.tx_hash.slice(-6)}</span>
+                          <span className="text-muted-foreground ml-2">{d.created_at ? new Date(d.created_at).toLocaleString() : ''}</span>
+                        </button>
+                        <div className="flex gap-1 shrink-0">
+                          <button onClick={() => copy(d.tx_hash, 'Hash copiado')} className="text-muted-foreground hover:text-foreground" title="Copiar tx"><Copy className="h-3 w-3" /></button>
+                          <a href={`https://sepolia.etherscan.io/tx/${d.tx_hash}`} target="_blank" rel="noreferrer" className="text-primary" title="Abrir tx"><ExternalLink className="h-3 w-3" /></a>
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
