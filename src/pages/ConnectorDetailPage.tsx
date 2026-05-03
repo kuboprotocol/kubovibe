@@ -602,8 +602,27 @@ export default function ConnectorDetailPage() {
     }
   }, [runFilter, dbRunsActive, undoSnapshot])
 
+  // Analytics: track dismiss-confirmation modal lifecycle.
+  const logDismissModal = useCallback(
+    (phase: 'opened' | 'confirmed' | 'cancelled', source: 'button' | 'shortcut' | 'esc' | 'overlay' | 'shortcut-direct') => {
+      logConnectorEvent({
+        connectorSlug: slug ?? 'unknown',
+        eventType: `filters_undo_dismiss_modal_${phase}`,
+        status: 'info',
+        message: `Modal de dispensar (${phase}) via ${source}`,
+        metadata: { phase, source, removed: undoSnapshot?.removed ?? [] },
+      }).catch(() => { /* non-blocking */ })
+    },
+    [slug, undoSnapshot],
+  )
+
+  const openDismissModal = useCallback((source: 'button' | 'shortcut' | 'esc') => {
+    logDismissModal('opened', source)
+    setDismissConfirmOpen(true)
+  }, [logDismissModal])
+
   // Centralized dismiss + audit logging helpers.
-  const dismissUndoBanner = useCallback((reason: 'manual' | 'esc' | 'expired' | 'restored' | 'reapplied') => {
+  const dismissUndoBanner = useCallback((reason: 'manual' | 'esc' | 'expired' | 'restored' | 'reapplied' | 'shortcut-direct') => {
     if (undoSnapshot) {
       logConnectorEvent({
         connectorSlug: slug ?? 'unknown',
