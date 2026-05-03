@@ -206,9 +206,13 @@ interface AILoadingAnimationProps {
   isVisible: boolean
   /** The language detected from user's chat messages */
   chatLanguage?: string
+  /** Generation already finished — show "ready" CTA so user isn't stuck on the overlay */
+  isReady?: boolean
+  /** Called when user clicks "ver agora" — should hide the overlay */
+  onSkip?: () => void
 }
 
-export default function AILoadingAnimation({ isVisible, chatLanguage }: AILoadingAnimationProps) {
+export default function AILoadingAnimation({ isVisible, chatLanguage, isReady, onSkip }: AILoadingAnimationProps) {
   const [messageIndex, setMessageIndex] = useState(0)
   const [elapsed, setElapsed] = useState(0)
 
