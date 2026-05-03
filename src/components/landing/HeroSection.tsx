@@ -85,7 +85,7 @@ export default function HeroSection() {
           className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent glass-border text-accent-foreground text-xs font-medium mb-8"
         >
           <Zap className="h-3 w-3" />
-          AI-powered app builder
+          Builder com IA — Web2 e Web3 sem complicação
         </motion.div>
 
         {/* Logo */}
