@@ -27,7 +27,8 @@ export default function PublicAppPage() {
         setError('Projeto sem conteúdo')
       } else {
         setHtml(data.generated_code)
-        document.title = data.title || 'Kubo Vibe App'
+        const appName = (data.title || '').trim()
+        document.title = appName ? `${appName} · Kubo Vibe` : 'Kubo Vibe App'
       }
       setLoading(false)
     }
