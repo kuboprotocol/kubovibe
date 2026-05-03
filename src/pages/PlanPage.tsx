@@ -452,6 +452,30 @@ export default function PlanPage() {
                   <Field label="Block" value={String(deployment.block_number ?? '-')} href={deployment.block_number ? `https://sepolia.etherscan.io/block/${deployment.block_number}` : undefined} />
                   <Field label="Gas used" value={deployment.gas_used ?? '-'} />
                 </div>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2 font-medium text-emerald-400 text-sm">
+                    <CheckCircle2 className="h-4 w-4" /> Deploy concluído
+                  </div>
+                  <div className="flex gap-2 items-center">
+                    <Badge variant="outline" className="border-emerald-500/40 text-emerald-300">Sepolia · success</Badge>
+                    <Button size="sm" variant="ghost" onClick={deployContract} disabled={deploying} className="h-7 text-xs gap-1">
+                      {deploying
+                        ? <><Loader2 className="h-3 w-3 animate-spin" /> Enviando…</>
+                        : <><Rocket className="h-3 w-3" /> Re-deploy</>}
+                    </Button>
+                  </div>
+                </div>
+                {deployError && (
+                  <div className="text-xs text-destructive bg-destructive/10 border border-destructive/30 rounded p-2">
+                    {deployError}
+                  </div>
+                )}
+                <div className="grid md:grid-cols-2 gap-2 text-xs">
+                  <Field label="Contract" value={deployment.contract_address} href={`https://sepolia.etherscan.io/address/${deployment.contract_address}`} />
+                  <Field label="Tx hash" value={deployment.tx_hash} href={`https://sepolia.etherscan.io/tx/${deployment.tx_hash}`} />
+                  <Field label="Block" value={String(deployment.block_number ?? '-')} href={deployment.block_number ? `https://sepolia.etherscan.io/block/${deployment.block_number}` : undefined} />
+                  <Field label="Gas used" value={deployment.gas_used ?? '-'} />
+                </div>
                 <div className="flex flex-wrap gap-2 pt-1">
                   <a href={`https://sepolia.etherscan.io/address/${deployment.contract_address}`} target="_blank" rel="noreferrer">
                     <Button size="sm" variant="outline" className="gap-1 h-7 text-xs"><ExternalLink className="h-3 w-3" /> Contrato no Etherscan</Button>
@@ -459,11 +483,22 @@ export default function PlanPage() {
                   <a href={`https://sepolia.etherscan.io/tx/${deployment.tx_hash}`} target="_blank" rel="noreferrer">
                     <Button size="sm" variant="outline" className="gap-1 h-7 text-xs"><ExternalLink className="h-3 w-3" /> Transação no Etherscan</Button>
                   </a>
+                  <Button size="sm" variant="outline" className="gap-1 h-7 text-xs" onClick={() => copy(deployment.contract_address, 'Endereço copiado')}>
+                    <Copy className="h-3 w-3" /> Copiar endereço
+                  </Button>
+                  <Button size="sm" variant="outline" className="gap-1 h-7 text-xs" onClick={() => copy(deployment.tx_hash, 'Hash copiado')}>
+                    <Copy className="h-3 w-3" /> Copiar tx hash
+                  </Button>
                   {deployment.events.length > 0 && (
-                    <Button size="sm" variant="outline" className="gap-1 h-7 text-xs"
-                      onClick={() => downloadFile(`events-${deployment.tx_hash.slice(0, 10)}.json`, JSON.stringify(deployment.events, null, 2), 'application/json')}>
-                      <Download className="h-3 w-3" /> Exportar eventos (JSON)
-                    </Button>
+                    <>
+                      <Button size="sm" variant="outline" className="gap-1 h-7 text-xs"
+                        onClick={() => downloadFile(`events-${deployment.tx_hash.slice(0, 10)}.json`, JSON.stringify(deployment.events, null, 2), 'application/json')}>
+                        <Download className="h-3 w-3" /> Eventos (JSON)
+                      </Button>
+                      <Button size="sm" variant="outline" className="gap-1 h-7 text-xs" onClick={exportEventsCSV}>
+                        <Download className="h-3 w-3" /> Eventos (CSV)
+                      </Button>
+                    </>
                   )}
                 </div>
                 {deployment.events.length > 0 && (
