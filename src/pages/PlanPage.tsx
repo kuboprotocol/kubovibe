@@ -221,6 +221,36 @@ export default function PlanPage() {
     }
   }
 
+  async function refreshHistory() {
+    if (!contract) return
+    const { data: deps } = await supabase
+      .from('contract_deployments')
+      .select('id, contract_address, tx_hash, block_number, gas_used, explorer_url, events, created_at')
+      .eq('contract_id', contract.id).order('created_at', { ascending: false }).limit(20)
+    if (deps?.length) {
+      const mapped: Deployment[] = deps.map((d) => ({
+        id: d.id,
+        contract_address: d.contract_address,
+        tx_hash: d.tx_hash,
+        block_number: d.block_number,
+        gas_used: d.gas_used,
+        explorer_url: d.explorer_url,
+        created_at: d.created_at,
+        events: (d.events ?? []) as Deployment['events'],
+      }))
+      setHistory(mapped)
+      setDeployment(mapped[0])
+    }
+  }
+
+  // Polling: enquanto deploying, atualiza histórico a cada 3s para refletir novas linhas
+  useEffect(() => {
+    if (!deploying || !contract) return
+    const t = setInterval(() => { void refreshHistory() }, 3000)
+    return () => clearInterval(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deploying, contract?.id])
+
   async function deployContract() {
     if (!contract) return
     setDeploying(true)
@@ -235,16 +265,20 @@ export default function PlanPage() {
         if (data.error === 'deployer_not_configured') throw new Error('Deployer indisponível no momento. Tente novamente em instantes.')
         throw new Error(data.error)
       }
-      setDeployment({
+      const newDep: Deployment = {
         id: data.deployment_id,
         contract_address: data.contract_address,
         tx_hash: data.tx_hash,
         block_number: data.block_number,
         gas_used: data.gas_used,
         explorer_url: data.explorer_url,
+        created_at: new Date().toISOString(),
         events: data.events ?? [],
-      })
+      }
+      setDeployment(newDep)
+      setHistory((h) => [newDep, ...h.filter((x) => x.id !== newDep.id)].slice(0, 20))
       toast.success('Deploy concluído na Sepolia!', { id: toastId, description: `Tx ${String(data.tx_hash).slice(0, 10)}…` })
+      void refreshHistory()
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Falha no deploy'
       setDeployError(msg)
@@ -272,8 +306,19 @@ export default function PlanPage() {
 
   function exportPlan() {
     if (!plan) return
-    downloadFile(`kubo-plan-${plan.id.slice(0, 8)}.json`,
-      JSON.stringify({ plan, contract, deployment }, null, 2), 'application/json')
+    const payload = {
+      exported_at: new Date().toISOString(),
+      plan,
+      contract,
+      deployment,
+      deployments_history: history,
+      explorer_links: deployment ? {
+        contract: `https://sepolia.etherscan.io/address/${deployment.contract_address}`,
+        tx: `https://sepolia.etherscan.io/tx/${deployment.tx_hash}`,
+        block: deployment.block_number ? `https://sepolia.etherscan.io/block/${deployment.block_number}` : null,
+      } : null,
+    }
+    downloadFile(`kubo-plan-${plan.id.slice(0, 8)}.json`, JSON.stringify(payload, null, 2), 'application/json')
   }
 
   if (loading) {
