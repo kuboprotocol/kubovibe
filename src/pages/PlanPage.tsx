@@ -76,6 +76,7 @@ export default function PlanPage() {
   const [deployment, setDeployment] = useState<Deployment | null>(null)
   const [generatingContract, setGeneratingContract] = useState(false)
   const [deploying, setDeploying] = useState(false)
+  const [deployError, setDeployError] = useState<string | null>(null)
 
   // Form ERC-20 customizado (persistido no localStorage por plano)
   const [form, setForm] = useState({ name: 'KuboCredit', symbol: 'KUBO', decimals: '18', initial_supply: '1000000' })
@@ -218,6 +219,8 @@ export default function PlanPage() {
   async function deployContract() {
     if (!contract) return
     setDeploying(true)
+    setDeployError(null)
+    const toastId = toast.loading(deployment ? 'Re-implantando contrato na Sepolia…' : 'Implantando contrato na Sepolia…')
     try {
       const { data, error } = await supabase.functions.invoke('web3-contract-deploy', {
         body: { contract_id: contract.id },
@@ -236,12 +239,30 @@ export default function PlanPage() {
         explorer_url: data.explorer_url,
         events: data.events ?? [],
       })
-      toast.success('Deploy concluído na Sepolia!')
+      toast.success('Deploy concluído na Sepolia!', { id: toastId, description: `Tx ${String(data.tx_hash).slice(0, 10)}…` })
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Falha no deploy')
+      const msg = e instanceof Error ? e.message : 'Falha no deploy'
+      setDeployError(msg)
+      toast.error(msg, { id: toastId })
     } finally {
       setDeploying(false)
     }
+  }
+
+  function exportEventsCSV() {
+    if (!deployment?.events?.length) return
+    const rows = [['index', 'name', 'args', 'topic0', 'data']]
+    deployment.events.forEach((ev, i) => {
+      rows.push([
+        String(i),
+        ev.name ?? '',
+        Array.isArray(ev.args) ? JSON.stringify(ev.args) : '',
+        ev.topics?.[0] ?? '',
+        ev.data ?? '',
+      ])
+    })
+    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
+    downloadFile(`events-${deployment.tx_hash.slice(0, 10)}.csv`, csv, 'text/csv')
   }
 
   function exportPlan() {
@@ -420,11 +441,17 @@ export default function PlanPage() {
                   <div className="flex gap-2 items-center">
                     <Badge variant="outline" className="border-emerald-500/40 text-emerald-300">Sepolia · success</Badge>
                     <Button size="sm" variant="ghost" onClick={deployContract} disabled={deploying} className="h-7 text-xs gap-1">
-                      {deploying ? <Loader2 className="h-3 w-3 animate-spin" /> : <Rocket className="h-3 w-3" />}
-                      Re-deploy
+                      {deploying
+                        ? <><Loader2 className="h-3 w-3 animate-spin" /> Enviando…</>
+                        : <><Rocket className="h-3 w-3" /> Re-deploy</>}
                     </Button>
                   </div>
                 </div>
+                {deployError && (
+                  <div className="text-xs text-destructive bg-destructive/10 border border-destructive/30 rounded p-2">
+                    {deployError}
+                  </div>
+                )}
                 <div className="grid md:grid-cols-2 gap-2 text-xs">
                   <Field label="Contract" value={deployment.contract_address} href={`https://sepolia.etherscan.io/address/${deployment.contract_address}`} />
                   <Field label="Tx hash" value={deployment.tx_hash} href={`https://sepolia.etherscan.io/tx/${deployment.tx_hash}`} />
@@ -438,11 +465,22 @@ export default function PlanPage() {
                   <a href={`https://sepolia.etherscan.io/tx/${deployment.tx_hash}`} target="_blank" rel="noreferrer">
                     <Button size="sm" variant="outline" className="gap-1 h-7 text-xs"><ExternalLink className="h-3 w-3" /> Transação no Etherscan</Button>
                   </a>
+                  <Button size="sm" variant="outline" className="gap-1 h-7 text-xs" onClick={() => copy(deployment.contract_address, 'Endereço copiado')}>
+                    <Copy className="h-3 w-3" /> Copiar endereço
+                  </Button>
+                  <Button size="sm" variant="outline" className="gap-1 h-7 text-xs" onClick={() => copy(deployment.tx_hash, 'Hash copiado')}>
+                    <Copy className="h-3 w-3" /> Copiar tx hash
+                  </Button>
                   {deployment.events.length > 0 && (
-                    <Button size="sm" variant="outline" className="gap-1 h-7 text-xs"
-                      onClick={() => downloadFile(`events-${deployment.tx_hash.slice(0, 10)}.json`, JSON.stringify(deployment.events, null, 2), 'application/json')}>
-                      <Download className="h-3 w-3" /> Exportar eventos (JSON)
-                    </Button>
+                    <>
+                      <Button size="sm" variant="outline" className="gap-1 h-7 text-xs"
+                        onClick={() => downloadFile(`events-${deployment.tx_hash.slice(0, 10)}.json`, JSON.stringify(deployment.events, null, 2), 'application/json')}>
+                        <Download className="h-3 w-3" /> Eventos (JSON)
+                      </Button>
+                      <Button size="sm" variant="outline" className="gap-1 h-7 text-xs" onClick={exportEventsCSV}>
+                        <Download className="h-3 w-3" /> Eventos (CSV)
+                      </Button>
+                    </>
                   )}
                 </div>
                 {deployment.events.length > 0 && (
@@ -468,11 +506,18 @@ export default function PlanPage() {
                 )}
               </div>
             ) : contract ? (
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className="text-xs">Status: <span className="ml-1 text-amber-400">aguardando deploy</span></Badge>
-                <Button size="sm" variant="ghost" onClick={deployContract} disabled={deploying} className="h-7 text-xs gap-1">
-                  {deploying ? <Loader2 className="h-3 w-3 animate-spin" /> : <Rocket className="h-3 w-3" />} Tentar novamente
-                </Button>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="outline" className="text-xs">Status: <span className="ml-1 text-amber-400">aguardando deploy</span></Badge>
+                  <Button size="sm" variant="ghost" onClick={deployContract} disabled={deploying} className="h-7 text-xs gap-1">
+                    {deploying ? <><Loader2 className="h-3 w-3 animate-spin" /> Enviando…</> : <><Rocket className="h-3 w-3" /> Tentar novamente</>}
+                  </Button>
+                </div>
+                {deployError && (
+                  <div className="text-xs text-destructive bg-destructive/10 border border-destructive/30 rounded p-2">
+                    {deployError}
+                  </div>
+                )}
               </div>
             ) : null}
           </CardContent>
