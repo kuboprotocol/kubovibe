@@ -224,7 +224,7 @@ export default function PlanPage() {
       })
       if (error) throw new Error(error.message || 'Falha no deploy')
       if (data?.error) {
-        if (data.error === 'deployer_not_configured') throw new Error('Deployer não configurado. Adicione SEPOLIA_RPC_URL e DEPLOYER_PRIVATE_KEY.')
+        if (data.error === 'deployer_not_configured') throw new Error('Deployer indisponível no momento. Tente novamente em instantes.')
         throw new Error(data.error)
       }
       setDeployment({
