@@ -684,10 +684,18 @@ export default function ConnectorDetailPage() {
         return
       }
 
+      // Shift+Esc → dismiss IMMEDIATELY (power-user shortcut, no modal).
+      if (e.key === 'Escape' && e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        if (isEditableTarget) return
+        e.preventDefault()
+        dismissUndoBanner('shortcut-direct')
+        return
+      }
+
       if (e.key === 'Escape' && !e.metaKey && !e.ctrlKey && !e.altKey) {
         if (isEditableTarget) return
         e.preventDefault()
-        setDismissConfirmOpen(true)
+        openDismissModal('esc')
       }
     }
     window.addEventListener('keydown', handler)
