@@ -129,37 +129,25 @@ test.describe('ConnectorDetailPage — Shift+Esc dismisses banner without modal'
     await cdp.openWithRun(`${RUN_SHA.slice(0, 8)}idemp`)
     await cdp.triggerUndoBanner()
 
-    // Count every dismissal event emitted to the network — the second
-    // Shift+Esc must NOT add to this count once the banner is gone.
-    const dismissEvents: string[] = []
-    const onRequest = (req: import('@playwright/test').Request) => {
-      if (req.method() !== 'POST') return
-      if (!/\/rest\/v1\/connector_activity_logs/.test(req.url())) return
-      const body = req.postData() ?? ''
-      if (body.includes('"event_type":"filters_undo_banner_dismissed"')) {
-        dismissEvents.push(body)
-      }
-    }
-    page.on('request', onRequest)
+    // Use the DF analytics helper instead of attaching a raw page.on listener.
+    const counter = trackConnectorEvents(page, ['filters_undo_banner_dismissed'])
 
     // 1st Shift+Esc → dismiss + log exactly one event.
-    const firstDismissP = cdp.waitForEvent('filters_undo_banner_dismissed')
     await cdp.pressShiftEsc()
-    await firstDismissP
+    await counter.waitFor('filters_undo_banner_dismissed')
     await expect(cdp.banner).toHaveCount(0, { timeout: 5_000 })
-    expect(dismissEvents.length, 'exactly one dismiss event after first Shift+Esc').toBe(1)
+    expect(counter.count('filters_undo_banner_dismissed'), 'one event after first Shift+Esc').toBe(1)
 
     // 2nd & 3rd Shift+Esc → must be no-ops: no banner, no modal, no events.
     await cdp.pressShiftEsc()
     await cdp.pressShiftEsc()
-    // Settle: give any stray inserts a window to land before asserting.
     await page.waitForTimeout(500)
 
-    expect(dismissEvents.length, 'no duplicate dismiss events after repeats').toBe(1)
+    expect(counter.count('filters_undo_banner_dismissed'), 'no duplicate events after repeats').toBe(1)
     await expect(cdp.banner).toHaveCount(0)
     await expect(cdp.dismissDialog).toHaveCount(0)
 
-    page.off('request', onRequest)
+    counter.dispose()
 
     // Spawn a fresh banner via a new reset cycle and confirm Renovar still
     // works end-to-end (counter snaps to 15s).
@@ -170,5 +158,47 @@ test.describe('ConnectorDetailPage — Shift+Esc dismisses banner without modal'
     await expectActionable(cdp.renew, 'Renovar (post-idempotent-dismiss)')
     await cdp.renew.click()
     await expect(cdp.counter).toHaveText(/15s/, { timeout: 2_000 })
+  })
+
+  test('Dispensar button → modal → Confirmar emits opened+confirmed analytics and removes banner', async ({ page }) => {
+    const cdp = new ConnectorDetailPage(page, 'github')
+
+    await cdp.login(TEST_EMAIL!, TEST_PASSWORD!)
+    await cdp.openWithRun(`${RUN_SHA.slice(0, 8)}btnpath`)
+    await cdp.triggerUndoBanner()
+
+    const counter = trackConnectorEvents(page, [
+      'filters_undo_dismiss_modal_opened',
+      'filters_undo_dismiss_modal_confirmed',
+      'filters_undo_dismiss_modal_cancelled',
+      'filters_undo_banner_dismissed',
+    ])
+
+    // Open the modal via the explicit Dispensar button.
+    await expectActionable(cdp.dismiss, 'Dispensar button')
+    await cdp.dismiss.click()
+    await waitForDialogState(cdp.dismissDialog, 'open')
+    const openedReq = await counter.waitFor('filters_undo_dismiss_modal_opened')
+    expect(openedReq.postData() ?? '').toContain('"source":"button"')
+
+    // Banner stays mounted but is paused while modal owns focus.
+    await expect(cdp.banner).toBeVisible()
+    await expect(cdp.counter).toContainText('pausado')
+
+    // Confirm dismissal.
+    await cdp.dismissConfirmBtn.click()
+    const confirmedReq = await counter.waitFor('filters_undo_dismiss_modal_confirmed')
+    expect(confirmedReq.postData() ?? '').toContain('"source":"button"')
+    const dismissedReq = await counter.waitFor('filters_undo_banner_dismissed')
+    expect(dismissedReq.postData() ?? '').toContain('"reason":"manual"')
+
+    // Modal + banner both gone, no cancellation analytics emitted.
+    await waitForDialogState(cdp.dismissDialog, 'closed')
+    await expect(cdp.banner).toHaveCount(0, { timeout: 5_000 })
+    expect(counter.count('filters_undo_dismiss_modal_cancelled'), 'no cancel event on confirm path').toBe(0)
+    expect(counter.count('filters_undo_dismiss_modal_opened'), 'one opened event').toBe(1)
+    expect(counter.count('filters_undo_dismiss_modal_confirmed'), 'one confirmed event').toBe(1)
+
+    counter.dispose()
   })
 })
