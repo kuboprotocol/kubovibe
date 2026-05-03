@@ -146,7 +146,7 @@ describe('Redirect flow: /connectors/github → /auth → /connectors/github', (
     await user.type(emailInput, 'tester@example.com')
     await user.type(passwordInput, 'password123')
 
-    await user.click(screen.getByRole('button', { name: /entrar na conta/i }))
+    await user.click(screen.getByTestId('auth-submit'))
 
     // Login was called with the typed credentials
     await waitFor(() => {
@@ -169,7 +169,7 @@ describe('Redirect flow: /connectors/github → /auth → /connectors/github', (
     const emailInput = await screen.findByPlaceholderText('Email')
     await user.type(emailInput, 'tester@example.com')
     await user.type(screen.getByPlaceholderText('Senha'), 'password123')
-    await user.click(screen.getByRole('button', { name: /entrar na conta/i }))
+    await user.click(screen.getByTestId('auth-submit'))
 
     await waitFor(() => {
       expect(screen.getByTestId('dashboard')).toBeInTheDocument()
