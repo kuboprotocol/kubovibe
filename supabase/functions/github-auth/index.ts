@@ -29,6 +29,20 @@ Deno.serve(async (req) => {
       })
     }
 
+    // Rate limit: 30 req/min por usuário (service role)
+    const adminClient = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    )
+    const { data: rl } = await adminClient.rpc('bump_rate_limit', {
+      _bucket: 'github_auth', _user: u.user.id, _window_seconds: 60,
+    })
+    if (typeof rl === 'number' && rl > 30) {
+      return new Response(JSON.stringify({ error: 'rate_limited', retry_after_seconds: 60 }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Retry-After': '60' }, status: 429,
+      })
+    }
+
     const { returnUrl } = await req.json().catch(() => ({ returnUrl: '' }))
 
     // Encode the app return URL + user_id in the state so the callback can persist + redirect

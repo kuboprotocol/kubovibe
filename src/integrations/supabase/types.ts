@@ -519,6 +519,27 @@ export type Database = {
         }
         Relationships: []
       }
+      rate_limit_counters: {
+        Row: {
+          bucket_key: string
+          count: number
+          user_id: string
+          window_start: string
+        }
+        Insert: {
+          bucket_key: string
+          count?: number
+          user_id: string
+          window_start: string
+        }
+        Update: {
+          bucket_key?: string
+          count?: number
+          user_id?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
       referrals: {
         Row: {
           created_at: string
@@ -845,6 +866,10 @@ export type Database = {
           started_at: string
           user_id: string
         }[]
+      }
+      bump_rate_limit: {
+        Args: { _bucket: string; _user: string; _window_seconds: number }
+        Returns: number
       }
       delete_email: {
         Args: { message_id: number; queue_name: string }
