@@ -23,6 +23,15 @@ const ETAG = '"redir-v1"'
 // is deterministic across runs and matches what a real CDN would emit.
 const LAST_MODIFIED = new Date('2024-01-01T00:00:00Z').toUTCString()
 
+/** Case-insensitive header lookup (RFC 9110 §5.1). */
+function headerCI(headers: Record<string, string | undefined>, name: string): string | undefined {
+  const target = name.toLowerCase()
+  for (const k of Object.keys(headers)) {
+    if (k.toLowerCase() === target) return headers[k]
+  }
+  return undefined
+}
+
 type Hit = {
   url: string
   method: string
@@ -148,65 +157,89 @@ test.describe('Canonical-domain redirect — 301 + Cache-Control + browser cache
         `second hit must be a conditional revalidation, got: ${JSON.stringify(second)}`,
       ).toBe(true)
       expect(second.status, 'revalidation must respond 304 Not Modified').toBe(304)
-      // ETag/Last-Modified must round-trip on the 304 so the browser can
-      // keep the cached 301 fresh (RFC 9111 §4.3.4).
-      expect(second.responseHeaders['ETag'] ?? second.responseHeaders['etag']).toBe(ETAG)
-      expect(second.responseHeaders['Last-Modified'] ?? second.responseHeaders['last-modified']).toBe(LAST_MODIFIED)
-      // If the client sent If-None-Match it must echo our ETag verbatim.
-      if (second.ifNoneMatch) {
-        expect(second.ifNoneMatch).toContain(ETAG)
-      }
+      // ETag/Last-Modified must round-trip on 304 — case-insensitive lookup
+      // because Node lowercases on `req.headers` but tests should not depend
+      // on which casing the runtime exposes (RFC 9110 §5.1).
+      expect(headerCI(second.responseHeaders, 'ETag')).toBe(ETAG)
+      expect(headerCI(second.responseHeaders, 'Last-Modified')).toBe(LAST_MODIFIED)
+      if (second.ifNoneMatch) expect(second.ifNoneMatch).toContain(ETAG)
     }
 
     await context.close()
     await edge.close()
   })
 
-  test('conditional revalidation: 304 echoes coherent ETag + Last-Modified', async ({ request }) => {
-    // Drives revalidation directly (browser-independent) so the 304 contract
-    // is locked even when the user-agent decides not to revalidate.
-    const edge = await startEdge()
+  // ─────────────────────────────────────────────────────────────────────────
+  // Scenario matrix: drives every combination of path / query / hash through
+  // both a fresh navigation (must 301) and a conditional revalidation (must
+  // 304 with coherent validators), all while tolerating ETag/Last-Modified
+  // header casing variations from any HTTP stack.
+  // ─────────────────────────────────────────────────────────────────────────
+  type Scenario = { label: string; path: string; query: string; hash: string }
+  const SCENARIOS: Scenario[] = [
+    { label: 'root',                       path: '/',                          query: '',                  hash: '' },
+    { label: 'deep path only',             path: '/connectors/github',         query: '',                  hash: '' },
+    { label: 'path + query',               path: '/dashboard',                 query: '?ref=email&t=1',    hash: '' },
+    { label: 'path + hash',                path: '/pricing',                   query: '',                  hash: '#enterprise' },
+    { label: 'path + query + hash',        path: '/connectors/github',         query: '?run=abc123',       hash: '#section-2' },
+    { label: 'multi-segment + qs + hash',  path: '/app/proj-123/meu-app',      query: '?ref=email&t=1',    hash: '#top' },
+    { label: 'encoded path + qs',          path: '/app/My%20Project',          query: '?q=hello%20world&x=%26', hash: '' },
+  ]
 
-    // Sanity: warm fetch returns 301 with validators.
-    const warm = await request.fetch(`${edge.url}/redir/x?q=1`, { maxRedirects: 0 })
-    expect(warm.status()).toBe(301)
-    const warmHeaders = warm.headers()
-    expect(warmHeaders['etag']).toBe(ETAG)
-    expect(warmHeaders['last-modified']).toBe(LAST_MODIFIED)
-    expect(warmHeaders['cache-control']).toBe(CACHE_CONTROL)
-    expect(warmHeaders['location']).toBe('/dest/x?q=1')
+  for (const sc of SCENARIOS) {
+    test(`scenario [${sc.label}]: 301 + 304 + validators round-trip`, async ({ request }) => {
+      const edge = await startEdge()
+      // Hash is never sent on the wire (RFC 3986 §3.5) — we still include it
+      // in the navigated URL to prove the server-side path/query handling is
+      // hash-agnostic. The browser-level hash preservation is covered by the
+      // companion Playwright spec.
+      const src = `${edge.url}/redir${sc.path}${sc.query}${sc.hash}`
+      const expectedLocation = `/dest${sc.path}${sc.query}` // hash stripped on the wire
 
-    // If-None-Match → 304 with same ETag + Last-Modified, no body.
-    const inm = await request.fetch(`${edge.url}/redir/x?q=1`, {
-      maxRedirects: 0,
-      headers: { 'If-None-Match': ETAG },
+      // ── Fresh request: must be a 301 with validators + correct Location ──
+      const fresh = await request.fetch(src, { maxRedirects: 0 })
+      expect(fresh.status(), `fresh must 301 for [${sc.label}]`).toBe(301)
+      const fH = fresh.headers()
+      expect(headerCI(fH, 'Location')).toBe(expectedLocation)
+      expect(headerCI(fH, 'ETag')).toBe(ETAG)
+      expect(headerCI(fH, 'Last-Modified')).toBe(LAST_MODIFIED)
+      expect(headerCI(fH, 'Cache-Control')).toBe(CACHE_CONTROL)
+      // 301 SHOULD have an empty (or nearly empty) body — locks that we are
+      // not accidentally serving the SPA shell on the redirect response.
+      expect((await fresh.body()).length, `301 body must be empty for [${sc.label}]`).toBe(0)
+
+      // ── Conditional revalidation via If-None-Match: must be 304 ──
+      const inm = await request.fetch(src, {
+        maxRedirects: 0,
+        headers: { 'If-None-Match': ETAG },
+      })
+      expect(inm.status(), `If-None-Match → 304 for [${sc.label}]`).toBe(304)
+      const iH = inm.headers()
+      expect(headerCI(iH, 'ETag')).toBe(ETAG)
+      expect(headerCI(iH, 'Last-Modified')).toBe(LAST_MODIFIED)
+      expect(headerCI(iH, 'Cache-Control')).toBe(CACHE_CONTROL)
+      expect((await inm.body()).length, '304 body must be empty').toBe(0)
+
+      // ── Conditional revalidation via If-Modified-Since (fresh) → 304 ──
+      const ims = await request.fetch(src, {
+        maxRedirects: 0,
+        headers: { 'If-Modified-Since': LAST_MODIFIED },
+      })
+      expect(ims.status(), `If-Modified-Since → 304 for [${sc.label}]`).toBe(304)
+      expect(headerCI(ims.headers(), 'ETag')).toBe(ETAG)
+
+      // ── Stale If-Modified-Since → fresh 301 ──
+      const stale = await request.fetch(src, {
+        maxRedirects: 0,
+        headers: { 'If-Modified-Since': new Date('2000-01-01T00:00:00Z').toUTCString() },
+      })
+      expect(stale.status(), `stale IMS → 301 for [${sc.label}]`).toBe(301)
+      expect(headerCI(stale.headers(), 'Location')).toBe(expectedLocation)
+
+      await edge.close()
     })
-    expect(inm.status()).toBe(304)
-    const inmH = inm.headers()
-    expect(inmH['etag'], 'ETag must round-trip on 304').toBe(ETAG)
-    expect(inmH['last-modified'], 'Last-Modified must round-trip on 304').toBe(LAST_MODIFIED)
-    expect(inmH['cache-control'], 'Cache-Control must round-trip on 304').toBe(CACHE_CONTROL)
-    expect((await inm.body()).length, '304 must have an empty body').toBe(0)
+  }
 
-    // If-Modified-Since (≥ Last-Modified) → 304 too.
-    const ims = await request.fetch(`${edge.url}/redir/x?q=1`, {
-      maxRedirects: 0,
-      headers: { 'If-Modified-Since': LAST_MODIFIED },
-    })
-    expect(ims.status()).toBe(304)
-    expect(ims.headers()['etag']).toBe(ETAG)
-    expect(ims.headers()['last-modified']).toBe(LAST_MODIFIED)
-
-    // Stale If-Modified-Since (older than Last-Modified) → fresh 301.
-    const stale = await request.fetch(`${edge.url}/redir/x?q=1`, {
-      maxRedirects: 0,
-      headers: { 'If-Modified-Since': new Date('2000-01-01T00:00:00Z').toUTCString() },
-    })
-    expect(stale.status()).toBe(301)
-    expect(stale.headers()['etag']).toBe(ETAG)
-
-    await edge.close()
-  })
 
   test('Cache-Control header value matches production contract', async ({ page }) => {
     // Locks the exact directive set we ship in vercel.json / render.yaml.
