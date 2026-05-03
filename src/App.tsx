@@ -64,6 +64,7 @@ const App = () => (
             <Route path="/shortlinks" element={<ProtectedRoute><ShortlinksPage /></ProtectedRoute>} />
             <Route path="/leaderboard" element={<ProtectedRoute><LeaderboardPage /></ProtectedRoute>} />
             <Route path="/emails" element={<ProtectedRoute><EmailDashboardPage /></ProtectedRoute>} />
+            <Route path="/plan/:id" element={<ProtectedRoute><PlanPage /></ProtectedRoute>} />
             <Route path="/app/:projectId" element={<PublicAppPage />} />
             <Route path="/app/:projectId/:slug" element={<PublicAppPage />} />
             <Route path="/unsubscribe" element={<UnsubscribePage />} />
