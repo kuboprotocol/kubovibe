@@ -532,6 +532,13 @@ export default function PlanPage() {
                       </Button>
                     </>
                   )}
+                  <Button size="sm" variant="outline" className="gap-1 h-7 text-xs"
+                    onClick={() => copy(
+                      `Contract: https://sepolia.etherscan.io/address/${deployment.contract_address}\nTx: https://sepolia.etherscan.io/tx/${deployment.tx_hash}${deployment.block_number ? `\nBlock: https://sepolia.etherscan.io/block/${deployment.block_number}` : ''}`,
+                      'Links Etherscan copiados',
+                    )}>
+                    <Copy className="h-3 w-3" /> Copiar links Etherscan
+                  </Button>
                 </div>
                 {deployment.events.length > 0 && (
                   <div className="pt-1">
