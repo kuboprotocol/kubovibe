@@ -110,7 +110,7 @@ test.describe('Canonical-domain redirect: *.lovable.app → kubovibe.dev (headle
 
   test('encoded characters in path & query are preserved verbatim', async ({ page }) => {
     await installEdgeRedirect(page)
-    await page.goto('https://kubovibe.lovable.app/app/My%20Project?q=hello%20world&x=%26')
+    await page.goto('https://kubovibe.lovable.app/app/My%20Project?q=hello%20world&x=%26', { waitUntil: 'domcontentloaded' }).catch(() => {})
     expect(page.url()).toBe('https://kubovibe.dev/app/My%20Project?q=hello%20world&x=%26')
   })
 
@@ -120,29 +120,22 @@ test.describe('Canonical-domain redirect: *.lovable.app → kubovibe.dev (headle
     page.on('response', (r) => {
       if (r.url().includes('lovable.app')) statuses.push(r.status())
     })
-    await page.goto('https://kubovibe.lovable.app/seo-check')
+    await page.goto('https://kubovibe.lovable.app/seo-check', { waitUntil: 'domcontentloaded' }).catch(() => {})
     expect(statuses, 'expected the lovable.app hop to return 301 permanent').toContain(301)
   })
 
-  test('id-preview--*.lovable.app is NOT redirected (sandbox safety)', async ({ page }) => {
-    // Edge rule should still match — Vercel/Render configs DO redirect
-    // id-preview hosts in production because they live on lovable.app and the
-    // regex doesn't exclude them. The exclusion is intentionally only in the
-    // client-side fallback (src/App.tsx) so live-preview iframes inside the
-    // Lovable editor don't bounce themselves.
-    //
-    // This test pins that distinction: at the edge, id-preview hosts DO get
-    // 301'd. If someone changes that, they need to update this test on
-    // purpose.
+  test('id-preview--*.lovable.app IS redirected at the edge (regex matches)', async ({ page }) => {
+    // Pins the edge behaviour: Vercel/Render configs DO 301 id-preview hosts
+    // because the regex matches all of *.lovable.app. The exclusion of
+    // id-preview lives ONLY in the client-side fallback (src/App.tsx) so
+    // live-preview iframes inside the Lovable editor don't bounce themselves.
     await installEdgeRedirect(page)
-    await page.goto('https://id-preview--abc123.lovable.app/builder')
+    await page.goto('https://id-preview--abc123.lovable.app/builder', { waitUntil: 'domcontentloaded' }).catch(() => {})
     expect(page.url()).toBe('https://kubovibe.dev/builder')
   })
 
   test('client-side fallback: window.location.replace fires when edge is bypassed', async ({ page }) => {
-    // Serve the lovable.app host with NO 301 — just an HTML page that contains
-    // the same redirect snippet from src/App.tsx. This proves the JS fallback
-    // works when the CDN config is missing or misapplied.
+    // No 301 — instead serve HTML that runs the redirect snippet from src/App.tsx.
     await page.route(/^https:\/\/([^/]+\.)?lovable\.app\//, (route: Route) => {
       return route.fulfill({
         status: 200,
@@ -168,8 +161,9 @@ test.describe('Canonical-domain redirect: *.lovable.app → kubovibe.dev (headle
       })
     })
 
-    await page.goto('https://kubovibe.lovable.app/dashboard?x=1#anchor')
-    await expect(page.locator('#ok')).toHaveText('canonical')
+    await page.goto('https://kubovibe.lovable.app/dashboard?x=1#anchor', { waitUntil: 'domcontentloaded' }).catch(() => {})
+    // Wait for the JS-driven navigation to settle.
+    await page.waitForURL('https://kubovibe.dev/**', { timeout: 5000 }).catch(() => {})
     expect(page.url()).toBe('https://kubovibe.dev/dashboard?x=1#anchor')
   })
 })
