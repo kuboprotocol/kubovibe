@@ -120,28 +120,50 @@ test.describe('Canonical-domain redirect — 301 + Cache-Control + browser cache
 
     const seenRedirectStatuses: number[] = []
     const cacheHeaders: string[] = []
-    page.on('response', (r) => {
+    const redirectBodySizes: number[] = []
+    page.on('response', async (r) => {
       const u = r.url()
       if (u.startsWith(`${edge.url}/redir/`)) {
         seenRedirectStatuses.push(r.status())
         const cc = r.headers()['cache-control']
         if (cc) cacheHeaders.push(cc)
+        if (r.status() === 301) {
+          try {
+            const body = await r.body()
+            redirectBodySizes.push(body.length)
+          } catch {
+            // body() may throw if the connection was reused/cancelled — ignore.
+          }
+        }
       }
     })
 
     // ---------- 1st navigation: hit edge → 301 → /dest/page ----------
-    await page.goto(`${edge.url}/redir/page?x=1`, { waitUntil: 'domcontentloaded' })
-    expect(page.url()).toBe(`${edge.url}/dest/page?x=1`)
+    // Includes a #fragment to lock browser-side hash preservation across the
+    // 301: per RFC 7231 §7.1.2 / WHATWG Fetch, when the Location has no own
+    // fragment the original request fragment is reattached after the redirect.
+    await page.goto(`${edge.url}/redir/page?x=1#anchor-1`, { waitUntil: 'domcontentloaded' })
+    expect(page.url()).toBe(`${edge.url}/dest/page?x=1#anchor-1`)
+    // Also assert in-page so we cover renderers that don't surface the hash
+    // on page.url() consistently across engines.
+    expect(await page.evaluate(() => window.location.hash)).toBe('#anchor-1')
     expect(seenRedirectStatuses, 'first hit must be 301').toContain(301)
     expect(cacheHeaders[0]).toBe(CACHE_CONTROL)
+    // 301 body must always be empty (when the runtime exposes it).
+    for (const size of redirectBodySizes) {
+      expect(size, '301 redirect body must be empty').toBe(0)
+    }
 
     const redirHits = () => edge.hits.filter((h) => h.url.startsWith('/redir/'))
     expect(redirHits().length, 'first navigation should hit the redirect endpoint exactly once').toBe(1)
+    // Fragment must NOT be sent on the wire (RFC 3986 §3.5).
+    expect(redirHits()[0].url).not.toContain('#')
 
     // ---------- 2nd navigation: cache must short-circuit ----------
     await page.goto('about:blank')
-    await page.goto(`${edge.url}/redir/page?x=1`, { waitUntil: 'domcontentloaded' })
-    expect(page.url()).toBe(`${edge.url}/dest/page?x=1`)
+    await page.goto(`${edge.url}/redir/page?x=1#anchor-1`, { waitUntil: 'domcontentloaded' })
+    expect(page.url()).toBe(`${edge.url}/dest/page?x=1#anchor-1`)
+    expect(await page.evaluate(() => window.location.hash)).toBe('#anchor-1')
 
     // Cross-browser contract: either the browser served the 301 fully from
     // cache (no extra hit), OR it issued a conditional revalidation that
@@ -184,6 +206,15 @@ test.describe('Canonical-domain redirect — 301 + Cache-Control + browser cache
     { label: 'path + query + hash',        path: '/connectors/github',         query: '?run=abc123',       hash: '#section-2' },
     { label: 'multi-segment + qs + hash',  path: '/app/proj-123/meu-app',      query: '?ref=email&t=1',    hash: '#top' },
     { label: 'encoded path + qs',          path: '/app/My%20Project',          query: '?q=hello%20world&x=%26', hash: '' },
+    // Broader encoded-query matrix — exercises the full pct-encoded charset
+    // (RFC 3986 §2.1) that real users paste into share links.
+    { label: 'qs encoded ampersand',       path: '/search',                    query: '?q=a%26b%3Dc',      hash: '' },
+    { label: 'qs plus as space',           path: '/search',                    query: '?q=a+b&x=1',        hash: '' },
+    { label: 'qs encoded slash',           path: '/app/My%20Project',          query: '?token=abc%2Fdef',  hash: '' },
+    { label: 'qs unicode (utf-8 pct)',     path: '/buscar',                    query: '?q=caf%C3%A9',      hash: '#resultados' },
+    { label: 'qs array brackets',          path: '/app/proj/run',              query: '?ids%5B%5D=1&ids%5B%5D=2', hash: '' },
+    { label: 'qs json blob',               path: '/api/echo',                  query: '?payload=%7B%22a%22%3A1%7D', hash: '' },
+    { label: 'qs trailing empty + hash',   path: '/list',                      query: '?tag=&page=2',      hash: '#row=42' },
   ]
 
   for (const sc of SCENARIOS) {
