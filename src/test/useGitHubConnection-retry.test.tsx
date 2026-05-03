@@ -1,19 +1,29 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 
-// --- Mocks ---
-const invokeMock = vi.fn()
-const fromMock = vi.fn((_name: string) => ({
-  select: () => ({
-    eq: () => ({ maybeSingle: async () => ({ data: null }) }),
-  }),
-  delete: () => ({ eq: async () => ({ error: null }) }),
-}))
+const h = vi.hoisted(() => {
+  const invokeMock = vi.fn()
+  const fromMock = vi.fn((_name: string) => ({
+    select: () => ({
+      eq: () => ({ maybeSingle: async () => ({ data: null }) }),
+    }),
+    delete: () => ({ eq: async () => ({ error: null }) }),
+  }))
+  const toastMock = {
+    success: vi.fn(),
+    error: vi.fn(),
+    warning: vi.fn(),
+    info: vi.fn(),
+  }
+  return { invokeMock, fromMock, toastMock }
+})
+
+const { invokeMock, fromMock, toastMock } = h
 
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
-    functions: { invoke: (name: string, opts?: unknown) => invokeMock(name, opts) },
-    from: (name: string) => fromMock(name),
+    functions: { invoke: (name: string, opts?: unknown) => h.invokeMock(name, opts) },
+    from: (name: string) => h.fromMock(name),
   },
 }))
 
@@ -21,13 +31,7 @@ vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({ user: { id: 'u1' } }),
 }))
 
-const toastMock = {
-  success: vi.fn(),
-  error: vi.fn(),
-  warning: vi.fn(),
-  info: vi.fn(),
-}
-vi.mock('sonner', () => ({ toast: toastMock }))
+vi.mock('sonner', () => ({ toast: h.toastMock }))
 
 vi.mock('@/hooks/useConnectorLogs', () => ({
   logConnectorEvent: vi.fn(),
