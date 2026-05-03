@@ -19,15 +19,28 @@ import type { AddressInfo } from 'node:net'
 
 const CACHE_CONTROL = 'public, max-age=31536000, immutable'
 
-type Hit = { url: string; method: string }
+type Hit = { url: string; method: string; ifNoneMatch?: string; ifModifiedSince?: string }
 
 /** Boots a local HTTP server that mimics the edge redirect rule. */
 function startEdge(): Promise<{ url: string; close: () => Promise<void>; hits: Hit[] }> {
   const hits: Hit[] = []
   const server = http.createServer((req, res) => {
-    hits.push({ url: req.url ?? '/', method: req.method ?? 'GET' })
+    const inm = req.headers['if-none-match']
+    const ims = req.headers['if-modified-since']
+    hits.push({
+      url: req.url ?? '/',
+      method: req.method ?? 'GET',
+      ifNoneMatch: typeof inm === 'string' ? inm : undefined,
+      ifModifiedSince: typeof ims === 'string' ? ims : undefined,
+    })
     if (req.url?.startsWith('/redir/')) {
-      // Emit the production 301 contract.
+      // Honor conditional revalidation so WebKit/Firefox stay redirected on
+      // a 304 just as they would in production.
+      if (inm === '"redir-v1"') {
+        res.writeHead(304, { 'Cache-Control': CACHE_CONTROL, ETag: '"redir-v1"' })
+        res.end()
+        return
+      }
       res.writeHead(301, {
         Location: `/dest${req.url.slice('/redir'.length)}`,
         'Cache-Control': CACHE_CONTROL,
