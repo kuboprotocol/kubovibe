@@ -24,6 +24,7 @@ import LeaderboardPage from "./pages/LeaderboardPage";
 import PublicAppPage from "./pages/PublicAppPage";
 import UnsubscribePage from "./pages/UnsubscribePage";
 import EmailDashboardPage from "./pages/EmailDashboardPage";
+import PlanPage from "./pages/PlanPage";
 
 const queryClient = new QueryClient();
 
