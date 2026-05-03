@@ -3,7 +3,7 @@ import { renderHook, act } from '@testing-library/react'
 
 // --- Mocks ---
 const invokeMock = vi.fn()
-const fromMock = vi.fn(() => ({
+const fromMock = vi.fn((_name: string) => ({
   select: () => ({
     eq: () => ({ maybeSingle: async () => ({ data: null }) }),
   }),
