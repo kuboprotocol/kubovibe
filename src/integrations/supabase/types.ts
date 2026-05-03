@@ -227,6 +227,59 @@ export type Database = {
         }
         Relationships: []
       }
+      generated_contracts: {
+        Row: {
+          created_at: string
+          decimals: number
+          id: string
+          initial_supply: number
+          metadata: Json
+          name: string
+          plan_id: string | null
+          solidity_version: string
+          source_code: string
+          standard: string
+          symbol: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          decimals?: number
+          id?: string
+          initial_supply?: number
+          metadata?: Json
+          name: string
+          plan_id?: string | null
+          solidity_version?: string
+          source_code: string
+          standard?: string
+          symbol: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          decimals?: number
+          id?: string
+          initial_supply?: number
+          metadata?: Json
+          name?: string
+          plan_id?: string | null
+          solidity_version?: string
+          source_code?: string
+          standard?: string
+          symbol?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generated_contracts_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "orchestration_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       github_connections: {
         Row: {
           access_token: string
@@ -269,6 +322,7 @@ export type Database = {
           model: string
           prompt: string
           stack: Json
+          task_states: Json
           tasks: Json
           updated_at: string
           user_id: string
@@ -281,6 +335,7 @@ export type Database = {
           model?: string
           prompt: string
           stack?: Json
+          task_states?: Json
           tasks?: Json
           updated_at?: string
           user_id: string
@@ -293,6 +348,7 @@ export type Database = {
           model?: string
           prompt?: string
           stack?: Json
+          task_states?: Json
           tasks?: Json
           updated_at?: string
           user_id?: string
