@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: kubo-vibe-web
+    runtime: static
+    buildCommand: bun install && bun run build
+    staticPublishPath: ./dist
+    routes:
+      # 301 redirect: any *.lovable.app host → kubovibe.dev (preserves path,
+      # query and hash because the browser carries query+hash on 3xx).
+      - type: redirect
+        source: /*
+        destination: https://kubovibe.dev/:splat
+        status: 301
+        condition:
+          host: "*.lovable.app"
+      # SPA fallback for the canonical domain
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+    envVars:
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: VITE_SUPABASE_PROJECT_ID
+        sync: false
