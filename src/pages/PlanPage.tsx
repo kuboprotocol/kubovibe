@@ -411,10 +411,13 @@ export default function PlanPage() {
               </>
             )}
 
-            {deployment && (
+            {deployment ? (
               <div className="border border-emerald-500/30 rounded-md p-4 bg-emerald-500/5 space-y-2">
-                <div className="flex items-center gap-2 font-medium text-emerald-400 text-sm">
-                  <CheckCircle2 className="h-4 w-4" /> Deploy concluído (Sepolia)
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2 font-medium text-emerald-400 text-sm">
+                    <CheckCircle2 className="h-4 w-4" /> Deploy concluído
+                  </div>
+                  <Badge variant="outline" className="border-emerald-500/40 text-emerald-300">Sepolia · success</Badge>
                 </div>
                 <div className="grid md:grid-cols-2 gap-2 text-xs">
                   <Field label="Contract" value={deployment.contract_address} href={deployment.explorer_url ?? undefined} />
@@ -424,14 +427,29 @@ export default function PlanPage() {
                 </div>
                 {deployment.events.length > 0 && (
                   <div className="pt-2">
-                    <div className="text-xs text-muted-foreground mb-1">Eventos ({deployment.events.length})</div>
-                    <pre className="text-[11px] bg-muted p-3 rounded overflow-x-auto max-h-48">
-{JSON.stringify(deployment.events, null, 2)}
-                    </pre>
+                    <div className="text-xs text-muted-foreground mb-2">Eventos emitidos ({deployment.events.length})</div>
+                    <ul className="space-y-1.5">
+                      {deployment.events.map((ev, i) => (
+                        <li key={i} className="text-[11px] bg-muted/60 p-2 rounded font-mono">
+                          {ev.name ? (
+                            <>
+                              <span className="text-emerald-400 font-semibold">{ev.name}</span>
+                              {Array.isArray(ev.args) && ev.args.length > 0 && (
+                                <span className="text-muted-foreground">({ev.args.map((a) => typeof a === 'string' && a.startsWith('0x') ? `${a.slice(0, 6)}…${a.slice(-4)}` : String(a)).join(', ')})</span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-muted-foreground">topic: {ev.topics?.[0]?.slice(0, 18)}…</span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 )}
               </div>
-            )}
+            ) : contract ? (
+              <Badge variant="outline" className="text-xs">Status: <span className="ml-1 text-amber-400">aguardando deploy</span></Badge>
+            ) : null}
           </CardContent>
         </Card>
       )}
