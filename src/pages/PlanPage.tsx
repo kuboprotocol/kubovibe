@@ -40,6 +40,7 @@ type Deployment = {
   block_number: number | null
   gas_used: string | null
   explorer_url: string | null
+  created_at?: string
   events: Array<{ name?: string; args?: unknown[]; topics?: string[]; data?: string }>
 }
 
