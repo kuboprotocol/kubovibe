@@ -51,8 +51,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers()
-  // @ts-expect-error restore
-  window.location = originalLocation
+  ;(window as unknown as { location: Location }).location = originalLocation
 })
 
 // Build a fake FunctionsHttpError-like error with a Response in context
