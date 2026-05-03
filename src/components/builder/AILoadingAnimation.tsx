@@ -206,9 +206,13 @@ interface AILoadingAnimationProps {
   isVisible: boolean
   /** The language detected from user's chat messages */
   chatLanguage?: string
+  /** Generation already finished — show "ready" CTA so user isn't stuck on the overlay */
+  isReady?: boolean
+  /** Called when user clicks "ver agora" — should hide the overlay */
+  onSkip?: () => void
 }
 
-export default function AILoadingAnimation({ isVisible, chatLanguage }: AILoadingAnimationProps) {
+export default function AILoadingAnimation({ isVisible, chatLanguage, isReady, onSkip }: AILoadingAnimationProps) {
   const [messageIndex, setMessageIndex] = useState(0)
   const [elapsed, setElapsed] = useState(0)
 
@@ -335,6 +339,20 @@ export default function AILoadingAnimation({ isVisible, chatLanguage }: AILoadin
                   </motion.p>
                 </AnimatePresence>
               </div>
+
+              {/* Ready CTA — appears the moment generation finishes so the
+                  user is never trapped on the loading screen. */}
+              {isReady && onSkip && (
+                <motion.button
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  onClick={onSkip}
+                  data-testid="loading-skip-button"
+                  className="px-5 py-2.5 rounded-full gradient-primary text-primary-foreground text-sm font-semibold shadow-lg hover:scale-105 transition-transform"
+                >
+                  ✨ Seu app está pronto — Ver agora
+                </motion.button>
+              )}
             </div>
           </motion.div>
         </motion.div>

@@ -106,8 +106,11 @@ export default function BuilderPage() {
     }
   }, [user])
 
-  // Minimum loading duration: 95 seconds (1:35)
-  const MIN_LOADING_MS = 95_000
+  // Minimum loading duration: 8 seconds (reduced from 95s — users were
+  // seeing a "black screen" because the overlay sat on top of the empty
+  // preview long after generation completed). The Ready CTA inside the
+  // animation lets users skip immediately when generation finishes early.
+  const MIN_LOADING_MS = 8_000
   const loadingStartRef = useRef<number>(0)
   const [showLoading, setShowLoading] = useState(false)
   const generationDoneRef = useRef(false)
@@ -564,7 +567,16 @@ export default function BuilderPage() {
                 {/* Loading overlay — sits on top of everything */}
                 {showLoading && (
                   <div className="absolute inset-0 z-20">
-                    <AILoadingAnimation isVisible={showLoading} chatLanguage={chatLanguage} />
+                    <AILoadingAnimation
+                      isVisible={showLoading}
+                      chatLanguage={chatLanguage}
+                      isReady={!isLoading && !!generatedCode}
+                      onSkip={() => {
+                        setShowLoading(false)
+                        pendingSaveRef.current?.()
+                        pendingSaveRef.current = null
+                      }}
+                    />
                   </div>
                 )}
               {generatedCode && !showLoading ? (

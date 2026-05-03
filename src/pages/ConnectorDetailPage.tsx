@@ -602,8 +602,27 @@ export default function ConnectorDetailPage() {
     }
   }, [runFilter, dbRunsActive, undoSnapshot])
 
+  // Analytics: track dismiss-confirmation modal lifecycle.
+  const logDismissModal = useCallback(
+    (phase: 'opened' | 'confirmed' | 'cancelled', source: 'button' | 'shortcut' | 'esc' | 'overlay' | 'shortcut-direct') => {
+      logConnectorEvent({
+        connectorSlug: slug ?? 'unknown',
+        eventType: `filters_undo_dismiss_modal_${phase}`,
+        status: 'info',
+        message: `Modal de dispensar (${phase}) via ${source}`,
+        metadata: { phase, source, removed: undoSnapshot?.removed ?? [] },
+      }).catch(() => { /* non-blocking */ })
+    },
+    [slug, undoSnapshot],
+  )
+
+  const openDismissModal = useCallback((source: 'button' | 'shortcut' | 'esc') => {
+    logDismissModal('opened', source)
+    setDismissConfirmOpen(true)
+  }, [logDismissModal])
+
   // Centralized dismiss + audit logging helpers.
-  const dismissUndoBanner = useCallback((reason: 'manual' | 'esc' | 'expired' | 'restored' | 'reapplied') => {
+  const dismissUndoBanner = useCallback((reason: 'manual' | 'esc' | 'expired' | 'restored' | 'reapplied' | 'shortcut-direct') => {
     if (undoSnapshot) {
       logConnectorEvent({
         connectorSlug: slug ?? 'unknown',
@@ -665,10 +684,18 @@ export default function ConnectorDetailPage() {
         return
       }
 
+      // Shift+Esc → dismiss IMMEDIATELY (power-user shortcut, no modal).
+      if (e.key === 'Escape' && e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        if (isEditableTarget) return
+        e.preventDefault()
+        dismissUndoBanner('shortcut-direct')
+        return
+      }
+
       if (e.key === 'Escape' && !e.metaKey && !e.ctrlKey && !e.altKey) {
         if (isEditableTarget) return
         e.preventDefault()
-        setDismissConfirmOpen(true)
+        openDismissModal('esc')
       }
     }
     window.addEventListener('keydown', handler)
@@ -996,6 +1023,9 @@ export default function ConnectorDetailPage() {
                   className="h-8 text-xs"
                   title={`Reiniciar contador para ${totalSeconds}s`}
                   data-testid="undo-renew-button"
+                  id="undo-renew-button"
+                  aria-label="Renovar contador do banner de desfazer"
+                  aria-keyshortcuts="Control+R"
                 >
                   <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
                   Renovar
@@ -1003,10 +1033,13 @@ export default function ConnectorDetailPage() {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => setDismissConfirmOpen(true)}
+                  onClick={() => openDismissModal('button')}
                   className="h-8 text-xs"
                   data-testid="undo-dismiss-button"
-                  title="Dispensar o banner de desfazer (pede confirmação)"
+                  id="undo-dismiss-button"
+                  aria-label="Dispensar banner de desfazer (Esc para confirmar, Shift+Esc para dispensar direto)"
+                  aria-keyshortcuts="Escape Shift+Escape"
+                  title="Dispensar (Esc = confirma, Shift+Esc = direto)"
                 >
                   Dispensar
                 </Button>
@@ -1436,7 +1469,16 @@ export default function ConnectorDetailPage() {
 
       {/* Undo banner dismiss confirmation — prevents accidental dismiss.
           TTL is paused while this dialog is open (see pauseTTL effect). */}
-      <AlertDialog open={dismissConfirmOpen} onOpenChange={setDismissConfirmOpen}>
+      <AlertDialog
+        open={dismissConfirmOpen}
+        onOpenChange={(next) => {
+          // If closing without confirm-button (esc/overlay) → log cancel.
+          if (!next && dismissConfirmOpen) {
+            logDismissModal('cancelled', 'overlay')
+          }
+          setDismissConfirmOpen(next)
+        }}
+      >
         <AlertDialogContent data-testid="undo-dismiss-confirm">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
@@ -1452,35 +1494,35 @@ export default function ConnectorDetailPage() {
                 {undoSnapshot && (
                   <div className="flex flex-wrap gap-1.5">
                     {undoSnapshot.run && (
-                      <Badge
-                        variant="secondary"
-                        className="font-mono text-[11px] gap-1 bg-destructive/10 text-destructive border-destructive/30"
-                      >
+                      <Badge variant="secondary" className="font-mono text-[11px] gap-1 bg-destructive/10 text-destructive border-destructive/30">
                         <span className="opacity-70">?run=</span>
                         <span>{undoSnapshot.run.slice(0, 8)}…</span>
                       </Badge>
                     )}
                     {undoSnapshot.runsDb && (
-                      <Badge
-                        variant="secondary"
-                        className="font-mono text-[11px] gap-1 bg-destructive/10 text-destructive border-destructive/30"
-                      >
+                      <Badge variant="secondary" className="font-mono text-[11px] gap-1 bg-destructive/10 text-destructive border-destructive/30">
                         <span>?runs=db</span>
                       </Badge>
                     )}
                   </div>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  Dica: o contador permanece pausado enquanto este aviso está aberto.
+                  Dica: o contador permanece pausado. Use <kbd className="px-1 py-0.5 rounded border bg-background text-[10px] font-mono">Shift+Esc</kbd> para dispensar direto sem este aviso.
                 </p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel data-testid="undo-dismiss-cancel">Manter banner</AlertDialogCancel>
+            <AlertDialogCancel
+              data-testid="undo-dismiss-cancel"
+              onClick={() => logDismissModal('cancelled', 'button')}
+            >
+              Manter banner
+            </AlertDialogCancel>
             <AlertDialogAction
               data-testid="undo-dismiss-confirm-button"
               onClick={() => {
+                logDismissModal('confirmed', 'button')
                 dismissUndoBanner('manual')
                 setDismissConfirmOpen(false)
               }}
