@@ -45,7 +45,7 @@ beforeEach(() => {
   toastMock.error.mockReset()
   toastMock.warning.mockReset()
   toastMock.info.mockReset()
-  (window as unknown as { location: unknown }).location = {
+  ;(window as unknown as { location: unknown }).location = {
     href: 'http://localhost/',
     pathname: '/',
     search: '',
