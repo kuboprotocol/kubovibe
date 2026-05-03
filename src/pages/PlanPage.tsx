@@ -577,6 +577,32 @@ export default function PlanPage() {
                 )}
               </div>
             ) : null}
+
+            {history.length > 1 && (
+              <div className="pt-2 border-t border-border/40">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs text-muted-foreground">Histórico de deploys ({history.length})</div>
+                  <Button size="sm" variant="ghost" onClick={refreshHistory} className="h-7 text-xs">Atualizar</Button>
+                </div>
+                <ul className="space-y-1.5 max-h-64 overflow-y-auto">
+                  {history.map((d) => {
+                    const isCurrent = deployment?.id === d.id
+                    return (
+                      <li key={d.id} className={`text-[11px] p-2 rounded font-mono flex items-center justify-between gap-2 ${isCurrent ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-muted/60'}`}>
+                        <button onClick={() => setDeployment(d)} className="text-left truncate hover:text-foreground">
+                          <span className="text-emerald-400">{d.tx_hash.slice(0, 10)}…{d.tx_hash.slice(-6)}</span>
+                          <span className="text-muted-foreground ml-2">{d.created_at ? new Date(d.created_at).toLocaleString() : ''}</span>
+                        </button>
+                        <div className="flex gap-1 shrink-0">
+                          <button onClick={() => copy(d.tx_hash, 'Hash copiado')} className="text-muted-foreground hover:text-foreground" title="Copiar tx"><Copy className="h-3 w-3" /></button>
+                          <a href={`https://sepolia.etherscan.io/tx/${d.tx_hash}`} target="_blank" rel="noreferrer" className="text-primary" title="Abrir tx"><ExternalLink className="h-3 w-3" /></a>
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
