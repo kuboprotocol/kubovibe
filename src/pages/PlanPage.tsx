@@ -132,18 +132,21 @@ export default function PlanPage() {
         })
         const { data: deps } = await supabase
           .from('contract_deployments')
-          .select('id, contract_address, tx_hash, block_number, gas_used, explorer_url, events')
-          .eq('contract_id', c.id).order('created_at', { ascending: false }).limit(1)
-        if (!cancelled && deps && deps[0]) {
-          setDeployment({
-            id: deps[0].id,
-            contract_address: deps[0].contract_address,
-            tx_hash: deps[0].tx_hash,
-            block_number: deps[0].block_number,
-            gas_used: deps[0].gas_used,
-            explorer_url: deps[0].explorer_url,
-            events: (deps[0].events ?? []) as Deployment['events'],
-          })
+          .select('id, contract_address, tx_hash, block_number, gas_used, explorer_url, events, created_at')
+          .eq('contract_id', c.id).order('created_at', { ascending: false }).limit(20)
+        if (!cancelled && deps && deps.length) {
+          const mapped: Deployment[] = deps.map((d) => ({
+            id: d.id,
+            contract_address: d.contract_address,
+            tx_hash: d.tx_hash,
+            block_number: d.block_number,
+            gas_used: d.gas_used,
+            explorer_url: d.explorer_url,
+            created_at: d.created_at,
+            events: (d.events ?? []) as Deployment['events'],
+          }))
+          setHistory(mapped)
+          setDeployment(mapped[0])
         }
       }
       setLoading(false)
