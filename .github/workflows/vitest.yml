@@ -22,6 +22,17 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
 
+      # Explicit ~/.npm cache (npm package download cache). setup-node's
+      # built-in cache also covers this, but a dedicated entry with broader
+      # restore-keys speeds up additional/transitive downloads between runs.
+      - name: Cache ~/.npm (npm download cache)
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-cache-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-cache-
+
       # Persistent Vite/Vitest caches: dependency pre-bundling and the
       # Vitest runner cache. Keyed on lockfile + config files so it is
       # invalidated only when deps or test config actually change.
