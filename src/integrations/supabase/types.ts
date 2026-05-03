@@ -760,7 +760,75 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      github_connections_safe: {
+        Row: {
+          connected_at: string | null
+          github_avatar_url: string | null
+          github_username: string | null
+          id: string | null
+          scope: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          connected_at?: string | null
+          github_avatar_url?: string | null
+          github_username?: string | null
+          id?: string | null
+          scope?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          connected_at?: string | null
+          github_avatar_url?: string | null
+          github_username?: string | null
+          id?: string | null
+          scope?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      published_projects: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          generated_code: string | null
+          id: string | null
+          is_published: boolean | null
+          published_at: string | null
+          published_url: string | null
+          title: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          generated_code?: string | null
+          id?: string | null
+          is_published?: boolean | null
+          published_at?: string | null
+          published_url?: string | null
+          title?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          generated_code?: string | null
+          id?: string | null
+          is_published?: boolean | null
+          published_at?: string | null
+          published_url?: string | null
+          title?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       admin_clear_connector_run: {

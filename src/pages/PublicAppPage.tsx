@@ -14,10 +14,10 @@ export default function PublicAppPage() {
 
     const load = async () => {
       const { data, error: err } = await supabase
-        .from('projects')
+        .from('published_projects' as never)
         .select('generated_code, is_published, title')
         .eq('id', projectId)
-        .maybeSingle()
+        .maybeSingle() as { data: { generated_code: string | null; is_published: boolean; title: string | null } | null; error: unknown }
 
       if (err || !data) {
         setError('Projeto não encontrado')
