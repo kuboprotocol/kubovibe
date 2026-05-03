@@ -402,9 +402,30 @@ test.describe('Canonical-domain redirect — 301 + Cache-Control + browser cache
     return out
   }
 
-  for (let i = 0; i < 12; i++) {
-    test(`fuzz #${i}: random pct-encoded path/query/hash round-trip`, async ({ request, browser }) => {
-      const rng = makeRng(0xC0FFEE + i * 7919)
+  // Seed base is overridable via env so CI can pin / replay a failing run.
+  // The resolved seed list is persisted to playwright-report/fuzz-seeds.json
+  // (uploaded as a workflow artifact) for full reproducibility.
+  const FUZZ_SEED_BASE = Number(process.env.FUZZ_SEED_BASE ?? 0xC0FFEE)
+  const FUZZ_COUNT = Number(process.env.FUZZ_COUNT ?? 12)
+  const FUZZ_SEEDS = Array.from({ length: FUZZ_COUNT }, (_, i) => FUZZ_SEED_BASE + i * 7919)
+
+  test.beforeAll(async () => {
+    const fs = await import('node:fs/promises')
+    const path = await import('node:path')
+    const dir = path.resolve('playwright-report')
+    await fs.mkdir(dir, { recursive: true }).catch(() => {})
+    await fs
+      .writeFile(
+        path.join(dir, 'fuzz-seeds.json'),
+        JSON.stringify({ base: FUZZ_SEED_BASE, count: FUZZ_COUNT, seeds: FUZZ_SEEDS }, null, 2),
+      )
+      .catch(() => {})
+  })
+
+  for (let i = 0; i < FUZZ_COUNT; i++) {
+    const seed = FUZZ_SEEDS[i]
+    test(`fuzz #${i} (seed=${seed}): random pct-encoded path/query/hash round-trip`, async ({ request, browser }) => {
+      const rng = makeRng(seed)
       const path = '/' + fuzzComponent(rng, 6) + '/' + fuzzComponent(rng, 4)
       const query = '?' + fuzzComponent(rng, 4) + '=' + fuzzComponent(rng, 6) + '&n=' + i
       const hash = '#' + fuzzComponent(rng, 5)
@@ -414,15 +435,17 @@ test.describe('Canonical-domain redirect — 301 + Cache-Control + browser cache
 
       // ─ HTTP layer: 301 must echo path+query verbatim into Location ─
       const fresh = await request.fetch(src, { maxRedirects: 0 })
-      expect(fresh.status(), `fuzz#${i} fresh status`).toBe(301)
-      expect(headerCI(fresh.headers(), 'Location'), `fuzz#${i} Location echo`).toBe(expectedLocation)
-      expect((await fresh.body()).length, `fuzz#${i} 301 body empty`).toBe(0)
+      expect(fresh.status(), `fuzz#${i} seed=${seed} fresh status`).toBe(301)
+      expect(headerCI(fresh.headers(), 'Location'), `fuzz#${i} seed=${seed} Location echo`).toBe(expectedLocation)
+      // Location MUST NEVER carry a fragment (RFC 7231 §7.1.2).
+      expect(headerCI(fresh.headers(), 'Location') ?? '', `fuzz#${i} no '#' in Location`).not.toContain('#')
+      expect((await fresh.body()).length, `fuzz#${i} seed=${seed} 301 body empty`).toBe(0)
 
       // ─ Browser layer: hash must be reattached after the 301 ─
       const ctx = await browser.newContext()
       const page = await ctx.newPage()
       await page.goto(src, { waitUntil: 'domcontentloaded' })
-      expect(page.url(), `fuzz#${i} browser url`).toBe(`${edge.url}${expectedLocation}${hash}`)
+      expect(page.url(), `fuzz#${i} seed=${seed} browser url`).toBe(`${edge.url}${expectedLocation}${hash}`)
       expect(await page.evaluate(() => window.location.hash), `fuzz#${i} window.location.hash`).toBe(hash)
       expect(edge.hits.every((h) => !h.url.includes('#')), `fuzz#${i} no fragment on the wire`).toBe(true)
 

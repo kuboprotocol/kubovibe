@@ -99,10 +99,18 @@ jobs:
             "https://kubovibe.lovable.app/connectors/github|https://kubovibe.dev/connectors/github"
             "https://kubovibe.lovable.app/dashboard?ref=email&t=1|https://kubovibe.dev/dashboard?ref=email&t=1"
             "https://kubovibe.lovable.app/app/proj-123/meu-app?ref=email&t=1|https://kubovibe.dev/app/proj-123/meu-app?ref=email&t=1"
-            # Hash present on source — curl drops it, server must still 301
-            # to the bare path+query (browser will reattach the hash).
+            # Hash present on source — curl drops it (RFC 3986 §3.5) before
+            # send, server must 301 to the bare path+query, and the Location
+            # MUST NEVER carry a '#' fragment (asserted below for every row).
+            # Browser-side hash reattachment is covered by the Playwright spec.
             "https://kubovibe.lovable.app/pricing#enterprise|https://kubovibe.dev/pricing"
             "https://kubovibe.lovable.app/dashboard?ref=email#section-2|https://kubovibe.dev/dashboard?ref=email"
+            # Empty hash (bare '#') — stripped by curl, must still 301 cleanly.
+            "https://kubovibe.lovable.app/pricing#|https://kubovibe.dev/pricing"
+            # Percent-encoded fragment chars — same rule: '#' never reaches edge.
+            "https://kubovibe.lovable.app/docs#sec%3D2|https://kubovibe.dev/docs"
+            "https://kubovibe.lovable.app/docs#a%20b|https://kubovibe.dev/docs"
+            "https://kubovibe.lovable.app/buscar?q=caf%C3%A9#caf%C3%A9|https://kubovibe.dev/buscar?q=caf%C3%A9"
             # Encoded query matrix: spaces, ampersands, plus, slashes, unicode
             "https://kubovibe.lovable.app/search?q=hello%20world|https://kubovibe.dev/search?q=hello%20world"
             "https://kubovibe.lovable.app/search?q=a%26b%3Dc|https://kubovibe.dev/search?q=a%26b%3Dc"
@@ -135,6 +143,13 @@ jobs:
             if [ "$location" != "$want" ]; then
               echo "::error::Bad Location for $src — want '$want', got '$location'"; fail=1; continue
             fi
+            # RFC 7231 §7.1.2: Location MUST NOT carry a fragment — UA reuses
+            # the original request URI's fragment after following the 301.
+            case "$location" in
+              *"#"*)
+                echo "::error::Location for $src must not contain '#' fragment — got '$location'"; fail=1; continue
+                ;;
+            esac
             if [ -z "$cc" ]; then
               echo "::error::Missing Cache-Control on 301 for $src"; fail=1; continue
             fi
