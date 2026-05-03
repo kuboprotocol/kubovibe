@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import { ArrowRight, Zap, Globe, Palette } from 'lucide-react'
+import { ArrowRight, Zap, Loader2 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import logoImg from '@/assets/logo-kubovibe.png'
 import PromptAttachMenu from '@/components/landing/PromptAttachMenu'
+import { supabase } from '@/integrations/supabase/client'
+import { useAuth } from '@/hooks/useAuth'
 
 // Sugestões em linguagem natural — sem jargão técnico (Web2 ou Web3).
 // O orquestrador detecta a stack por trás. O usuário só descreve a ideia.
