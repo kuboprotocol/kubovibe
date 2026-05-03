@@ -1,7 +1,6 @@
-// Página /plan/:id — preview por camadas do plano gerado pelo orquestrador,
-// com gerenciamento de status das tarefas (todo / in_progress / done),
-// disparo do motor Web3 para gerar o contrato ERC-20 e download dos
-// artefatos (plano em JSON + .sol do contrato).
+// Página /plan/:id — preview por camadas, gerenciamento de status,
+// geração de ERC-20 customizado, deploy automático na Sepolia,
+// persistência de contratos/deploys e tratamento de erros.
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
@@ -9,8 +8,10 @@ import { supabase } from '@/integrations/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
-import { ArrowLeft, Download, Wallet, Cpu, Layers, FileCode, CheckCircle2, Circle, Loader2 } from 'lucide-react'
+import { ArrowLeft, Download, Wallet, Cpu, Layers, FileCode, CheckCircle2, Circle, Loader2, Rocket, ExternalLink, Copy } from 'lucide-react'
 import { useDemoWallet } from '@/hooks/useDemoWallet'
 
 type TaskStatus = 'todo' | 'in_progress' | 'done'
@@ -23,7 +24,6 @@ type Plan = {
   stack: Record<string, string>
   tasks: Task[]
   task_states: Record<string, TaskStatus>
-  user_summary?: string
 }
 type GeneratedContract = {
   id: string
@@ -32,6 +32,15 @@ type GeneratedContract = {
   source_code: string
   decimals: number
   initial_supply: string
+}
+type Deployment = {
+  id: string
+  contract_address: string
+  tx_hash: string
+  block_number: number | null
+  gas_used: string | null
+  explorer_url: string | null
+  events: Array<{ name?: string; args?: unknown[]; topics?: string[]; data?: string }>
 }
 
 const LAYER_META = {
@@ -52,6 +61,10 @@ function downloadFile(filename: string, content: string, mime = 'text/plain') {
   URL.revokeObjectURL(url)
 }
 
+function copy(text: string, label = 'Copiado') {
+  navigator.clipboard.writeText(text).then(() => toast.success(label))
+}
+
 export default function PlanPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -60,7 +73,24 @@ export default function PlanPage() {
   const [plan, setPlan] = useState<Plan | null>(null)
   const [loading, setLoading] = useState(true)
   const [contract, setContract] = useState<GeneratedContract | null>(null)
+  const [deployment, setDeployment] = useState<Deployment | null>(null)
   const [generatingContract, setGeneratingContract] = useState(false)
+  const [deploying, setDeploying] = useState(false)
+
+  // Form ERC-20 customizado (persistido no localStorage por plano)
+  const [form, setForm] = useState({ name: 'KuboCredit', symbol: 'KUBO', decimals: '18', initial_supply: '1000000' })
+
+  useEffect(() => {
+    if (!id) return
+    const saved = localStorage.getItem(`kubo:plan-form:${id}`)
+    if (saved) {
+      try { setForm({ ...form, ...JSON.parse(saved) }) } catch { /* noop */ }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id])
+  useEffect(() => {
+    if (id) localStorage.setItem(`kubo:plan-form:${id}`, JSON.stringify(form))
+  }, [form, id])
 
   useEffect(() => {
     if (!id) return
@@ -70,8 +100,7 @@ export default function PlanPage() {
       const { data, error } = await supabase
         .from('orchestration_plans')
         .select('id, prompt, intent, capabilities, stack, tasks, task_states')
-        .eq('id', id)
-        .maybeSingle()
+        .eq('id', id).maybeSingle()
       if (cancelled) return
       if (error || !data) {
         toast.error('Plano não encontrado')
@@ -79,31 +108,40 @@ export default function PlanPage() {
         return
       }
       setPlan({
-        id: data.id,
-        prompt: data.prompt,
+        id: data.id, prompt: data.prompt,
         intent: data.intent as Plan['intent'],
         capabilities: data.capabilities ?? [],
         stack: (data.stack ?? {}) as Record<string, string>,
-        tasks: (data.tasks ?? []) as Task[],
+        tasks: (data.tasks ?? []) as unknown as Task[],
         task_states: (data.task_states ?? {}) as Record<string, TaskStatus>,
       })
 
       const { data: contracts } = await supabase
         .from('generated_contracts')
         .select('id, name, symbol, source_code, decimals, initial_supply')
-        .eq('plan_id', id)
-        .order('created_at', { ascending: false })
-        .limit(1)
+        .eq('plan_id', id).order('created_at', { ascending: false }).limit(1)
       if (!cancelled && contracts && contracts[0]) {
         const c = contracts[0]
         setContract({
-          id: c.id,
-          name: c.name,
-          symbol: c.symbol,
-          source_code: c.source_code,
-          decimals: c.decimals,
+          id: c.id, name: c.name, symbol: c.symbol,
+          source_code: c.source_code, decimals: c.decimals,
           initial_supply: String(c.initial_supply),
         })
+        const { data: deps } = await supabase
+          .from('contract_deployments')
+          .select('id, contract_address, tx_hash, block_number, gas_used, explorer_url, events')
+          .eq('contract_id', c.id).order('created_at', { ascending: false }).limit(1)
+        if (!cancelled && deps && deps[0]) {
+          setDeployment({
+            id: deps[0].id,
+            contract_address: deps[0].contract_address,
+            tx_hash: deps[0].tx_hash,
+            block_number: deps[0].block_number,
+            gas_used: deps[0].gas_used,
+            explorer_url: deps[0].explorer_url,
+            events: (deps[0].events ?? []) as Deployment['events'],
+          })
+        }
       }
       setLoading(false)
     })()
@@ -125,70 +163,100 @@ export default function PlanPage() {
   async function setStatus(taskId: string, status: TaskStatus) {
     if (!plan) return
     const next = { ...plan.task_states, [taskId]: status }
+    const prev = plan
     setPlan({ ...plan, task_states: next })
-    const { error } = await supabase
-      .from('orchestration_plans')
-      .update({ task_states: next })
-      .eq('id', plan.id)
+    const { error } = await supabase.from('orchestration_plans').update({ task_states: next }).eq('id', plan.id)
     if (error) {
       toast.error('Falha ao salvar status')
-      // rollback
-      setPlan(plan)
+      setPlan(prev)
     }
+  }
+
+  function validateForm(): string | null {
+    if (!/^[A-Z][A-Za-z0-9_]{1,40}$/.test(form.name)) return 'Nome deve começar com maiúscula (PascalCase, sem espaços)'
+    if (!/^[A-Z0-9]{2,11}$/.test(form.symbol)) return 'Símbolo: 2-11 caracteres (A-Z, 0-9)'
+    const d = Number(form.decimals)
+    if (!Number.isInteger(d) || d < 0 || d > 36) return 'Decimals: inteiro 0..36'
+    if (!/^\d{1,30}$/.test(form.initial_supply)) return 'Supply: inteiro positivo'
+    return null
   }
 
   async function generateContract() {
     if (!plan) return
+    const err = validateForm()
+    if (err) { toast.error(err); return }
     setGeneratingContract(true)
     try {
-      const name = 'KuboCredit'
-      const symbol = 'KUBO'
       const { data, error } = await supabase.functions.invoke('web3-contract-gen', {
         body: {
           plan_id: plan.id,
           standard: 'erc20',
-          name, symbol,
-          decimals: 18,
-          initial_supply: '1000000',
+          name: form.name,
+          symbol: form.symbol.toUpperCase(),
+          decimals: Number(form.decimals),
+          initial_supply: form.initial_supply,
         },
       })
-      if (error) throw error
+      if (error) throw new Error(error.message || 'Falha na geração')
+      if (data?.error) throw new Error(data.error)
       setContract({
         id: data.contract_id,
-        name: data.name,
-        symbol: data.symbol,
+        name: data.name, symbol: data.symbol,
         source_code: data.source_code,
         decimals: data.decimals,
         initial_supply: String(data.initial_supply),
       })
-      toast.success('Contrato ERC-20 gerado!')
+      setDeployment(null)
+      toast.success(`Contrato ${data.name} gerado!`)
     } catch (e) {
-      console.error(e)
       toast.error(e instanceof Error ? e.message : 'Falha ao gerar contrato')
     } finally {
       setGeneratingContract(false)
     }
   }
 
+  async function deployContract() {
+    if (!contract) return
+    setDeploying(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('web3-contract-deploy', {
+        body: { contract_id: contract.id },
+      })
+      if (error) throw new Error(error.message || 'Falha no deploy')
+      if (data?.error) {
+        if (data.error === 'deployer_not_configured') throw new Error('Deployer não configurado. Adicione SEPOLIA_RPC_URL e DEPLOYER_PRIVATE_KEY.')
+        throw new Error(data.error)
+      }
+      setDeployment({
+        id: data.deployment_id,
+        contract_address: data.contract_address,
+        tx_hash: data.tx_hash,
+        block_number: data.block_number,
+        gas_used: data.gas_used,
+        explorer_url: data.explorer_url,
+        events: data.events ?? [],
+      })
+      toast.success('Deploy concluído na Sepolia!')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Falha no deploy')
+    } finally {
+      setDeploying(false)
+    }
+  }
+
   function exportPlan() {
     if (!plan) return
-    downloadFile(
-      `kubo-plan-${plan.id.slice(0, 8)}.json`,
-      JSON.stringify(plan, null, 2),
-      'application/json',
-    )
+    downloadFile(`kubo-plan-${plan.id.slice(0, 8)}.json`,
+      JSON.stringify({ plan, contract, deployment }, null, 2), 'application/json')
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
+    return <div className="min-h-screen flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
   }
   if (!plan) return null
 
-  const showWeb3 = plan.intent !== 'web2_app' || plan.capabilities.some((c) => ['wallet', 'smart_contract', 'token_mint', 'nft', 'on_chain_tx'].includes(c))
+  const showWeb3 = plan.intent !== 'web2_app' || plan.capabilities.some((c) =>
+    ['wallet', 'smart_contract', 'token_mint', 'nft', 'on_chain_tx'].includes(c))
 
   return (
     <div className="min-h-screen px-6 py-10 max-w-5xl mx-auto">
@@ -209,7 +277,6 @@ export default function PlanPage() {
         </div>
       </motion.div>
 
-      {/* Carteira demo (Web3 invisível) */}
       {showWeb3 && (
         <Card className="mb-6 border-primary/30">
           <CardHeader className="pb-3">
@@ -219,25 +286,18 @@ export default function PlanPage() {
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground mb-2">
-              Carteira demo gerada automaticamente — sem instalar nada. (Endereço determinístico para o MVP.)
+              Carteira demo determinística (MVP). O deploy on-chain usa a carteira deployer custodial da plataforma.
             </p>
-            <code className="text-sm font-mono bg-muted px-3 py-2 rounded-md inline-block">
-              {wallet.short ?? '—'}
-            </code>
+            <code className="text-sm font-mono bg-muted px-3 py-2 rounded-md inline-block">{wallet.short ?? '—'}</code>
           </CardContent>
         </Card>
       )}
 
-      {/* Capacidades + stack */}
       <Card className="mb-6">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Capacidades detectadas</CardTitle>
-        </CardHeader>
+        <CardHeader className="pb-3"><CardTitle className="text-base">Capacidades detectadas</CardTitle></CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-2 mb-4">
-            {plan.capabilities.map((c) => (
-              <Badge key={c} variant="secondary">{c}</Badge>
-            ))}
+            {plan.capabilities.map((c) => <Badge key={c} variant="secondary">{c}</Badge>)}
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
             {Object.entries(plan.stack).map(([k, v]) => (
@@ -250,7 +310,6 @@ export default function PlanPage() {
         </CardContent>
       </Card>
 
-      {/* Preview por camadas */}
       <div className="space-y-6 mb-8">
         {([1, 2, 3] as const).map((layer) => {
           const meta = LAYER_META[layer]
@@ -278,13 +337,8 @@ export default function PlanPage() {
                         </div>
                         <div className="flex gap-1 shrink-0">
                           {(['todo', 'in_progress', 'done'] as TaskStatus[]).map((s) => (
-                            <Button
-                              key={s}
-                              variant={status === s ? 'default' : 'ghost'}
-                              size="sm"
-                              className="h-7 text-xs px-2"
-                              onClick={() => setStatus(t.id, s)}
-                            >
+                            <Button key={s} variant={status === s ? 'default' : 'ghost'} size="sm"
+                              className="h-7 text-xs px-2" onClick={() => setStatus(t.id, s)}>
                               {s === 'todo' ? 'Pendente' : s === 'in_progress' ? 'Em andamento' : 'Pronto'}
                             </Button>
                           ))}
@@ -299,55 +353,111 @@ export default function PlanPage() {
         })}
       </div>
 
-      {/* Motor Web3: gerar contrato */}
       {showWeb3 && (
         <Card className="mb-6 border-emerald-500/30">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
-              <FileCode className="h-4 w-4 text-emerald-400" /> Smart contract (ERC-20)
+              <FileCode className="h-4 w-4 text-emerald-400" /> Smart contract (ERC-20 customizado)
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            {!contract ? (
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm text-muted-foreground">
-                  Gera o contrato KuboCredit (ERC-20, supply 1.000.000, OpenZeppelin v5).
-                </p>
-                <Button onClick={generateContract} disabled={generatingContract} className="gap-2">
-                  {generatingContract && <Loader2 className="h-4 w-4 animate-spin" />}
-                  Gerar contrato
-                </Button>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div>
+                <Label htmlFor="c-name" className="text-xs">Nome</Label>
+                <Input id="c-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
               </div>
-            ) : (
+              <div>
+                <Label htmlFor="c-sym" className="text-xs">Símbolo</Label>
+                <Input id="c-sym" value={form.symbol} onChange={(e) => setForm({ ...form, symbol: e.target.value.toUpperCase() })} />
+              </div>
+              <div>
+                <Label htmlFor="c-dec" className="text-xs">Decimals</Label>
+                <Input id="c-dec" type="number" min={0} max={36} value={form.decimals} onChange={(e) => setForm({ ...form, decimals: e.target.value })} />
+              </div>
+              <div>
+                <Label htmlFor="c-sup" className="text-xs">Supply inicial</Label>
+                <Input id="c-sup" value={form.initial_supply} onChange={(e) => setForm({ ...form, initial_supply: e.target.value })} />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <p className="text-xs text-muted-foreground">
+                Baseado em OpenZeppelin v5. Após gerar, faça o deploy automático na testnet Sepolia.
+              </p>
+              <div className="flex gap-2">
+                <Button onClick={generateContract} disabled={generatingContract || deploying} className="gap-2">
+                  {generatingContract ? <><Loader2 className="h-4 w-4 animate-spin" /> Gerando…</> : 'Gerar contrato'}
+                </Button>
+                {contract && (
+                  <Button onClick={deployContract} disabled={deploying || generatingContract} variant="default" className="gap-2 bg-emerald-600 hover:bg-emerald-700">
+                    {deploying ? <><Loader2 className="h-4 w-4 animate-spin" /> Implantando…</> : <><Rocket className="h-4 w-4" /> Deploy Sepolia</>}
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {contract && (
               <>
-                <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+                <div className="flex items-center justify-between mb-1 gap-2 flex-wrap">
                   <div className="text-sm">
                     <span className="font-medium">{contract.name}</span>{' '}
                     <span className="text-muted-foreground">({contract.symbol}, {contract.decimals} decimals, supply {contract.initial_supply})</span>
                   </div>
-                  <Button
-                    variant="outline" size="sm"
-                    onClick={() => downloadFile(`${contract.name}.sol`, contract.source_code, 'text/plain')}
-                    className="gap-2"
-                  >
+                  <Button variant="outline" size="sm" onClick={() => downloadFile(`${contract.name}.sol`, contract.source_code, 'text/plain')} className="gap-2">
                     <Download className="h-4 w-4" /> Baixar .sol
                   </Button>
                 </div>
-                <pre className="text-xs bg-muted p-4 rounded-md overflow-x-auto max-h-96 font-mono">
-                  {contract.source_code}
-                </pre>
+                <pre className="text-xs bg-muted p-4 rounded-md overflow-x-auto max-h-80 font-mono">{contract.source_code}</pre>
               </>
+            )}
+
+            {deployment && (
+              <div className="border border-emerald-500/30 rounded-md p-4 bg-emerald-500/5 space-y-2">
+                <div className="flex items-center gap-2 font-medium text-emerald-400 text-sm">
+                  <CheckCircle2 className="h-4 w-4" /> Deploy concluído (Sepolia)
+                </div>
+                <div className="grid md:grid-cols-2 gap-2 text-xs">
+                  <Field label="Contract" value={deployment.contract_address} href={deployment.explorer_url ?? undefined} />
+                  <Field label="Tx hash" value={deployment.tx_hash} href={deployment.explorer_url?.replace('/address/', '/tx/').replace(deployment.contract_address, deployment.tx_hash) ?? undefined} />
+                  <Field label="Block" value={String(deployment.block_number ?? '-')} />
+                  <Field label="Gas used" value={deployment.gas_used ?? '-'} />
+                </div>
+                {deployment.events.length > 0 && (
+                  <div className="pt-2">
+                    <div className="text-xs text-muted-foreground mb-1">Eventos ({deployment.events.length})</div>
+                    <pre className="text-[11px] bg-muted p-3 rounded overflow-x-auto max-h-48">
+{JSON.stringify(deployment.events, null, 2)}
+                    </pre>
+                  </div>
+                )}
+              </div>
             )}
           </CardContent>
         </Card>
       )}
 
-      {/* Export */}
       <div className="flex justify-end">
         <Button variant="outline" onClick={exportPlan} className="gap-2">
-          <Download className="h-4 w-4" /> Exportar plano (JSON)
+          <Download className="h-4 w-4" /> Exportar tudo (JSON)
         </Button>
       </div>
+    </div>
+  )
+}
+
+function Field({ label, value, href }: { label: string; value: string; href?: string }) {
+  return (
+    <div className="flex items-start gap-2 min-w-0">
+      <span className="text-muted-foreground shrink-0">{label}:</span>
+      <code className="font-mono truncate">{value}</code>
+      <button onClick={() => copy(value)} className="text-muted-foreground hover:text-foreground shrink-0" title="Copiar">
+        <Copy className="h-3 w-3" />
+      </button>
+      {href && (
+        <a href={href} target="_blank" rel="noreferrer" className="text-primary shrink-0" title="Abrir no Etherscan">
+          <ExternalLink className="h-3 w-3" />
+        </a>
+      )}
     </div>
   )
 }
