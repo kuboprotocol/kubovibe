@@ -76,6 +76,7 @@ export default function PlanPage() {
   const [deployment, setDeployment] = useState<Deployment | null>(null)
   const [generatingContract, setGeneratingContract] = useState(false)
   const [deploying, setDeploying] = useState(false)
+  const [deployError, setDeployError] = useState<string | null>(null)
 
   // Form ERC-20 customizado (persistido no localStorage por plano)
   const [form, setForm] = useState({ name: 'KuboCredit', symbol: 'KUBO', decimals: '18', initial_supply: '1000000' })
