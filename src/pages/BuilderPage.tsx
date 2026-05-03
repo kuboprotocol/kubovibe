@@ -539,7 +539,7 @@ export default function BuilderPage() {
                 }}
               />
               <div className="relative flex-1">
-                <textarea value={input} onChange={(e) => setInput(e.target.value)} placeholder="Describe your app..." rows={2}
+                <textarea value={input} onChange={(e) => setInput(e.target.value)} placeholder="Descreva o que você quer construir. Ex: 'app de delivery com pagamento via Pix e cripto'" rows={2}
                   className="w-full resize-none bg-secondary rounded-xl px-4 py-3 pr-12 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                   onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
                   onPaste={(e) => {

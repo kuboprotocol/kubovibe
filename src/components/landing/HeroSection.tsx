@@ -7,10 +7,14 @@ import { toast } from 'sonner'
 import logoImg from '@/assets/logo-kubovibe.png'
 import PromptAttachMenu from '@/components/landing/PromptAttachMenu'
 
+// Sugestões em linguagem natural — sem jargão técnico (Web2 ou Web3).
+// O orquestrador detecta a stack por trás. O usuário só descreve a ideia.
 const suggestions = [
-  'A food delivery app with live tracking',
-  'Portfolio website with dark mode',
-  'SaaS dashboard with analytics',
+  'Um app estilo Nubank com login e carteira digital',
+  'Marketplace de NFTs com pagamento em cripto',
+  'Loja online com fidelidade em tokens',
+  'Dashboard SaaS com analytics em tempo real',
+  'Rede social com recompensas para criadores',
 ]
 
 export default function HeroSection() {
@@ -81,7 +85,7 @@ export default function HeroSection() {
           className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent glass-border text-accent-foreground text-xs font-medium mb-8"
         >
           <Zap className="h-3 w-3" />
-          AI-powered app builder
+          Builder com IA — Web2 e Web3 sem complicação
         </motion.div>
 
         {/* Logo */}
@@ -100,9 +104,9 @@ export default function HeroSection() {
           transition={{ duration: 0.5, delay: 0.1 }}
           className="text-4xl md:text-6xl font-display font-bold text-foreground leading-[1.1] tracking-tight"
         >
-          Turn ideas into
+          Transforme ideias em
           <br />
-          <span className="hero-highlight">real products</span>
+          <span className="hero-highlight">produtos reais</span>
         </motion.h1>
 
         <motion.p
@@ -111,7 +115,7 @@ export default function HeroSection() {
           transition={{ duration: 0.5, delay: 0.2 }}
           className="mt-6 text-lg text-muted-foreground max-w-lg mx-auto leading-relaxed"
         >
-          Describe your vision and watch it come to life. No coding, no templates — just your imagination.
+          Descreva sua ideia em português comum. Nós cuidamos do resto — Web2, Web3, carteira, contratos. Você não precisa saber nada disso.
         </motion.p>
 
         {/* Prompt input */}
@@ -125,7 +129,7 @@ export default function HeroSection() {
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Describe your app idea..."
+              placeholder="Descreva o app que você quer. Exemplo: 'Quero um app estilo Nubank com login e carteira'"
               className="w-full resize-none bg-transparent px-5 pt-5 pb-16 text-foreground placeholder:text-muted-foreground focus:outline-none text-base min-h-[130px] font-sans"
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -158,7 +162,7 @@ export default function HeroSection() {
                 onClick={handleGenerate}
                 className="rounded-xl px-6 gap-2"
               >
-                Generate
+                Gerar
                 <ArrowRight className="h-4 w-4" />
               </Button>
             </div>
