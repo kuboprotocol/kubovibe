@@ -73,3 +73,53 @@ jobs:
               sys.exit(1)
           print('✓ render.yaml contains canonical-domain 301 redirect')
           "
+
+  live-redirect-curl-check:
+    name: Live 301 redirect (curl)
+    runs-on: ubuntu-latest
+    needs: verify-deploy-configs
+    # Only run on push to main (post-deploy verification). PRs validate config
+    # statically above; live curl needs the deployed edge to be up to date.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Curl sample *.lovable.app URL and assert 301 + Location
+        run: |
+          set -euo pipefail
+
+          # Hash fragments are never sent in HTTP requests (RFC 3986 §3.5) so
+          # curl cannot observe them — that contract is covered by the
+          # Playwright e2e specs. Here we lock the server-side guarantees:
+          # status code, Location host/path, and query-string preservation.
+          SAMPLES=(
+            "https://kubovibe.lovable.app/|https://kubovibe.dev/"
+            "https://kubovibe.lovable.app/connectors/github|https://kubovibe.dev/connectors/github"
+            "https://kubovibe.lovable.app/dashboard?ref=email&t=1|https://kubovibe.dev/dashboard?ref=email&t=1"
+            "https://kubovibe.lovable.app/app/proj-123/meu-app?ref=email&t=1|https://kubovibe.dev/app/proj-123/meu-app?ref=email&t=1"
+          )
+
+          fail=0
+          for pair in "${SAMPLES[@]}"; do
+            src="${pair%%|*}"
+            want="${pair##*|}"
+            echo "→ $src"
+
+            # -sS silent but show errors, -o /dev/null discard body, -D - dump headers,
+            # --max-time 15 cap latency, do NOT follow (-L) so we see the 301 itself.
+            headers=$(curl -sS -o /dev/null -D - --max-time 15 "$src" || true)
+            status=$(echo "$headers" | awk 'NR==1{print $2}')
+            location=$(echo "$headers" | awk 'BEGIN{IGNORECASE=1} /^location:/{sub(/\r$/,""); print $2}')
+
+            if [ "$status" != "301" ]; then
+              echo "::error::Expected 301 from $src, got $status"
+              fail=1
+              continue
+            fi
+            if [ "$location" != "$want" ]; then
+              echo "::error::Bad Location for $src — want '$want', got '$location'"
+              fail=1
+              continue
+            fi
+            echo "  ✓ 301 → $location"
+          done
+
+          exit $fail
