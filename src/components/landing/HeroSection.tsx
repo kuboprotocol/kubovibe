@@ -162,7 +162,7 @@ export default function HeroSection() {
                 onClick={handleGenerate}
                 className="rounded-xl px-6 gap-2"
               >
-                Generate
+                Gerar
                 <ArrowRight className="h-4 w-4" />
               </Button>
             </div>
