@@ -15,19 +15,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # setup-node's built-in `cache: npm` already caches ~/.npm keyed on the
+      # lockfile hash. Avoid a second actions/cache step on the same path —
+      # it duplicates work, doubles cache storage and adds save/restore overhead.
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
           cache-dependency-path: package-lock.json
-
-      - name: Cache ~/.npm (npm download cache)
-        uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-npm-cache-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-npm-cache-
 
       - name: Install dependencies
         run: npm ci --prefer-offline --no-audit --fund=false
