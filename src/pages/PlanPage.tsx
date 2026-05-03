@@ -219,6 +219,8 @@ export default function PlanPage() {
   async function deployContract() {
     if (!contract) return
     setDeploying(true)
+    setDeployError(null)
+    const toastId = toast.loading(deployment ? 'Re-implantando contrato na Sepolia…' : 'Implantando contrato na Sepolia…')
     try {
       const { data, error } = await supabase.functions.invoke('web3-contract-deploy', {
         body: { contract_id: contract.id },
@@ -237,12 +239,30 @@ export default function PlanPage() {
         explorer_url: data.explorer_url,
         events: data.events ?? [],
       })
-      toast.success('Deploy concluído na Sepolia!')
+      toast.success('Deploy concluído na Sepolia!', { id: toastId, description: `Tx ${String(data.tx_hash).slice(0, 10)}…` })
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Falha no deploy')
+      const msg = e instanceof Error ? e.message : 'Falha no deploy'
+      setDeployError(msg)
+      toast.error(msg, { id: toastId })
     } finally {
       setDeploying(false)
     }
+  }
+
+  function exportEventsCSV() {
+    if (!deployment?.events?.length) return
+    const rows = [['index', 'name', 'args', 'topic0', 'data']]
+    deployment.events.forEach((ev, i) => {
+      rows.push([
+        String(i),
+        ev.name ?? '',
+        Array.isArray(ev.args) ? JSON.stringify(ev.args) : '',
+        ev.topics?.[0] ?? '',
+        ev.data ?? '',
+      ])
+    })
+    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
+    downloadFile(`events-${deployment.tx_hash.slice(0, 10)}.csv`, csv, 'text/csv')
   }
 
   function exportPlan() {
