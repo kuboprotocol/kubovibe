@@ -120,12 +120,21 @@ test.describe('Canonical-domain redirect — 301 + Cache-Control + browser cache
 
     const seenRedirectStatuses: number[] = []
     const cacheHeaders: string[] = []
-    page.on('response', (r) => {
+    const redirectBodySizes: number[] = []
+    page.on('response', async (r) => {
       const u = r.url()
       if (u.startsWith(`${edge.url}/redir/`)) {
         seenRedirectStatuses.push(r.status())
         const cc = r.headers()['cache-control']
         if (cc) cacheHeaders.push(cc)
+        if (r.status() === 301) {
+          try {
+            const body = await r.body()
+            redirectBodySizes.push(body.length)
+          } catch {
+            // body() may throw if the connection was reused/cancelled — ignore.
+          }
+        }
       }
     })
 
