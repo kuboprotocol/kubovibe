@@ -18,45 +18,74 @@ import type { AddressInfo } from 'node:net'
  */
 
 const CACHE_CONTROL = 'public, max-age=31536000, immutable'
+const ETAG = '"redir-v1"'
+// Stable Last-Modified anchored to a fixed point in the past so revalidation
+// is deterministic across runs and matches what a real CDN would emit.
+const LAST_MODIFIED = new Date('2024-01-01T00:00:00Z').toUTCString()
 
-type Hit = { url: string; method: string; ifNoneMatch?: string; ifModifiedSince?: string }
+type Hit = {
+  url: string
+  method: string
+  ifNoneMatch?: string
+  ifModifiedSince?: string
+  status: number
+  responseHeaders: Record<string, string>
+}
 
 /** Boots a local HTTP server that mimics the edge redirect rule. */
 function startEdge(): Promise<{ url: string; close: () => Promise<void>; hits: Hit[] }> {
   const hits: Hit[] = []
   const server = http.createServer((req, res) => {
-    const inm = req.headers['if-none-match']
-    const ims = req.headers['if-modified-since']
-    hits.push({
+    const inm = typeof req.headers['if-none-match'] === 'string' ? (req.headers['if-none-match'] as string) : undefined
+    const ims =
+      typeof req.headers['if-modified-since'] === 'string' ? (req.headers['if-modified-since'] as string) : undefined
+    const hit: Hit = {
       url: req.url ?? '/',
       method: req.method ?? 'GET',
-      ifNoneMatch: typeof inm === 'string' ? inm : undefined,
-      ifModifiedSince: typeof ims === 'string' ? ims : undefined,
-    })
+      ifNoneMatch: inm,
+      ifModifiedSince: ims,
+      status: 0,
+      responseHeaders: {},
+    }
+    hits.push(hit)
+
+    const send = (status: number, headers: Record<string, string>, body?: string) => {
+      hit.status = status
+      hit.responseHeaders = headers
+      res.writeHead(status, headers)
+      res.end(body)
+    }
+
     if (req.url?.startsWith('/redir/')) {
-      // Honor conditional revalidation so WebKit/Firefox stay redirected on
-      // a 304 just as they would in production.
-      if (inm === '"redir-v1"') {
-        res.writeHead(304, { 'Cache-Control': CACHE_CONTROL, ETag: '"redir-v1"' })
-        res.end()
+      // Conditional revalidation → 304 with the SAME ETag + Last-Modified +
+      // Cache-Control as the original 301 (RFC 9111 §4.3.4 / §4.3.5).
+      const imsMatches = ims !== undefined && new Date(ims).getTime() >= new Date(LAST_MODIFIED).getTime()
+      if (inm === ETAG || imsMatches) {
+        send(304, {
+          'Cache-Control': CACHE_CONTROL,
+          ETag: ETAG,
+          'Last-Modified': LAST_MODIFIED,
+        })
         return
       }
-      res.writeHead(301, {
+      send(301, {
         Location: `/dest${req.url.slice('/redir'.length)}`,
         'Cache-Control': CACHE_CONTROL,
-        ETag: '"redir-v1"',
+        ETag: ETAG,
+        'Last-Modified': LAST_MODIFIED,
         Date: new Date().toUTCString(),
       })
-      res.end()
       return
     }
     if (req.url?.startsWith('/dest')) {
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' })
-      res.end('<!doctype html><html><body><main id="ok">canonical</main></body></html>')
+      send(
+        200,
+        { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' },
+        '<!doctype html><html><body><main id="ok">canonical</main></body></html>',
+      )
       return
     }
-    res.writeHead(404)
-    res.end()
+    send(404, {})
   })
   return new Promise((resolve) => {
     server.listen(0, '127.0.0.1', () => {
