@@ -60,13 +60,27 @@ export default function HeroSection() {
     toast.success('Referência adicionada!')
   }
 
-  // Conecta o botão Gerar ao orquestrador (Camada 2). Se o usuário não está
-  // logado, redireciona para /auth preservando o prompt para retomar depois.
-  const handleGenerate = async () => {
-    const text = prompt.trim()
+  // Restaura prompt pendente após login (vindo do /auth).
+  useEffect(() => {
+    const saved = sessionStorage.getItem('kubo:pending_prompt')
+    if (saved) {
+      setPrompt(saved)
+      if (user) {
+        sessionStorage.removeItem('kubo:pending_prompt')
+        setTimeout(() => handleGenerate(saved), 0)
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user])
+
+  // Conecta o botão Gerar ao orquestrador (Camada 2). Sem login: persiste o
+  // prompt em sessionStorage e manda para /auth; ao voltar, retoma sozinho.
+  const handleGenerate = async (override?: string) => {
+    const text = (typeof override === 'string' ? override : prompt).trim()
     if (!text) return
     if (!user) {
-      navigate('/auth', { state: { initialPrompt: text, redirectTo: '/' } })
+      sessionStorage.setItem('kubo:pending_prompt', text)
+      navigate('/auth', { state: { redirectTo: '/' } })
       return
     }
     setGenerating(true)
