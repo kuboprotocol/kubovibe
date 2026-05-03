@@ -171,7 +171,7 @@ describe('ConnectorDetailPage — undo banner persists across reload', () => {
     expect(window.localStorage.getItem(STORAGE_KEY)).not.toBeNull()
 
     const banner = await screen.findByTestId('undo-banner')
-    const dismissBtn = within(banner).getByRole('button', { name: /^dispensar$/i })
+    const dismissBtn = within(banner).getByTestId('undo-dismiss-button')
     act(() => { fireEvent.click(dismissBtn) })
 
     // Banner stays visible; a confirmation dialog must appear first.
