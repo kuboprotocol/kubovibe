@@ -37,6 +37,16 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
+    // Rate limit: 60 req/min por usuário
+    const { data: rl } = await serviceClient.rpc('bump_rate_limit', {
+      _bucket: 'github_repos', _user: user.id, _window_seconds: 60,
+    })
+    if (typeof rl === 'number' && rl > 60) {
+      return new Response(JSON.stringify({ error: 'rate_limited', retry_after_seconds: 60 }), {
+        status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Retry-After': '60' },
+      })
+    }
+
     const { data: connection, error: connError } = await serviceClient
       .from('github_connections')
       .select('access_token')
