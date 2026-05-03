@@ -192,7 +192,7 @@ export default function HeroSection() {
               <Button
                 variant="hero"
                 size="sm"
-                onClick={handleGenerate}
+                onClick={() => handleGenerate()}
                 disabled={generating}
                 className="rounded-xl px-6 gap-2"
               >
