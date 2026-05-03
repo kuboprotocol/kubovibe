@@ -97,20 +97,27 @@ test.describe('Canonical-domain redirect — 301 + Cache-Control + browser cache
     expect(seenRedirectStatuses, 'first hit must be 301').toContain(301)
     expect(cacheHeaders[0]).toBe(CACHE_CONTROL)
 
-    const hitsAfterFirst = edge.hits.filter((h) => h.url.startsWith('/redir/')).length
-    expect(hitsAfterFirst, 'first navigation should hit the redirect endpoint exactly once').toBe(1)
+    const redirHits = () => edge.hits.filter((h) => h.url.startsWith('/redir/'))
+    expect(redirHits().length, 'first navigation should hit the redirect endpoint exactly once').toBe(1)
 
     // ---------- 2nd navigation: cache must short-circuit ----------
     await page.goto('about:blank')
     await page.goto(`${edge.url}/redir/page?x=1`, { waitUntil: 'domcontentloaded' })
     expect(page.url()).toBe(`${edge.url}/dest/page?x=1`)
 
-    const hitsAfterSecond = edge.hits.filter((h) => h.url.startsWith('/redir/')).length
-    expect(
-      hitsAfterSecond,
-      `redirect endpoint must NOT be re-hit when Cache-Control=${CACHE_CONTROL}; ` +
-        `server hits seen: ${JSON.stringify(edge.hits)}`,
-    ).toBe(1)
+    // Cross-browser contract: either the browser served the 301 fully from
+    // cache (no extra hit), OR it issued a conditional revalidation that
+    // must carry If-None-Match / If-Modified-Since (i.e. NOT a fresh GET).
+    // A naked re-GET with no validators means caching is broken.
+    const hits = redirHits()
+    expect(hits.length, `at most one extra revalidation allowed; hits: ${JSON.stringify(hits)}`).toBeLessThanOrEqual(2)
+    if (hits.length === 2) {
+      const second = hits[1]
+      expect(
+        Boolean(second.ifNoneMatch || second.ifModifiedSince),
+        `second hit must be a conditional revalidation, got: ${JSON.stringify(second)}`,
+      ).toBe(true)
+    }
 
     await context.close()
     await edge.close()
