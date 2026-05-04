@@ -19,10 +19,19 @@ jobs:
       # lockfile hash. Avoid a second actions/cache step on the same path —
       # it duplicates work, doubles cache storage and adds save/restore overhead.
       - uses: actions/setup-node@v4
+        id: setup-node
         with:
           node-version: 20
           cache: npm
           cache-dependency-path: package-lock.json
+
+      - name: Report npm cache hit/miss
+        run: |
+          if [ "${{ steps.setup-node.outputs.cache-hit }}" = "true" ]; then
+            echo "::notice title=npm cache (playwright)::HIT"
+          else
+            echo "::notice title=npm cache (playwright)::MISS"
+          fi
 
       - name: Install dependencies
         run: npm ci --prefer-offline --no-audit --fund=false
@@ -54,10 +63,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
+        id: setup-node
         with:
           node-version: 20
           cache: npm
           cache-dependency-path: package-lock.json
+      - name: Report npm cache hit/miss
+        run: |
+          if [ "${{ steps.setup-node.outputs.cache-hit }}" = "true" ]; then
+            echo "::notice title=npm cache (hash-suite)::HIT"
+          else
+            echo "::notice title=npm cache (hash-suite)::MISS"
+          fi
       - name: Install dependencies
         run: npm ci --prefer-offline --no-audit --fund=false
       - name: Install Playwright Chromium (with system libs)
@@ -83,10 +100,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
+        id: setup-node
         with:
           node-version: 20
           cache: npm
           cache-dependency-path: package-lock.json
+      - name: Report npm cache hit/miss
+        run: |
+          if [ "${{ steps.setup-node.outputs.cache-hit }}" = "true" ]; then
+            echo "::notice title=npm cache (fuzz-suite)::HIT"
+          else
+            echo "::notice title=npm cache (fuzz-suite)::MISS"
+          fi
       - name: Install dependencies
         run: npm ci --prefer-offline --no-audit --fund=false
       - name: Install Playwright Chromium (with system libs)
@@ -125,10 +150,19 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
+        id: setup-node
         with:
           node-version: 20
           cache: npm
           cache-dependency-path: package-lock.json
+
+      - name: Report npm cache hit/miss
+        run: |
+          if [ "${{ steps.setup-node.outputs.cache-hit }}" = "true" ]; then
+            echo "::notice title=npm cache (${{ matrix.browser }})::HIT"
+          else
+            echo "::notice title=npm cache (${{ matrix.browser }})::MISS"
+          fi
 
       - name: Install dependencies
         run: npm ci --prefer-offline --no-audit --fund=false
