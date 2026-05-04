@@ -240,4 +240,62 @@ describe('useGitHubConnection retry/backoff on 429', () => {
       await runScenario('-5')
     })
   })
+
+  describe('falls back to exponential backoff when payload retry_after_seconds is invalid', () => {
+    function rateLimitedWithPayload(payload: Record<string, unknown>) {
+      const response = new Response(JSON.stringify(payload), {
+        status: 429,
+        headers: { 'Content-Type': 'application/json' },
+      })
+      const err = new Error('rate limited') as Error & { context: { response: Response } }
+      err.context = { response }
+      return err
+    }
+
+    async function runPayloadScenario(payload: Record<string, unknown>) {
+      invokeMock
+        .mockResolvedValueOnce({ data: null, error: rateLimitedWithPayload(payload) })
+        .mockResolvedValueOnce({ data: { url: 'https://github.com/x' }, error: null })
+
+      const { result } = renderHook(() => useGitHubConnection())
+      await act(async () => {
+        result.current.connect()
+        await Promise.resolve(); await Promise.resolve(); await Promise.resolve()
+      })
+
+      // Expect exponential default: 1000 * 2^0 = 1000ms
+      await act(async () => { await vi.advanceTimersByTimeAsync(999) })
+      expect(invokeMock).toHaveBeenCalledTimes(1)
+      await act(async () => { await vi.advanceTimersByTimeAsync(2) })
+      expect(invokeMock).toHaveBeenCalledTimes(2)
+    }
+
+    it('payload without retry_after_seconds → exponential default (1s)', async () => {
+      await runPayloadScenario({ error: 'rate_limited' })
+    })
+
+    it('payload with empty-string retry_after_seconds → exponential default (1s)', async () => {
+      await runPayloadScenario({ error: 'rate_limited', retry_after_seconds: '' })
+    })
+
+    it('payload with non-numeric retry_after_seconds → exponential default (1s)', async () => {
+      await runPayloadScenario({ error: 'rate_limited', retry_after_seconds: 'soon' })
+    })
+
+    it('payload with null retry_after_seconds → exponential default (1s)', async () => {
+      await runPayloadScenario({ error: 'rate_limited', retry_after_seconds: null })
+    })
+
+    it('payload with zero retry_after_seconds → exponential default (1s)', async () => {
+      await runPayloadScenario({ error: 'rate_limited', retry_after_seconds: 0 })
+    })
+
+    it('payload with negative retry_after_seconds → exponential default (1s)', async () => {
+      await runPayloadScenario({ error: 'rate_limited', retry_after_seconds: -10 })
+    })
+
+    it('payload with NaN-producing object retry_after_seconds → exponential default (1s)', async () => {
+      await runPayloadScenario({ error: 'rate_limited', retry_after_seconds: { foo: 1 } })
+    })
+  })
 })
