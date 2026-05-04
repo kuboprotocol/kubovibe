@@ -188,4 +188,56 @@ describe('useGitHubConnection retry/backoff on 429', () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(2) })
     expect(invokeMock).toHaveBeenCalledTimes(2)
   })
+
+  describe('falls back to exponential backoff when Retry-After is invalid', () => {
+    function rateLimitedWithHeader(headerValue: string | null) {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (headerValue !== null) headers['Retry-After'] = headerValue
+      const response = new Response(JSON.stringify({ error: 'rate_limited' }), {
+        status: 429,
+        headers,
+      })
+      const err = new Error('rate limited') as Error & { context: { response: Response } }
+      err.context = { response }
+      return err
+    }
+
+    async function runScenario(headerValue: string | null) {
+      invokeMock
+        .mockResolvedValueOnce({ data: null, error: rateLimitedWithHeader(headerValue) })
+        .mockResolvedValueOnce({ data: { url: 'https://github.com/x' }, error: null })
+
+      const { result } = renderHook(() => useGitHubConnection())
+      await act(async () => {
+        result.current.connect()
+        await Promise.resolve(); await Promise.resolve(); await Promise.resolve()
+      })
+
+      // Expect exponential default: 1000 * 2^0 = 1000ms
+      await act(async () => { await vi.advanceTimersByTimeAsync(999) })
+      expect(invokeMock).toHaveBeenCalledTimes(1)
+      await act(async () => { await vi.advanceTimersByTimeAsync(2) })
+      expect(invokeMock).toHaveBeenCalledTimes(2)
+    }
+
+    it('absent Retry-After header → exponential default (1s)', async () => {
+      await runScenario(null)
+    })
+
+    it('empty Retry-After header → exponential default (1s)', async () => {
+      await runScenario('')
+    })
+
+    it('non-numeric Retry-After header (e.g. "soon") → exponential default (1s)', async () => {
+      await runScenario('soon')
+    })
+
+    it('zero Retry-After header → exponential default (1s)', async () => {
+      await runScenario('0')
+    })
+
+    it('negative Retry-After header → exponential default (1s)', async () => {
+      await runScenario('-5')
+    })
+  })
 })
