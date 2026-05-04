@@ -32,6 +32,14 @@ jobs:
           else
             echo "::notice title=npm cache (playwright)::MISS"
           fi
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit --fund=false
+
+      - name: Install Playwright Chromium (with system libs)
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright tests (excluding split redirect-cache suites)
         env:
           TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
           TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
