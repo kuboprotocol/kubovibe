@@ -27,12 +27,18 @@ jobs:
           cache-dependency-path: package-lock.json
 
       - name: Report npm cache hit/miss
+        env:
+          JOB_LABEL: vitest
         run: |
+          echo "::group::[${JOB_LABEL}] npm cache status"
           if [ "${{ steps.setup-node.outputs.cache-hit }}" = "true" ]; then
-            echo "::notice title=npm cache::HIT (~/.npm restored from setup-node cache)"
+            echo "::notice title=[${JOB_LABEL}] npm cache::HIT (~/.npm restored from setup-node cache)"
+            echo "[${JOB_LABEL}] npm cache: HIT"
           else
-            echo "::notice title=npm cache::MISS (no cache restored — full download)"
+            echo "::notice title=[${JOB_LABEL}] npm cache::MISS (no cache restored — full download)"
+            echo "[${JOB_LABEL}] npm cache: MISS"
           fi
+          echo "::endgroup::"
 
       # Persistent Vite/Vitest caches: dependency pre-bundling and the
       # Vitest runner cache. Keyed on lockfile + config files so it is
@@ -50,10 +56,25 @@ jobs:
             ${{ runner.os }}-vite-vitest-
 
       - name: Install dependencies
-        run: npm ci --prefer-offline --no-audit --fund=false
+        env:
+          JOB_LABEL: vitest
+        run: |
+          echo "::group::[${JOB_LABEL}] npm ci"
+          npm ci --prefer-offline --no-audit --fund=false
+          echo "::endgroup::"
 
       - name: Run redirect-flow tests
-        run: npx vitest run src/test/redirect-flow.test.tsx --reporter=verbose
+        env:
+          JOB_LABEL: vitest
+        run: |
+          echo "::group::[${JOB_LABEL}] redirect-flow tests"
+          npx vitest run src/test/redirect-flow.test.tsx --reporter=verbose
+          echo "::endgroup::"
 
       - name: Run full Vitest suite
-        run: npm test -- --reporter=verbose
+        env:
+          JOB_LABEL: vitest
+        run: |
+          echo "::group::[${JOB_LABEL}] full vitest suite"
+          npm test -- --reporter=verbose
+          echo "::endgroup::"
