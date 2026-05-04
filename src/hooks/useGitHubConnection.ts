@@ -70,7 +70,12 @@ export function useGitHubConnection() {
         if (ctxResp) {
           try { payload = await ctxResp.clone().json() } catch { /* noop */ }
           const headerRA = ctxResp.headers.get('Retry-After')
-          retryAfter = Number(payload?.retry_after_seconds ?? headerRA ?? 0)
+          const rawHint = payload?.retry_after_seconds ?? headerRA
+          const parsed =
+            rawHint === null || rawHint === undefined || rawHint === ''
+              ? 0
+              : Number(rawHint)
+          retryAfter = Number.isFinite(parsed) && parsed > 0 ? parsed : 0
         }
 
         if (status === 429 || payload?.error === 'rate_limited') {
