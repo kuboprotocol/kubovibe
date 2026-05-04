@@ -150,10 +150,19 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
+        id: setup-node
         with:
           node-version: 20
           cache: npm
           cache-dependency-path: package-lock.json
+
+      - name: Report npm cache hit/miss
+        run: |
+          if [ "${{ steps.setup-node.outputs.cache-hit }}" = "true" ]; then
+            echo "::notice title=npm cache (${{ matrix.browser }})::HIT"
+          else
+            echo "::notice title=npm cache (${{ matrix.browser }})::MISS"
+          fi
 
       - name: Install dependencies
         run: npm ci --prefer-offline --no-audit --fund=false
