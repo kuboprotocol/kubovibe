@@ -12,13 +12,11 @@ jobs:
     name: Vitest (RTL redirect-flow + unit tests)
     timeout-minutes: 10
     runs-on: ubuntu-latest
+    env:
+      JOB_LABEL: vitest
     steps:
       - uses: actions/checkout@v4
 
-      # Node + built-in npm cache (keyed on package-lock.json).
-      # setup-node's built-in `cache: npm` already caches ~/.npm keyed on the
-      # lockfile hash. A separate actions/cache step on the same path would
-      # duplicate storage and add save/restore overhead with no real gain.
       - uses: actions/setup-node@v4
         id: setup-node
         with:
@@ -26,39 +24,15 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
 
-      # Detect npm cache regressions. Behavior controlled by repo/org variable
-      # NPM_CACHE_STRICT:
-      #   - "error" → fail the job on MISS (use to gate PRs after caching is stable)
-      #   - "warn"  → emit ::warning:: on MISS (default — visible but non-blocking)
-      #   - "off"   → only ::notice:: (silent regression detection)
-      - name: Report npm cache hit/miss
-        env:
-          JOB_LABEL: vitest
-          CACHE_HIT: ${{ steps.setup-node.outputs.cache-hit }}
-          NPM_CACHE_STRICT: ${{ vars.NPM_CACHE_STRICT || 'warn' }}
-        run: |
-          echo "::group::[${JOB_LABEL}] npm cache status (strict=${NPM_CACHE_STRICT})"
-          if [ "${CACHE_HIT}" = "true" ]; then
-            echo "::notice title=[${JOB_LABEL}] npm cache::HIT (~/.npm restored from setup-node cache)"
-            echo "[${JOB_LABEL}] npm cache: HIT"
-            echo "::endgroup::"
-            exit 0
-          fi
-          echo "[${JOB_LABEL}] npm cache: MISS"
-          case "${NPM_CACHE_STRICT}" in
-            error)
-              echo "::error title=[${JOB_LABEL}] npm cache MISS::Cache regression detected — failing job (NPM_CACHE_STRICT=error)."
-              echo "::endgroup::"
-              exit 1
-              ;;
-            off)
-              echo "::notice title=[${JOB_LABEL}] npm cache::MISS (no cache restored — full download)"
-              ;;
-            *)
-              echo "::warning title=[${JOB_LABEL}] npm cache MISS::No cache restored — full npm download. Investigate lockfile/key churn or set NPM_CACHE_STRICT=error to enforce."
-              ;;
-          esac
-          echo "::endgroup::"
+      - name: Report npm cache (key + miss streak)
+        uses: ./.github/actions/npm-cache-report
+        with:
+          job-label: ${{ env.JOB_LABEL }}
+          cache-hit: ${{ steps.setup-node.outputs.cache-hit }}
+          lockfile-hash: ${{ hashFiles('package-lock.json') }}
+          node-version: "20"
+          strict: ${{ vars.NPM_CACHE_STRICT || 'warn' }}
+          max-misses: ${{ vars.NPM_CACHE_MAX_MISSES || '3' }}
 
       # Persistent Vite/Vitest caches: dependency pre-bundling and the
       # Vitest runner cache. Keyed on lockfile + config files so it is
@@ -76,24 +50,18 @@ jobs:
             ${{ runner.os }}-vite-vitest-
 
       - name: Install dependencies
-        env:
-          JOB_LABEL: vitest
         run: |
           echo "::group::[${JOB_LABEL}] npm ci"
           npm ci --prefer-offline --no-audit --fund=false
           echo "::endgroup::"
 
       - name: Run redirect-flow tests
-        env:
-          JOB_LABEL: vitest
         run: |
           echo "::group::[${JOB_LABEL}] redirect-flow tests"
           npx vitest run src/test/redirect-flow.test.tsx --reporter=verbose
           echo "::endgroup::"
 
       - name: Run full Vitest suite
-        env:
-          JOB_LABEL: vitest
         run: |
           echo "::group::[${JOB_LABEL}] full vitest suite"
           npm test -- --reporter=verbose
