@@ -26,18 +26,38 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
 
+      # Detect npm cache regressions. Behavior controlled by repo/org variable
+      # NPM_CACHE_STRICT:
+      #   - "error" → fail the job on MISS (use to gate PRs after caching is stable)
+      #   - "warn"  → emit ::warning:: on MISS (default — visible but non-blocking)
+      #   - "off"   → only ::notice:: (silent regression detection)
       - name: Report npm cache hit/miss
         env:
           JOB_LABEL: vitest
+          CACHE_HIT: ${{ steps.setup-node.outputs.cache-hit }}
+          NPM_CACHE_STRICT: ${{ vars.NPM_CACHE_STRICT || 'warn' }}
         run: |
-          echo "::group::[${JOB_LABEL}] npm cache status"
-          if [ "${{ steps.setup-node.outputs.cache-hit }}" = "true" ]; then
+          echo "::group::[${JOB_LABEL}] npm cache status (strict=${NPM_CACHE_STRICT})"
+          if [ "${CACHE_HIT}" = "true" ]; then
             echo "::notice title=[${JOB_LABEL}] npm cache::HIT (~/.npm restored from setup-node cache)"
             echo "[${JOB_LABEL}] npm cache: HIT"
-          else
-            echo "::notice title=[${JOB_LABEL}] npm cache::MISS (no cache restored — full download)"
-            echo "[${JOB_LABEL}] npm cache: MISS"
+            echo "::endgroup::"
+            exit 0
           fi
+          echo "[${JOB_LABEL}] npm cache: MISS"
+          case "${NPM_CACHE_STRICT}" in
+            error)
+              echo "::error title=[${JOB_LABEL}] npm cache MISS::Cache regression detected — failing job (NPM_CACHE_STRICT=error)."
+              echo "::endgroup::"
+              exit 1
+              ;;
+            off)
+              echo "::notice title=[${JOB_LABEL}] npm cache::MISS (no cache restored — full download)"
+              ;;
+            *)
+              echo "::warning title=[${JOB_LABEL}] npm cache MISS::No cache restored — full npm download. Investigate lockfile/key churn or set NPM_CACHE_STRICT=error to enforce."
+              ;;
+          esac
           echo "::endgroup::"
 
       # Persistent Vite/Vitest caches: dependency pre-bundling and the
