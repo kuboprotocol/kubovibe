@@ -140,6 +140,21 @@ Deno.test('handle: 401 when x-test-secret header is missing or wrong (no createC
   assertEquals(spy.calls.length, 0)
 })
 
+Deno.test('handle: wrong x-test-secret -> 401 unauthorized and createClient is NOT called', async () => {
+  const spy = makeCreateClientSpy()
+  const res = await handle(postWithSecret('definitely-not-the-secret'), {
+    createClient: spy.fn,
+    getEnv: envGetterFrom(fullEnv),
+  })
+
+  assertEquals(res.status, 401)
+  const body = await res.json()
+  assertEquals(body.error, 'unauthorized')
+
+  // Garantia: nenhum cliente Supabase foi instanciado — sem chance de vazar SERVICE_ROLE_KEY.
+  assertEquals(spy.calls.length, 0, 'createClient must not be called when secret is invalid')
+})
+
 Deno.test('handle: rejects non-POST methods with 405', async () => {
   const spy = makeCreateClientSpy()
   const res = await handle(new Request('http://local/test', { method: 'GET' }), {
