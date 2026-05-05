@@ -145,8 +145,9 @@ Deno.test('HTTP integration: 401 unauthorized when x-test-secret header is absen
 Deno.test('HTTP integration: 401 unauthorized when x-test-secret is incorrect (no createClient call)', async () => {
   const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
   try {
-    // Variantes de secret incorreto: valor errado, vazio, com whitespace e com prefixo válido.
-    const wrongSecrets = ['totally-wrong', '', '   ', `${SECRET}-extra`, `wrong-${SECRET}`]
+    // Variantes de secret incorreto: valor errado, vazio, com prefixo/sufixo do válido.
+    // (whitespace-only é coberto por teste dedicado abaixo.)
+    const wrongSecrets = ['totally-wrong', '', `${SECRET}-extra`, `wrong-${SECRET}`]
     for (const wrong of wrongSecrets) {
       const res = await fetch(`${ctx.url}/`, {
         method: 'POST',
