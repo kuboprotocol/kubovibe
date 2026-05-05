@@ -145,8 +145,9 @@ Deno.test('HTTP integration: 401 unauthorized when x-test-secret header is absen
 Deno.test('HTTP integration: 401 unauthorized when x-test-secret is incorrect (no createClient call)', async () => {
   const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
   try {
-    // Variantes de secret incorreto: valor errado, vazio, com whitespace e com prefixo válido.
-    const wrongSecrets = ['totally-wrong', '', '   ', `${SECRET}-extra`, `wrong-${SECRET}`]
+    // Variantes de secret incorreto: valor errado, vazio, com prefixo/sufixo do válido.
+    // (whitespace-only é coberto por teste dedicado abaixo.)
+    const wrongSecrets = ['totally-wrong', '', `${SECRET}-extra`, `wrong-${SECRET}`]
     for (const wrong of wrongSecrets) {
       const res = await fetch(`${ctx.url}/`, {
         method: 'POST',
@@ -159,6 +160,29 @@ Deno.test('HTTP integration: 401 unauthorized when x-test-secret is incorrect (n
     }
     // Nenhuma das tentativas pode instanciar Supabase client.
     assertEquals(ctx._calls, 0, 'createClient não deve ser chamado com secret incorreto')
+  } finally {
+    await ctx.stop()
+  }
+})
+
+Deno.test('HTTP integration: whitespace-only x-test-secret (" ") -> 401, body {error:"unauthorized"}, createClientCalls === 0', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    const res = await fetch(`${ctx.url}/`, {
+      method: 'POST',
+      headers: { 'x-test-secret': ' ', 'content-type': 'application/json' },
+    })
+
+    // Contrato: status 401
+    assertEquals(res.status, 401, 'secret só com whitespace deve ser rejeitado')
+    assertEquals(res.headers.get('content-type'), 'application/json')
+
+    // Contrato: body exato
+    const body = await res.json()
+    assertEquals(body, { error: 'unauthorized' })
+
+    // Contrato: createClient nunca foi chamado
+    assertEquals(ctx._calls, 0, 'createClientCalls === 0 — nenhum cliente Supabase instanciado')
   } finally {
     await ctx.stop()
   }
