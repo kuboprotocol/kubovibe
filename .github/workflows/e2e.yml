@@ -27,16 +27,35 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
 
+      # Detect npm cache regressions. Behavior controlled by repo/org variable
+      # NPM_CACHE_STRICT: "error" fails the job on MISS, "warn" (default) emits
+      # a workflow warning, "off" only logs a notice.
       - name: Report npm cache hit/miss
+        env:
+          CACHE_HIT: ${{ steps.setup-node.outputs.cache-hit }}
+          NPM_CACHE_STRICT: ${{ vars.NPM_CACHE_STRICT || 'warn' }}
         run: |
-          echo "::group::[${JOB_LABEL}] npm cache status"
-          if [ "${{ steps.setup-node.outputs.cache-hit }}" = "true" ]; then
+          echo "::group::[${JOB_LABEL}] npm cache status (strict=${NPM_CACHE_STRICT})"
+          if [ "${CACHE_HIT}" = "true" ]; then
             echo "::notice title=[${JOB_LABEL}] npm cache::HIT"
             echo "[${JOB_LABEL}] npm cache: HIT"
-          else
-            echo "::notice title=[${JOB_LABEL}] npm cache::MISS"
-            echo "[${JOB_LABEL}] npm cache: MISS"
+            echo "::endgroup::"
+            exit 0
           fi
+          echo "[${JOB_LABEL}] npm cache: MISS"
+          case "${NPM_CACHE_STRICT}" in
+            error)
+              echo "::error title=[${JOB_LABEL}] npm cache MISS::Cache regression detected — failing job (NPM_CACHE_STRICT=error)."
+              echo "::endgroup::"
+              exit 1
+              ;;
+            off)
+              echo "::notice title=[${JOB_LABEL}] npm cache::MISS"
+              ;;
+            *)
+              echo "::warning title=[${JOB_LABEL}] npm cache MISS::No cache restored — full npm download. Investigate lockfile/key churn or set NPM_CACHE_STRICT=error to enforce."
+              ;;
+          esac
           echo "::endgroup::"
 
       - name: Install dependencies
@@ -85,16 +104,35 @@ jobs:
           node-version: 20
           cache: npm
           cache-dependency-path: package-lock.json
+      # Detect npm cache regressions. Behavior controlled by repo/org variable
+      # NPM_CACHE_STRICT: "error" fails the job on MISS, "warn" (default) emits
+      # a workflow warning, "off" only logs a notice.
       - name: Report npm cache hit/miss
+        env:
+          CACHE_HIT: ${{ steps.setup-node.outputs.cache-hit }}
+          NPM_CACHE_STRICT: ${{ vars.NPM_CACHE_STRICT || 'warn' }}
         run: |
-          echo "::group::[${JOB_LABEL}] npm cache status"
-          if [ "${{ steps.setup-node.outputs.cache-hit }}" = "true" ]; then
+          echo "::group::[${JOB_LABEL}] npm cache status (strict=${NPM_CACHE_STRICT})"
+          if [ "${CACHE_HIT}" = "true" ]; then
             echo "::notice title=[${JOB_LABEL}] npm cache::HIT"
             echo "[${JOB_LABEL}] npm cache: HIT"
-          else
-            echo "::notice title=[${JOB_LABEL}] npm cache::MISS"
-            echo "[${JOB_LABEL}] npm cache: MISS"
+            echo "::endgroup::"
+            exit 0
           fi
+          echo "[${JOB_LABEL}] npm cache: MISS"
+          case "${NPM_CACHE_STRICT}" in
+            error)
+              echo "::error title=[${JOB_LABEL}] npm cache MISS::Cache regression detected — failing job (NPM_CACHE_STRICT=error)."
+              echo "::endgroup::"
+              exit 1
+              ;;
+            off)
+              echo "::notice title=[${JOB_LABEL}] npm cache::MISS"
+              ;;
+            *)
+              echo "::warning title=[${JOB_LABEL}] npm cache MISS::No cache restored — full npm download. Investigate lockfile/key churn or set NPM_CACHE_STRICT=error to enforce."
+              ;;
+          esac
           echo "::endgroup::"
       - name: Install dependencies
         run: |
@@ -136,16 +174,35 @@ jobs:
           node-version: 20
           cache: npm
           cache-dependency-path: package-lock.json
+      # Detect npm cache regressions. Behavior controlled by repo/org variable
+      # NPM_CACHE_STRICT: "error" fails the job on MISS, "warn" (default) emits
+      # a workflow warning, "off" only logs a notice.
       - name: Report npm cache hit/miss
+        env:
+          CACHE_HIT: ${{ steps.setup-node.outputs.cache-hit }}
+          NPM_CACHE_STRICT: ${{ vars.NPM_CACHE_STRICT || 'warn' }}
         run: |
-          echo "::group::[${JOB_LABEL}] npm cache status"
-          if [ "${{ steps.setup-node.outputs.cache-hit }}" = "true" ]; then
+          echo "::group::[${JOB_LABEL}] npm cache status (strict=${NPM_CACHE_STRICT})"
+          if [ "${CACHE_HIT}" = "true" ]; then
             echo "::notice title=[${JOB_LABEL}] npm cache::HIT"
             echo "[${JOB_LABEL}] npm cache: HIT"
-          else
-            echo "::notice title=[${JOB_LABEL}] npm cache::MISS"
-            echo "[${JOB_LABEL}] npm cache: MISS"
+            echo "::endgroup::"
+            exit 0
           fi
+          echo "[${JOB_LABEL}] npm cache: MISS"
+          case "${NPM_CACHE_STRICT}" in
+            error)
+              echo "::error title=[${JOB_LABEL}] npm cache MISS::Cache regression detected — failing job (NPM_CACHE_STRICT=error)."
+              echo "::endgroup::"
+              exit 1
+              ;;
+            off)
+              echo "::notice title=[${JOB_LABEL}] npm cache::MISS"
+              ;;
+            *)
+              echo "::warning title=[${JOB_LABEL}] npm cache MISS::No cache restored — full npm download. Investigate lockfile/key churn or set NPM_CACHE_STRICT=error to enforce."
+              ;;
+          esac
           echo "::endgroup::"
       - name: Install dependencies
         run: |
@@ -202,16 +259,35 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
 
+      # Detect npm cache regressions. Behavior controlled by repo/org variable
+      # NPM_CACHE_STRICT: "error" fails the job on MISS, "warn" (default) emits
+      # a workflow warning, "off" only logs a notice.
       - name: Report npm cache hit/miss
+        env:
+          CACHE_HIT: ${{ steps.setup-node.outputs.cache-hit }}
+          NPM_CACHE_STRICT: ${{ vars.NPM_CACHE_STRICT || 'warn' }}
         run: |
-          echo "::group::[${JOB_LABEL}] npm cache status"
-          if [ "${{ steps.setup-node.outputs.cache-hit }}" = "true" ]; then
+          echo "::group::[${JOB_LABEL}] npm cache status (strict=${NPM_CACHE_STRICT})"
+          if [ "${CACHE_HIT}" = "true" ]; then
             echo "::notice title=[${JOB_LABEL}] npm cache::HIT"
             echo "[${JOB_LABEL}] npm cache: HIT"
-          else
-            echo "::notice title=[${JOB_LABEL}] npm cache::MISS"
-            echo "[${JOB_LABEL}] npm cache: MISS"
+            echo "::endgroup::"
+            exit 0
           fi
+          echo "[${JOB_LABEL}] npm cache: MISS"
+          case "${NPM_CACHE_STRICT}" in
+            error)
+              echo "::error title=[${JOB_LABEL}] npm cache MISS::Cache regression detected — failing job (NPM_CACHE_STRICT=error)."
+              echo "::endgroup::"
+              exit 1
+              ;;
+            off)
+              echo "::notice title=[${JOB_LABEL}] npm cache::MISS"
+              ;;
+            *)
+              echo "::warning title=[${JOB_LABEL}] npm cache MISS::No cache restored — full npm download. Investigate lockfile/key churn or set NPM_CACHE_STRICT=error to enforce."
+              ;;
+          esac
           echo "::endgroup::"
 
       - name: Install dependencies
