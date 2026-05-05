@@ -17,9 +17,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # setup-node's built-in `cache: npm` already caches ~/.npm keyed on the
-      # lockfile hash. Avoid a second actions/cache step on the same path —
-      # it duplicates work, doubles cache storage and adds save/restore overhead.
       - uses: actions/setup-node@v4
         id: setup-node
         with:
@@ -27,36 +24,36 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
 
-      # Detect npm cache regressions. Behavior controlled by repo/org variable
-      # NPM_CACHE_STRICT: "error" fails the job on MISS, "warn" (default) emits
-      # a workflow warning, "off" only logs a notice.
-      - name: Report npm cache hit/miss
-        env:
-          CACHE_HIT: ${{ steps.setup-node.outputs.cache-hit }}
-          NPM_CACHE_STRICT: ${{ vars.NPM_CACHE_STRICT || 'warn' }}
-        run: |
-          echo "::group::[${JOB_LABEL}] npm cache status (strict=${NPM_CACHE_STRICT})"
-          if [ "${CACHE_HIT}" = "true" ]; then
-            echo "::notice title=[${JOB_LABEL}] npm cache::HIT"
-            echo "[${JOB_LABEL}] npm cache: HIT"
-            echo "::endgroup::"
-            exit 0
-          fi
-          echo "[${JOB_LABEL}] npm cache: MISS"
-          case "${NPM_CACHE_STRICT}" in
-            error)
-              echo "::error title=[${JOB_LABEL}] npm cache MISS::Cache regression detected — failing job (NPM_CACHE_STRICT=error)."
-              echo "::endgroup::"
-              exit 1
-              ;;
-            off)
-              echo "::notice title=[${JOB_LABEL}] npm cache::MISS"
-              ;;
-            *)
-              echo "::warning title=[${JOB_LABEL}] npm cache MISS::No cache restored — full npm download. Investigate lockfile/key churn or set NPM_CACHE_STRICT=error to enforce."
-              ;;
-          esac
-          echo "::endgroup::"
+      - name: Report npm cache (key + miss streak)
+        uses: ./.github/actions/npm-cache-report
+        with:
+          job-label: ${{ env.JOB_LABEL }}
+          cache-hit: ${{ steps.setup-node.outputs.cache-hit }}
+          lockfile-hash: ${{ hashFiles('package-lock.json') }}
+          node-version: "20"
+          strict: ${{ vars.NPM_CACHE_STRICT || 'warn' }}
+          max-misses: ${{ vars.NPM_CACHE_MAX_MISSES || '3' }}
+
+      # Vite cache helps when e2e boots the dev/preview server.
+      - name: Cache Vite
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules/.vite
+            .vite
+          key: ${{ runner.os }}-vite-${{ hashFiles('package-lock.json', 'vite.config.ts', 'tsconfig*.json') }}
+          restore-keys: |
+            ${{ runner.os }}-vite-
+
+      # Cache Playwright browser binaries keyed on the installed @playwright/test version.
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
 
       - name: Install dependencies
         run: |
@@ -67,7 +64,13 @@ jobs:
       - name: Install Playwright Chromium (with system libs)
         run: |
           echo "::group::[${JOB_LABEL}] playwright install chromium"
-          npx playwright install --with-deps chromium
+          if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
+            echo "[${JOB_LABEL}] playwright browsers cache: HIT — installing system deps only"
+            npx playwright install-deps chromium
+          else
+            echo "[${JOB_LABEL}] playwright browsers cache: MISS — full install"
+            npx playwright install --with-deps chromium
+          fi
           echo "::endgroup::"
 
       - name: Run Playwright tests (excluding split redirect-cache suites)
@@ -104,51 +107,60 @@ jobs:
           node-version: 20
           cache: npm
           cache-dependency-path: package-lock.json
-      # Detect npm cache regressions. Behavior controlled by repo/org variable
-      # NPM_CACHE_STRICT: "error" fails the job on MISS, "warn" (default) emits
-      # a workflow warning, "off" only logs a notice.
-      - name: Report npm cache hit/miss
-        env:
-          CACHE_HIT: ${{ steps.setup-node.outputs.cache-hit }}
-          NPM_CACHE_STRICT: ${{ vars.NPM_CACHE_STRICT || 'warn' }}
-        run: |
-          echo "::group::[${JOB_LABEL}] npm cache status (strict=${NPM_CACHE_STRICT})"
-          if [ "${CACHE_HIT}" = "true" ]; then
-            echo "::notice title=[${JOB_LABEL}] npm cache::HIT"
-            echo "[${JOB_LABEL}] npm cache: HIT"
-            echo "::endgroup::"
-            exit 0
-          fi
-          echo "[${JOB_LABEL}] npm cache: MISS"
-          case "${NPM_CACHE_STRICT}" in
-            error)
-              echo "::error title=[${JOB_LABEL}] npm cache MISS::Cache regression detected — failing job (NPM_CACHE_STRICT=error)."
-              echo "::endgroup::"
-              exit 1
-              ;;
-            off)
-              echo "::notice title=[${JOB_LABEL}] npm cache::MISS"
-              ;;
-            *)
-              echo "::warning title=[${JOB_LABEL}] npm cache MISS::No cache restored — full npm download. Investigate lockfile/key churn or set NPM_CACHE_STRICT=error to enforce."
-              ;;
-          esac
-          echo "::endgroup::"
+
+      - name: Report npm cache (key + miss streak)
+        uses: ./.github/actions/npm-cache-report
+        with:
+          job-label: ${{ env.JOB_LABEL }}
+          cache-hit: ${{ steps.setup-node.outputs.cache-hit }}
+          lockfile-hash: ${{ hashFiles('package-lock.json') }}
+          node-version: "20"
+          strict: ${{ vars.NPM_CACHE_STRICT || 'warn' }}
+          max-misses: ${{ vars.NPM_CACHE_MAX_MISSES || '3' }}
+
+      - name: Cache Vite
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules/.vite
+            .vite
+          key: ${{ runner.os }}-vite-${{ hashFiles('package-lock.json', 'vite.config.ts', 'tsconfig*.json') }}
+          restore-keys: |
+            ${{ runner.os }}-vite-
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
       - name: Install dependencies
         run: |
           echo "::group::[${JOB_LABEL}] npm ci"
           npm ci --prefer-offline --no-audit --fund=false
           echo "::endgroup::"
+
       - name: Install Playwright Chromium (with system libs)
         run: |
           echo "::group::[${JOB_LABEL}] playwright install chromium"
-          npx playwright install --with-deps chromium
+          if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
+            echo "[${JOB_LABEL}] playwright browsers cache: HIT — installing system deps only"
+            npx playwright install-deps chromium
+          else
+            echo "[${JOB_LABEL}] playwright browsers cache: MISS — full install"
+            npx playwright install --with-deps chromium
+          fi
           echo "::endgroup::"
+
       - name: Run hash-preservation matrix only
         run: |
           echo "::group::[${JOB_LABEL}] playwright hash-preservation matrix"
           npx playwright test --project=chromium e2e/canonical-domain-redirect-cache.spec.ts --grep "hash preservation across cached 301"
           echo "::endgroup::"
+
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4
@@ -163,7 +175,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       JOB_LABEL: fuzz-suite
-      # Override in workflow_dispatch / repo vars to replay a specific seed run.
       FUZZ_SEED_BASE: ${{ vars.FUZZ_SEED_BASE || '12648430' }}
       FUZZ_COUNT: ${{ vars.FUZZ_COUNT || '12' }}
     steps:
@@ -174,51 +185,60 @@ jobs:
           node-version: 20
           cache: npm
           cache-dependency-path: package-lock.json
-      # Detect npm cache regressions. Behavior controlled by repo/org variable
-      # NPM_CACHE_STRICT: "error" fails the job on MISS, "warn" (default) emits
-      # a workflow warning, "off" only logs a notice.
-      - name: Report npm cache hit/miss
-        env:
-          CACHE_HIT: ${{ steps.setup-node.outputs.cache-hit }}
-          NPM_CACHE_STRICT: ${{ vars.NPM_CACHE_STRICT || 'warn' }}
-        run: |
-          echo "::group::[${JOB_LABEL}] npm cache status (strict=${NPM_CACHE_STRICT})"
-          if [ "${CACHE_HIT}" = "true" ]; then
-            echo "::notice title=[${JOB_LABEL}] npm cache::HIT"
-            echo "[${JOB_LABEL}] npm cache: HIT"
-            echo "::endgroup::"
-            exit 0
-          fi
-          echo "[${JOB_LABEL}] npm cache: MISS"
-          case "${NPM_CACHE_STRICT}" in
-            error)
-              echo "::error title=[${JOB_LABEL}] npm cache MISS::Cache regression detected — failing job (NPM_CACHE_STRICT=error)."
-              echo "::endgroup::"
-              exit 1
-              ;;
-            off)
-              echo "::notice title=[${JOB_LABEL}] npm cache::MISS"
-              ;;
-            *)
-              echo "::warning title=[${JOB_LABEL}] npm cache MISS::No cache restored — full npm download. Investigate lockfile/key churn or set NPM_CACHE_STRICT=error to enforce."
-              ;;
-          esac
-          echo "::endgroup::"
+
+      - name: Report npm cache (key + miss streak)
+        uses: ./.github/actions/npm-cache-report
+        with:
+          job-label: ${{ env.JOB_LABEL }}
+          cache-hit: ${{ steps.setup-node.outputs.cache-hit }}
+          lockfile-hash: ${{ hashFiles('package-lock.json') }}
+          node-version: "20"
+          strict: ${{ vars.NPM_CACHE_STRICT || 'warn' }}
+          max-misses: ${{ vars.NPM_CACHE_MAX_MISSES || '3' }}
+
+      - name: Cache Vite
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules/.vite
+            .vite
+          key: ${{ runner.os }}-vite-${{ hashFiles('package-lock.json', 'vite.config.ts', 'tsconfig*.json') }}
+          restore-keys: |
+            ${{ runner.os }}-vite-
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
       - name: Install dependencies
         run: |
           echo "::group::[${JOB_LABEL}] npm ci"
           npm ci --prefer-offline --no-audit --fund=false
           echo "::endgroup::"
+
       - name: Install Playwright Chromium (with system libs)
         run: |
           echo "::group::[${JOB_LABEL}] playwright install chromium"
-          npx playwright install --with-deps chromium
+          if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
+            echo "[${JOB_LABEL}] playwright browsers cache: HIT — installing system deps only"
+            npx playwright install-deps chromium
+          else
+            echo "[${JOB_LABEL}] playwright browsers cache: MISS — full install"
+            npx playwright install --with-deps chromium
+          fi
           echo "::endgroup::"
+
       - name: Run fuzz suite (deterministic seeds)
         run: |
           echo "::group::[${JOB_LABEL}] playwright fuzz suite (seed_base=${FUZZ_SEED_BASE} count=${FUZZ_COUNT})"
           npx playwright test --project=chromium e2e/canonical-domain-redirect-cache.spec.ts --grep "fuzz #"
           echo "::endgroup::"
+
       - name: Upload Playwright report (with persisted fuzz seeds)
         if: always()
         uses: actions/upload-artifact@v4
@@ -226,6 +246,7 @@ jobs:
           name: playwright-report-fuzz
           path: playwright-report/
           retention-days: 30
+
       - name: Upload fuzz seed manifest
         if: always()
         uses: actions/upload-artifact@v4
@@ -259,36 +280,35 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
 
-      # Detect npm cache regressions. Behavior controlled by repo/org variable
-      # NPM_CACHE_STRICT: "error" fails the job on MISS, "warn" (default) emits
-      # a workflow warning, "off" only logs a notice.
-      - name: Report npm cache hit/miss
-        env:
-          CACHE_HIT: ${{ steps.setup-node.outputs.cache-hit }}
-          NPM_CACHE_STRICT: ${{ vars.NPM_CACHE_STRICT || 'warn' }}
-        run: |
-          echo "::group::[${JOB_LABEL}] npm cache status (strict=${NPM_CACHE_STRICT})"
-          if [ "${CACHE_HIT}" = "true" ]; then
-            echo "::notice title=[${JOB_LABEL}] npm cache::HIT"
-            echo "[${JOB_LABEL}] npm cache: HIT"
-            echo "::endgroup::"
-            exit 0
-          fi
-          echo "[${JOB_LABEL}] npm cache: MISS"
-          case "${NPM_CACHE_STRICT}" in
-            error)
-              echo "::error title=[${JOB_LABEL}] npm cache MISS::Cache regression detected — failing job (NPM_CACHE_STRICT=error)."
-              echo "::endgroup::"
-              exit 1
-              ;;
-            off)
-              echo "::notice title=[${JOB_LABEL}] npm cache::MISS"
-              ;;
-            *)
-              echo "::warning title=[${JOB_LABEL}] npm cache MISS::No cache restored — full npm download. Investigate lockfile/key churn or set NPM_CACHE_STRICT=error to enforce."
-              ;;
-          esac
-          echo "::endgroup::"
+      - name: Report npm cache (key + miss streak)
+        uses: ./.github/actions/npm-cache-report
+        with:
+          job-label: ${{ env.JOB_LABEL }}
+          cache-hit: ${{ steps.setup-node.outputs.cache-hit }}
+          lockfile-hash: ${{ hashFiles('package-lock.json') }}
+          node-version: "20"
+          strict: ${{ vars.NPM_CACHE_STRICT || 'warn' }}
+          max-misses: ${{ vars.NPM_CACHE_MAX_MISSES || '3' }}
+
+      - name: Cache Vite
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules/.vite
+            .vite
+          key: ${{ runner.os }}-vite-${{ hashFiles('package-lock.json', 'vite.config.ts', 'tsconfig*.json') }}
+          restore-keys: |
+            ${{ runner.os }}-vite-
+
+      # Per-browser Playwright cache so firefox/webkit don't invalidate each other.
+      - name: Cache Playwright browsers (${{ matrix.browser }})
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ matrix.browser }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-${{ matrix.browser }}-
 
       - name: Install dependencies
         run: |
@@ -299,7 +319,13 @@ jobs:
       - name: Install Playwright browser (${{ matrix.browser }})
         run: |
           echo "::group::[${JOB_LABEL}] playwright install ${{ matrix.browser }}"
-          npx playwright install --with-deps ${{ matrix.browser }}
+          if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
+            echo "[${JOB_LABEL}] playwright browsers cache: HIT — installing system deps only"
+            npx playwright install-deps ${{ matrix.browser }}
+          else
+            echo "[${JOB_LABEL}] playwright browsers cache: MISS — full install"
+            npx playwright install --with-deps ${{ matrix.browser }}
+          fi
           echo "::endgroup::"
 
       - name: Run canonical-domain redirect cache spec (excluding fuzz)

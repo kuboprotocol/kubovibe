@@ -1,0 +1,100 @@
+name: NPM Cache Report
+description: |
+  Reports the npm cache key/hit status for setup-node and tracks consecutive
+  MISSes via an auxiliary actions/cache entry. Fails the job when:
+    - NPM_CACHE_STRICT=error and current run is a MISS, OR
+    - consecutive MISS streak exceeds NPM_CACHE_MAX_MISSES (default 3).
+  Otherwise emits ::warning:: (default) or ::notice:: (off).
+
+inputs:
+  job-label:
+    description: Short label used to namespace logs and the miss-counter cache key.
+    required: true
+  cache-hit:
+    description: The `cache-hit` output from actions/setup-node.
+    required: true
+  lockfile-hash:
+    description: hashFiles('package-lock.json') from the caller. Used to display the cache key.
+    required: true
+  node-version:
+    description: Node major version, used in the displayed cache key.
+    required: false
+    default: "20"
+  strict:
+    description: error | warn | off
+    required: false
+    default: warn
+  max-misses:
+    description: Fail when consecutive MISS streak strictly exceeds this number.
+    required: false
+    default: "3"
+
+runs:
+  using: composite
+  steps:
+    # Restore (and later save) the consecutive-miss counter for this job.
+    # Key is fixed per job-label so it always restores the previous run's value.
+    - name: Restore miss-counter cache
+      id: miss-cache
+      uses: actions/cache@v4
+      with:
+        path: .npm-cache-misses
+        key: npm-miss-counter-${{ inputs.job-label }}-v1
+
+    - name: Report npm cache + enforce miss streak
+      shell: bash
+      env:
+        JOB_LABEL: ${{ inputs.job-label }}
+        CACHE_HIT: ${{ inputs.cache-hit }}
+        LOCK_HASH: ${{ inputs.lockfile-hash }}
+        NODE_VERSION: ${{ inputs.node-version }}
+        NPM_CACHE_STRICT: ${{ inputs.strict }}
+        NPM_CACHE_MAX_MISSES: ${{ inputs.max-misses }}
+        RUNNER_OS_LBL: ${{ runner.os }}
+      run: |
+        echo "::group::[${JOB_LABEL}] npm cache status (strict=${NPM_CACHE_STRICT}, max_misses=${NPM_CACHE_MAX_MISSES})"
+        # Cache key as composed by setup-node (display only — useful to spot churn).
+        CACHE_KEY="node-cache-${RUNNER_OS_LBL}-npm-${LOCK_HASH}"
+        echo "[${JOB_LABEL}] cache key: ${CACHE_KEY}"
+        echo "[${JOB_LABEL}] node version: ${NODE_VERSION}"
+        echo "::notice title=[${JOB_LABEL}] npm cache key::${CACHE_KEY}"
+
+        STREAK_FILE=".npm-cache-misses"
+        PREV=0
+        if [ -f "${STREAK_FILE}" ]; then
+          PREV=$(cat "${STREAK_FILE}" 2>/dev/null || echo 0)
+          case "${PREV}" in ''|*[!0-9]*) PREV=0 ;; esac
+        fi
+
+        if [ "${CACHE_HIT}" = "true" ]; then
+          echo "[${JOB_LABEL}] npm cache: HIT (resetting miss streak from ${PREV} to 0)"
+          echo "::notice title=[${JOB_LABEL}] npm cache::HIT — streak reset (was ${PREV})"
+          echo 0 > "${STREAK_FILE}"
+          echo "::endgroup::"
+          exit 0
+        fi
+
+        NEW=$((PREV + 1))
+        echo "${NEW}" > "${STREAK_FILE}"
+        echo "[${JOB_LABEL}] npm cache: MISS (consecutive misses: ${NEW})"
+
+        if [ "${NEW}" -gt "${NPM_CACHE_MAX_MISSES}" ]; then
+          echo "::error title=[${JOB_LABEL}] npm cache MISS streak::Consecutive MISS streak ${NEW} exceeds limit ${NPM_CACHE_MAX_MISSES}. Failing."
+          echo "::endgroup::"
+          exit 1
+        fi
+
+        case "${NPM_CACHE_STRICT}" in
+          error)
+            echo "::error title=[${JOB_LABEL}] npm cache MISS::Cache regression detected — failing job (NPM_CACHE_STRICT=error). Streak=${NEW}/${NPM_CACHE_MAX_MISSES}."
+            echo "::endgroup::"
+            exit 1
+            ;;
+          off)
+            echo "::notice title=[${JOB_LABEL}] npm cache::MISS (streak=${NEW}/${NPM_CACHE_MAX_MISSES})"
+            ;;
+          *)
+            echo "::warning title=[${JOB_LABEL}] npm cache MISS::No cache restored. Streak=${NEW}/${NPM_CACHE_MAX_MISSES}. Set NPM_CACHE_STRICT=error to enforce immediately."
+            ;;
+        esac
+        echo "::endgroup::"
