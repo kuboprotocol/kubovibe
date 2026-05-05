@@ -178,3 +178,80 @@ Deno.test('HTTP integration: CORS preflight (OPTIONS) responds 200 with allowed 
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: 401 with wrong secret still includes CORS headers', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    const res = await fetch(`${ctx.url}/`, {
+      method: 'POST',
+      headers: { 'x-test-secret': 'definitely-wrong', 'content-type': 'application/json' },
+    })
+    assertEquals(res.status, 401)
+
+    // CORS deve estar presente mesmo em respostas de erro (necessário para o
+    // browser conseguir LER o status/body 401 vindo de outra origem).
+    assertEquals(res.headers.get('access-control-allow-origin'), '*')
+    const allowed = res.headers.get('access-control-allow-headers') ?? ''
+    assert(allowed.includes('x-test-secret'), 'allow-headers deve listar x-test-secret')
+    assert(allowed.includes('content-type'), 'allow-headers deve listar content-type')
+    assert(allowed.includes('authorization'), 'allow-headers deve listar authorization')
+
+    const body = await res.json()
+    assertEquals(body, { error: 'unauthorized' })
+    assertEquals(ctx._calls, 0)
+  } finally {
+    await ctx.stop()
+  }
+})
+
+Deno.test('HTTP integration: empty x-test-secret ("") -> 401 unauthorized + CORS, no createClient', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    const res = await fetch(`${ctx.url}/`, {
+      method: 'POST',
+      headers: { 'x-test-secret': '', 'content-type': 'application/json' },
+    })
+    assertEquals(res.status, 401, 'header vazio deve ser tratado como ausente')
+    assertEquals(res.headers.get('content-type'), 'application/json')
+    assertEquals(res.headers.get('access-control-allow-origin'), '*')
+
+    const body = await res.json()
+    assertEquals(body, { error: 'unauthorized' })
+    assertEquals(ctx._calls, 0, 'createClient não deve ser chamado com secret vazio')
+  } finally {
+    await ctx.stop()
+  }
+})
+
+Deno.test('HTTP integration: invalid JSON body is tolerated (handler does not parse it)', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    // Secret correto + body claramente malformado: handler não consome body,
+    // portanto deve responder 200 normalmente. Garante que não há regressão
+    // que comece a parsear req.json() sem proteção.
+    const okRes = await fetch(`${ctx.url}/`, {
+      method: 'POST',
+      headers: { 'x-test-secret': SECRET, 'content-type': 'application/json' },
+      body: '{not-json,,,',
+    })
+    assertEquals(okRes.status, 200)
+    assertEquals(okRes.headers.get('access-control-allow-origin'), '*')
+    const okBody = await okRes.json()
+    assertEquals(typeof okBody.access_token, 'string')
+
+    // Secret errado + body malformado: 401 + CORS, sem tocar createClient extra.
+    const callsAfterOk = ctx._calls
+    const badRes = await fetch(`${ctx.url}/`, {
+      method: 'POST',
+      headers: { 'x-test-secret': 'wrong', 'content-type': 'application/json' },
+      body: '<<<not-json>>>',
+    })
+    assertEquals(badRes.status, 401)
+    assertEquals(badRes.headers.get('access-control-allow-origin'), '*')
+    const badBody = await badRes.json()
+    assertEquals(badBody, { error: 'unauthorized' })
+    assertEquals(ctx._calls, callsAfterOk, 'sem createClient extra para body inválido + secret errado')
+  } finally {
+    await ctx.stop()
+  }
+})
