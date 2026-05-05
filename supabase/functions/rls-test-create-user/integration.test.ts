@@ -1,0 +1,158 @@
+// Teste de integração: sobe o handler em um servidor HTTP local (porta efêmera)
+// e valida o contrato de resposta da edge function via fetch real.
+//
+// Cobre:
+//  - 200 OK com schema completo de sessão quando secret correto.
+//  - 401 unauthorized quando header x-test-secret está ausente
+//    (e nenhum createClient é instanciado).
+import { assertEquals, assert, assertExists } from 'https://deno.land/std@0.224.0/assert/mod.ts'
+import { handle, type CreateClientFn } from './index.ts'
+
+const SECRET = 'integration-test-secret'
+const URL_ENV = 'https://example.supabase.co'
+const SERVICE = 'service-role-key-INT'
+const ANON = 'anon-key-INT'
+
+const fullEnv: Record<string, string> = {
+  SUPABASE_URL: URL_ENV,
+  SUPABASE_SERVICE_ROLE_KEY: SERVICE,
+  SUPABASE_ANON_KEY: ANON,
+  RLS_TEST_SECRET: SECRET,
+}
+
+function makeFakeClient() {
+  return {
+    auth: {
+      admin: {
+        createUser: async () => ({
+          data: { user: { id: 'integration-user-id' } },
+          error: null,
+        }),
+      },
+      signInWithPassword: async () => ({
+        data: {
+          session: {
+            access_token: 'access-token-int',
+            refresh_token: 'refresh-token-int',
+          },
+        },
+        error: null,
+      }),
+    },
+  }
+}
+
+interface ServerCtx {
+  url: string
+  stop: () => Promise<void>
+  createClientCalls: number
+}
+
+/**
+ * Sobe o handler em uma porta efêmera (port: 0 -> SO escolhe livre).
+ * Permite injetar um createClient fake e contar chamadas a partir do escopo do server.
+ */
+async function startServer(env: Record<string, string>): Promise<ServerCtx> {
+  let createClientCalls = 0
+  const fakeCreateClient: CreateClientFn = () => {
+    createClientCalls++
+    return makeFakeClient()
+  }
+  const ac = new AbortController()
+
+  const server = Deno.serve(
+    { port: 0, hostname: '127.0.0.1', signal: ac.signal, onListen: () => {} },
+    (req) => handle(req, { createClient: fakeCreateClient, getEnv: (n) => env[n] }),
+  )
+
+  // Deno.serve retorna { addr } no objeto server (Deno 1.40+).
+  const addr = (server as unknown as { addr: { hostname: string; port: number } }).addr
+  const url = `http://${addr.hostname}:${addr.port}`
+
+  return {
+    url,
+    createClientCalls: 0,
+    get stop() {
+      return async () => {
+        ac.abort()
+        try { await server.finished } catch { /* ignore */ }
+      }
+    },
+    // proxy dinâmico para counter
+    // @ts-ignore add getter
+    get _calls() { return createClientCalls },
+  } as unknown as ServerCtx & { _calls: number }
+}
+
+Deno.test('HTTP integration: 200 OK with full session contract when secret is correct', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    const res = await fetch(`${ctx.url}/`, {
+      method: 'POST',
+      headers: { 'x-test-secret': SECRET, 'content-type': 'application/json' },
+    })
+    assertEquals(res.status, 200, 'status deve ser 200')
+    assertEquals(res.headers.get('content-type'), 'application/json')
+
+    const body = await res.json()
+
+    // Contrato de resposta: todos os campos exigidos pelo cliente de testes.
+    assertExists(body.user_id, 'user_id é obrigatório')
+    assertExists(body.email, 'email é obrigatório')
+    assertExists(body.access_token, 'access_token é obrigatório')
+    assertExists(body.refresh_token, 'refresh_token é obrigatório')
+
+    assertEquals(typeof body.user_id, 'string')
+    assertEquals(typeof body.email, 'string')
+    assertEquals(typeof body.access_token, 'string')
+    assertEquals(typeof body.refresh_token, 'string')
+
+    assertEquals(body.user_id, 'integration-user-id')
+    assertEquals(body.access_token, 'access-token-int')
+    assertEquals(body.refresh_token, 'refresh-token-int')
+    assert(body.email.endsWith('@rls-test.kubovibe.dev'), 'email deve usar domínio de teste')
+
+    // Apenas as 4 chaves esperadas — nada de vazar service role/secret.
+    assertEquals(
+      Object.keys(body).sort(),
+      ['access_token', 'email', 'refresh_token', 'user_id'],
+    )
+
+    // Dois createClient: admin (service role) + userClient (anon).
+    assertEquals(ctx._calls, 2)
+  } finally {
+    await ctx.stop()
+  }
+})
+
+Deno.test('HTTP integration: 401 unauthorized when x-test-secret header is absent', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    const res = await fetch(`${ctx.url}/`, { method: 'POST' })
+    assertEquals(res.status, 401)
+    assertEquals(res.headers.get('content-type'), 'application/json')
+
+    const body = await res.json()
+    assertEquals(body, { error: 'unauthorized' })
+
+    // Nenhum cliente instanciado — sem chance de tocar Supabase Admin API.
+    assertEquals(ctx._calls, 0, 'createClient não deve ser chamado sem secret')
+  } finally {
+    await ctx.stop()
+  }
+})
+
+Deno.test('HTTP integration: CORS preflight (OPTIONS) responds 200 with allowed headers', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    const res = await fetch(`${ctx.url}/`, { method: 'OPTIONS' })
+    assertEquals(res.status, 200)
+    assertEquals(res.headers.get('access-control-allow-origin'), '*')
+    const allowed = res.headers.get('access-control-allow-headers') ?? ''
+    assert(allowed.includes('x-test-secret'), 'preflight deve permitir x-test-secret')
+    await res.text()
+    assertEquals(ctx._calls, 0)
+  } finally {
+    await ctx.stop()
+  }
+})
