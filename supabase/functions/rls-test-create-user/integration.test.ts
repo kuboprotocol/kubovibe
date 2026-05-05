@@ -165,6 +165,29 @@ Deno.test('HTTP integration: 401 unauthorized when x-test-secret is incorrect (n
   }
 })
 
+Deno.test('HTTP integration: whitespace-only x-test-secret (" ") -> 401, body {error:"unauthorized"}, createClientCalls === 0', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    const res = await fetch(`${ctx.url}/`, {
+      method: 'POST',
+      headers: { 'x-test-secret': ' ', 'content-type': 'application/json' },
+    })
+
+    // Contrato: status 401
+    assertEquals(res.status, 401, 'secret só com whitespace deve ser rejeitado')
+    assertEquals(res.headers.get('content-type'), 'application/json')
+
+    // Contrato: body exato
+    const body = await res.json()
+    assertEquals(body, { error: 'unauthorized' })
+
+    // Contrato: createClient nunca foi chamado
+    assertEquals(ctx._calls, 0, 'createClientCalls === 0 — nenhum cliente Supabase instanciado')
+  } finally {
+    await ctx.stop()
+  }
+})
+
 Deno.test('HTTP integration: CORS preflight (OPTIONS) responds 200 with allowed headers', async () => {
   const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
   try {
