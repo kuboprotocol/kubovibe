@@ -142,6 +142,28 @@ Deno.test('HTTP integration: 401 unauthorized when x-test-secret header is absen
   }
 })
 
+Deno.test('HTTP integration: 401 unauthorized when x-test-secret is incorrect (no createClient call)', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    // Variantes de secret incorreto: valor errado, vazio, com whitespace e com prefixo válido.
+    const wrongSecrets = ['totally-wrong', '', '   ', `${SECRET}-extra`, `wrong-${SECRET}`]
+    for (const wrong of wrongSecrets) {
+      const res = await fetch(`${ctx.url}/`, {
+        method: 'POST',
+        headers: { 'x-test-secret': wrong, 'content-type': 'application/json' },
+      })
+      assertEquals(res.status, 401, `secret "${wrong}" deve resultar em 401`)
+      assertEquals(res.headers.get('content-type'), 'application/json')
+      const body = await res.json()
+      assertEquals(body, { error: 'unauthorized' })
+    }
+    // Nenhuma das tentativas pode instanciar Supabase client.
+    assertEquals(ctx._calls, 0, 'createClient não deve ser chamado com secret incorreto')
+  } finally {
+    await ctx.stop()
+  }
+})
+
 Deno.test('HTTP integration: CORS preflight (OPTIONS) responds 200 with allowed headers', async () => {
   const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
   try {
