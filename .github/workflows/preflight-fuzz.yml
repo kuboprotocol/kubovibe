@@ -271,29 +271,83 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-      # Stage the fast-check files into per-file directories so each upload
-      # contains exactly one JSON (used only by the request-method category,
-      # since fast-check only runs there).
-      - name: Stage fast-check JSON files for individual upload
-        if: always() && steps.gate.outputs.should_run == 'true' && matrix.id == 'request-method'
-        id: stage_fc
+      # Stage per-file artifacts so each download contains exactly one file.
+      # seeds.json / failures.json exist for ALL categories (manual fuzzers).
+      # fc-seeds.json / fc-failures.json only exist for request-method.
+      - name: Stage per-file artifacts (seeds, failures, log, fast-check)
+        if: always() && steps.gate.outputs.should_run == 'true'
+        id: stage
         run: |
-          mkdir -p reports/fc-seeds reports/fc-failures
-          STAGED_SEEDS=0
-          STAGED_FAILS=0
-          if [ -f "$FUZZ_STATE_DIR/fc-seeds.json" ]; then
-            cp "$FUZZ_STATE_DIR/fc-seeds.json" reports/fc-seeds/fc-seeds.json
+          mkdir -p \
+            reports/seeds reports/failures reports/log \
+            reports/fc-seeds reports/fc-failures
+
+          STAGED_SEEDS=0; STAGED_FAILS=0; STAGED_LOG=0
+          STAGED_FC_SEEDS=0; STAGED_FC_FAILS=0
+
+          if [ -f "$FUZZ_STATE_DIR/seeds.json" ]; then
+            cp "$FUZZ_STATE_DIR/seeds.json" reports/seeds/seeds.json
             STAGED_SEEDS=1
           fi
-          if [ -f "$FUZZ_STATE_DIR/fc-failures.json" ]; then
-            cp "$FUZZ_STATE_DIR/fc-failures.json" reports/fc-failures/fc-failures.json
+          if [ -f "$FUZZ_STATE_DIR/failures.json" ]; then
+            cp "$FUZZ_STATE_DIR/failures.json" reports/failures/failures.json
             STAGED_FAILS=1
           fi
-          echo "staged_seeds=${STAGED_SEEDS}" >> "$GITHUB_OUTPUT"
-          echo "staged_failures=${STAGED_FAILS}" >> "$GITHUB_OUTPUT"
+          if [ -f "reports/fuzz-${CATEGORY_ID}.log" ]; then
+            cp "reports/fuzz-${CATEGORY_ID}.log" "reports/log/fuzz-${CATEGORY_ID}.log"
+            STAGED_LOG=1
+          fi
+          if [ "${CATEGORY_ID}" = "request-method" ]; then
+            if [ -f "$FUZZ_STATE_DIR/fc-seeds.json" ]; then
+              cp "$FUZZ_STATE_DIR/fc-seeds.json" reports/fc-seeds/fc-seeds.json
+              STAGED_FC_SEEDS=1
+            fi
+            if [ -f "$FUZZ_STATE_DIR/fc-failures.json" ]; then
+              cp "$FUZZ_STATE_DIR/fc-failures.json" reports/fc-failures/fc-failures.json
+              STAGED_FC_FAILS=1
+            fi
+          fi
+
+          {
+            echo "staged_seeds=${STAGED_SEEDS}"
+            echo "staged_failures=${STAGED_FAILS}"
+            echo "staged_log=${STAGED_LOG}"
+            echo "staged_fc_seeds=${STAGED_FC_SEEDS}"
+            echo "staged_fc_failures=${STAGED_FC_FAILS}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Upload seeds.json (per category)
+        if: always() && steps.gate.outputs.should_run == 'true' && steps.stage.outputs.staged_seeds == '1'
+        id: upload_seeds
+        uses: actions/upload-artifact@v4
+        with:
+          name: preflight-fuzz-${{ matrix.id }}-seeds-${{ github.run_id }}
+          path: reports/seeds/seeds.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload failures.json (per category)
+        if: always() && steps.gate.outputs.should_run == 'true' && steps.stage.outputs.staged_failures == '1'
+        id: upload_failures
+        uses: actions/upload-artifact@v4
+        with:
+          name: preflight-fuzz-${{ matrix.id }}-failures-${{ github.run_id }}
+          path: reports/failures/failures.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload fuzz log (per category)
+        if: always() && steps.gate.outputs.should_run == 'true' && steps.stage.outputs.staged_log == '1'
+        id: upload_log
+        uses: actions/upload-artifact@v4
+        with:
+          name: preflight-fuzz-${{ matrix.id }}-log-${{ github.run_id }}
+          path: reports/log/fuzz-${{ matrix.id }}.log
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Upload fc-seeds.json artifact
-        if: always() && steps.gate.outputs.should_run == 'true' && matrix.id == 'request-method' && steps.stage_fc.outputs.staged_seeds == '1'
+        if: always() && steps.gate.outputs.should_run == 'true' && steps.stage.outputs.staged_fc_seeds == '1'
         id: upload_fc_seeds
         uses: actions/upload-artifact@v4
         with:
@@ -303,7 +357,7 @@ jobs:
           retention-days: 14
 
       - name: Upload fc-failures.json artifact
-        if: always() && steps.gate.outputs.should_run == 'true' && matrix.id == 'request-method' && steps.stage_fc.outputs.staged_failures == '1'
+        if: always() && steps.gate.outputs.should_run == 'true' && steps.stage.outputs.staged_fc_failures == '1'
         id: upload_fc_failures
         uses: actions/upload-artifact@v4
         with:
@@ -317,12 +371,18 @@ jobs:
         id: links
         run: |
           ARTIFACT_URL="${{ steps.upload.outputs.artifact-url }}"
+          SEEDS_URL="${{ steps.upload_seeds.outputs.artifact-url }}"
+          FAILURES_URL="${{ steps.upload_failures.outputs.artifact-url }}"
+          LOG_URL="${{ steps.upload_log.outputs.artifact-url }}"
           FC_SEEDS_URL="${{ steps.upload_fc_seeds.outputs.artifact-url }}"
           FC_FAILURES_URL="${{ steps.upload_fc_failures.outputs.artifact-url }}"
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           if [ -z "${ARTIFACT_URL}" ]; then ARTIFACT_URL="${RUN_URL}#artifacts"; fi
           {
             echo "artifact_url=${ARTIFACT_URL}"
+            echo "seeds_url=${SEEDS_URL}"
+            echo "failures_url=${FAILURES_URL}"
+            echo "log_url=${LOG_URL}"
             echo "fc_seeds_url=${FC_SEEDS_URL}"
             echo "fc_failures_url=${FC_FAILURES_URL}"
             echo "run_url=${RUN_URL}"
@@ -330,15 +390,14 @@ jobs:
 
           {
             echo ""
-            echo "### 📦 Artifacts for \`${CATEGORY_ID}\`"
-            echo "- [Download \`${ARTIFACT_NAME}\` (full bundle)](${ARTIFACT_URL})"
-            if [ -n "${FC_SEEDS_URL}" ]; then
-              echo "- [Download \`fc-seeds.json\` only](${FC_SEEDS_URL})"
-            fi
-            if [ -n "${FC_FAILURES_URL}" ]; then
-              echo "- [Download \`fc-failures.json\` only](${FC_FAILURES_URL})"
-            fi
-            echo "- [Workflow run page](${RUN_URL})"
+            echo "### 📦 Direct downloads for \`${CATEGORY_ID}\`"
+            echo "- [📥 Full bundle (\`${ARTIFACT_NAME}\`)](${ARTIFACT_URL})"
+            [ -n "${SEEDS_URL}" ]        && echo "- [🌱 \`seeds.json\`](${SEEDS_URL})"
+            [ -n "${FAILURES_URL}" ]     && echo "- [💥 \`failures.json\`](${FAILURES_URL})"
+            [ -n "${LOG_URL}" ]          && echo "- [📜 \`fuzz-${CATEGORY_ID}.log\`](${LOG_URL})"
+            [ -n "${FC_SEEDS_URL}" ]     && echo "- [🌱 \`fc-seeds.json\` (fast-check)](${FC_SEEDS_URL})"
+            [ -n "${FC_FAILURES_URL}" ]  && echo "- [💥 \`fc-failures.json\` (fast-check minimized)](${FC_FAILURES_URL})"
+            echo "- [🔗 Workflow run page](${RUN_URL})"
           } >> "${{ steps.summary.outputs.summary_file }}"
 
       # Dedicated GitHub Check Run per category — visible as its own status
@@ -354,7 +413,7 @@ jobs:
           output: |
             {
               "title": "${{ steps.fuzz.outputs.exit_code == '0' && format('✅ {0} — invariants held', matrix.label) || format('❌ {0} — invariant violation', matrix.label) }}",
-              "summary": "Category: `${{ matrix.id }}`\nRun #${{ github.run_number }} on `${{ github.ref_name }}` (`${{ github.sha }}`).\n\n**Status:** ${{ steps.fuzz.outputs.exit_code == '0' && 'PASS' || 'FAIL' }}\n\n📦 **Artifacts**\n- [Full bundle (`${{ env.ARTIFACT_NAME }}`)](${{ steps.links.outputs.artifact_url }})${{ steps.links.outputs.fc_seeds_url && format('\n- [fc-seeds.json (fast-check seeds)]({0})', steps.links.outputs.fc_seeds_url) || '' }}${{ steps.links.outputs.fc_failures_url && format('\n- [fc-failures.json (fast-check minimized counterexamples)]({0})', steps.links.outputs.fc_failures_url) || '' }}\n\n🔗 [Workflow run page](${{ steps.links.outputs.run_url }})\n\nFull bundle contains: `seeds.json`, `failures.json`, `fc-seeds.json`, `fc-failures.json` (when applicable) and `reports/fuzz-${{ matrix.id }}.log`."
+              "summary": "Category: `${{ matrix.id }}`\nRun #${{ github.run_number }} on `${{ github.ref_name }}` (`${{ github.sha }}`).\n\n**Status:** ${{ steps.fuzz.outputs.exit_code == '0' && 'PASS' || 'FAIL' }}\n\n### 📦 Direct downloads\n- [📥 Full bundle (`${{ env.ARTIFACT_NAME }}`)](${{ steps.links.outputs.artifact_url }})${{ steps.links.outputs.seeds_url && format('\n- [🌱 `seeds.json`]({0})', steps.links.outputs.seeds_url) || '' }}${{ steps.links.outputs.failures_url && format('\n- [💥 `failures.json`]({0})', steps.links.outputs.failures_url) || '' }}${{ steps.links.outputs.log_url && format('\n- [📜 `fuzz-{0}.log`]({1})', matrix.id, steps.links.outputs.log_url) || '' }}${{ steps.links.outputs.fc_seeds_url && format('\n- [🌱 `fc-seeds.json` (fast-check)]({0})', steps.links.outputs.fc_seeds_url) || '' }}${{ steps.links.outputs.fc_failures_url && format('\n- [💥 `fc-failures.json` (fast-check minimized)]({0})', steps.links.outputs.fc_failures_url) || '' }}\n\n🔗 [Workflow run page](${{ steps.links.outputs.run_url }})"
             }
 
       # Sticky PR comment per category (header is unique → no overwrites).
