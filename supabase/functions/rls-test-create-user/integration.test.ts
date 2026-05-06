@@ -203,6 +203,40 @@ Deno.test('HTTP integration: CORS preflight (OPTIONS) responds 200 with allowed 
   }
 })
 
+Deno.test('HTTP integration: OPTIONS preflight returns CORS even with WRONG x-test-secret', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    // Browser preflight nunca envia o body real; o handler DEVE responder 200
+    // com CORS antes de qualquer validação de secret. Caso contrário, o browser
+    // bloqueia a request real e o usuário vê erro de CORS em vez de 401.
+    const res = await fetch(`${ctx.url}/`, {
+      method: 'OPTIONS',
+      headers: {
+        'x-test-secret': 'definitely-wrong-secret',
+        'origin': 'https://app.kubovibe.dev',
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'x-test-secret, content-type',
+      },
+    })
+
+    assertEquals(res.status, 200, 'preflight deve responder 200 independente do secret')
+    assertEquals(res.headers.get('access-control-allow-origin'), '*')
+
+    const allowed = res.headers.get('access-control-allow-headers') ?? ''
+    assert(allowed.includes('x-test-secret'), 'allow-headers deve listar x-test-secret')
+    assert(allowed.includes('content-type'), 'allow-headers deve listar content-type')
+    assert(allowed.includes('authorization'), 'allow-headers deve listar authorization')
+
+    // Consome body para evitar resource leak no Deno.
+    await res.text()
+
+    // OPTIONS NÃO pode validar secret nem instanciar Supabase client.
+    assertEquals(ctx._calls, 0, 'OPTIONS jamais deve chamar createClient')
+  } finally {
+    await ctx.stop()
+  }
+})
+
 Deno.test('HTTP integration: 401 with wrong secret still includes CORS headers', async () => {
   const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
   try {
