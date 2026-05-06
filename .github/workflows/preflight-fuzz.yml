@@ -400,6 +400,42 @@ jobs:
             echo "- [🔗 Workflow run page](${RUN_URL})"
           } >> "${{ steps.summary.outputs.summary_file }}"
 
+      # Append a fast-check-specific section with INLINE direct download links
+      # right next to the contextual explanation, so reviewers reading the PR
+      # comment / summary-request-method.md don't need to scroll to find them.
+      - name: Append fast-check artifact links to summary
+        if: always() && steps.gate.outputs.should_run == 'true' && matrix.id == 'request-method'
+        env:
+          FC_SEEDS_URL: ${{ steps.links.outputs.fc_seeds_url }}
+          FC_FAILURES_URL: ${{ steps.links.outputs.fc_failures_url }}
+          SUMMARY_FILE: ${{ steps.summary.outputs.summary_file }}
+        run: |
+          {
+            echo ""
+            echo "### 🎯 fast-check direct downloads (Access-Control-Request-Method)"
+            echo ""
+            if [ -n "${FC_SEEDS_URL}" ]; then
+              echo "- 🌱 **Seeds executed (last 50 runs):** [\`fc-seeds.json\`](${FC_SEEDS_URL})"
+            else
+              echo "- 🌱 \`fc-seeds.json\` — _(not produced in this run)_"
+            fi
+            if [ -n "${FC_FAILURES_URL}" ]; then
+              echo "- 💥 **Minimized counterexamples (last 100):** [\`fc-failures.json\`](${FC_FAILURES_URL})"
+            else
+              echo "- 💥 \`fc-failures.json\` — _(no failures persisted in this run — invariants held)_"
+            fi
+            echo ""
+            echo "_The two files above are uploaded as standalone GitHub artifacts so you can \`curl\` or download them without unpacking the full bundle._"
+          } >> "${SUMMARY_FILE}"
+
+          # Re-emit the augmented summary into the GitHub Actions UI panel.
+          {
+            echo ""
+            echo "### 🎯 fast-check direct downloads"
+            [ -n "${FC_SEEDS_URL}" ]    && echo "- [fc-seeds.json](${FC_SEEDS_URL})"
+            [ -n "${FC_FAILURES_URL}" ] && echo "- [fc-failures.json](${FC_FAILURES_URL})"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       # Dedicated GitHub Check Run per category — visible as its own status
       # on PRs and commits, with details_url pointing at the category artifact.
       - name: Publish GitHub Check (${{ matrix.label }})
