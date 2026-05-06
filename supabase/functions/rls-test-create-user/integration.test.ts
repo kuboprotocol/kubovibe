@@ -7029,3 +7029,224 @@ Deno.test('HTTP integration: OPTIONS preflight — inconsistent/malformed Conten
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: OPTIONS preflight — Access-Control-Request-METHOD with percent-encoded separators (%2C/%20/%09/%0D%0A/%00) × exotic Unicode whitespace — Allow-Methods stays LITERAL exact (no decode-leak, no echo, no smuggling)', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    const EXPECTED_METHODS_LITERAL = 'POST, OPTIONS'
+    const EXPECTED_METHODS_SET = new Set(['post', 'options'])
+    const DANGEROUS_METHODS = [
+      'delete', 'put', 'patch', 'trace', 'connect', 'propfind',
+      'proppatch', 'mkcol', 'copy', 'move', 'lock', 'unlock',
+      'custom-method', 'evil', 'pwn', 'injected', 'smuggled',
+      '*', 'get',
+    ]
+    const EXPECTED_HEADERS_LITERAL = 'authorization, x-client-info, apikey, content-type, x-test-secret'
+
+    const u = new URL(ctx.url)
+    const hostHeader = u.host
+
+    // Payloads que combinam separadores percent-encoded (%2C upper / %2c lower / %252C duplo,
+    // espaço %20, tab %09, CRLF %0D%0A, null %00) com whitespace exótico Unicode (NBSP U+00A0,
+    // em-space U+2003, ideographic space U+3000, narrow NBSP U+202F, hair space U+200A, ZWS U+200B)
+    // aplicados ao VALOR de Access-Control-Request-Method.
+    //
+    // Contrato: Allow-Methods PERMANECE 'POST, OPTIONS' independente do parsing;
+    // nenhum '%' literal, nenhum byte não-ASCII, nenhum método perigoso, nenhum smuggling.
+    const PAYLOADS: Array<{ label: string; raw: string }> = [
+      // --- %2C / %2c puros como separador escondendo método extra. ---
+      { label: '%2C escondendo DELETE',                  raw: 'POST%2CDELETE' },
+      { label: '%2c escondendo PUT',                     raw: 'POST%2cPUT' },
+      { label: '%2C escondendo PATCH + PROPFIND',        raw: 'POST%2CPATCH%2CPROPFIND' },
+      { label: '%2C escondendo wildcard',                raw: 'POST%2C*' },
+      { label: '%2C escondendo CUSTOM-METHOD',           raw: 'POST%2CCUSTOM-METHOD' },
+
+      // --- Percent-encoding duplo (%252C = "%2C" literal). ---
+      { label: '%252C duplo (não deve decodificar)',     raw: 'POST%252CDELETE' },
+      { label: '%252c duplo lowercase',                  raw: 'POST%252cPUT' },
+
+      // --- %20 (space) percent-encoded ao redor do método. ---
+      { label: '%20 antes do método',                    raw: '%20POST' },
+      { label: '%20 depois do método',                   raw: 'POST%20' },
+      { label: '%20 ao redor do método',                 raw: '%20POST%20' },
+      { label: 'múltiplos %20 ao redor',                 raw: '%20%20%20POST%20%20%20' },
+      { label: '%20 no meio (POST%20DELETE)',            raw: 'POST%20DELETE' },
+      { label: '%20 + %2C escondendo método',            raw: 'POST%20%2C%20DELETE' },
+
+      // --- Outros separadores percent-encoded. ---
+      { label: '%09 tab percent-encoded antes',          raw: '%09POST' },
+      { label: '%09 tab percent-encoded entre',          raw: 'POST%09DELETE' },
+      { label: '%0D%0A CRLF + Set-Cookie smuggle',       raw: 'POST%0D%0ASet-Cookie:%20pwn=1' },
+      { label: '%0D%0A CRLF + X-Method-Injected',        raw: 'POST%0D%0AX-Method-Injected:%20yes' },
+      { label: '%00 null antes',                         raw: '%00POST' },
+      { label: '%00 null depois',                        raw: 'POST%00' },
+      { label: '%00 null escondendo método',             raw: 'POST%00DELETE' },
+      { label: '%3B semicolon (não-separador)',          raw: 'POST%3BDELETE' },
+      { label: '%2F slash (não-separador)',              raw: 'POST%2FDELETE' },
+
+      // --- Whitespace exótico Unicode ao redor do método. ---
+      { label: 'NBSP (U+00A0) ao redor',                 raw: '\u00A0POST\u00A0' },
+      { label: 'em-space (U+2003) ao redor',             raw: '\u2003POST\u2003' },
+      { label: 'ideographic space (U+3000) ao redor',    raw: '\u3000POST\u3000' },
+      { label: 'narrow NBSP (U+202F) ao redor',          raw: '\u202FPOST\u202F' },
+      { label: 'hair space (U+200A) ao redor',           raw: '\u200APOST\u200A' },
+      { label: 'zero-width space (U+200B) intra',        raw: 'PO\u200BST' },
+      { label: 'NBSP entre POST e DELETE',               raw: 'POST\u00A0DELETE' },
+      { label: 'em-space entre POST e PUT',              raw: 'POST\u2003PUT' },
+      { label: 'mix NBSP + em + ideographic',            raw: '\u00A0POST\u2003,\u3000DELETE\u00A0' },
+
+      // --- Whitespace exótico + percent-encoded + casing. ---
+      { label: 'NBSP + %2C + UPPER',                     raw: '\u00A0POST\u00A0%2C\u00A0DELETE\u00A0' },
+      { label: 'em-space + %2c + lowercase',             raw: '\u2003post\u2003%2c\u2003put\u2003' },
+      { label: 'ideographic + %252C + mixed',            raw: '\u3000PoSt\u3000%252C\u3000DeLeTe\u3000' },
+
+      // --- Tentativas de smuggling com %2C escondendo dangerous methods. ---
+      { label: '%2C + NBSP escondendo TRACE',            raw: 'POST%2C\u00A0TRACE' },
+      { label: '%2C + ZWS escondendo CONNECT',           raw: 'POST%2C\u200BCONNECT' },
+      { label: '%2c + ideographic escondendo PROPFIND',  raw: 'POST%2c\u3000PROPFIND' },
+
+      // --- Caos: tudo combinado. ---
+      { label: 'caos #1: %2C + %20 + NBSP + UPPER',      raw: '\u00A0POST%20%2C%20DELETE\u00A0%2c\u00A0PUT\u2003%2C\u2003PATCH\u3000' },
+      { label: 'caos #2: duplo + null + Cyrillic',       raw: '\u00A0%50OST%252C%00\u00A0РOST' },  // 'Р' Cyrillic
+      { label: 'caos #3: %0D%0A smuggle + NBSP',         raw: '\u00A0POST%2C%0D%0ASet-Cookie:%20evil=1\u00A0%2C\u00A0DELETE\u00A0' },
+      { label: 'caos #4: empty com whitespace exótico',  raw: '\u00A0\u2003\u3000\u202F\u200A\u200B' },
+    ]
+
+    const parseList = (v: string | null): string[] =>
+      (v ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
+
+    type RawResponse = { status: number; headers: Headers } | { error: string }
+
+    async function sendRaw(payload: string): Promise<RawResponse> {
+      let conn: Deno.TcpConn | null = null
+      try {
+        conn = await Deno.connect({ hostname: u.hostname, port: parseInt(u.port, 10), transport: 'tcp' })
+        const reqLines = [
+          'OPTIONS / HTTP/1.1',
+          `Host: ${hostHeader}`,
+          'Origin: https://evil.example.com',
+          `Access-Control-Request-Method: ${payload}`,
+          'Access-Control-Request-Headers: authorization, x-test-secret',
+          'Connection: close',
+          '',
+          '',
+        ]
+        await conn.write(new TextEncoder().encode(reqLines.join('\r\n')))
+
+        const chunks: Uint8Array[] = []
+        const buf = new Uint8Array(8192)
+        while (true) {
+          const n = await conn.read(buf)
+          if (n === null) break
+          chunks.push(buf.slice(0, n))
+        }
+        const total = chunks.reduce((s, c) => s + c.length, 0)
+        const merged = new Uint8Array(total)
+        let off = 0
+        for (const c of chunks) { merged.set(c, off); off += c.length }
+        const text = new TextDecoder().decode(merged)
+
+        const headerEnd = text.indexOf('\r\n\r\n')
+        if (headerEnd === -1) return { error: 'no header terminator' }
+        const lines = text.slice(0, headerEnd).split('\r\n')
+        const m = lines[0].match(/^HTTP\/1\.[01]\s+(\d{3})/)
+        if (!m) return { error: `bad status: ${lines[0]}` }
+        const status = parseInt(m[1], 10)
+        const headers = new Headers()
+        for (let i = 1; i < lines.length; i++) {
+          const idx = lines[i].indexOf(':')
+          if (idx === -1) continue
+          const name = lines[i].slice(0, idx).trim()
+          const value = lines[i].slice(idx + 1).trim()
+          if (name) headers.append(name, value)
+        }
+        return { status, headers }
+      } finally {
+        try { conn?.close() } catch { /* ignore */ }
+      }
+    }
+
+    let validatedAs200 = 0
+    let acceptedAs4xx = 0
+
+    for (const p of PAYLOADS) {
+      const result = await sendRaw(p.raw)
+      const ctxLabel = `[Payload: ${p.label}]`
+
+      if ('error' in result) { acceptedAs4xx++; continue }
+
+      // (1) Status 200 OU 4xx — nunca 5xx (parser não pode crashar com %xx/Unicode em method).
+      assert(
+        result.status === 200 || (result.status >= 400 && result.status < 500),
+        `${ctxLabel}: status deve ser 200 ou 4xx, recebido ${result.status}`,
+      )
+      if (result.status !== 200) { acceptedAs4xx++; continue }
+      validatedAs200++
+
+      // (2) Allow-Methods LITERAL EXATO.
+      const am = result.headers.get('access-control-allow-methods')
+      assertExists(am, `${ctxLabel}: Allow-Methods deve estar presente`)
+      assertEquals(
+        am, EXPECTED_METHODS_LITERAL,
+        `${ctxLabel}: Allow-Methods deve ser literal "${EXPECTED_METHODS_LITERAL}"`,
+      )
+
+      // (3) Conjunto bate exatamente — apenas POST e OPTIONS.
+      const parsed = new Set(parseList(am))
+      assertEquals(parsed.size, EXPECTED_METHODS_SET.size, `${ctxLabel}: Allow-Methods deve listar exatamente 2 métodos`)
+      for (const m of EXPECTED_METHODS_SET) {
+        assert(parsed.has(m), `${ctxLabel}: Allow-Methods deve incluir "${m}"`)
+      }
+
+      // (4) NUNCA dangerous methods (mesmo que %2C tenha tentado escondê-los).
+      for (const dangerous of DANGEROUS_METHODS) {
+        assert(!parsed.has(dangerous), `${ctxLabel}: Allow-Methods NÃO PODE conter "${dangerous}"`)
+      }
+
+      // (5) NUNCA '%' literal (echo de percent-encoding) nem CR/LF/null/HTAB.
+      assert(!am.includes('%'), `${ctxLabel}: Allow-Methods NÃO PODE conter '%' (echo de percent)`)
+      assert(!am.includes('\r'), `${ctxLabel}: Allow-Methods NÃO PODE conter CR`)
+      assert(!am.includes('\n'), `${ctxLabel}: Allow-Methods NÃO PODE conter LF`)
+      assert(!am.includes('\x00'), `${ctxLabel}: Allow-Methods NÃO PODE conter null byte`)
+      assert(!am.includes('\t'), `${ctxLabel}: Allow-Methods NÃO PODE conter HTAB`)
+
+      // (6) Allow-Methods deve ser ASCII puro (anti-Unicode-leak).
+      for (const ch of am) {
+        const code = ch.charCodeAt(0)
+        assert(code >= 0x20 && code <= 0x7E, `${ctxLabel}: Allow-Methods contém char não-ASCII U+${code.toString(16).padStart(4, '0')}`)
+      }
+
+      // (7) Outros campos CORS literais.
+      assertEquals(result.headers.get('access-control-allow-headers'), EXPECTED_HEADERS_LITERAL, `${ctxLabel}: Allow-Headers literal`)
+      assertEquals(result.headers.get('access-control-allow-origin'), '*', `${ctxLabel}: Allow-Origin '*'`)
+      assertEquals(result.headers.get('access-control-allow-credentials'), null, `${ctxLabel}: Allow-Credentials NUNCA`)
+      assertEquals(result.headers.get('access-control-max-age'), '86400', `${ctxLabel}: Max-Age literal`)
+
+      // (8) Headers smuggling NUNCA aparecem.
+      assertEquals(result.headers.get('set-cookie'), null, `${ctxLabel}: Set-Cookie NUNCA`)
+      assertEquals(result.headers.get('cookie'), null, `${ctxLabel}: Cookie NUNCA`)
+      assertEquals(result.headers.get('x-injected'), null, `${ctxLabel}: X-Injected NUNCA`)
+      assertEquals(result.headers.get('x-smuggled'), null, `${ctxLabel}: X-Smuggled NUNCA`)
+      assertEquals(result.headers.get('x-method-injected'), null, `${ctxLabel}: X-Method-Injected NUNCA`)
+      assertEquals(result.headers.get('access-control-expose-headers'), null, `${ctxLabel}: Expose-Headers NUNCA`)
+
+      // (9) Allow-Methods aparece exatamente 1x.
+      let occurrences = 0
+      for (const [name] of result.headers) {
+        if (name.toLowerCase() === 'access-control-allow-methods') occurrences++
+      }
+      assertEquals(occurrences, 1, `${ctxLabel}: Allow-Methods deve aparecer exatamente 1x`)
+    }
+
+    // (10) Cobertura total da matriz.
+    assertEquals(
+      validatedAs200 + acceptedAs4xx, PAYLOADS.length,
+      `todos os ${PAYLOADS.length} payloads devem ser cobertos (200=${validatedAs200}, 4xx/erro=${acceptedAs4xx})`,
+    )
+
+    // (11) Zero createClient invocado.
+    assertEquals(ctx._calls, 0, 'createClient NUNCA pode ser invocado em OPTIONS preflight (Request-Method com %xx + Unicode whitespace)')
+  } finally {
+    await ctx.stop()
+  }
+})
