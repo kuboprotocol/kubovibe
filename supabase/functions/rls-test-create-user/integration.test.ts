@@ -1375,3 +1375,84 @@ Deno.test('HTTP integration: OPTIONS preflight — Access-Control-Allow-Credenti
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: OPTIONS preflight — Vary: Origin and Access-Control-Expose-Headers MUST be absent', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    // Por que esse teste é DEDICADO:
+    //   * `Vary: Origin` só faz sentido quando o handler ECOA o Origin recebido
+    //     (resposta dependente de input). Como esta edge devolve `Allow-Origin: "*"`
+    //     ESTÁTICO, declarar `Vary: Origin` é incorreto: induz proxies/CDNs a
+    //     fragmentar o cache por origem desnecessariamente, degradando hit-rate
+    //     e mascarando bugs de cache. Deve estar ausente.
+    //   * `Access-Control-Expose-Headers` só deve ser declarado quando o handler
+    //     intencionalmente expõe headers customizados ao JS do browser (além da
+    //     CORS-safelist). O handler NÃO expõe nada custom — declarar esse header
+    //     vazaria a superfície de resposta e poderia acidentalmente expor
+    //     identificadores internos a clientes cross-origin.
+    //
+    // Validação dupla por header:
+    //   (1) headers.get(name) === null
+    //   (2) Iteração case-insensitive sobre todos os headers, garantindo que
+    //       nenhuma variante de capitalização escape do .get().
+
+    const preflight = await fetch(`${ctx.url}/`, {
+      method: 'OPTIONS',
+      headers: {
+        'origin': 'https://app.kubovibe.dev',
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'content-type, x-test-secret',
+      },
+    })
+    assertEquals(preflight.status, 200, 'preflight deve responder 200')
+
+    // (1) .get() direto — Vary NÃO deve listar "Origin" (o runtime pode injetar
+    // `Vary: Accept-Encoding` automaticamente para negociação de compressão; isso
+    // é OK e independe do handler. O que NÃO pode aparecer é "Origin", pois
+    // Allow-Origin é estático "*").
+    const varyHeader = preflight.headers.get('vary')
+    if (varyHeader !== null) {
+      const tokens = varyHeader.split(',').map((t) => t.trim().toLowerCase())
+      assertEquals(
+        tokens.includes('origin'),
+        false,
+        `OPTIONS: Vary NÃO pode listar "Origin" — Allow-Origin é estático "*". Vary recebido: "${varyHeader}"`,
+      )
+      assertEquals(
+        tokens.includes('*'),
+        false,
+        `OPTIONS: Vary NÃO pode ser "*" — força revalidação total no cache. Vary recebido: "${varyHeader}"`,
+      )
+    }
+
+    // (1) .get() direto — Expose-Headers
+    assertEquals(
+      preflight.headers.get('access-control-expose-headers'),
+      null,
+      'OPTIONS: Access-Control-Expose-Headers NÃO pode estar presente — handler não expõe headers custom',
+    )
+
+    // (2) Varredura case-insensitive — detecta qualquer variante de
+    // Access-Control-Expose-Headers (não verificamos Vary aqui pois pode conter
+    // tokens legítimos como Accept-Encoding injetados pelo runtime).
+    const leaks: string[] = []
+    for (const [name, value] of preflight.headers) {
+      if (name.toLowerCase() === 'access-control-expose-headers') {
+        leaks.push(`${name}=${value}`)
+      }
+    }
+    assertEquals(
+      leaks,
+      [],
+      `OPTIONS: nenhum cabeçalho Access-Control-Expose-Headers permitido (qualquer capitalização) — vazamentos: ${JSON.stringify(leaks)}`,
+    )
+
+    await preflight.text()
+
+    // Sanidade: o preflight retorna Allow-Origin "*" estático (justifica ausência de Vary).
+    assertEquals(preflight.headers.get('access-control-allow-origin'), '*')
+    assertEquals(ctx._calls, 0, 'preflight nunca deve chamar createClient')
+  } finally {
+    await ctx.stop()
+  }
+})
