@@ -2491,13 +2491,15 @@ Deno.test('HTTP integration: hostile Cookie on cross-origin (HEAD/GET/POST/OPTIO
       // para HEAD, dependendo do handler) e NUNCA ecoa o Origin hostil.
       // ────────────────────────────────────────────────────────────────
       const allowOrigin = res.headers.get('access-control-allow-origin')
+      // Guarda anti-eco PRIMEIRO (antes do narrowing) — String() evita
+      // que o TS estreite o tipo e marque a comparação como impossível.
+      assert(
+        String(allowOrigin) !== String(HOSTILE_ORIGIN),
+        `${label}: Allow-Origin ECOOU o Origin hostil "${HOSTILE_ORIGIN}"`,
+      )
       assert(
         allowOrigin === '*' || allowOrigin === null,
         `${label}: Allow-Origin deve ser "*" ou ausente, recebido ${JSON.stringify(allowOrigin)}`,
-      )
-      assert(
-        allowOrigin !== HOSTILE_ORIGIN,
-        `${label}: Allow-Origin ECOOU o Origin hostil "${HOSTILE_ORIGIN}"`,
       )
 
       await res.text()
