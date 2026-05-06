@@ -292,6 +292,67 @@ cat > "${DUP_SEEDS_FALLBACK}" <<'EOF'
 _The two files above are uploaded as standalone GitHub artifacts so you can curl or download them without unpacking the full bundle._
 EOF
 
+# ─── cross-contamination fixtures ────────────────────────────────────────────
+# Each token has EXACTLY ONE bullet (so assert_single_bullet_for would pass)
+# but the labels/tokens are swapped — the seeds canonical prefix points to
+# fc-failures.json or vice-versa. This is the false-positive class we want
+# to close: the validator must reject it instead of trusting count==1.
+
+# Swapped CANONICAL bullets: seeds prefix wraps fc-failures.json link, and
+# failures prefix wraps fc-seeds.json link. Each token still has 1 bullet.
+SWAP_CANONICAL="${WORKDIR}/swap_canonical.md"
+cat > "${SWAP_CANONICAL}" <<EOF
+# Preflight CORS Fuzz — request-headers
+
+### 🎯 fast-check direct downloads (Access-Control-Request-Headers)
+
+- 🌱 **Seeds executed (last 50 runs):** [\`fc-failures.json\`](https://example.com/failures)
+- 💥 **Minimized counterexamples (last 100):** [\`fc-seeds.json\`](https://example.com/seeds)
+
+_The two files above are uploaded as standalone GitHub artifacts so you can curl or download them without unpacking the full bundle._
+EOF
+
+# Only the SEEDS canonical line is contaminated (failures bullet is correct).
+# Each token still appears in exactly 1 bullet line (count==1).
+SEEDS_PREFIX_WITH_FAILURES_TOKEN="${WORKDIR}/seeds_prefix_failures_token.md"
+cat > "${SEEDS_PREFIX_WITH_FAILURES_TOKEN}" <<EOF
+# Preflight CORS Fuzz — request-headers
+
+### 🎯 fast-check direct downloads (Access-Control-Request-Headers)
+
+- 🌱 **Seeds executed (last 50 runs):** [\`fc-failures.json\`](https://example.com/seeds)
+${FAILURES_OK}
+
+_The two files above are uploaded as standalone GitHub artifacts so you can curl or download them without unpacking the full bundle._
+EOF
+
+# Only the FAILURES canonical line is contaminated.
+FAILURES_PREFIX_WITH_SEEDS_TOKEN="${WORKDIR}/failures_prefix_seeds_token.md"
+cat > "${FAILURES_PREFIX_WITH_SEEDS_TOKEN}" <<EOF
+# Preflight CORS Fuzz — request-headers
+
+### 🎯 fast-check direct downloads (Access-Control-Request-Headers)
+
+${SEEDS_OK}
+- 💥 **Minimized counterexamples (last 100):** [\`fc-seeds.json\`](https://example.com/failures)
+
+_The two files above are uploaded as standalone GitHub artifacts so you can curl or download them without unpacking the full bundle._
+EOF
+
+# Swapped FALLBACK markers: seeds emoji + backtick wraps fc-failures.json,
+# failures emoji + backtick wraps fc-seeds.json. Each token has 1 bullet.
+SWAP_FALLBACK="${WORKDIR}/swap_fallback.md"
+cat > "${SWAP_FALLBACK}" <<'EOF'
+# Preflight CORS Fuzz — request-headers
+
+### 🎯 fast-check direct downloads (Access-Control-Request-Headers)
+
+- 🌱 `fc-failures.json` — _(not produced in this run)_
+- 💥 `fc-seeds.json` — _(no failures persisted in this run — invariants held)_
+
+_The two files above are uploaded as standalone GitHub artifacts so you can curl or download them without unpacking the full bundle._
+EOF
+
 # ─── run cases ───────────────────────────────────────────────────────────────
 
 echo "▶ verify-fc-summary.sh smoke tests"
@@ -358,6 +419,20 @@ run_case "BAD: mix canonical+fallback for fc-seeds.json" \
   "${MIX_SEEDS}"     1 1 1 "https://example.com/seeds" "https://example.com/failures"
 run_case "BAD: mix canonical+fallback for fc-failures.json" \
   "${MIX_FAILURES}"  1 1 1 "https://example.com/seeds" "https://example.com/failures"
+
+echo ""
+echo "── cross-contamination: swapped tokens (must fail) ──"
+# Each of these fixtures has exactly ONE bullet per token (so the count-only
+# check would falsely accept them) — the validator must catch the label↔token
+# mismatch instead.
+run_case "BAD: SEEDS prefix wraps fc-failures.json (canonical)" \
+  "${SEEDS_PREFIX_WITH_FAILURES_TOKEN}" 1 1 1 "https://example.com/seeds" "https://example.com/failures"
+run_case "BAD: FAILURES prefix wraps fc-seeds.json (canonical)" \
+  "${FAILURES_PREFIX_WITH_SEEDS_TOKEN}" 1 1 1 "https://example.com/seeds" "https://example.com/failures"
+run_case "BAD: both canonical bullets swapped (seeds↔failures)" \
+  "${SWAP_CANONICAL}" 1 1 1 "https://example.com/seeds" "https://example.com/failures"
+run_case "BAD: both fallback markers swapped (seeds↔failures)" \
+  "${SWAP_FALLBACK}"  1 0 0 "" ""
 
 # ─── summary ─────────────────────────────────────────────────────────────────
 
