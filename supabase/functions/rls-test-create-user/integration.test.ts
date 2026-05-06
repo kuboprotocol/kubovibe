@@ -3041,3 +3041,254 @@ Deno.test('HTTP integration: 401/403 auth-rejection responses with hostile Cooki
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: CORS preflight — Allow-Headers contract (exact set, case-insensitive, no wildcards)', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    // Contrato esperado (literal do handler index.ts):
+    //   'authorization, x-client-info, apikey, content-type, x-test-secret'
+    const EXPECTED_LITERAL = 'authorization, x-client-info, apikey, content-type, x-test-secret'
+    const EXPECTED_SET = new Set([
+      'authorization', 'x-client-info', 'apikey', 'content-type', 'x-test-secret',
+    ])
+
+    // Helper de parsing case-insensitive.
+    const parseAllowHeaders = (v: string | null): string[] =>
+      (v ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
+
+    // Cenários: preflights variados — todos devem retornar o mesmo Allow-Headers.
+    const scenarios: Array<{ name: string; init: RequestInit }> = [
+      {
+        name: 'preflight padrão (Origin same-origin-ish + Request-Method POST + Request-Headers)',
+        init: {
+          method: 'OPTIONS',
+          headers: {
+            'origin': 'https://app.kubovibe.dev',
+            'access-control-request-method': 'POST',
+            'access-control-request-headers': 'content-type, x-test-secret, authorization',
+          },
+        },
+      },
+      {
+        name: 'preflight cross-origin hostil',
+        init: {
+          method: 'OPTIONS',
+          headers: {
+            'origin': 'https://evil.example.com',
+            'access-control-request-method': 'POST',
+            'access-control-request-headers': 'x-test-secret',
+          },
+        },
+      },
+      {
+        name: 'preflight bare OPTIONS (sem headers de preflight)',
+        init: { method: 'OPTIONS' },
+      },
+      {
+        name: 'preflight pedindo header NÃO listado (apikey + custom)',
+        init: {
+          method: 'OPTIONS',
+          headers: {
+            'origin': 'https://app.kubovibe.dev',
+            'access-control-request-method': 'POST',
+            'access-control-request-headers': 'apikey, x-fake-not-allowed',
+          },
+        },
+      },
+    ]
+
+    for (const sc of scenarios) {
+      const res = await fetch(`${ctx.url}/`, sc.init)
+      await res.text()
+
+      // (1) Status do preflight: handler retorna 200 com 'ok'.
+      assertEquals(res.status, 200, `[${sc.name}] preflight deve retornar 200`)
+
+      // (2) Allow-Headers presente.
+      const ah = res.headers.get('access-control-allow-headers')
+      assertExists(ah, `[${sc.name}] Allow-Headers deve estar presente`)
+
+      // (3) Valor literal exato — handler NÃO ecoa Request-Headers, retorna lista fixa.
+      assertEquals(
+        ah,
+        EXPECTED_LITERAL,
+        `[${sc.name}] Allow-Headers deve ser literal "${EXPECTED_LITERAL}"`,
+      )
+
+      // (4) Conjunto parseado bate exatamente — sem extras, sem omissões.
+      const parsed = new Set(parseAllowHeaders(ah))
+      assertEquals(
+        parsed.size,
+        EXPECTED_SET.size,
+        `[${sc.name}] Allow-Headers deve listar exatamente ${EXPECTED_SET.size} headers`,
+      )
+      for (const h of EXPECTED_SET) {
+        assert(parsed.has(h), `[${sc.name}] Allow-Headers deve incluir "${h}"`)
+      }
+
+      // (5) NUNCA usar wildcard '*' em Allow-Headers (incompatível com credenciais e ambíguo).
+      assert(
+        !parsed.has('*'),
+        `[${sc.name}] Allow-Headers NÃO PODE conter wildcard '*'`,
+      )
+
+      // (6) Headers perigosos NUNCA podem aparecer (cookie / set-cookie / etc).
+      const FORBIDDEN = ['cookie', 'set-cookie', 'set-cookie2', 'host', 'origin']
+      for (const f of FORBIDDEN) {
+        assert(
+          !parsed.has(f),
+          `[${sc.name}] Allow-Headers NÃO PODE listar header sensível "${f}"`,
+        )
+      }
+
+      // (7) Leitura case-insensitive do nome do header.
+      for (const variant of [
+        'access-control-allow-headers',
+        'Access-Control-Allow-Headers',
+        'ACCESS-CONTROL-ALLOW-HEADERS',
+      ]) {
+        assertEquals(
+          res.headers.get(variant),
+          EXPECTED_LITERAL,
+          `[${sc.name}] header "${variant}" deve ser legível e idêntico`,
+        )
+      }
+    }
+  } finally {
+    await ctx.stop()
+  }
+})
+
+Deno.test('HTTP integration: CORS preflight — Access-Control-Max-Age contract (exact 86400, numeric, sane bounds)', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    // Contrato esperado (literal do handler index.ts): '86400' (24h).
+    const EXPECTED_MAX_AGE = '86400'
+    const EXPECTED_NUMERIC = 86400
+
+    const scenarios: Array<{ name: string; init: RequestInit }> = [
+      {
+        name: 'preflight padrão',
+        init: {
+          method: 'OPTIONS',
+          headers: {
+            'origin': 'https://app.kubovibe.dev',
+            'access-control-request-method': 'POST',
+            'access-control-request-headers': 'content-type, x-test-secret',
+          },
+        },
+      },
+      {
+        name: 'preflight cross-origin hostil',
+        init: {
+          method: 'OPTIONS',
+          headers: {
+            'origin': 'https://evil.example.com',
+            'access-control-request-method': 'POST',
+          },
+        },
+      },
+      {
+        name: 'preflight bare OPTIONS',
+        init: { method: 'OPTIONS' },
+      },
+    ]
+
+    for (const sc of scenarios) {
+      const res = await fetch(`${ctx.url}/`, sc.init)
+      await res.text()
+
+      assertEquals(res.status, 200, `[${sc.name}] preflight deve retornar 200`)
+
+      // (1) Max-Age presente.
+      const ma = res.headers.get('access-control-max-age')
+      assertExists(ma, `[${sc.name}] Access-Control-Max-Age deve estar presente`)
+
+      // (2) Valor literal exato.
+      assertEquals(
+        ma,
+        EXPECTED_MAX_AGE,
+        `[${sc.name}] Max-Age deve ser literal "${EXPECTED_MAX_AGE}"`,
+      )
+
+      // (3) Numérico válido — sem espaços, sem sufixos, parseável como inteiro positivo.
+      assert(/^\d+$/.test(ma), `[${sc.name}] Max-Age deve ser dígitos puros, recebeu "${ma}"`)
+      const n = Number(ma)
+      assert(Number.isInteger(n), `[${sc.name}] Max-Age deve ser inteiro`)
+      assertEquals(n, EXPECTED_NUMERIC, `[${sc.name}] Max-Age numérico deve ser ${EXPECTED_NUMERIC}`)
+
+      // (4) Bounds sanos — > 0 (não desabilitar cache) e <= 86400 (Chrome cap; Firefox cap = 24h).
+      // Valores acima de 86400 são silenciosamente truncados pelos browsers — desperdício e indica bug.
+      assert(n > 0, `[${sc.name}] Max-Age deve ser > 0 (zero desabilita cache de preflight)`)
+      assert(n <= 86400, `[${sc.name}] Max-Age deve ser <= 86400 (limite efetivo dos browsers)`)
+
+      // (5) Leitura case-insensitive do nome do header.
+      for (const variant of [
+        'access-control-max-age',
+        'Access-Control-Max-Age',
+        'ACCESS-CONTROL-MAX-AGE',
+      ]) {
+        assertEquals(
+          res.headers.get(variant),
+          EXPECTED_MAX_AGE,
+          `[${sc.name}] header "${variant}" deve ser legível e idêntico`,
+        )
+      }
+
+      // (6) Garantia: Max-Age aparece exatamente uma vez (sem duplicação por proxy).
+      let occurrences = 0
+      for (const [name] of res.headers) {
+        if (name.toLowerCase() === 'access-control-max-age') occurrences++
+      }
+      assertEquals(occurrences, 1, `[${sc.name}] Max-Age deve aparecer exatamente 1x, encontrou ${occurrences}`)
+    }
+  } finally {
+    await ctx.stop()
+  }
+})
+
+Deno.test('HTTP integration: bare OPTIONS (no preflight headers) — returns 200 with FULL CORS contract and no createClient', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    // OPTIONS "puro" — sem Origin nem Request-Method/Headers. Handler ainda deve responder
+    // com o conjunto completo de CORS headers (contrato uniforme) e nunca instanciar Supabase.
+    const res = await fetch(`${ctx.url}/`, { method: 'OPTIONS' })
+    const body = await res.text()
+
+    // (1) Status + body literal do handler.
+    assertEquals(res.status, 200, 'bare OPTIONS deve retornar 200')
+    assertEquals(body, 'ok', 'bare OPTIONS deve retornar body literal "ok"')
+
+    // (2) Contrato CORS completo — todos os 4 headers definidos em corsHeaders.
+    assertEquals(res.headers.get('access-control-allow-origin'), '*')
+    assertEquals(
+      res.headers.get('access-control-allow-headers'),
+      'authorization, x-client-info, apikey, content-type, x-test-secret',
+    )
+    assertEquals(res.headers.get('access-control-allow-methods'), 'POST, OPTIONS')
+    assertEquals(res.headers.get('access-control-max-age'), '86400')
+
+    // (3) Headers proibidos NUNCA presentes (mesmo sem cookies no request).
+    assertEquals(res.headers.get('access-control-allow-credentials'), null)
+    assertEquals(res.headers.get('access-control-expose-headers'), null)
+    assertEquals(res.headers.get('set-cookie'), null)
+    assertEquals(res.headers.get('set-cookie2'), null)
+
+    // (4) Vary nunca contém Origin/Cookie/Authorization (incompatível com Allow-Origin: '*').
+    const vary = res.headers.get('vary')
+    if (vary !== null) {
+      const tokens = vary.split(',').map((s) => s.trim().toLowerCase())
+      for (const forbidden of ['origin', 'cookie', 'authorization', '*']) {
+        assert(
+          !tokens.includes(forbidden),
+          `bare OPTIONS: Vary NÃO PODE conter "${forbidden}", recebeu "${vary}"`,
+        )
+      }
+    }
+
+    // (5) Sem createClient instanciado — preflight nunca toca Supabase.
+    assertEquals(ctx._calls, 0, 'bare OPTIONS NUNCA pode instanciar createClient')
+  } finally {
+    await ctx.stop()
+  }
+})
