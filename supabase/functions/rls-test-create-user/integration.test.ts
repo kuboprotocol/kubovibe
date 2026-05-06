@@ -3898,3 +3898,168 @@ Deno.test('HTTP integration: OPTIONS without Origin — Access-Control-Request-H
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: 401/403 auth-rejection — uniform CORS contract across Origins (Allow-Origin "*", NO Allow-Credentials, literal Allow-Headers/Max-Age)', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    // Contrato literal do handler index.ts.
+    const EXPECTED_ALLOW_ORIGIN = '*'
+    const EXPECTED_ALLOW_HEADERS = 'authorization, x-client-info, apikey, content-type, x-test-secret'
+    const EXPECTED_ALLOW_HEADERS_SET = new Set([
+      'authorization', 'x-client-info', 'apikey', 'content-type', 'x-test-secret',
+    ])
+    const EXPECTED_MAX_AGE = '86400'
+    const EXPECTED_ALLOW_METHODS = 'POST, OPTIONS'
+
+    // Cenários que produzem 401 (handler real).
+    // Nota: handler não emite 403, mas a invariante é defensiva — vale para qualquer
+    // resposta auth-rejection futura (401/403). Cobrimos todos os caminhos 401 reais.
+    const AUTH_REJECTION_SCENARIOS: Array<{ name: string; status: number; secretHeader: Record<string, string> }> = [
+      { name: '401 — sem x-test-secret',          status: 401, secretHeader: {} },
+      { name: '401 — x-test-secret vazio',        status: 401, secretHeader: { 'x-test-secret': '' } },
+      { name: '401 — x-test-secret incorreto',    status: 401, secretHeader: { 'x-test-secret': 'wrong-secret' } },
+      { name: '401 — x-test-secret tamanho errado',status: 401, secretHeader: { 'x-test-secret': SECRET + 'X' } },
+    ]
+
+    // Diferentes Origens — contrato deve ser idêntico para todas.
+    const ORIGINS: Array<{ label: string; value: string | null }> = [
+      { label: 'sem Origin',                      value: null },
+      { label: 'same-origin produção',            value: 'https://app.kubovibe.dev' },
+      { label: 'same-origin lovable',             value: 'https://kubovibe.lovable.app' },
+      { label: 'cross-origin hostil',             value: 'https://evil.example.com' },
+      { label: 'cross-origin localhost',          value: 'http://localhost:5173' },
+      { label: 'Origin literal "null" (sandbox)', value: 'null' },
+      { label: 'cross-origin porta exótica',      value: 'https://attacker.example.com:31337' },
+    ]
+
+    const parseList = (v: string | null): string[] =>
+      (v ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
+
+    for (const sc of AUTH_REJECTION_SCENARIOS) {
+      for (const origin of ORIGINS) {
+        const headers: Record<string, string> = {
+          'content-type': 'application/json',
+          ...sc.secretHeader,
+        }
+        if (origin.value !== null) headers['origin'] = origin.value
+
+        const res = await fetch(`${ctx.url}/`, {
+          method: 'POST',
+          headers,
+          body: '{}',
+        })
+        await res.text()
+
+        const ctxLabel = `[${sc.name} | Origin: ${origin.label}]`
+
+        // (1) Status esperado.
+        assertEquals(res.status, sc.status, `${ctxLabel}: status deve ser ${sc.status}`)
+
+        // (2) Allow-Origin — sempre '*' literal, NUNCA eco do Origin recebido.
+        const allowOrigin = res.headers.get('access-control-allow-origin')
+        assertEquals(
+          allowOrigin,
+          EXPECTED_ALLOW_ORIGIN,
+          `${ctxLabel}: Allow-Origin deve ser '*' literal`,
+        )
+        if (origin.value !== null && origin.value !== '*') {
+          assert(
+            allowOrigin !== origin.value,
+            `${ctxLabel}: Allow-Origin NÃO PODE ecoar Origin recebido "${origin.value}"`,
+          )
+        }
+        assert(
+          allowOrigin !== 'null',
+          `${ctxLabel}: Allow-Origin NÃO PODE ser literal 'null' (vulnerabilidade conhecida)`,
+        )
+
+        // (3) Allow-Credentials — NUNCA presente (incompatível com Allow-Origin: '*').
+        assertEquals(
+          res.headers.get('access-control-allow-credentials'),
+          null,
+          `${ctxLabel}: Allow-Credentials NUNCA pode aparecer em ${sc.status}`,
+        )
+
+        // (4) Allow-Headers — contrato literal exato e uniforme.
+        const ah = res.headers.get('access-control-allow-headers')
+        assertEquals(
+          ah,
+          EXPECTED_ALLOW_HEADERS,
+          `${ctxLabel}: Allow-Headers deve ser literal exato`,
+        )
+        const ahSet = new Set(parseList(ah))
+        assertEquals(
+          ahSet.size,
+          EXPECTED_ALLOW_HEADERS_SET.size,
+          `${ctxLabel}: Allow-Headers deve listar exatamente ${EXPECTED_ALLOW_HEADERS_SET.size} headers`,
+        )
+        for (const h of EXPECTED_ALLOW_HEADERS_SET) {
+          assert(ahSet.has(h), `${ctxLabel}: Allow-Headers deve incluir "${h}"`)
+        }
+        assert(
+          !ahSet.has('*'),
+          `${ctxLabel}: Allow-Headers NÃO PODE conter wildcard '*'`,
+        )
+
+        // (5) Max-Age — contrato literal uniforme.
+        assertEquals(
+          res.headers.get('access-control-max-age'),
+          EXPECTED_MAX_AGE,
+          `${ctxLabel}: Max-Age deve ser literal "${EXPECTED_MAX_AGE}"`,
+        )
+
+        // (6) Allow-Methods — contrato literal uniforme.
+        assertEquals(
+          res.headers.get('access-control-allow-methods'),
+          EXPECTED_ALLOW_METHODS,
+          `${ctxLabel}: Allow-Methods deve ser "${EXPECTED_ALLOW_METHODS}"`,
+        )
+
+        // (7) Vary — sem tokens proibidos (incompatíveis com Allow-Origin: '*').
+        const vary = res.headers.get('vary')
+        if (vary !== null) {
+          const tokens = vary.split(',').map((s) => s.trim().toLowerCase())
+          for (const forbidden of ['origin', 'cookie', 'authorization', '*']) {
+            assert(
+              !tokens.includes(forbidden),
+              `${ctxLabel}: Vary NÃO PODE conter "${forbidden}", recebeu "${vary}"`,
+            )
+          }
+        }
+
+        // (8) Expose-Headers + Set-Cookie — defesa adicional.
+        assertEquals(
+          res.headers.get('access-control-expose-headers'),
+          null,
+          `${ctxLabel}: Expose-Headers NUNCA pode aparecer em ${sc.status}`,
+        )
+        assertEquals(
+          res.headers.get('set-cookie'),
+          null,
+          `${ctxLabel}: Set-Cookie NUNCA pode aparecer em ${sc.status}`,
+        )
+        assertEquals(
+          res.headers.get('set-cookie2'),
+          null,
+          `${ctxLabel}: Set-Cookie2 NUNCA pode aparecer em ${sc.status}`,
+        )
+
+        // (9) Content-Type JSON canônico.
+        assertEquals(
+          res.headers.get('content-type'),
+          'application/json',
+          `${ctxLabel}: Content-Type deve ser application/json`,
+        )
+      }
+    }
+
+    // (10) Garantia: nenhum createClient instanciado em qualquer 401.
+    assertEquals(
+      ctx._calls,
+      0,
+      'createClient NUNCA pode ser invocado em respostas 401/403',
+    )
+  } finally {
+    await ctx.stop()
+  }
+})
