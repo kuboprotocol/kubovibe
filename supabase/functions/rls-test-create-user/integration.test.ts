@@ -1406,12 +1406,24 @@ Deno.test('HTTP integration: OPTIONS preflight — Vary: Origin and Access-Contr
     })
     assertEquals(preflight.status, 200, 'preflight deve responder 200')
 
-    // (1) .get() direto — Vary
-    assertEquals(
-      preflight.headers.get('vary'),
-      null,
-      'OPTIONS: Vary NÃO pode estar presente — Allow-Origin é estático "*", não há variação por Origin',
-    )
+    // (1) .get() direto — Vary NÃO deve listar "Origin" (o runtime pode injetar
+    // `Vary: Accept-Encoding` automaticamente para negociação de compressão; isso
+    // é OK e independe do handler. O que NÃO pode aparecer é "Origin", pois
+    // Allow-Origin é estático "*").
+    const varyHeader = preflight.headers.get('vary')
+    if (varyHeader !== null) {
+      const tokens = varyHeader.split(',').map((t) => t.trim().toLowerCase())
+      assertEquals(
+        tokens.includes('origin'),
+        false,
+        `OPTIONS: Vary NÃO pode listar "Origin" — Allow-Origin é estático "*". Vary recebido: "${varyHeader}"`,
+      )
+      assertEquals(
+        tokens.includes('*'),
+        false,
+        `OPTIONS: Vary NÃO pode ser "*" — força revalidação total no cache. Vary recebido: "${varyHeader}"`,
+      )
+    }
 
     // (1) .get() direto — Expose-Headers
     assertEquals(
@@ -1420,19 +1432,19 @@ Deno.test('HTTP integration: OPTIONS preflight — Vary: Origin and Access-Contr
       'OPTIONS: Access-Control-Expose-Headers NÃO pode estar presente — handler não expõe headers custom',
     )
 
-    // (2) Varredura case-insensitive — detecta qualquer variante (Vary, vary, VARY,
-    // Access-Control-Expose-Headers, etc.) que possa vazar via reverse-proxy.
+    // (2) Varredura case-insensitive — detecta qualquer variante de
+    // Access-Control-Expose-Headers (não verificamos Vary aqui pois pode conter
+    // tokens legítimos como Accept-Encoding injetados pelo runtime).
     const leaks: string[] = []
     for (const [name, value] of preflight.headers) {
-      const lower = name.toLowerCase()
-      if (lower === 'vary' || lower === 'access-control-expose-headers') {
+      if (name.toLowerCase() === 'access-control-expose-headers') {
         leaks.push(`${name}=${value}`)
       }
     }
     assertEquals(
       leaks,
       [],
-      `OPTIONS: nenhum cabeçalho Vary ou Access-Control-Expose-Headers permitido (qualquer capitalização) — vazamentos: ${JSON.stringify(leaks)}`,
+      `OPTIONS: nenhum cabeçalho Access-Control-Expose-Headers permitido (qualquer capitalização) — vazamentos: ${JSON.stringify(leaks)}`,
     )
 
     await preflight.text()
