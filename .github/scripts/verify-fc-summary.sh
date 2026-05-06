@@ -124,14 +124,14 @@ FAILURES_BULLET_PREFIX='- 💥 **Minimized counterexamples (last 100):** '
 # used to locate candidate lines for the debug dump.
 assert_bullet_line() {
   local expected_line="$1" link_token="$2" reason="$3"
-  # -F fixed-string, -x whole-line match. Anchors prevent partial/substring
-  # matches like a stripped emoji or a missing bold prefix from passing.
-  if ! grep -Fxq "${expected_line}" "${SUMMARY_FILE}"; then
+  # -F fixed-string, -x whole-line match, -- end of options (the expected
+  # line starts with "- " which would otherwise be parsed as a grep flag).
+  if ! grep -Fxq -- "${expected_line}" "${SUMMARY_FILE}"; then
     echo "::error title=${CONTEXT_LABEL} bullet format violation::${reason}"
     echo "Expected exact line:"
     echo "  ${expected_line}"
     echo "Candidate lines found in ${SUMMARY_FILE} (mentioning ${link_token}):"
-    grep -n -F "${link_token}" "${SUMMARY_FILE}" | sed 's/^/  /' || echo "  (none)"
+    grep -n -F -- "${link_token}" "${SUMMARY_FILE}" | sed 's/^/  /' || echo "  (none)"
     fail "${reason}"
   fi
 }
