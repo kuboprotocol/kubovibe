@@ -2158,3 +2158,65 @@ Deno.test('HTTP integration: cross-origin POST — no Allow-Credentials, Allow-O
     }
   }
 })
+
+Deno.test('HTTP integration: OPTIONS without Origin header — no Allow-Credentials, Allow-Origin still "*" (no echo, no "null")', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    const res = await fetch(ctx.url, {
+      method: 'OPTIONS',
+      headers: {
+        // Sem 'origin' propositalmente — alguns handlers mal-escritos fazem
+        // fallback para echo do header inexistente, gerando "null" literal,
+        // string vazia, ou simplesmente omitem o Allow-Origin.
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'content-type, x-test-secret',
+      },
+    })
+
+    assertEquals(res.status, 200, 'OPTIONS sem Origin deve retornar 200')
+
+    // (1) Allow-Credentials ausente — checagem direta.
+    assertEquals(
+      res.headers.get('access-control-allow-credentials'),
+      null,
+      'OPTIONS sem Origin: Access-Control-Allow-Credentials NÃO pode estar presente',
+    )
+
+    // (1b) Varredura case-insensitive defensiva.
+    const credLeak: string[] = []
+    for (const [name, value] of res.headers) {
+      if (name.toLowerCase() === 'access-control-allow-credentials') {
+        credLeak.push(`${name}=${value}`)
+      }
+    }
+    assertEquals(
+      credLeak,
+      [],
+      `OPTIONS sem Origin: nenhum Allow-Credentials permitido (qualquer capitalização) — vazamentos: ${JSON.stringify(credLeak)}`,
+    )
+
+    // (2) Allow-Origin deve ser exatamente "*" — nem ausente, nem "null"
+    // literal, nem string vazia, nem ecoando algum valor inesperado.
+    const allowOrigin = res.headers.get('access-control-allow-origin')
+    assertEquals(
+      allowOrigin,
+      '*',
+      `OPTIONS sem Origin: Allow-Origin deve ser exatamente "*", recebido ${JSON.stringify(allowOrigin)}`,
+    )
+
+    // (2b) Guardas explícitas contra valores patológicos comuns.
+    const PATHOLOGICAL = ['null', '', 'undefined', 'http://', 'https://']
+    if (allowOrigin !== null && PATHOLOGICAL.includes(allowOrigin)) {
+      throw new Error(
+        `OPTIONS sem Origin: Allow-Origin retornou valor patológico ${JSON.stringify(allowOrigin)}`,
+      )
+    }
+
+    // Sanidade: OPTIONS nunca invoca createClient.
+    assertEquals(ctx._calls, 0, 'OPTIONS sem Origin nunca deve chamar createClient')
+
+    await res.text()
+  } finally {
+    await ctx.stop()
+  }
+})
