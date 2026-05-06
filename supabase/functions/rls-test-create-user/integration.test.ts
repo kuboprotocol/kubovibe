@@ -499,3 +499,42 @@ Deno.test('HTTP integration: bare OPTIONS (no CORS request headers) + WRONG x-te
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: OPTIONS preflight exposes Access-Control-Allow-Methods (POST, OPTIONS) with blank x-test-secret', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    const res = await fetch(`${ctx.url}/`, {
+      method: 'OPTIONS',
+      headers: {
+        'x-test-secret': ' ',
+        'origin': 'https://app.kubovibe.dev',
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'x-test-secret, content-type',
+      },
+    })
+
+    assertEquals(res.status, 200, 'preflight com secret em branco deve responder 200')
+
+    // Allow-Methods: deve listar POST (método real) e OPTIONS (preflight).
+    const methods = res.headers.get('access-control-allow-methods') ?? ''
+    assert(methods.length > 0, 'allow-methods deve estar presente')
+    const upper = methods.toUpperCase()
+    assert(upper.includes('POST'), `allow-methods deve listar POST (got: "${methods}")`)
+    assert(upper.includes('OPTIONS'), `allow-methods deve listar OPTIONS (got: "${methods}")`)
+    // Métodos não suportados não devem ser anunciados (handler só aceita POST).
+    assert(!upper.includes('DELETE'), 'allow-methods não deve listar DELETE')
+    assert(!upper.includes('PUT'), 'allow-methods não deve listar PUT')
+
+    // Allow-Origin e Allow-Headers continuam corretos.
+    assertEquals(res.headers.get('access-control-allow-origin'), '*')
+    const allowed = res.headers.get('access-control-allow-headers') ?? ''
+    assert(allowed.includes('x-test-secret'), 'allow-headers deve listar x-test-secret')
+    assert(allowed.includes('content-type'), 'allow-headers deve listar content-type')
+    assert(allowed.includes('authorization'), 'allow-headers deve listar authorization')
+
+    await res.text()
+    assertEquals(ctx._calls, 0, 'OPTIONS jamais deve chamar createClient')
+  } finally {
+    await ctx.stop()
+  }
+})
