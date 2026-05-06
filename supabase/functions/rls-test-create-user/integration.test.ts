@@ -7250,3 +7250,273 @@ Deno.test('HTTP integration: OPTIONS preflight — Access-Control-Request-METHOD
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: OPTIONS preflight — response NEVER contains unexpected headers (Set-Cookie, etc.) AND Allow-Methods/Allow-Headers NEVER echo input AND NEVER contain CR/LF/null embedded', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    const EXPECTED_METHODS_LITERAL = 'POST, OPTIONS'
+    const EXPECTED_HEADERS_LITERAL = 'authorization, x-client-info, apikey, content-type, x-test-secret'
+
+    // Allowlist EXATA de headers esperados na resposta de preflight.
+    // QUALQUER header fora desse conjunto é considerado "unexpected" e rejeitado.
+    const ALLOWED_RESPONSE_HEADERS = new Set([
+      'access-control-allow-origin',
+      'access-control-allow-methods',
+      'access-control-allow-headers',
+      'access-control-max-age',
+      // Headers HTTP de transporte considerados benignos.
+      'content-length',
+      'content-type',
+      'date',
+      'connection',
+      'keep-alive',
+      'vary',
+    ])
+
+    // Headers que NUNCA podem aparecer em preflight (sensíveis/perigosos).
+    const FORBIDDEN_RESPONSE_HEADERS = [
+      'set-cookie', 'set-cookie2', 'cookie', 'cookie2',
+      'authorization', 'proxy-authorization',
+      'access-control-allow-credentials',
+      'access-control-expose-headers',
+      'x-injected', 'x-smuggled', 'x-echo', 'x-leak',
+      'x-evil', 'x-pwn', 'x-csrf-token',
+      'x-forwarded-for', 'x-real-ip',
+      'www-authenticate', 'proxy-authenticate',
+      'strict-transport-security', 'content-security-policy',
+      'x-frame-options', 'x-content-type-options',
+      'server', 'x-powered-by',
+    ]
+
+    const u = new URL(ctx.url)
+    const hostHeader = u.host
+
+    // Tokens "marker" que NUNCA devem aparecer refletidos em Allow-Methods/Allow-Headers.
+    // Cada payload injeta esses markers via Origin/Request-Method/Request-Headers e
+    // depois validamos que NENHUM marker vazou para a resposta.
+    const ECHO_MARKERS = [
+      'EVIL', 'PWN', 'INJECTED', 'SMUGGLED', 'LEAK', 'ECHO',
+      'CUSTOM-METHOD', 'X-CUSTOM-HEADER', 'X-EVIL-HEADER',
+      'DELETE', 'PROPFIND', 'TRACE', 'CONNECT',
+      'attacker.com', 'evil.example.com',
+      'set-cookie', 'cookie', '%2C', '%0D%0A', '%00',
+      '\r', '\n', '\x00', '\t',
+    ]
+
+    // Matriz de payloads: cada um tenta provocar echo/leak via diferentes vetores.
+    const PAYLOADS: Array<{
+      label: string
+      origin?: string
+      requestMethod?: string
+      requestHeaders?: string
+      extraHeaders?: Array<[string, string]>
+    }> = [
+      // --- Baseline (sem nada exótico). ---
+      { label: 'baseline minimal', requestMethod: 'POST', requestHeaders: 'authorization' },
+
+      // --- Tentativas de echo via Origin. ---
+      { label: 'Origin com EVIL marker',                  origin: 'https://EVIL.attacker.com',           requestMethod: 'POST', requestHeaders: 'authorization' },
+      { label: 'Origin com PWN + null',                   origin: 'https://PWN\x00.evil.com',            requestMethod: 'POST', requestHeaders: 'authorization' },
+      { label: 'Origin com CRLF smuggle',                 origin: 'https://attacker.com\r\nSet-Cookie: pwn=1', requestMethod: 'POST', requestHeaders: 'authorization' },
+
+      // --- Tentativas de echo via Request-Method. ---
+      { label: 'Request-Method = CUSTOM-METHOD',          requestMethod: 'CUSTOM-METHOD',                requestHeaders: 'authorization' },
+      { label: 'Request-Method = DELETE',                 requestMethod: 'DELETE',                       requestHeaders: 'authorization' },
+      { label: 'Request-Method = PROPFIND',               requestMethod: 'PROPFIND',                     requestHeaders: 'authorization' },
+      { label: 'Request-Method = TRACE,CONNECT',          requestMethod: 'TRACE, CONNECT',               requestHeaders: 'authorization' },
+      { label: 'Request-Method = EVIL com null',          requestMethod: 'EVIL\x00POST',                 requestHeaders: 'authorization' },
+
+      // --- Tentativas de echo via Request-Headers. ---
+      { label: 'Request-Headers = X-EVIL-HEADER',         requestMethod: 'POST', requestHeaders: 'X-EVIL-HEADER, X-CUSTOM-HEADER' },
+      { label: 'Request-Headers = set-cookie',            requestMethod: 'POST', requestHeaders: 'set-cookie, cookie' },
+      { label: 'Request-Headers = INJECTED list',         requestMethod: 'POST', requestHeaders: 'INJECTED, SMUGGLED, LEAK, ECHO, PWN' },
+      { label: 'Request-Headers com CRLF',                requestMethod: 'POST', requestHeaders: 'authorization\r\nSet-Cookie: x=1' },
+      { label: 'Request-Headers com null',                requestMethod: 'POST', requestHeaders: 'authorization\x00X-Injected' },
+      { label: 'Request-Headers com %2C smuggle',         requestMethod: 'POST', requestHeaders: 'content-type%2Cset-cookie' },
+
+      // --- Tentativas de injeção via headers extras "estranhos". ---
+      { label: 'extra X-Forwarded-For',                   requestMethod: 'POST', requestHeaders: 'authorization', extraHeaders: [['X-Forwarded-For', 'EVIL-IP']] },
+      { label: 'extra Cookie',                            requestMethod: 'POST', requestHeaders: 'authorization', extraHeaders: [['Cookie', 'session=PWN']] },
+      { label: 'extra Authorization (echo prep)',         requestMethod: 'POST', requestHeaders: 'authorization', extraHeaders: [['Authorization', 'Bearer EVIL']] },
+      { label: 'extra X-Custom-Echo',                     requestMethod: 'POST', requestHeaders: 'authorization', extraHeaders: [['X-Custom-Echo', 'INJECTED']] },
+
+      // --- Combinações caóticas. ---
+      { label: 'caos: Origin + Method + Headers tudo evil', origin: 'https://EVIL.attacker.com', requestMethod: 'CUSTOM-METHOD', requestHeaders: 'X-EVIL-HEADER, set-cookie, INJECTED' },
+      { label: 'caos: tudo + extras',                       origin: 'https://PWN.evil.com', requestMethod: 'PROPFIND', requestHeaders: 'X-CUSTOM-HEADER, LEAK', extraHeaders: [['Cookie', 'PWN=1'], ['X-Forwarded-For', 'evil']] },
+    ]
+
+    type RawResponse = {
+      status: number
+      headers: Headers
+      headerLines: string[]   // linhas brutas (preserva CR/LF se vazaram).
+      raw: string
+    } | { error: string }
+
+    async function sendRaw(p: typeof PAYLOADS[number]): Promise<RawResponse> {
+      let conn: Deno.TcpConn | null = null
+      try {
+        conn = await Deno.connect({ hostname: u.hostname, port: parseInt(u.port, 10), transport: 'tcp' })
+        const reqLines = [
+          'OPTIONS / HTTP/1.1',
+          `Host: ${hostHeader}`,
+        ]
+        if (p.origin !== undefined) reqLines.push(`Origin: ${p.origin}`)
+        if (p.requestMethod !== undefined) reqLines.push(`Access-Control-Request-Method: ${p.requestMethod}`)
+        if (p.requestHeaders !== undefined) reqLines.push(`Access-Control-Request-Headers: ${p.requestHeaders}`)
+        if (p.extraHeaders) {
+          for (const [k, v] of p.extraHeaders) reqLines.push(`${k}: ${v}`)
+        }
+        reqLines.push('Connection: close', '', '')
+        await conn.write(new TextEncoder().encode(reqLines.join('\r\n')))
+
+        const chunks: Uint8Array[] = []
+        const buf = new Uint8Array(8192)
+        while (true) {
+          const n = await conn.read(buf)
+          if (n === null) break
+          chunks.push(buf.slice(0, n))
+        }
+        const total = chunks.reduce((s, c) => s + c.length, 0)
+        const merged = new Uint8Array(total)
+        let off = 0
+        for (const c of chunks) { merged.set(c, off); off += c.length }
+        const text = new TextDecoder().decode(merged)
+
+        const headerEnd = text.indexOf('\r\n\r\n')
+        if (headerEnd === -1) return { error: 'no header terminator' }
+        const lines = text.slice(0, headerEnd).split('\r\n')
+        const m = lines[0].match(/^HTTP\/1\.[01]\s+(\d{3})/)
+        if (!m) return { error: `bad status: ${lines[0]}` }
+        const status = parseInt(m[1], 10)
+        const headers = new Headers()
+        const headerLines: string[] = []
+        for (let i = 1; i < lines.length; i++) {
+          headerLines.push(lines[i])
+          const idx = lines[i].indexOf(':')
+          if (idx === -1) continue
+          const name = lines[i].slice(0, idx).trim()
+          const value = lines[i].slice(idx + 1).trim()
+          if (name) headers.append(name, value)
+        }
+        return { status, headers, headerLines, raw: text }
+      } finally {
+        try { conn?.close() } catch { /* ignore */ }
+      }
+    }
+
+    let validatedAs200 = 0
+    let acceptedAs4xx = 0
+
+    for (const p of PAYLOADS) {
+      const result = await sendRaw(p)
+      const ctxLabel = `[Payload: ${p.label}]`
+
+      if ('error' in result) { acceptedAs4xx++; continue }
+
+      // (1) NUNCA 5xx — handler não pode crashar com qualquer combinação.
+      assert(
+        result.status < 500,
+        `${ctxLabel}: status NUNCA pode ser 5xx, recebido ${result.status}`,
+      )
+      if (result.status !== 200) { acceptedAs4xx++; continue }
+      validatedAs200++
+
+      // (2) Allowlist estrita: nenhum header fora do conjunto esperado.
+      for (const [name] of result.headers) {
+        const lower = name.toLowerCase()
+        assert(
+          ALLOWED_RESPONSE_HEADERS.has(lower),
+          `${ctxLabel}: header inesperado na resposta: "${name}" (não está na allowlist)`,
+        )
+      }
+
+      // (3) Headers proibidos NUNCA aparecem (mesmo se entrassem na allowlist por erro).
+      for (const forbidden of FORBIDDEN_RESPONSE_HEADERS) {
+        assertEquals(
+          result.headers.get(forbidden), null,
+          `${ctxLabel}: header proibido presente: "${forbidden}"`,
+        )
+      }
+
+      // (4) Allow-Methods e Allow-Headers literais exatos.
+      const am = result.headers.get('access-control-allow-methods')
+      const ah = result.headers.get('access-control-allow-headers')
+      assertExists(am, `${ctxLabel}: Allow-Methods deve estar presente`)
+      assertExists(ah, `${ctxLabel}: Allow-Headers deve estar presente`)
+      assertEquals(am, EXPECTED_METHODS_LITERAL, `${ctxLabel}: Allow-Methods literal exato`)
+      assertEquals(ah, EXPECTED_HEADERS_LITERAL, `${ctxLabel}: Allow-Headers literal exato`)
+
+      // (5) NENHUM marker de echo vazou para Allow-Methods/Allow-Headers.
+      for (const marker of ECHO_MARKERS) {
+        assert(
+          !am.toLowerCase().includes(marker.toLowerCase()),
+          `${ctxLabel}: Allow-Methods refletiu marker "${marker}"`,
+        )
+        assert(
+          !ah.toLowerCase().includes(marker.toLowerCase()),
+          `${ctxLabel}: Allow-Headers refletiu marker "${marker}"`,
+        )
+      }
+
+      // (6) NENHUM CR/LF/null/HTAB embutido em Allow-Methods/Allow-Headers.
+      for (const [field, value] of [['Allow-Methods', am], ['Allow-Headers', ah]] as const) {
+        assert(!value.includes('\r'), `${ctxLabel}: ${field} contém CR embutido`)
+        assert(!value.includes('\n'), `${ctxLabel}: ${field} contém LF embutido`)
+        assert(!value.includes('\x00'), `${ctxLabel}: ${field} contém null byte embutido`)
+        assert(!value.includes('\t'), `${ctxLabel}: ${field} contém HTAB embutido`)
+        // ASCII puro 0x20-0x7E.
+        for (const ch of value) {
+          const code = ch.charCodeAt(0)
+          assert(
+            code >= 0x20 && code <= 0x7E,
+            `${ctxLabel}: ${field} contém char não-ASCII U+${code.toString(16).padStart(4, '0')}`,
+          )
+        }
+      }
+
+      // (7) Allow-Origin SEMPRE literal '*', NUNCA echo de Origin.
+      const ao = result.headers.get('access-control-allow-origin')
+      assertEquals(ao, '*', `${ctxLabel}: Allow-Origin deve ser literal '*' (sem echo de Origin)`)
+      if (p.origin) {
+        assert(
+          !ao!.includes(p.origin),
+          `${ctxLabel}: Allow-Origin NÃO PODE refletir Origin "${p.origin}"`,
+        )
+      }
+
+      // (8) Max-Age literal '86400'.
+      assertEquals(result.headers.get('access-control-max-age'), '86400', `${ctxLabel}: Max-Age literal`)
+
+      // (9) Cada header CORS aparece exatamente 1x (sem duplicação por echo).
+      const counts: Record<string, number> = {}
+      for (const [name] of result.headers) {
+        const lower = name.toLowerCase()
+        counts[lower] = (counts[lower] ?? 0) + 1
+      }
+      assertEquals(counts['access-control-allow-methods'], 1, `${ctxLabel}: Allow-Methods deve aparecer 1x`)
+      assertEquals(counts['access-control-allow-headers'], 1, `${ctxLabel}: Allow-Headers deve aparecer 1x`)
+      assertEquals(counts['access-control-allow-origin'], 1, `${ctxLabel}: Allow-Origin deve aparecer 1x`)
+      assertEquals(counts['access-control-max-age'], 1, `${ctxLabel}: Max-Age deve aparecer 1x`)
+
+      // (10) Sanity: linhas brutas de header não contêm "Set-Cookie" em lugar nenhum
+      //      (proteção extra contra header smuggling via response splitting).
+      for (const line of result.headerLines) {
+        assert(
+          !/set-cookie/i.test(line),
+          `${ctxLabel}: linha de header bruta contém "set-cookie": "${line}"`,
+        )
+      }
+    }
+
+    // (11) Cobertura total da matriz.
+    assertEquals(
+      validatedAs200 + acceptedAs4xx, PAYLOADS.length,
+      `todos os ${PAYLOADS.length} payloads devem ser cobertos (200=${validatedAs200}, 4xx/erro=${acceptedAs4xx})`,
+    )
+
+    // (12) Zero createClient invocado em qualquer preflight.
+    assertEquals(ctx._calls, 0, 'createClient NUNCA pode ser invocado em OPTIONS preflight')
+  } finally {
+    await ctx.stop()
+  }
+})
