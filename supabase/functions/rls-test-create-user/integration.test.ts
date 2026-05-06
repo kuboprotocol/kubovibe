@@ -8646,10 +8646,25 @@ Deno.test('HTTP integration: OPTIONS preflight — fuzz with deterministic SHRIN
     }
 
     // ─── Persistência: arquivo de seeds + falhas reduzidas. ───
-    const PERSIST_DIR = '/tmp/rls-test-fuzz-state'
-    const SEEDS_FILE = `${PERSIST_DIR}/seeds.json`
-    const FAILURES_FILE = `${PERSIST_DIR}/failures.json`
-    try { Deno.mkdirSync(PERSIST_DIR, { recursive: true }) } catch { /* ignore */ }
+    // Tenta múltiplos caminhos e cai para in-memory se sandbox bloquear writes.
+    const PERSIST_CANDIDATES = [
+      '/tmp/rls-test-fuzz-state',
+      `${Deno.cwd()}/.rls-test-fuzz-state`,
+    ]
+    let PERSIST_DIR: string | null = null
+    for (const cand of PERSIST_CANDIDATES) {
+      try {
+        Deno.mkdirSync(cand, { recursive: true })
+        // Verifica write real.
+        const probe = `${cand}/.write-probe`
+        Deno.writeTextFileSync(probe, 'ok')
+        try { Deno.removeSync(probe) } catch { /* ignore */ }
+        PERSIST_DIR = cand
+        break
+      } catch { /* try next */ }
+    }
+    const SEEDS_FILE = PERSIST_DIR ? `${PERSIST_DIR}/seeds.json` : null
+    const FAILURES_FILE = PERSIST_DIR ? `${PERSIST_DIR}/failures.json` : null
 
     interface PersistedSeed { seed: number; runAt: string; n: number }
     interface PersistedFailure {
@@ -8658,11 +8673,22 @@ Deno.test('HTTP integration: OPTIONS preflight — fuzz with deterministic SHRIN
       shrunk: FuzzPayload; shrunkReason: string; shrinkIterations: number;
     }
 
-    const loadJson = <T,>(path: string, fallback: T): T => {
+    const loadJson = <T,>(path: string | null, fallback: T): T => {
+      if (!path) return fallback
       try { return JSON.parse(Deno.readTextFileSync(path)) } catch { return fallback }
     }
-    const saveJson = (path: string, data: unknown): void => {
-      try { Deno.writeTextFileSync(path, JSON.stringify(data, null, 2)) } catch { /* ignore */ }
+    let persistWritesOk = 0
+    let persistWritesFailed = 0
+    const saveJson = (path: string | null, data: unknown): boolean => {
+      if (!path) { persistWritesFailed++; return false }
+      try {
+        Deno.writeTextFileSync(path, JSON.stringify(data, null, 2))
+        persistWritesOk++
+        return true
+      } catch {
+        persistWritesFailed++
+        return false
+      }
     }
 
     const seedsHistory: PersistedSeed[] = loadJson(SEEDS_FILE, [])
@@ -8673,7 +8699,7 @@ Deno.test('HTTP integration: OPTIONS preflight — fuzz with deterministic SHRIN
     const N = 250
 
     seedsHistory.push({ seed: SEED, runAt: new Date().toISOString(), n: N })
-    saveJson(SEEDS_FILE, seedsHistory.slice(-50)) // mantém últimos 50
+    const seedSaved = saveJson(SEEDS_FILE, seedsHistory.slice(-50)) // mantém últimos 50
 
     let validatedAs200 = 0
     let acceptedAs4xx = 0
