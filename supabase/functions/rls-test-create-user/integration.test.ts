@@ -1153,3 +1153,127 @@ Deno.test('HTTP integration: OPTIONS preflight — Allow-Headers is EXACTLY the 
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: OPTIONS preflight — Allow-Origin is exactly "*" and no unexpected CORS headers leak', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    // Contrato: corsHeaders declara estaticamente apenas QUATRO chaves CORS:
+    //   - Access-Control-Allow-Origin:  "*"
+    //   - Access-Control-Allow-Headers: <canonical 5-token list>
+    //   - Access-Control-Allow-Methods: "POST, OPTIONS"
+    //   - Access-Control-Max-Age:       "86400"
+    //
+    // Esse teste blinda DUAS propriedades:
+    //   (1) Allow-Origin é EXATAMENTE "*" (literal). Não pode ecoar o
+    //       Origin recebido, não pode ter espaços/whitespace, não pode
+    //       virar "null", e não pode listar múltiplas origens (CORS spec
+    //       permite só "*" OU uma única origem; múltiplas violam o RFC).
+    //   (2) Nenhum outro header da família "Access-Control-*" vaza além
+    //       dos quatro declarados — com destaque para os perigosos:
+    //         - Allow-Credentials (incompatível com "*" — vazaria cookies)
+    //         - Expose-Headers    (não declarado pelo handler)
+    //         - Request-Method/Request-Headers (são REQUEST-side, nunca
+    //           devem aparecer em RESPONSE)
+    const HOSTILE_ORIGIN = 'https://evil.example.com'
+    const res = await fetch(`${ctx.url}/`, {
+      method: 'OPTIONS',
+      headers: {
+        // Origin propositalmente "hostil" para garantir que o handler
+        // NÃO está ecoando o valor recebido em vez de devolver "*".
+        'origin': HOSTILE_ORIGIN,
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'content-type, x-test-secret',
+      },
+    })
+
+    assertEquals(res.status, 200, 'preflight deve responder 200')
+
+    // (1) Allow-Origin literal exato.
+    const origin = res.headers.get('access-control-allow-origin')
+    assertEquals(
+      origin,
+      '*',
+      `allow-origin deve ser EXATAMENTE "*" (got: "${origin}")`,
+    )
+    assert(
+      origin !== HOSTILE_ORIGIN,
+      'allow-origin NÃO pode ecoar o Origin recebido (risco de bypass de CORS)',
+    )
+    assert(
+      origin !== 'null',
+      'allow-origin NÃO pode ser a string "null" (vazaria a contextos opaque)',
+    )
+    assert(
+      !/[, ]/.test(origin!),
+      `allow-origin NÃO pode conter vírgula ou espaço (CORS spec proíbe múltiplas origens) (got: "${origin}")`,
+    )
+
+    // (2) Whitelist de headers Access-Control-* esperados na RESPOSTA.
+    // Tudo que estiver fora dessa lista é regressão.
+    const ALLOWED_RESPONSE_HEADERS = new Set([
+      'access-control-allow-origin',
+      'access-control-allow-headers',
+      'access-control-allow-methods',
+      'access-control-max-age',
+    ])
+
+    // Headers explicitamente PROIBIDOS na resposta — cada um por um motivo
+    // de segurança/conformidade distinto, validados individualmente para
+    // mensagem de erro precisa.
+    const FORBIDDEN_RESPONSE_HEADERS: Array<[string, string]> = [
+      [
+        'access-control-allow-credentials',
+        'incompatível com Allow-Origin "*" — combinação rejeitada por todos os browsers e vazaria cookies/auth',
+      ],
+      [
+        'access-control-expose-headers',
+        'handler não declara Expose-Headers; presença indica drift acidental',
+      ],
+      [
+        'access-control-request-method',
+        'header REQUEST-side; jamais deve aparecer em resposta',
+      ],
+      [
+        'access-control-request-headers',
+        'header REQUEST-side; jamais deve aparecer em resposta',
+      ],
+    ]
+
+    for (const [forbidden, reason] of FORBIDDEN_RESPONSE_HEADERS) {
+      assertEquals(
+        res.headers.get(forbidden),
+        null,
+        `Header proibido "${forbidden}" presente na resposta — ${reason}`,
+      )
+    }
+
+    // Varredura geral: enumera TODOS os headers da resposta e falha se
+    // achar algum "access-control-*" fora da whitelist. Isso captura
+    // headers desconhecidos/futuros que possam ser introduzidos por
+    // engano (ex: alguém adicionando "access-control-allow-private-network").
+    const unexpected: string[] = []
+    for (const [name] of res.headers) {
+      const lower = name.toLowerCase()
+      if (lower.startsWith('access-control-') && !ALLOWED_RESPONSE_HEADERS.has(lower)) {
+        unexpected.push(lower)
+      }
+    }
+    assertEquals(
+      unexpected,
+      [],
+      `Headers Access-Control-* inesperados na resposta: ${JSON.stringify(unexpected)}`,
+    )
+
+    // Sanidade dos quatro headers CORS canônicos (presença obrigatória).
+    assertExists(res.headers.get('access-control-allow-headers'), 'Allow-Headers obrigatório ausente')
+    assertEquals(res.headers.get('access-control-allow-methods'), 'POST, OPTIONS')
+    assertEquals(res.headers.get('access-control-max-age'), '86400')
+
+    await res.text()
+
+    // Preflight nunca pode instanciar Supabase client.
+    assertEquals(ctx._calls, 0, 'OPTIONS jamais deve chamar createClient')
+  } finally {
+    await ctx.stop()
+  }
+})
