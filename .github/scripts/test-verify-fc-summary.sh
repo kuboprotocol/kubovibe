@@ -186,6 +186,112 @@ ${FAILURES_OK}
 _The two files above are uploaded as standalone GitHub artifacts so you can curl or download them without unpacking the full bundle._
 EOF
 
+# ─── presence + uniqueness fixtures ──────────────────────────────────────────
+
+# Missing fc-seeds bullet entirely (only failures bullet present).
+MISSING_SEEDS="${WORKDIR}/missing_seeds.md"
+cat > "${MISSING_SEEDS}" <<EOF
+# Preflight CORS Fuzz — request-headers
+
+### 🎯 fast-check direct downloads (Access-Control-Request-Headers)
+
+${FAILURES_OK}
+
+_The two files above are uploaded as standalone GitHub artifacts so you can curl or download them without unpacking the full bundle._
+EOF
+
+# Missing fc-failures bullet entirely.
+MISSING_FAILURES="${WORKDIR}/missing_failures.md"
+cat > "${MISSING_FAILURES}" <<EOF
+# Preflight CORS Fuzz — request-headers
+
+### 🎯 fast-check direct downloads (Access-Control-Request-Headers)
+
+${SEEDS_OK}
+
+_The two files above are uploaded as standalone GitHub artifacts so you can curl or download them without unpacking the full bundle._
+EOF
+
+# Missing BOTH bullets — section header only.
+MISSING_BOTH="${WORKDIR}/missing_both.md"
+cat > "${MISSING_BOTH}" <<'EOF'
+# Preflight CORS Fuzz — request-headers
+
+### 🎯 fast-check direct downloads (Access-Control-Request-Headers)
+
+_The two files above are uploaded as standalone GitHub artifacts so you can curl or download them without unpacking the full bundle._
+EOF
+
+# Duplicate canonical seeds bullet (writer/append ran twice).
+DUP_SEEDS_CANONICAL="${WORKDIR}/dup_seeds_canonical.md"
+cat > "${DUP_SEEDS_CANONICAL}" <<EOF
+# Preflight CORS Fuzz — request-headers
+
+### 🎯 fast-check direct downloads (Access-Control-Request-Headers)
+
+${SEEDS_OK}
+${SEEDS_OK}
+${FAILURES_OK}
+
+_The two files above are uploaded as standalone GitHub artifacts so you can curl or download them without unpacking the full bundle._
+EOF
+
+# Duplicate canonical failures bullet.
+DUP_FAILURES_CANONICAL="${WORKDIR}/dup_failures_canonical.md"
+cat > "${DUP_FAILURES_CANONICAL}" <<EOF
+# Preflight CORS Fuzz — request-headers
+
+### 🎯 fast-check direct downloads (Access-Control-Request-Headers)
+
+${SEEDS_OK}
+${FAILURES_OK}
+${FAILURES_OK}
+
+_The two files above are uploaded as standalone GitHub artifacts so you can curl or download them without unpacking the full bundle._
+EOF
+
+# Mixed: canonical inline AND fallback marker for the same file (drift
+# between staged state and rendered output).
+MIX_SEEDS="${WORKDIR}/mix_seeds.md"
+cat > "${MIX_SEEDS}" <<EOF
+# Preflight CORS Fuzz — request-headers
+
+### 🎯 fast-check direct downloads (Access-Control-Request-Headers)
+
+${SEEDS_OK}
+- 🌱 \`fc-seeds.json\` — _(not produced in this run)_
+${FAILURES_OK}
+
+_The two files above are uploaded as standalone GitHub artifacts so you can curl or download them without unpacking the full bundle._
+EOF
+
+MIX_FAILURES="${WORKDIR}/mix_failures.md"
+cat > "${MIX_FAILURES}" <<EOF
+# Preflight CORS Fuzz — request-headers
+
+### 🎯 fast-check direct downloads (Access-Control-Request-Headers)
+
+${SEEDS_OK}
+${FAILURES_OK}
+- 💥 \`fc-failures.json\` — _(no failures persisted in this run — invariants held)_
+
+_The two files above are uploaded as standalone GitHub artifacts so you can curl or download them without unpacking the full bundle._
+EOF
+
+# Duplicate FALLBACK markers (appended twice while not staged).
+DUP_SEEDS_FALLBACK="${WORKDIR}/dup_seeds_fallback.md"
+cat > "${DUP_SEEDS_FALLBACK}" <<'EOF'
+# Preflight CORS Fuzz — request-headers
+
+### 🎯 fast-check direct downloads (Access-Control-Request-Headers)
+
+- 🌱 `fc-seeds.json` — _(not produced in this run)_
+- 🌱 `fc-seeds.json` — _(not produced in this run)_
+- 💥 `fc-failures.json` — _(no failures persisted in this run — invariants held)_
+
+_The two files above are uploaded as standalone GitHub artifacts so you can curl or download them without unpacking the full bundle._
+EOF
+
 # ─── run cases ───────────────────────────────────────────────────────────────
 
 echo "▶ verify-fc-summary.sh smoke tests"
@@ -228,6 +334,30 @@ run_case "BAD: stray seeds inline link while not staged" \
   "${STRAY_SEEDS}" 1 0 0 "" ""
 run_case "BAD: stray failures inline link while not staged" \
   "${STRAY_FAILURES}" 1 0 0 "" ""
+
+echo ""
+echo "── presence: missing bullets (must fail) ──"
+run_case "BAD: fc-seeds bullet missing entirely (staged)" \
+  "${MISSING_SEEDS}"    1 1 1 "https://example.com/seeds" "https://example.com/failures"
+run_case "BAD: fc-failures bullet missing entirely (staged)" \
+  "${MISSING_FAILURES}" 1 1 1 "https://example.com/seeds" "https://example.com/failures"
+run_case "BAD: BOTH bullets missing (section header only, staged)" \
+  "${MISSING_BOTH}"     1 1 1 "https://example.com/seeds" "https://example.com/failures"
+run_case "BAD: BOTH bullets missing (not staged either)" \
+  "${MISSING_BOTH}"     1 0 0 "" ""
+
+echo ""
+echo "── uniqueness: duplicate bullets (must fail) ──"
+run_case "BAD: duplicate canonical fc-seeds bullet" \
+  "${DUP_SEEDS_CANONICAL}"    1 1 1 "https://example.com/seeds" "https://example.com/failures"
+run_case "BAD: duplicate canonical fc-failures bullet" \
+  "${DUP_FAILURES_CANONICAL}" 1 1 1 "https://example.com/seeds" "https://example.com/failures"
+run_case "BAD: duplicate fallback fc-seeds marker (not staged)" \
+  "${DUP_SEEDS_FALLBACK}"     1 0 0 "" ""
+run_case "BAD: mix canonical+fallback for fc-seeds.json" \
+  "${MIX_SEEDS}"     1 1 1 "https://example.com/seeds" "https://example.com/failures"
+run_case "BAD: mix canonical+fallback for fc-failures.json" \
+  "${MIX_FAILURES}"  1 1 1 "https://example.com/seeds" "https://example.com/failures"
 
 # ─── summary ─────────────────────────────────────────────────────────────────
 
