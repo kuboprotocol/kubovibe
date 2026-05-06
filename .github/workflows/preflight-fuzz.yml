@@ -599,13 +599,19 @@ jobs:
           chmod +x .github/scripts/verify-fc-summary.sh
           .github/scripts/verify-fc-summary.sh
 
+          # Re-read script outputs from GITHUB_OUTPUT to enrich the run summary
+          # (we can't reference ${{ steps.verify_sticky.outputs.* }} from the
+          # same step that writes them).
+          SEEDS_OUT=$(grep -E '^seeds_result=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2- || echo "validated")
+          FAIL_OUT=$(grep -E '^failures_result=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2- || echo "validated")
+          SIZE_OUT=$(grep -E '^size_bytes=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2- || echo "n/a")
           {
             echo ""
             echo "### 💬 Sticky PR comment self-check (${CATEGORY_ID})"
             echo "- Header: \`${STICKY_HEADER}\`"
-            echo "- \`fc-seeds.json\`:    ${{ steps.verify_sticky.outputs.seeds_result || 'validated' }}"
-            echo "- \`fc-failures.json\`: ${{ steps.verify_sticky.outputs.failures_result || 'validated' }}"
-            echo "- Body size: ${{ steps.verify_sticky.outputs.size_bytes || 'n/a' }} bytes"
+            echo "- \`fc-seeds.json\`:    ${SEEDS_OUT}"
+            echo "- \`fc-failures.json\`: ${FAIL_OUT}"
+            echo "- Body size: ${SIZE_OUT} bytes"
           } >> "$GITHUB_STEP_SUMMARY"
 
       # Stage + upload summary-<category>.md as a standalone artifact so it
