@@ -345,3 +345,40 @@ Deno.test('HTTP integration: invalid JSON body is tolerated (handler does not pa
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: OPTIONS without Origin header + WRONG x-test-secret still returns CORS headers', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    // Cenários como curl, scripts server-to-server e alguns clients HTTP
+    // não enviam Origin no preflight. O handler DEVE responder CORS mesmo
+    // assim e ignorar o secret (preflight é sempre processado antes da auth).
+    const res = await fetch(`${ctx.url}/`, {
+      method: 'OPTIONS',
+      headers: {
+        'x-test-secret': 'definitely-wrong-secret',
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'x-test-secret, content-type',
+        // Intencionalmente SEM 'origin'
+      },
+    })
+
+    assertEquals(res.status, 200, 'OPTIONS sem Origin deve responder 200')
+    assertEquals(
+      res.headers.get('access-control-allow-origin'),
+      '*',
+      'allow-origin: * deve ser retornado mesmo sem Origin na request',
+    )
+
+    const allowed = res.headers.get('access-control-allow-headers') ?? ''
+    assert(allowed.includes('x-test-secret'), 'allow-headers deve listar x-test-secret')
+    assert(allowed.includes('content-type'), 'allow-headers deve listar content-type')
+    assert(allowed.includes('authorization'), 'allow-headers deve listar authorization')
+
+    await res.text()
+
+    // Preflight nunca pode validar secret nem instanciar Supabase client.
+    assertEquals(ctx._calls, 0, 'OPTIONS jamais deve chamar createClient')
+  } finally {
+    await ctx.stop()
+  }
+})
