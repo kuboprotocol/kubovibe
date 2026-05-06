@@ -6148,3 +6148,226 @@ Deno.test('HTTP integration: OPTIONS preflight — Access-Control-Request-Header
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: OPTIONS preflight — Access-Control-Request-Headers with percent-encoded/UTF-8 confusables × whitespace-around-commas — Allow-Headers stays LITERAL exact (no echo, no decode-leak)', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    const EXPECTED_HEADERS_LITERAL = 'authorization, x-client-info, apikey, content-type, x-test-secret'
+    const EXPECTED_HEADERS_SET = new Set([
+      'authorization', 'x-client-info', 'apikey', 'content-type', 'x-test-secret',
+    ])
+    const DANGEROUS_HEADERS = [
+      'set-cookie', 'set-cookie2', 'cookie', 'cookie2',
+      'host', 'origin', 'authorization-bearer',
+      'x-evil-cookie', 'x-fake-header', 'x-csrf-token',
+      'x-forwarded-for', 'x-real-ip', 'proxy-authorization',
+      'x-injected', 'x-smuggled', 'x-utf8',
+      '*',
+    ]
+    // Tokens "decode-leak": se o servidor decodificasse percent-encoding, esses apareceriam.
+    const DECODED_LEAK_TOKENS = [
+      'set-cookie',         // de %73%65%74-%63%6F%6F%6B%69%65
+      'cookie',             // de %63%6F%6F%6B%69%65
+      'host',               // de %68%6F%73%74
+      'authorization',      // de %61%75%74%68... — válido, mas valida que NÃO veio do decode
+      '\r', '\n', '\x00',   // de %0D %0A %00 — anti CRLF/null smuggling via percent
+    ]
+
+    const u = new URL(ctx.url)
+    const hostHeader = u.host
+
+    // Payloads que combinam:
+    //  (A) percent-encoding (RFC 3986) — bytes literais "%XX" que NÃO devem ser decodificados em header values.
+    //  (B) UTF-8 confusables — caracteres Unicode que VISUALMENTE parecem ASCII mas têm bytes diferentes.
+    //  (C) whitespace ao redor de vírgulas — formatação cosmética ortogonal.
+    const PAYLOADS: Array<{ label: string; raw: string }> = [
+      // --- Percent-encoded "puro" — bytes literais não devem virar control chars/dangerous. ---
+      { label: 'percent-encoded set-cookie',           raw: '%73%65%74-%63%6F%6F%6B%69%65, content-type' },
+      { label: 'percent-encoded cookie maiúsculo',     raw: '%43%6F%6F%6B%69%65 , content-type' },
+      { label: 'percent-encoded CR (%0D)',             raw: 'content-type%0D, x-test-secret' },
+      { label: 'percent-encoded LF (%0A)',             raw: 'content-type%0A, x-test-secret' },
+      { label: 'percent-encoded CRLF (%0D%0A)',        raw: 'content-type%0D%0ASet-Cookie:%20pwn=1' },
+      { label: 'percent-encoded null (%00)',           raw: 'content-type%00, x-test-secret' },
+      { label: 'percent-encoded space (%20) interno', raw: 'content-type%20%2C%20x-test-secret' },  // %2C = ','
+      { label: 'percent-encoded comma (%2C)',          raw: 'content-type%2Cx-test-secret' },
+      { label: 'percent-encoded host injection',       raw: '%68%6F%73%74 , content-type' },
+      { label: 'percent-encoded mix maiúsculo/minúsculo', raw: '%63%6f%4f%6B%69%65, content-type' },
+      { label: 'percent-encoded tudo',                 raw: '%61%75%74%68%6F%72%69%7A%61%74%69%6F%6E' },
+
+      // --- Percent-encoded INVÁLIDOS (parser deve manter literal). ---
+      { label: 'percent + 1 hex (%4)',                 raw: 'content-type, %4' },
+      { label: 'percent + non-hex (%ZZ)',              raw: 'content-type, x%ZZtest-secret' },
+      { label: 'percent solto trailing',               raw: 'content-type, x-test-secret%' },
+      { label: 'percent percent (%%)',                 raw: 'content-type%%x-test-secret' },
+
+      // --- UTF-8 confusables (Unicode lookalikes). ---
+      // Cyrillic 'а' (U+0430) parece ASCII 'a'. Greek 'Ε' (U+0395) parece 'E'.
+      { label: 'cyrillic а em authorization',          raw: 'аuthorization, content-type' },
+      { label: 'fullwidth uppercase AUTHORIZATION',    raw: 'ＡＵＴＨＯＲＩＺＡＴＩＯＮ, content-type' },
+      { label: 'cyrillic с em set-cookie',             raw: 'сet-cookie, content-type' },  // 'с' Cyrillic
+      { label: 'mathematical bold authorization',      raw: '𝐚𝐮𝐭𝐡𝐨𝐫𝐢𝐳𝐚𝐭𝐢𝐨𝐧, content-type' },
+      { label: 'zero-width space dentro de token',     raw: 'auth\u200Borization, content-type' },
+      { label: 'soft hyphen dentro de token',          raw: 'cont\u00ADent-type, x-test-secret' },
+      { label: 'BOM no início',                        raw: '\uFEFFcontent-type, x-test-secret' },
+
+      // --- UTF-8 inválido / overlong / surrogates lone (encodados como bytes via TextEncoder). ---
+      // Nota: TextEncoder não emite bytes inválidos; usamos sequências válidas mas semanticamente confusas.
+      { label: 'caractere combining acima',            raw: 'content-type\u0301, x-test-secret' },
+      { label: 'RTL override (U+202E)',                raw: 'content-type\u202E, x-test-secret' },
+      { label: 'normalização NFKD: ﬃ ligature',        raw: 'aﬃkey, content-type' },  // 'ﬃ' poderia normalizar para 'ffi'
+
+      // --- Whitespace ao redor de vírgulas (com e sem percent/UTF-8). ---
+      { label: 'espaço antes da vírgula simples',       raw: 'authorization ,x-client-info' },
+      { label: 'espaços ao redor de todas vírgulas',    raw: ' authorization , x-client-info , apikey , content-type , x-test-secret ' },
+      { label: 'tab ao redor de vírgulas',              raw: '\tcontent-type\t,\tx-test-secret\t' },
+      { label: 'NBSP ao redor (U+00A0)',                raw: '\u00A0content-type\u00A0,\u00A0x-test-secret\u00A0' },
+      { label: 'múltiplos NBSP + percent',              raw: '\u00A0\u00A0content-type%2C%20x-test-secret\u00A0\u00A0' },
+      { label: 'em-space (U+2003) ao redor',            raw: '\u2003content-type\u2003,\u2003x-test-secret\u2003' },
+      { label: 'mix tab + NBSP + percent + cyrillic',   raw: '\t\u00A0аuthorization\u00A0\t,\u00A0%63ookie\u00A0,\tcontent-type\t' },
+
+      // --- Combinações caóticas: percent + UTF-8 + whitespace + tentativa de smuggling. ---
+      { label: 'caos: percent CRLF + NBSP + cyrillic',  raw: '\u00A0%73et-cookie\u00A0%0D%0AX-Injected:%201\u00A0,\u00A0content-type\u00A0' },
+      { label: 'caos: zero-width + percent + space',    raw: 'cont\u200Bent-type\u00A0%2C\u00A0%73et-cookie\u00A0,\u00A0x-test-secret' },
+      { label: 'caos: BOM + RTL + percent host',        raw: '\uFEFF\u202E%68%6F%73%74\u00A0,\u00A0content-type' },
+    ]
+
+    const parseList = (v: string | null): string[] =>
+      (v ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
+
+    type RawResponse = { status: number; headers: Headers } | { error: string }
+
+    async function sendRaw(payload: string): Promise<RawResponse> {
+      let conn: Deno.TcpConn | null = null
+      try {
+        conn = await Deno.connect({ hostname: u.hostname, port: parseInt(u.port, 10), transport: 'tcp' })
+        const reqLines = [
+          'OPTIONS / HTTP/1.1',
+          `Host: ${hostHeader}`,
+          'Origin: https://evil.example.com',
+          'Access-Control-Request-Method: POST',
+          `Access-Control-Request-Headers: ${payload}`,
+          'Connection: close',
+          '',
+          '',
+        ]
+        await conn.write(new TextEncoder().encode(reqLines.join('\r\n')))
+
+        const chunks: Uint8Array[] = []
+        const buf = new Uint8Array(8192)
+        while (true) {
+          const n = await conn.read(buf)
+          if (n === null) break
+          chunks.push(buf.slice(0, n))
+        }
+        const total = chunks.reduce((s, c) => s + c.length, 0)
+        const merged = new Uint8Array(total)
+        let off = 0
+        for (const c of chunks) { merged.set(c, off); off += c.length }
+        const text = new TextDecoder().decode(merged)
+
+        const headerEnd = text.indexOf('\r\n\r\n')
+        if (headerEnd === -1) return { error: 'no header terminator' }
+        const lines = text.slice(0, headerEnd).split('\r\n')
+        const m = lines[0].match(/^HTTP\/1\.[01]\s+(\d{3})/)
+        if (!m) return { error: `bad status: ${lines[0]}` }
+        const status = parseInt(m[1], 10)
+        const headers = new Headers()
+        for (let i = 1; i < lines.length; i++) {
+          const idx = lines[i].indexOf(':')
+          if (idx === -1) continue
+          const name = lines[i].slice(0, idx).trim()
+          const value = lines[i].slice(idx + 1).trim()
+          if (name) headers.append(name, value)
+        }
+        return { status, headers }
+      } finally {
+        try { conn?.close() } catch { /* ignore */ }
+      }
+    }
+
+    let validatedAs200 = 0
+    let acceptedAs4xx = 0
+
+    for (const p of PAYLOADS) {
+      const result = await sendRaw(p.raw)
+      const ctxLabel = `[Payload: ${p.label}]`
+
+      if ('error' in result) { acceptedAs4xx++; continue }
+
+      // (1) Status 200 OU 4xx — nunca 5xx (parser não pode crashar com Unicode/percent).
+      assert(
+        result.status === 200 || (result.status >= 400 && result.status < 500),
+        `${ctxLabel}: status deve ser 200 ou 4xx, recebido ${result.status}`,
+      )
+      if (result.status !== 200) { acceptedAs4xx++; continue }
+      validatedAs200++
+
+      // (2) Allow-Headers LITERAL EXATO — sem echo de percent-encoded nem UTF-8 confusable.
+      const ah = result.headers.get('access-control-allow-headers')
+      assertExists(ah, `${ctxLabel}: Allow-Headers deve estar presente`)
+      assertEquals(
+        ah, EXPECTED_HEADERS_LITERAL,
+        `${ctxLabel}: Allow-Headers deve ser literal "${EXPECTED_HEADERS_LITERAL}"`,
+      )
+
+      // (3) Conjunto bate exatamente.
+      const parsed = new Set(parseList(ah))
+      assertEquals(parsed.size, EXPECTED_HEADERS_SET.size, `${ctxLabel}: Allow-Headers deve listar exatamente 5 headers`)
+      for (const h of EXPECTED_HEADERS_SET) {
+        assert(parsed.has(h), `${ctxLabel}: Allow-Headers deve incluir "${h}"`)
+      }
+
+      // (4) NUNCA cabeçalhos perigosos.
+      for (const dangerous of DANGEROUS_HEADERS) {
+        assert(!parsed.has(dangerous), `${ctxLabel}: Allow-Headers NÃO PODE conter "${dangerous}"`)
+      }
+
+      // (5) NUNCA bytes/strings que indicam decode-leak (CR/LF/null vindos de %0D/%0A/%00).
+      for (const leak of DECODED_LEAK_TOKENS) {
+        if (leak === 'authorization') continue  // está na allowlist legitimamente
+        assert(!ah.includes(leak), `${ctxLabel}: Allow-Headers NÃO PODE conter decode-leak "${JSON.stringify(leak)}"`)
+      }
+
+      // (6) NUNCA echoar caracteres Unicode confusables — Allow-Headers deve ser ASCII puro.
+      for (const ch of ah) {
+        const code = ch.charCodeAt(0)
+        assert(code >= 0x20 && code <= 0x7E, `${ctxLabel}: Allow-Headers contém char não-ASCII U+${code.toString(16).padStart(4, '0')}`)
+      }
+
+      // (7) NUNCA conter literal '%' (sinal de echo de percent-encoding).
+      assert(!ah.includes('%'), `${ctxLabel}: Allow-Headers NÃO PODE conter '%' (echo de percent)`)
+
+      // (8) Outros campos CORS literais.
+      assertEquals(result.headers.get('access-control-allow-methods'), 'POST, OPTIONS', `${ctxLabel}: Allow-Methods literal`)
+      assertEquals(result.headers.get('access-control-allow-origin'), '*', `${ctxLabel}: Allow-Origin '*'`)
+      assertEquals(result.headers.get('access-control-allow-credentials'), null, `${ctxLabel}: Allow-Credentials NUNCA`)
+      assertEquals(result.headers.get('access-control-max-age'), '86400', `${ctxLabel}: Max-Age literal`)
+
+      // (9) Headers smuggling NUNCA aparecem na resposta.
+      assertEquals(result.headers.get('set-cookie'), null, `${ctxLabel}: Set-Cookie NUNCA`)
+      assertEquals(result.headers.get('cookie'), null, `${ctxLabel}: Cookie NUNCA`)
+      assertEquals(result.headers.get('x-injected'), null, `${ctxLabel}: X-Injected NUNCA`)
+      assertEquals(result.headers.get('x-smuggled'), null, `${ctxLabel}: X-Smuggled NUNCA`)
+      assertEquals(result.headers.get('x-utf8'), null, `${ctxLabel}: X-Utf8 NUNCA`)
+      assertEquals(result.headers.get('access-control-expose-headers'), null, `${ctxLabel}: Expose-Headers NUNCA`)
+
+      // (10) Allow-Headers aparece exatamente 1x.
+      let occurrences = 0
+      for (const [name] of result.headers) {
+        if (name.toLowerCase() === 'access-control-allow-headers') occurrences++
+      }
+      assertEquals(occurrences, 1, `${ctxLabel}: Allow-Headers deve aparecer exatamente 1x`)
+    }
+
+    // (11) Sanidade da matriz.
+    assertEquals(
+      validatedAs200 + acceptedAs4xx, PAYLOADS.length,
+      `todos os ${PAYLOADS.length} payloads devem ser cobertos (200=${validatedAs200}, 4xx/erro=${acceptedAs4xx})`,
+    )
+
+    // (12) Zero createClient.
+    assertEquals(ctx._calls, 0, 'createClient NUNCA pode ser invocado em OPTIONS preflight (percent/UTF-8)')
+  } finally {
+    await ctx.stop()
+  }
+})
