@@ -637,3 +637,54 @@ Deno.test('HTTP integration: OPTIONS with CORS headers (Origin + Request-Method)
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: OPTIONS with VALID x-test-secret returns Max-Age 86400 and full CORS headers', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    // Mesmo com secret válido, OPTIONS é preflight: deve devolver os defaults
+    // de CORS (incluindo Max-Age 86400) sem chamar createClient. O contrato
+    // garante que o cache de preflight do navegador funcione independente da
+    // validade do secret.
+    const res = await fetch(`${ctx.url}/`, {
+      method: 'OPTIONS',
+      headers: {
+        'origin': 'https://app.kubovibe.dev',
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'content-type, x-test-secret',
+        'x-test-secret': SECRET,
+      },
+    })
+
+    assertEquals(res.status, 200, 'preflight com secret válido deve responder 200')
+
+    // Max-Age: exatamente 86400 (24h) — valor do default em corsHeaders.
+    assertEquals(
+      res.headers.get('access-control-max-age'),
+      '86400',
+      'max-age default deve ser 86400 (24h)',
+    )
+
+    // Allow-Methods: POST + OPTIONS, sem métodos não suportados.
+    const methods = res.headers.get('access-control-allow-methods') ?? ''
+    const upper = methods.toUpperCase()
+    assert(upper.includes('POST'), `allow-methods deve listar POST (got: "${methods}")`)
+    assert(upper.includes('OPTIONS'), `allow-methods deve listar OPTIONS (got: "${methods}")`)
+    assert(!upper.includes('DELETE'), 'allow-methods não deve listar DELETE')
+    assert(!upper.includes('PUT'), 'allow-methods não deve listar PUT')
+
+    // Allow-Origin wildcard + Allow-Headers completos.
+    assertEquals(res.headers.get('access-control-allow-origin'), '*')
+    const allowed = res.headers.get('access-control-allow-headers') ?? ''
+    assert(allowed.includes('x-test-secret'), 'allow-headers deve listar x-test-secret')
+    assert(allowed.includes('content-type'), 'allow-headers deve listar content-type')
+    assert(allowed.includes('authorization'), 'allow-headers deve listar authorization')
+    assert(allowed.includes('apikey'), 'allow-headers deve listar apikey')
+
+    await res.text()
+
+    // Preflight nunca pode instanciar Supabase client, mesmo com secret válido.
+    assertEquals(ctx._calls, 0, 'OPTIONS jamais deve chamar createClient')
+  } finally {
+    await ctx.stop()
+  }
+})
