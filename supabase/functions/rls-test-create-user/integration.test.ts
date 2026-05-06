@@ -1623,3 +1623,92 @@ Deno.test('HTTP integration: cross-origin GET response MUST NOT include Access-C
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: POST 401 (permission denied) MUST NOT include Allow-Credentials and MUST keep Allow-Origin "*"', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    // Por que 401 (e não 403):
+    //   * O handler `rls-test-create-user` NÃO tem branch que retorne 403
+    //     hoje. Seu único caminho de "permissão negada" é o 401, disparado
+    //     quando o `x-test-secret` é inválido/ausente. Espelhamos o
+    //     comportamento real em vez de inventar mocks artificiais.
+    //   * Esse teste é DEDICADO ao contrato CORS no caminho de erro de
+    //     autorização, complementando os testes existentes de POST 200/401
+    //     genéricos. Aqui validamos o par EXATO Allow-Origin "*" + ausência
+    //     de Allow-Credentials, que é a combinação CORS-spec-compliant.
+    //
+    // Por que o par precisa ser validado JUNTO:
+    //   * Allow-Credentials: true + Allow-Origin: "*" = REJEITADO pela
+    //     spec (Fetch §3.2). Browsers descartam a resposta inteira.
+    //   * Allow-Origin que ECOA Origin do request (não "*" estático) +
+    //     Allow-Credentials: true = válido pela spec, mas vazaria cookies
+    //     a qualquer origem que faça o request (CSRF amplificado).
+    //   * O handler usa "*" estático — então Allow-Credentials DEVE estar
+    //     ausente, e Allow-Origin DEVE permanecer "*" mesmo no caminho de erro.
+    //
+    // Validação tripla:
+    //   (1) headers.get('access-control-allow-credentials') === null
+    //   (2) Iteração case-insensitive (protege contra capitalização variante).
+    //   (3) headers.get('access-control-allow-origin') === '*' literal exato
+    //       (não ecoa Origin recebido, não "null", sem vírgulas/espaços).
+
+    const HOSTILE_ORIGIN = 'https://attacker.example.com'
+
+    const res = await fetch(`${ctx.url}/`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-test-secret': 'wrong-secret-permission-denied',
+        // Origin presente — reproduz cenário cross-origin real onde o
+        // browser AVALIA Allow-Credentials + Allow-Origin juntos.
+        'origin': HOSTILE_ORIGIN,
+      },
+      body: JSON.stringify({ email: 'a@b.com', password: 'pw' }),
+    })
+
+    assertEquals(res.status, 401, 'POST com secret inválido deve retornar 401 (permission denied)')
+
+    // (1) .get() direto — Allow-Credentials ausente.
+    assertEquals(
+      res.headers.get('access-control-allow-credentials'),
+      null,
+      'POST 401: Access-Control-Allow-Credentials NÃO pode estar presente em resposta de permissão negada',
+    )
+
+    // (2) Varredura case-insensitive — captura variantes capitalizadas
+    // que possam escapar do .get().
+    const leaks: string[] = []
+    for (const [name, value] of res.headers) {
+      if (name.toLowerCase() === 'access-control-allow-credentials') {
+        leaks.push(`${name}=${value}`)
+      }
+    }
+    assertEquals(
+      leaks,
+      [],
+      `POST 401: nenhum cabeçalho Allow-Credentials permitido (qualquer capitalização) — vazamentos: ${JSON.stringify(leaks)}`,
+    )
+
+    // (3) Allow-Origin permanece exatamente "*" — NÃO ecoa o Origin hostil,
+    // NÃO vira "null", NÃO contém vírgulas/espaços (CORS spec proíbe múltiplas
+    // origens num único header).
+    const allowOrigin = res.headers.get('access-control-allow-origin')
+    assertEquals(
+      allowOrigin,
+      '*',
+      `POST 401: Allow-Origin deve ser exatamente "*" literal, recebido: ${JSON.stringify(allowOrigin)}`,
+    )
+    // Sanidade defensiva: garante que o handler NÃO ecoou o Origin hostil
+    // (vetor clássico de CORS misconfig).
+    if (allowOrigin === HOSTILE_ORIGIN) {
+      throw new Error(`POST 401: Allow-Origin ECOOU o Origin hostil "${HOSTILE_ORIGIN}" — falha crítica de CORS`)
+    }
+
+    // Sanidade do contrato: 401 ainda devolve JSON estruturado.
+    assertEquals(res.headers.get('content-type'), 'application/json')
+    const body = await res.json()
+    assertExists(body.error, '401 deve retornar payload com campo error')
+  } finally {
+    await ctx.stop()
+  }
+})
