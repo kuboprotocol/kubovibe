@@ -6801,3 +6801,231 @@ Deno.test('HTTP integration: OPTIONS preflight — Access-Control-Request-Header
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: OPTIONS preflight — inconsistent/malformed Content-Length variants — Allow-Methods/Allow-Headers stay LITERAL exact (no echo, no smuggling, no 5xx)', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    const EXPECTED_METHODS_LITERAL = 'POST, OPTIONS'
+    const EXPECTED_METHODS_SET = new Set(['post', 'options'])
+    const EXPECTED_HEADERS_LITERAL = 'authorization, x-client-info, apikey, content-type, x-test-secret'
+    const EXPECTED_HEADERS_SET = new Set([
+      'authorization', 'x-client-info', 'apikey', 'content-type', 'x-test-secret',
+    ])
+    const DANGEROUS_METHODS = ['get', 'put', 'patch', 'delete', 'head', 'connect', 'trace', 'propfind', 'custom-method', '*']
+    const DANGEROUS_HEADERS = [
+      'set-cookie', 'set-cookie2', 'cookie', 'cookie2',
+      'host', 'origin', 'authorization-bearer',
+      'x-evil-cookie', 'x-fake-header', 'x-csrf-token',
+      'x-forwarded-for', 'x-real-ip', 'proxy-authorization',
+      'x-injected', 'x-smuggled', 'x-cl-leak',
+      '*',
+    ]
+
+    const u = new URL(ctx.url)
+    const hostHeader = u.host
+
+    // Cada payload é um conjunto completo de extra-headers (entre os básicos e o body),
+    // mais um body opcional. O servidor deve responder 200 (ignorando body em OPTIONS),
+    // 400 (rejeitando smuggling) ou fechar — NUNCA 5xx, NUNCA com headers smuggled.
+    const PAYLOADS: Array<{ label: string; extraHeaders: string[]; body: string }> = [
+      // --- Content-Length sem body (CL > 0, body vazio). ---
+      { label: 'CL: 10 + body vazio',                   extraHeaders: ['Content-Length: 10'], body: '' },
+      { label: 'CL: 999999 + body vazio (esperaria gigante)', extraHeaders: ['Content-Length: 999999'], body: '' },
+
+      // --- Content-Length menor que body real (request smuggling clássico). ---
+      { label: 'CL: 0 + body MALICIOUS',                extraHeaders: ['Content-Length: 0'], body: 'MALICIOUS' },
+      { label: 'CL: 5 + body de 50 chars',              extraHeaders: ['Content-Length: 5'], body: 'X'.repeat(50) },
+      { label: 'CL: 1 + body com smuggle GET /admin',   extraHeaders: ['Content-Length: 1'], body: 'GET /admin HTTP/1.1\r\nHost: evil\r\n\r\n' },
+
+      // --- Content-Length maior que body real (servidor pode pendurar). ---
+      { label: 'CL: 1000 + body de 5 chars',            extraHeaders: ['Content-Length: 1000'], body: 'short' },
+
+      // --- Content-Length duplicado idêntico (RFC 7230 §3.3.3 — permitido se idêntico). ---
+      { label: 'CL duplicado idêntico (0, 0)',          extraHeaders: ['Content-Length: 0', 'Content-Length: 0'], body: '' },
+
+      // --- Content-Length duplicado divergente (DEVE ser rejeitado — smuggling). ---
+      { label: 'CL divergente (0, 100)',                extraHeaders: ['Content-Length: 0', 'Content-Length: 100'], body: '' },
+      { label: 'CL divergente (10, 20, 30)',            extraHeaders: ['Content-Length: 10', 'Content-Length: 20', 'Content-Length: 30'], body: '' },
+      { label: 'CL como lista (0, 100)',                extraHeaders: ['Content-Length: 0, 100'], body: '' },
+
+      // --- Content-Length malformado (não-numérico). ---
+      { label: 'CL: abc (não-numérico)',                extraHeaders: ['Content-Length: abc'], body: '' },
+      { label: 'CL: -1 (negativo)',                     extraHeaders: ['Content-Length: -1'], body: '' },
+      { label: 'CL: 1e10 (notação científica)',         extraHeaders: ['Content-Length: 1e10'], body: '' },
+      { label: 'CL: 0x10 (hex)',                        extraHeaders: ['Content-Length: 0x10'], body: '' },
+      { label: 'CL: + leading sign',                    extraHeaders: ['Content-Length: +5'], body: 'hello' },
+      { label: 'CL: leading zeros',                     extraHeaders: ['Content-Length: 00000005'], body: 'hello' },
+      { label: 'CL: vazio',                             extraHeaders: ['Content-Length: '], body: '' },
+      { label: 'CL: só whitespace',                     extraHeaders: ['Content-Length:    '], body: '' },
+      { label: 'CL: gigante (uint64 overflow)',         extraHeaders: ['Content-Length: 99999999999999999999'], body: '' },
+
+      // --- Content-Length com whitespace exótico no valor. ---
+      { label: 'CL com tab antes do número',            extraHeaders: ['Content-Length:\t5'], body: 'hello' },
+      { label: 'CL com SP+TAB antes',                   extraHeaders: ['Content-Length:  \t5'], body: 'hello' },
+      { label: 'CL com whitespace trailing',            extraHeaders: ['Content-Length: 5    '], body: 'hello' },
+
+      // --- Content-Length + Transfer-Encoding (TE.CL / CL.TE smuggling). ---
+      { label: 'CL: 0 + TE: chunked',                   extraHeaders: ['Content-Length: 0', 'Transfer-Encoding: chunked'], body: '5\r\nhello\r\n0\r\n\r\n' },
+      { label: 'TE: chunked + CL: 100',                 extraHeaders: ['Transfer-Encoding: chunked', 'Content-Length: 100'], body: '0\r\n\r\n' },
+      { label: 'TE: chunked + body smuggle GET',        extraHeaders: ['Transfer-Encoding: chunked'], body: '0\r\n\r\nGET /admin HTTP/1.1\r\nHost: evil\r\n\r\n' },
+
+      // --- Content-Length + tentativa de injetar headers via body. ---
+      { label: 'CL: 0 + body com Set-Cookie',           extraHeaders: ['Content-Length: 0'], body: 'Set-Cookie: pwn=1\r\n\r\n' },
+      { label: 'CL: 0 + body com X-Injected',           extraHeaders: ['Content-Length: 0'], body: 'X-Injected: 1\r\n\r\n' },
+
+      // --- Content-Length + casing variado da chave. ---
+      { label: 'content-length lowercase',              extraHeaders: ['content-length: 0'], body: '' },
+      { label: 'CONTENT-LENGTH UPPERCASE',              extraHeaders: ['CONTENT-LENGTH: 0'], body: '' },
+      { label: 'Content-length Title-mix',              extraHeaders: ['Content-length: 0'], body: '' },
+
+      // --- Sem Content-Length em OPTIONS (caso normal — controle). ---
+      { label: 'sem Content-Length (controle)',         extraHeaders: [], body: '' },
+    ]
+
+    const parseList = (v: string | null): string[] =>
+      (v ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
+
+    type RawResponse = { status: number; headers: Headers } | { error: string }
+
+    async function sendRaw(extraHeaders: string[], body: string): Promise<RawResponse> {
+      let conn: Deno.TcpConn | null = null
+      try {
+        conn = await Deno.connect({ hostname: u.hostname, port: parseInt(u.port, 10), transport: 'tcp' })
+        const baseLines = [
+          'OPTIONS / HTTP/1.1',
+          `Host: ${hostHeader}`,
+          'Origin: https://evil.example.com',
+          'Access-Control-Request-Method: POST',
+          'Access-Control-Request-Headers: content-type, x-test-secret',
+          ...extraHeaders,
+          'Connection: close',
+          '',
+          '',
+        ]
+        const head = baseLines.join('\r\n')
+        await conn.write(new TextEncoder().encode(head + body))
+
+        const chunks: Uint8Array[] = []
+        const buf = new Uint8Array(8192)
+        // Timeout safety: 3s — alguns payloads podem fazer servidor pendurar esperando body.
+        const readWithTimeout = async (): Promise<void> => {
+          const timer = setTimeout(() => { try { conn?.close() } catch { /* ignore */ } }, 3000)
+          try {
+            while (true) {
+              const n = await conn!.read(buf)
+              if (n === null) break
+              chunks.push(buf.slice(0, n))
+            }
+          } finally {
+            clearTimeout(timer)
+          }
+        }
+        try { await readWithTimeout() } catch { /* timeout/closed — desfecho seguro */ }
+
+        const total = chunks.reduce((s, c) => s + c.length, 0)
+        if (total === 0) return { error: 'no response (closed/timeout)' }
+        const merged = new Uint8Array(total)
+        let off = 0
+        for (const c of chunks) { merged.set(c, off); off += c.length }
+        const text = new TextDecoder().decode(merged)
+
+        const headerEnd = text.indexOf('\r\n\r\n')
+        if (headerEnd === -1) return { error: 'no header terminator' }
+        const lines = text.slice(0, headerEnd).split('\r\n')
+        const m = lines[0].match(/^HTTP\/1\.[01]\s+(\d{3})/)
+        if (!m) return { error: `bad status: ${lines[0]}` }
+        const status = parseInt(m[1], 10)
+        const headers = new Headers()
+        for (let i = 1; i < lines.length; i++) {
+          const idx = lines[i].indexOf(':')
+          if (idx === -1) continue
+          const name = lines[i].slice(0, idx).trim()
+          const value = lines[i].slice(idx + 1).trim()
+          if (name) headers.append(name, value)
+        }
+        return { status, headers }
+      } finally {
+        try { conn?.close() } catch { /* ignore */ }
+      }
+    }
+
+    let validatedAs200 = 0
+    let acceptedAs4xx = 0
+    let acceptedAsClosed = 0
+
+    for (const p of PAYLOADS) {
+      const result = await sendRaw(p.extraHeaders, p.body)
+      const ctxLabel = `[CL payload: ${p.label}]`
+
+      if ('error' in result) {
+        // Conexão fechada ou request malformada — desfecho seguro.
+        acceptedAsClosed++
+        continue
+      }
+
+      // (1) Status 200 OU 4xx — NUNCA 5xx (parser não pode crashar com CL malformado).
+      assert(
+        result.status === 200 || (result.status >= 400 && result.status < 500),
+        `${ctxLabel}: status deve ser 200 ou 4xx, recebido ${result.status}`,
+      )
+      if (result.status !== 200) { acceptedAs4xx++; continue }
+      validatedAs200++
+
+      // (2) Allow-Methods LITERAL EXATO.
+      const am = result.headers.get('access-control-allow-methods')
+      assertExists(am, `${ctxLabel}: Allow-Methods deve estar presente`)
+      assertEquals(am, EXPECTED_METHODS_LITERAL, `${ctxLabel}: Allow-Methods deve ser literal "${EXPECTED_METHODS_LITERAL}"`)
+      const parsedMethods = new Set(parseList(am))
+      assertEquals(parsedMethods.size, EXPECTED_METHODS_SET.size, `${ctxLabel}: Allow-Methods deve listar exatamente 2 métodos`)
+      for (const m of EXPECTED_METHODS_SET) assert(parsedMethods.has(m), `${ctxLabel}: Allow-Methods deve incluir "${m}"`)
+      for (const dangerous of DANGEROUS_METHODS) assert(!parsedMethods.has(dangerous), `${ctxLabel}: Allow-Methods NÃO PODE conter "${dangerous}"`)
+
+      // (3) Allow-Headers LITERAL EXATO — não pode ser afetado por CL.
+      const ah = result.headers.get('access-control-allow-headers')
+      assertExists(ah, `${ctxLabel}: Allow-Headers deve estar presente`)
+      assertEquals(ah, EXPECTED_HEADERS_LITERAL, `${ctxLabel}: Allow-Headers deve ser literal "${EXPECTED_HEADERS_LITERAL}"`)
+      const parsedHeaders = new Set(parseList(ah))
+      assertEquals(parsedHeaders.size, EXPECTED_HEADERS_SET.size, `${ctxLabel}: Allow-Headers deve listar exatamente 5 headers`)
+      for (const h of EXPECTED_HEADERS_SET) assert(parsedHeaders.has(h), `${ctxLabel}: Allow-Headers deve incluir "${h}"`)
+      for (const dangerous of DANGEROUS_HEADERS) assert(!parsedHeaders.has(dangerous), `${ctxLabel}: Allow-Headers NÃO PODE conter "${dangerous}"`)
+
+      // (4) Anti-leak nos valores: sem CR/LF/null embutidos.
+      assert(!am.includes('\r') && !am.includes('\n') && !am.includes('\x00'), `${ctxLabel}: Allow-Methods sem CR/LF/null`)
+      assert(!ah.includes('\r') && !ah.includes('\n') && !ah.includes('\x00'), `${ctxLabel}: Allow-Headers sem CR/LF/null`)
+
+      // (5) Allow-Origin/Credentials/Max-Age literais.
+      assertEquals(result.headers.get('access-control-allow-origin'), '*', `${ctxLabel}: Allow-Origin '*'`)
+      assertEquals(result.headers.get('access-control-allow-credentials'), null, `${ctxLabel}: Allow-Credentials NUNCA`)
+      assertEquals(result.headers.get('access-control-max-age'), '86400', `${ctxLabel}: Max-Age literal`)
+
+      // (6) Headers smuggled via body NUNCA aparecem na resposta.
+      assertEquals(result.headers.get('set-cookie'), null, `${ctxLabel}: Set-Cookie NUNCA`)
+      assertEquals(result.headers.get('cookie'), null, `${ctxLabel}: Cookie NUNCA`)
+      assertEquals(result.headers.get('x-injected'), null, `${ctxLabel}: X-Injected NUNCA`)
+      assertEquals(result.headers.get('x-smuggled'), null, `${ctxLabel}: X-Smuggled NUNCA`)
+      assertEquals(result.headers.get('x-cl-leak'), null, `${ctxLabel}: X-CL-Leak NUNCA`)
+      assertEquals(result.headers.get('access-control-expose-headers'), null, `${ctxLabel}: Expose-Headers NUNCA`)
+
+      // (7) Allow-Methods/Allow-Headers aparecem exatamente 1x cada.
+      let methodsCount = 0, headersCount = 0
+      for (const [name] of result.headers) {
+        const lower = name.toLowerCase()
+        if (lower === 'access-control-allow-methods') methodsCount++
+        if (lower === 'access-control-allow-headers') headersCount++
+      }
+      assertEquals(methodsCount, 1, `${ctxLabel}: Allow-Methods deve aparecer exatamente 1x`)
+      assertEquals(headersCount, 1, `${ctxLabel}: Allow-Headers deve aparecer exatamente 1x`)
+    }
+
+    // (8) Cobertura total.
+    assertEquals(
+      validatedAs200 + acceptedAs4xx + acceptedAsClosed, PAYLOADS.length,
+      `todos os ${PAYLOADS.length} payloads devem ser cobertos (200=${validatedAs200}, 4xx=${acceptedAs4xx}, closed=${acceptedAsClosed})`,
+    )
+
+    // (9) Zero createClient mesmo com CL malformado/smuggling.
+    assertEquals(ctx._calls, 0, 'createClient NUNCA pode ser invocado em OPTIONS preflight (Content-Length malformado)')
+  } finally {
+    await ctx.stop()
+  }
+})
