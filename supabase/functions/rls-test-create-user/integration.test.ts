@@ -2312,3 +2312,81 @@ Deno.test('HTTP integration: cross-origin GET/POST WITH Cookie header — server
     }
   }
 })
+
+Deno.test('HTTP integration: cross-origin OPTIONS preflight WITH Cookie header — server MUST NOT add Allow-Credentials, keeps Allow-Origin "*"', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    const HOSTILE_ORIGIN = 'https://evil.example.com'
+    const HOSTILE_COOKIE = 'sid=stolen-session-abc123; theme=dark; auth=fake-token'
+
+    const res = await fetch(ctx.url, {
+      method: 'OPTIONS',
+      headers: {
+        'origin': HOSTILE_ORIGIN,
+        'cookie': HOSTILE_COOKIE,
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'content-type, x-test-secret',
+      },
+    })
+
+    assertEquals(res.status, 200, 'OPTIONS preflight com Cookie deve retornar 200')
+
+    // (1) Allow-Credentials ausente — checagem direta. Presença de Cookie
+    // no preflight NÃO pode induzir o servidor a refletir credentials:true
+    // (vetor clássico de CORS bypass: `*` + credentials, rejeitado por
+    // browsers mas emitido por servidores mal-configurados).
+    assertEquals(
+      res.headers.get('access-control-allow-credentials'),
+      null,
+      'OPTIONS+Cookie: Allow-Credentials NÃO pode aparecer mesmo com Cookie no preflight',
+    )
+
+    // (1b) Varredura case-insensitive defensiva.
+    const credLeak: string[] = []
+    for (const [name, value] of res.headers) {
+      if (name.toLowerCase() === 'access-control-allow-credentials') {
+        credLeak.push(`${name}=${value}`)
+      }
+    }
+    assertEquals(
+      credLeak,
+      [],
+      `OPTIONS+Cookie: vazamento de Allow-Credentials (qualquer capitalização): ${JSON.stringify(credLeak)}`,
+    )
+
+    // (2) Allow-Origin literal "*" — combinação spec-compliant com
+    // ausência de Allow-Credentials. Não pode ecoar Origin hostil.
+    const allowOrigin = res.headers.get('access-control-allow-origin')
+    assertEquals(
+      allowOrigin,
+      '*',
+      `OPTIONS+Cookie: Allow-Origin deve ser exatamente "*", recebido ${JSON.stringify(allowOrigin)}`,
+    )
+    assert(
+      allowOrigin !== HOSTILE_ORIGIN,
+      `OPTIONS+Cookie: Allow-Origin ECOOU o Origin hostil "${HOSTILE_ORIGIN}"`,
+    )
+
+    // (3) Servidor não deve devolver Set-Cookie em resposta a preflight
+    // cross-origin com Cookie — sanidade contra session fixation.
+    const setCookieLeak: string[] = []
+    for (const [name, value] of res.headers) {
+      const ln = name.toLowerCase()
+      if (ln === 'set-cookie' || ln === 'set-cookie2') {
+        setCookieLeak.push(`${name}=${value}`)
+      }
+    }
+    assertEquals(
+      setCookieLeak,
+      [],
+      `OPTIONS+Cookie: nenhum Set-Cookie esperado em preflight cross-origin: ${JSON.stringify(setCookieLeak)}`,
+    )
+
+    // Sanidade: preflight nunca invoca createClient.
+    assertEquals(ctx._calls, 0, 'OPTIONS+Cookie nunca deve chamar createClient')
+
+    await res.text()
+  } finally {
+    await ctx.stop()
+  }
+})
