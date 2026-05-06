@@ -171,6 +171,44 @@ assert_single_bullet_for() {
   fi
 }
 
+# Cross-contamination check: a bullet using the canonical SEEDS prefix
+# (or the seeds fallback emoji+marker) MUST reference fc-seeds.json — never
+# fc-failures.json. Same for failures bullets. This catches the subtle case
+# where each token has exactly 1 bullet (so assert_single_bullet_for passes)
+# but the labels and tokens were swapped — e.g.
+#   - 🌱 **Seeds executed (last 50 runs):** [`fc-failures.json`](URL)
+#   - 💥 **Minimized counterexamples (last 100):** [`fc-seeds.json`](URL)
+# That would silently mislabel artifacts in the PR comment / Check Run.
+#
+# We use awk for line-by-line evaluation because the wrong-token check needs
+# to look at the SAME line (prefix match + forbidden token presence), not
+# at the file as a whole.
+assert_no_cross_contamination() {
+  local label_prefix="$1"          # canonical bullet prefix OR fallback marker prefix
+  local expected_token="$2"        # e.g. "fc-seeds.json"
+  local forbidden_token="$3"       # e.g. "fc-failures.json"
+  local kind="$4"                  # human label, e.g. "seeds canonical bullet"
+
+  # awk -v args avoid shell-quoting issues with backticks and emoji.
+  local hits
+  hits=$(awk \
+    -v prefix="${label_prefix}" \
+    -v forbidden="${forbidden_token}" \
+    'index($0, prefix) == 1 && index($0, forbidden) > 0 { printf "%d:%s\n", NR, $0 }' \
+    "${SUMMARY_FILE}")
+
+  if [ -n "${hits}" ]; then
+    echo "::error title=${CONTEXT_LABEL} cross-contamination::A '${kind}' line references the wrong token '${forbidden_token}' (expected '${expected_token}')"
+    echo "Offending line(s):"
+    printf '%s\n' "${hits}" | sed 's/^/  /'
+    echo ""
+    echo "Rule: every line starting with"
+    echo "  ${label_prefix}"
+    echo "must reference '${expected_token}', never '${forbidden_token}'."
+    fail "Cross-contamination: '${kind}' line points at '${forbidden_token}' instead of '${expected_token}' in ${CONTEXT_LABEL}"
+  fi
+}
+
 # ─── presence + uniqueness gate (runs FIRST) ─────────────────────────────────
 # Must hold regardless of whether STAGED_FC_* is 1 or 0 — both the canonical
 # inline bullet and the fallback marker count as "the one bullet for this
@@ -178,6 +216,21 @@ assert_single_bullet_for() {
 
 assert_single_bullet_for "fc-seeds.json"
 assert_single_bullet_for "fc-failures.json"
+
+# ─── cross-contamination gate ────────────────────────────────────────────────
+# Canonical bullet prefixes must own their respective token. Fallback
+# markers also have category-specific emoji+text that must not point at
+# the opposite file.
+assert_no_cross_contamination \
+  "${SEEDS_BULLET_PREFIX}"    "fc-seeds.json"    "fc-failures.json" "seeds canonical bullet"
+assert_no_cross_contamination \
+  "${FAILURES_BULLET_PREFIX}" "fc-failures.json" "fc-seeds.json"    "failures canonical bullet"
+# Fallback marker prefixes (must match the writer's exact strings).
+assert_no_cross_contamination \
+  '- 🌱 `'  "fc-seeds.json"    "fc-failures.json" "seeds fallback marker"
+assert_no_cross_contamination \
+  '- 💥 `'  "fc-failures.json" "fc-seeds.json"    "failures fallback marker"
+
 
 # ─── fc-seeds.json — conditional on STAGED_FC_SEEDS ──────────────────────────
 
