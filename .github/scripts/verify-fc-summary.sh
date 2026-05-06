@@ -113,45 +113,77 @@ if [ -n "${FC_HEADER_LABEL}" ]; then
   fi
 fi
 
-# Expected canonical bullet formats (must match the `Append fast-check
-# artifact links to summary` step in .github/workflows/preflight-fuzz.yml).
-# Kept here so any drift between writer and validator fails CI loudly.
+# Expected canonical bullet formats (kept for human-readable error messages
+# only — actual matching uses tolerant ERE regex below). Must stay in sync
+# with the writer in .github/workflows/preflight-fuzz.yml.
 SEEDS_BULLET_PREFIX='- 🌱 **Seeds executed (last 50 runs):** '
 FAILURES_BULLET_PREFIX='- 💥 **Minimized counterexamples (last 100):** '
 
-# Assert that a given inline link appears as a properly-formatted bullet line
-# (full line match, not just substring). $1=expected full line, $2=link token
-# used to locate candidate lines for the debug dump.
-assert_bullet_line() {
-  local expected_line="$1" link_token="$2" reason="$3"
-  # -F fixed-string, -x whole-line match, -- end of options (the expected
-  # line starts with "- " which would otherwise be parsed as a grep flag).
-  if ! grep -Fxq -- "${expected_line}" "${SUMMARY_FILE}"; then
+# ── Tolerant regex building blocks (POSIX ERE, used with `grep -E`) ──────────
+# We deliberately accept variations that are semantically equivalent in
+# rendered Markdown so the validator does not falsely reject:
+#   * leading indent / trailing CR
+#   * collapsed or expanded whitespace runs
+#   * `**bold**` vs `__bold__` (CommonMark synonyms)
+#   * `[ \`tok\` ]( url )` Prettier-formatted inline links
+# Everything that affects rendered MEANING (emoji, label words, token, URL)
+# must still match exactly.
+_S='[[:space:]]+'
+_S0='[[:space:]]*'
+_BOL="^${_S0}-${_S}"
+
+# Escape a literal value for safe inclusion in an ERE pattern. Escapes regex
+# metachars so URLs/tokens with dots (fc-seeds.json) or query strings don't
+# act as wildcards.
+ere_escape() {
+  # Use '#' as sed delimiter so '/' inside URLs doesn't terminate the s///.
+  printf '%s' "$1" | sed 's#[].[\(){}$^*+?|\\/]#\\&#g'
+}
+
+# Build the regex fragment matching a markdown inline link `[`token`](url)`
+# while tolerating inner whitespace.
+link_regex_for() {
+  local token_esc url_esc
+  token_esc="$(ere_escape "$1")"
+  url_esc="$(ere_escape "$2")"
+  printf '\\[%s`%s`%s\\]%s\\(%s%s%s\\)' \
+    "${_S0}" "${token_esc}" "${_S0}" "${_S0}" "${_S0}" "${url_esc}" "${_S0}"
+}
+
+# Assert that a bullet line matching the canonical SHAPE for
+# (emoji, label, token, url) exists in the summary file.
+# Shape: ^ <indent?> - <ws> <emoji> <ws> **label** <ws> [`token`](url) <ws?> $
+assert_canonical_bullet() {
+  local emoji="$1" label="$2" token="$3" url="$4" reason="$5"
+  local emoji_esc label_esc link_re re
+
+  emoji_esc="$(ere_escape "${emoji}")"
+  label_esc="$(ere_escape "${label}")"
+  link_re="$(link_regex_for "${token}" "${url}")"
+
+  re="${_BOL}${emoji_esc}${_S}(\\*\\*|__)${label_esc}(\\*\\*|__)${_S}${link_re}${_S0}\$"
+
+  if ! grep -Eq -- "${re}" "${SUMMARY_FILE}"; then
     echo "::error title=${CONTEXT_LABEL} bullet format violation::${reason}"
-    echo "Expected exact line:"
-    echo "  ${expected_line}"
-    echo "Candidate lines found in ${SUMMARY_FILE} (mentioning ${link_token}):"
-    grep -n -F -- "${link_token}" "${SUMMARY_FILE}" | sed 's/^/  /' || echo "  (none)"
+    echo "Expected line matching tolerant regex:"
+    echo "  ${re}"
+    echo "Candidate lines mentioning '${token}':"
+    grep -nF -- "${token}" "${SUMMARY_FILE}" | sed 's/^/  /' || echo "  (none)"
     fail "${reason}"
   fi
 }
 
 # Assert that exactly ONE bullet line in ${SUMMARY_FILE} mentions the given
-# token (e.g. "fc-seeds.json"). Counts BOTH canonical inline-link bullets
-# and the documented fallback markers. A bullet line is identified by the
-# leading "- " marker. Fails on:
-#   - 0 occurrences  → the section silently dropped the file entirely
-#   - >1 occurrences → duplicate render (writer drift, append ran twice,
-#                      cross-category contamination, etc.)
-# This runs BEFORE the conditional content checks so duplicates are
-# caught even when one of the duplicates happens to match the expected
-# canonical bullet.
+# token. Counts BOTH canonical inline-link bullets and fallback markers.
+# A bullet is identified by tolerant `^<indent?>-<ws>` prefix.
 assert_single_bullet_for() {
-  local token="$1"   # e.g. "fc-seeds.json"
-  # Match lines starting with "- " that contain the token. -F is fixed-
-  # string for the token; we use grep -E for the line anchor.
+  local token="$1"
+  local token_esc
+  token_esc="$(ere_escape "${token}")"
+
+  local re="${_BOL}.*${token_esc}"
   local count
-  count=$(grep -cE "^- .*$(printf '%s' "${token}" | sed 's/[][\\.^$*+?(){}|/]/\\&/g')" "${SUMMARY_FILE}" || true)
+  count=$(grep -cE -- "${re}" "${SUMMARY_FILE}" || true)
   count="${count:-0}"
 
   if [ "${count}" = "0" ]; then
@@ -165,49 +197,44 @@ assert_single_bullet_for() {
   if [ "${count}" -gt 1 ]; then
     echo "::error title=${CONTEXT_LABEL} duplicate bullet::Found ${count} bullet lines mentioning '${token}' in ${CONTEXT_LABEL}; expected exactly 1"
     echo "Offending bullet lines (with line numbers):"
-    grep -nE "^- .*$(printf '%s' "${token}" | sed 's/[][\\.^$*+?(){}|/]/\\&/g')" "${SUMMARY_FILE}" \
-      | sed 's/^/  /'
+    grep -nE -- "${re}" "${SUMMARY_FILE}" | sed 's/^/  /'
     fail "Duplicate '${token}' bullet detected (${count} occurrences); writer/append ran more than once or cross-category contamination"
   fi
 }
 
-# Cross-contamination check: a bullet using the canonical SEEDS prefix
-# (or the seeds fallback emoji+marker) MUST reference fc-seeds.json — never
-# fc-failures.json. Same for failures bullets. This catches the subtle case
-# where each token has exactly 1 bullet (so assert_single_bullet_for passes)
-# but the labels and tokens were swapped — e.g.
-#   - 🌱 **Seeds executed (last 50 runs):** [`fc-failures.json`](URL)
-#   - 💥 **Minimized counterexamples (last 100):** [`fc-seeds.json`](URL)
-# That would silently mislabel artifacts in the PR comment / Check Run.
-#
-# We use awk for line-by-line evaluation because the wrong-token check needs
-# to look at the SAME line (prefix match + forbidden token presence), not
-# at the file as a whole.
+# Cross-contamination: a bullet whose LEADING SHAPE matches the canonical
+# seeds (or seeds-fallback) signature MUST reference fc-seeds.json — never
+# fc-failures.json. Same for failures bullets. Now uses a regex signature
+# tolerant to whitespace/indent variation instead of literal index() match.
 assert_no_cross_contamination() {
-  local label_prefix="$1"          # canonical bullet prefix OR fallback marker prefix
-  local expected_token="$2"        # e.g. "fc-seeds.json"
-  local forbidden_token="$3"       # e.g. "fc-failures.json"
-  local kind="$4"                  # human label, e.g. "seeds canonical bullet"
+  local signature_re="$1"          # ERE matching bullet's leading shape
+  local expected_token="$2"
+  local forbidden_token="$3"
+  local kind="$4"
 
-  # awk -v args avoid shell-quoting issues with backticks and emoji.
+  local forbidden_esc
+  forbidden_esc="$(ere_escape "${forbidden_token}")"
+
   local hits
-  hits=$(awk \
-    -v prefix="${label_prefix}" \
-    -v forbidden="${forbidden_token}" \
-    'index($0, prefix) == 1 && index($0, forbidden) > 0 { printf "%d:%s\n", NR, $0 }' \
-    "${SUMMARY_FILE}")
+  hits=$(grep -nE -- "${signature_re}.*${forbidden_esc}" "${SUMMARY_FILE}" || true)
 
   if [ -n "${hits}" ]; then
     echo "::error title=${CONTEXT_LABEL} cross-contamination::A '${kind}' line references the wrong token '${forbidden_token}' (expected '${expected_token}')"
     echo "Offending line(s):"
     printf '%s\n' "${hits}" | sed 's/^/  /'
     echo ""
-    echo "Rule: every line starting with"
-    echo "  ${label_prefix}"
+    echo "Rule: every line matching the '${kind}' signature"
+    echo "  ${signature_re}"
     echo "must reference '${expected_token}', never '${forbidden_token}'."
     fail "Cross-contamination: '${kind}' line points at '${forbidden_token}' instead of '${expected_token}' in ${CONTEXT_LABEL}"
   fi
 }
+
+# Pre-built signatures for the four bullet "kinds" we validate.
+SEEDS_CANONICAL_SIG="${_BOL}🌱${_S}(\\*\\*|__)Seeds${_S}executed"
+FAILURES_CANONICAL_SIG="${_BOL}💥${_S}(\\*\\*|__)Minimized${_S}counterexamples"
+SEEDS_FALLBACK_SIG="${_BOL}🌱${_S}\`"
+FAILURES_FALLBACK_SIG="${_BOL}💥${_S}\`"
 
 # ─── presence + uniqueness gate (runs FIRST) ─────────────────────────────────
 # Must hold regardless of whether STAGED_FC_* is 1 or 0 — both the canonical
@@ -218,18 +245,18 @@ assert_single_bullet_for "fc-seeds.json"
 assert_single_bullet_for "fc-failures.json"
 
 # ─── cross-contamination gate ────────────────────────────────────────────────
-# Canonical bullet prefixes must own their respective token. Fallback
-# markers also have category-specific emoji+text that must not point at
-# the opposite file.
+# Canonical bullet signatures must own their respective token. Fallback
+# markers also have category-specific emoji that must not point at the
+# opposite file. Signatures are tolerant ERE regexes (whitespace, indent,
+# **/__ bold synonyms) — see assert_no_cross_contamination().
 assert_no_cross_contamination \
-  "${SEEDS_BULLET_PREFIX}"    "fc-seeds.json"    "fc-failures.json" "seeds canonical bullet"
+  "${SEEDS_CANONICAL_SIG}"    "fc-seeds.json"    "fc-failures.json" "seeds canonical bullet"
 assert_no_cross_contamination \
-  "${FAILURES_BULLET_PREFIX}" "fc-failures.json" "fc-seeds.json"    "failures canonical bullet"
-# Fallback marker prefixes (must match the writer's exact strings).
+  "${FAILURES_CANONICAL_SIG}" "fc-failures.json" "fc-seeds.json"    "failures canonical bullet"
 assert_no_cross_contamination \
-  '- 🌱 `'  "fc-seeds.json"    "fc-failures.json" "seeds fallback marker"
+  "${SEEDS_FALLBACK_SIG}"     "fc-seeds.json"    "fc-failures.json" "seeds fallback marker"
 assert_no_cross_contamination \
-  '- 💥 `'  "fc-failures.json" "fc-seeds.json"    "failures fallback marker"
+  "${FAILURES_FALLBACK_SIG}"  "fc-failures.json" "fc-seeds.json"    "failures fallback marker"
 
 
 # ─── fc-seeds.json — conditional on STAGED_FC_SEEDS ──────────────────────────
@@ -243,20 +270,19 @@ if [ "${STAGED_FC_SEEDS}" = "1" ]; then
     https://*) : ;;
     *) fail "fc-seeds.json URL is not https:// (got: ${FC_SEEDS_URL})" ;;
   esac
-  assert_contains "[\`fc-seeds.json\`](${FC_SEEDS_URL})" \
-    "Missing inline fc-seeds.json link to ${FC_SEEDS_URL} in ${CONTEXT_LABEL}"
-  # Strict bullet-format check: the writer emits a full canonical bullet,
-  # so reject any drift (e.g. missing emoji, missing bold label, wrong dash).
-  assert_bullet_line \
-    "${SEEDS_BULLET_PREFIX}[\`fc-seeds.json\`](${FC_SEEDS_URL})" \
-    "fc-seeds.json" \
-    "fc-seeds.json inline link is not formatted as the canonical bullet '${SEEDS_BULLET_PREFIX}[\`fc-seeds.json\`](URL)' in ${CONTEXT_LABEL}"
+  # Tolerant canonical-bullet check (whitespace/markdown variations OK,
+  # but emoji + label words + token + URL must all be present and correct).
+  assert_canonical_bullet \
+    "🌱" "Seeds executed (last 50 runs):" "fc-seeds.json" "${FC_SEEDS_URL}" \
+    "fc-seeds.json bullet does not match canonical shape '${SEEDS_BULLET_PREFIX}[\`fc-seeds.json\`](URL)' in ${CONTEXT_LABEL}"
   SEEDS_RESULT="link OK (${FC_SEEDS_URL})"
 else
   assert_contains "\`fc-seeds.json\` — _(not produced in this run)_" \
     "fc-seeds.json was not staged → ${CONTEXT_LABEL} must include the documented fallback marker"
-  # Defensive: when not staged, no stray inline link should exist.
-  if grep -Eq "\[\`fc-seeds\.json\`\]\(https://" "${SUMMARY_FILE}"; then
+  # Defensive: when not staged, no stray inline link should exist (tolerant
+  # to inner whitespace inside the link text/URL).
+  stray_seeds_re="\\[${_S0}\`fc-seeds\\.json\`${_S0}\\]${_S0}\\(${_S0}https://"
+  if grep -Eq -- "${stray_seeds_re}" "${SUMMARY_FILE}"; then
     fail "fc-seeds.json was NOT staged but ${CONTEXT_LABEL} contains a stray inline https link"
   fi
   SEEDS_RESULT="fallback marker (not staged)"
@@ -273,17 +299,15 @@ if [ "${STAGED_FC_FAILURES}" = "1" ]; then
     https://*) : ;;
     *) fail "fc-failures.json URL is not https:// (got: ${FC_FAILURES_URL})" ;;
   esac
-  assert_contains "[\`fc-failures.json\`](${FC_FAILURES_URL})" \
-    "Missing inline fc-failures.json link to ${FC_FAILURES_URL} in ${CONTEXT_LABEL}"
-  assert_bullet_line \
-    "${FAILURES_BULLET_PREFIX}[\`fc-failures.json\`](${FC_FAILURES_URL})" \
-    "fc-failures.json" \
-    "fc-failures.json inline link is not formatted as the canonical bullet '${FAILURES_BULLET_PREFIX}[\`fc-failures.json\`](URL)' in ${CONTEXT_LABEL}"
+  assert_canonical_bullet \
+    "💥" "Minimized counterexamples (last 100):" "fc-failures.json" "${FC_FAILURES_URL}" \
+    "fc-failures.json bullet does not match canonical shape '${FAILURES_BULLET_PREFIX}[\`fc-failures.json\`](URL)' in ${CONTEXT_LABEL}"
   FAILURES_RESULT="link OK (${FC_FAILURES_URL})"
 else
   assert_contains "\`fc-failures.json\` — _(no failures persisted in this run — invariants held)_" \
     "fc-failures.json was not staged → ${CONTEXT_LABEL} must include the documented fallback marker"
-  if grep -Eq "\[\`fc-failures\.json\`\]\(https://" "${SUMMARY_FILE}"; then
+  stray_failures_re="\\[${_S0}\`fc-failures\\.json\`${_S0}\\]${_S0}\\(${_S0}https://"
+  if grep -Eq -- "${stray_failures_re}" "${SUMMARY_FILE}"; then
     fail "fc-failures.json was NOT staged but ${CONTEXT_LABEL} contains a stray inline https link"
   fi
   FAILURES_RESULT="fallback marker (not staged)"
