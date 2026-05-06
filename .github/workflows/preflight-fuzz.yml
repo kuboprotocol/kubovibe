@@ -532,6 +532,55 @@ jobs:
             echo "- Sticky PR comment source: OK"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # Stage + upload summary-<category>.md BEFORE the Check Run is published
+      # so the Check Run "Direct downloads" block can include the summary
+      # artifact URL inline (resolved via steps.upload_summary.outputs.artifact-url).
+      # Runs with `if: always()` so the file is preserved on failure as well as
+      # success — this is the same artifact downloadable from the Actions UI.
+      - name: Stage summary file for upload
+        if: always() && steps.gate.outputs.should_run == 'true'
+        id: stage_summary
+        run: |
+          mkdir -p reports/summary
+          SRC="${{ steps.summary.outputs.summary_file }}"
+          DEST="reports/summary/summary-${CATEGORY_ID}.md"
+          if [ -f "${SRC}" ]; then
+            cp "${SRC}" "${DEST}"
+            echo "staged=1" >> "$GITHUB_OUTPUT"
+            echo "Staged ${SRC} → ${DEST} ($(wc -c < "${DEST}") bytes)"
+          else
+            # Always emit a placeholder so the artifact upload doesn't get
+            # skipped silently — easier to detect "summary never produced".
+            echo "::warning title=summary-${CATEGORY_ID}.md missing::No summary file produced by step.summary at ${SRC}" >&2
+            echo "(no summary file was produced by the summary step — see job logs)" > "${DEST}"
+            echo "staged=0" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload summary-${{ matrix.id }}.md artifact
+        if: always() && steps.gate.outputs.should_run == 'true'
+        id: upload_summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: preflight-fuzz-${{ matrix.id }}-summary-run${{ github.run_number }}-${{ github.run_id }}
+          path: reports/summary/summary-${{ matrix.id }}.md
+          if-no-files-found: warn
+          retention-days: 14
+
+      # Expose the freshly-uploaded summary artifact URL as a step output so
+      # the Check Run summary (next step) can render an inline download link.
+      # Falls back to the run page #artifacts anchor if upload-artifact didn't
+      # surface a URL (older runner / partial failure).
+      - name: Resolve summary artifact URL
+        if: always() && steps.gate.outputs.should_run == 'true'
+        id: summary_link
+        run: |
+          SUMMARY_URL="${{ steps.upload_summary.outputs.artifact-url }}"
+          if [ -z "${SUMMARY_URL}" ]; then
+            SUMMARY_URL="${{ steps.links.outputs.run_url }}#artifacts"
+          fi
+          echo "summary_url=${SUMMARY_URL}" >> "$GITHUB_OUTPUT"
+          echo "summary_url=${SUMMARY_URL}"
+
       # Dedicated GitHub Check Run per category — visible as its own status
       # on PRs and commits, with details_url pointing at the category artifact.
 
@@ -546,7 +595,7 @@ jobs:
           output: |
             {
               "title": "${{ steps.fuzz.outputs.exit_code == '0' && format('✅ {0} — invariants held', matrix.label) || format('❌ {0} — invariant violation', matrix.label) }}",
-              "summary": "Category: `${{ matrix.id }}`\nRun #${{ github.run_number }} on `${{ github.ref_name }}` (`${{ github.sha }}`).\n\n**Status:** ${{ steps.fuzz.outputs.exit_code == '0' && 'PASS' || 'FAIL' }}\n\n### 📦 Direct downloads\n- [📥 Full bundle (`${{ env.ARTIFACT_NAME }}`)](${{ steps.links.outputs.artifact_url }})${{ steps.links.outputs.seeds_url && format('\n- [🌱 `seeds.json`]({0})', steps.links.outputs.seeds_url) || '' }}${{ steps.links.outputs.failures_url && format('\n- [💥 `failures.json`]({0})', steps.links.outputs.failures_url) || '' }}${{ steps.links.outputs.log_url && format('\n- [📜 `fuzz-{0}.log`]({1})', matrix.id, steps.links.outputs.log_url) || '' }}${{ steps.links.outputs.fc_seeds_url && format('\n- [🌱 `fc-seeds.json` (fast-check)]({0})', steps.links.outputs.fc_seeds_url) || '' }}${{ steps.links.outputs.fc_failures_url && format('\n- [💥 `fc-failures.json` (fast-check minimized)]({0})', steps.links.outputs.fc_failures_url) || '' }}\n\n🔗 [Workflow run page](${{ steps.links.outputs.run_url }})"
+              "summary": "Category: `${{ matrix.id }}`\nRun #${{ github.run_number }} on `${{ github.ref_name }}` (`${{ github.sha }}`).\n\n**Status:** ${{ steps.fuzz.outputs.exit_code == '0' && 'PASS' || 'FAIL' }}\n\n### 📦 Direct downloads\n- [📥 Full bundle (`${{ env.ARTIFACT_NAME }}`)](${{ steps.links.outputs.artifact_url }})${{ steps.links.outputs.seeds_url && format('\n- [🌱 `seeds.json`]({0})', steps.links.outputs.seeds_url) || '' }}${{ steps.links.outputs.failures_url && format('\n- [💥 `failures.json`]({0})', steps.links.outputs.failures_url) || '' }}${{ steps.links.outputs.log_url && format('\n- [📜 `fuzz-{0}.log`]({1})', matrix.id, steps.links.outputs.log_url) || '' }}${{ steps.links.outputs.fc_seeds_url && format('\n- [🌱 `fc-seeds.json` (fast-check)]({0})', steps.links.outputs.fc_seeds_url) || '' }}${{ steps.links.outputs.fc_failures_url && format('\n- [💥 `fc-failures.json` (fast-check minimized)]({0})', steps.links.outputs.fc_failures_url) || '' }}${{ steps.summary_link.outputs.summary_url && format('\n- [📝 `summary-{0}.md`]({1})', matrix.id, steps.summary_link.outputs.summary_url) || '' }}\n\n🔗 [Workflow run page](${{ steps.links.outputs.run_url }})"
             }
 
       # Validate the EXACT file that will be posted as the sticky PR comment
@@ -614,37 +663,10 @@ jobs:
             echo "- Body size: ${SIZE_OUT} bytes"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      # Stage + upload summary-<category>.md as a standalone artifact so it
-      # can be inspected in the GitHub Actions UI even when an upstream
-      # `Verify ...` step (or any other step) failed. Runs with `if: always()`
-      # so the file is preserved on failure as well as success.
-      - name: Stage summary file for upload
-        if: always() && steps.gate.outputs.should_run == 'true'
-        id: stage_summary
-        run: |
-          mkdir -p reports/summary
-          SRC="${{ steps.summary.outputs.summary_file }}"
-          DEST="reports/summary/summary-${CATEGORY_ID}.md"
-          if [ -f "${SRC}" ]; then
-            cp "${SRC}" "${DEST}"
-            echo "staged=1" >> "$GITHUB_OUTPUT"
-            echo "Staged ${SRC} → ${DEST} ($(wc -c < "${DEST}") bytes)"
-          else
-            # Always emit a placeholder so the artifact upload doesn't get
-            # skipped silently — easier to detect "summary never produced".
-            echo "::warning title=summary-${CATEGORY_ID}.md missing::No summary file produced by step.summary at ${SRC}" >&2
-            echo "(no summary file was produced by the summary step — see job logs)" > "${DEST}"
-            echo "staged=0" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Upload summary-${{ matrix.id }}.md artifact
-        if: always() && steps.gate.outputs.should_run == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: preflight-fuzz-${{ matrix.id }}-summary-run${{ github.run_number }}-${{ github.run_id }}
-          path: reports/summary/summary-${{ matrix.id }}.md
-          if-no-files-found: warn
-          retention-days: 14
+      # NOTE: summary-<category>.md is staged & uploaded earlier (before the
+      # Check Run is published) so the Check Run summary can embed the artifact
+      # URL inline. See `Stage summary file for upload` / `Upload summary-...`
+      # / `Resolve summary artifact URL` steps above.
 
       # Sticky PR comment per category (header is unique → no overwrites).
       - name: Comment on PR (${{ matrix.label }})
