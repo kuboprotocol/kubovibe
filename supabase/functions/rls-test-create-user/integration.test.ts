@@ -1547,3 +1547,79 @@ Deno.test('HTTP integration: POST responses (200 success + 401 unauthorized) MUS
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: cross-origin GET response MUST NOT include Access-Control-Allow-Credentials', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    // Por que esse teste cobre GET (método NÃO suportado pelo handler):
+    //   * O contrato real do handler é responder 405 (`method_not_allowed`)
+    //     para qualquer método != POST/OPTIONS. O usuário pediu validação
+    //     "200 ou 404" como guarda-chuva genérico — espelhamos o comportamento
+    //     real (405) e aceitamos qualquer status >= 200 < 500, pois o que
+    //     importa para esse teste é o CONTRATO DE HEADERS, não o status code.
+    //   * Mesmo num caminho de erro (405), `corsHeaders` é spreadado via json(),
+    //     então qualquer vazamento acidental de Allow-Credentials apareceria.
+    //     Precisamos blindar TODOS os métodos HTTP, não apenas POST/OPTIONS.
+    //   * Allow-Credentials: true + Allow-Origin: "*" é REJEITADO pela CORS
+    //     spec (Fetch §3.2). Browsers bloqueariam a resposta inteira mesmo
+    //     em métodos não-suportados, mascarando o 405 com erro de CORS.
+    //
+    // Validação dupla:
+    //   (1) headers.get(...) === null
+    //   (2) Iteração case-insensitive (protege contra reverse-proxies que
+    //       reescrevem capitalização de headers).
+
+    const res = await fetch(`${ctx.url}/`, {
+      method: 'GET',
+      headers: {
+        // Origin presente — reproduz cenário cross-origin real onde o
+        // browser AVALIA Allow-Credentials junto com Allow-Origin "*".
+        'origin': 'https://hostile.example.com',
+      },
+    })
+
+    // Sanidade: status deve ser uma resposta HTTP válida (não 5xx). O handler
+    // real retorna 405; aceitamos 200/404/405 para cobrir evolução futura
+    // (ex: adicionar GET de health-check).
+    if (res.status >= 500) {
+      throw new Error(`GET retornou ${res.status}, esperado < 500 (handler real retorna 405)`)
+    }
+
+    // (1) .get() direto — proteção primária.
+    assertEquals(
+      res.headers.get('access-control-allow-credentials'),
+      null,
+      `GET ${res.status}: Access-Control-Allow-Credentials NÃO pode estar presente em resposta cross-origin (incompatível com Allow-Origin "*")`,
+    )
+
+    // (2) Varredura case-insensitive — captura variantes capitalizadas
+    // (ex: "Access-Control-Allow-Credentials") que possam escapar de .get().
+    const leaks: string[] = []
+    for (const [name, value] of res.headers) {
+      if (name.toLowerCase() === 'access-control-allow-credentials') {
+        leaks.push(`${name}=${value}`)
+      }
+    }
+    assertEquals(
+      leaks,
+      [],
+      `GET ${res.status}: nenhum cabeçalho Allow-Credentials permitido (qualquer capitalização) — vazamentos: ${JSON.stringify(leaks)}`,
+    )
+
+    // Sanidade do contrato CORS: a resposta cross-origin DEVE devolver
+    // Allow-Origin "*" estático (combinação que SÓ é válida na ausência
+    // de Allow-Credentials — o que acabamos de provar acima).
+    assertEquals(
+      res.headers.get('access-control-allow-origin'),
+      '*',
+      'GET cross-origin: Allow-Origin deve ser "*" estático (não ecoar Origin do request)',
+    )
+
+    // GET não invoca createClient (handler rejeita método antes).
+    assertEquals(ctx._calls, 0, 'GET não-suportado nunca deve chamar createClient')
+
+    await res.text()
+  } finally {
+    await ctx.stop()
+  }
+})
