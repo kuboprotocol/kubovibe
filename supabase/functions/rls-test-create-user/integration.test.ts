@@ -4571,3 +4571,151 @@ Deno.test('HTTP integration: OPTIONS without Origin — Access-Control-Request-M
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: OPTIONS WITH Origin — Access-Control-Request-Method casing/spacing variants — Allow-Methods stays LITERAL "POST, OPTIONS" (no echo, no leak across Origins)', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    const EXPECTED_LITERAL = 'POST, OPTIONS'
+    const EXPECTED_SET = new Set(['POST', 'OPTIONS'])
+
+    // Variantes de Request-Method (casing/spacing/rejected/exotic).
+    const REQUEST_METHOD_VARIANTS: Array<{ label: string; value: string }> = [
+      { label: 'POST UPPER',                value: 'POST' },
+      { label: 'post lower',                value: 'post' },
+      { label: 'Post Title',                value: 'Post' },
+      { label: 'PoSt mixed',                value: 'PoSt' },
+      { label: 'OPTIONS UPPER',             value: 'OPTIONS' },
+      { label: 'options lower',             value: 'options' },
+      { label: 'OpTiOnS mixed',             value: 'OpTiOnS' },
+      { label: 'POST leading space',        value: ' POST' },
+      { label: 'POST trailing space',       value: 'POST ' },
+      { label: 'POST surrounding spaces',   value: '  POST  ' },
+      { label: 'POST with tab',             value: '\tPOST' },
+      { label: 'GET (rejected)',            value: 'GET' },
+      { label: 'PUT (rejected)',            value: 'PUT' },
+      { label: 'DELETE (rejected)',         value: 'DELETE' },
+      { label: 'PATCH (rejected)',          value: 'PATCH' },
+      { label: 'HEAD (rejected)',           value: 'HEAD' },
+      { label: 'CONNECT (rejected)',        value: 'CONNECT' },
+      { label: 'TRACE (rejected)',          value: 'TRACE' },
+      { label: 'PROPFIND (WebDAV)',         value: 'PROPFIND' },
+      { label: 'CUSTOM-METHOD',             value: 'CUSTOM-METHOD' },
+      { label: 'wildcard *',                value: '*' },
+    ]
+
+    // Origens diversas — Allow-Methods deve ser idêntico para todas (handler não ramifica).
+    const ORIGINS: Array<{ label: string; value: string }> = [
+      { label: 'same-origin produção',     value: 'https://app.kubovibe.dev' },
+      { label: 'same-origin lovable',      value: 'https://kubovibe.lovable.app' },
+      { label: 'cross-origin hostil',      value: 'https://evil.example.com' },
+      { label: 'localhost dev',            value: 'http://localhost:5173' },
+      { label: 'Origin literal "null"',    value: 'null' },
+      { label: 'porta exótica',            value: 'https://attacker.example.com:31337' },
+    ]
+
+    const parseMethods = (v: string | null): string[] =>
+      (v ?? '').split(',').map((s) => s.trim().toUpperCase()).filter(Boolean)
+
+    for (const origin of ORIGINS) {
+      for (const variant of REQUEST_METHOD_VARIANTS) {
+        const res = await fetch(`${ctx.url}/`, {
+          method: 'OPTIONS',
+          headers: {
+            'origin': origin.value,
+            'access-control-request-method': variant.value,
+            'access-control-request-headers': 'content-type',
+          },
+        })
+        await res.text()
+
+        const ctxLabel = `[Origin: ${origin.label} | Request-Method: ${variant.label}]`
+
+        // (1) Status 200.
+        assertEquals(res.status, 200, `${ctxLabel}: preflight deve retornar 200`)
+
+        // (2) Allow-Methods LITERAL EXATO — handler NÃO ramifica por Origin nem por Request-Method.
+        const allowMethods = res.headers.get('access-control-allow-methods')
+        assertEquals(
+          allowMethods,
+          EXPECTED_LITERAL,
+          `${ctxLabel}: Allow-Methods deve ser literal "${EXPECTED_LITERAL}"`,
+        )
+
+        // (3) Conjunto parseado — exatamente 2 métodos sem duplicatas.
+        const methods = parseMethods(allowMethods)
+        assertEquals(methods.length, 2, `${ctxLabel}: Allow-Methods deve listar 2 métodos`)
+        assertEquals(new Set(methods).size, 2, `${ctxLabel}: Allow-Methods sem duplicatas`)
+        for (const m of EXPECTED_SET) {
+          assert(methods.includes(m), `${ctxLabel}: Allow-Methods deve incluir "${m}"`)
+        }
+
+        // (4) NUNCA ecoar o Request-Method solicitado (especialmente os rejeitados).
+        const requested = variant.value.trim().toUpperCase()
+        if (requested && requested !== 'POST' && requested !== 'OPTIONS') {
+          assert(
+            !methods.includes(requested),
+            `${ctxLabel}: Allow-Methods NÃO PODE ecoar Request-Method "${requested}"`,
+          )
+        }
+
+        // (5) NUNCA wildcard nem métodos perigosos.
+        assert(!methods.includes('*'), `${ctxLabel}: Allow-Methods NÃO PODE conter '*'`)
+        const FORBIDDEN = ['GET', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'CONNECT', 'TRACE', 'PROPFIND']
+        for (const f of FORBIDDEN) {
+          assert(!methods.includes(f), `${ctxLabel}: Allow-Methods NÃO PODE incluir "${f}"`)
+        }
+
+        // (6) Allow-Origin permanece '*' literal — sem eco mesmo com Origin presente.
+        const allowOrigin = res.headers.get('access-control-allow-origin')
+        assertEquals(allowOrigin, '*', `${ctxLabel}: Allow-Origin deve ser '*' literal`)
+        assert(allowOrigin !== origin.value, `${ctxLabel}: Allow-Origin NÃO PODE ecoar Origin`)
+        assert(allowOrigin !== 'null', `${ctxLabel}: Allow-Origin NUNCA pode ser 'null'`)
+
+        // (7) Allow-Credentials NUNCA presente (incompatível com '*').
+        assertEquals(
+          res.headers.get('access-control-allow-credentials'), null,
+          `${ctxLabel}: Allow-Credentials NUNCA pode aparecer`,
+        )
+
+        // (8) Allow-Headers + Max-Age permanecem literais (contrato uniforme).
+        assertEquals(
+          res.headers.get('access-control-allow-headers'),
+          'authorization, x-client-info, apikey, content-type, x-test-secret',
+          `${ctxLabel}: Allow-Headers deve permanecer literal exato`,
+        )
+        assertEquals(
+          res.headers.get('access-control-max-age'), '86400',
+          `${ctxLabel}: Max-Age deve permanecer '86400'`,
+        )
+
+        // (9) Vary sem 'origin' (incompatível com Allow-Origin: '*').
+        const vary = res.headers.get('vary')
+        if (vary !== null) {
+          const tokens = vary.split(',').map((s) => s.trim().toLowerCase())
+          assert(
+            !tokens.includes('origin'),
+            `${ctxLabel}: Vary NÃO PODE conter 'origin', recebeu "${vary}"`,
+          )
+        }
+
+        // (10) Allow-Methods aparece exatamente 1x.
+        let occurrences = 0
+        for (const [name] of res.headers) {
+          if (name.toLowerCase() === 'access-control-allow-methods') occurrences++
+        }
+        assertEquals(
+          occurrences, 1,
+          `${ctxLabel}: Allow-Methods deve aparecer exatamente 1x`,
+        )
+      }
+    }
+
+    // (11) Garantia: nenhum createClient instanciado em qualquer preflight.
+    assertEquals(
+      ctx._calls, 0,
+      'createClient NUNCA pode ser invocado em OPTIONS preflight',
+    )
+  } finally {
+    await ctx.stop()
+  }
+})
