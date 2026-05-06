@@ -1805,3 +1805,167 @@ Deno.test('HTTP integration: cross-origin HEAD request MUST NOT include Allow-Cr
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: OPTIONS preflight cross-origin — no Allow-Credentials, Allow-Origin "*", no cookies, sane CORS cache, status in valid HTTP range', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    // Esse teste consolida 4 contratos críticos do preflight cross-origin:
+    //
+    //   (A) Allow-Credentials AUSENTE + Allow-Origin "*" literal exato.
+    //       Combinação CORS-spec-compliant (Fetch §3.2). Sem isso o browser
+    //       descarta a resposta inteira.
+    //
+    //   (B) Ausência total de cookies (Set-Cookie / Set-Cookie2) no preflight.
+    //       Preflights NUNCA devem setar cookies — eles são pings de capability,
+    //       não fluxos autenticados. Setar cookie aqui pode (i) vazar sessão a
+    //       origem cross-origin, (ii) ser silenciosamente descartado pelo browser
+    //       (cookies em preflight são ignorados pela spec), criando confusão
+    //       entre dev e produção.
+    //
+    //   (C) Cache CORS sano:
+    //         * `Max-Age: 86400` presente (1 dia — evita preflight a cada call,
+    //           reduzindo latência e custo).
+    //         * Sem `Vary: Origin` (o handler devolve "*" estático, então
+    //           variar por Origin fragmentaria cache desnecessariamente em
+    //           CDNs/proxies).
+    //         * Sem `Vary: Cookie` (preflight não lê cookies; declarar isso
+    //           induziria proxies a fragmentar cache por sessão, derrubando
+    //           hit-rate).
+    //
+    //   (D) Status code numa faixa HTTP válida (100–599). HTTP não define 6xx;
+    //       guarda defensiva contra qualquer código fora do range causado por
+    //       bug de runtime (ex: Response construído com status 600 jogaria
+    //       TypeError no Deno, mas blindamos aqui também).
+    //
+    // Por que CONSOLIDAR num único teste: os 4 contratos são intrinsecamente
+    // ligados ao caminho de preflight. Separá-los multiplicaria setup/teardown
+    // (cada teste sobe um servidor) sem ganho de granularidade — se qualquer
+    // um falhar, o vazamento é local ao mesmo branch do handler.
+
+    const HOSTILE_ORIGIN = 'https://attacker.example.com'
+
+    const preflight = await fetch(`${ctx.url}/`, {
+      method: 'OPTIONS',
+      headers: {
+        'origin': HOSTILE_ORIGIN,
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'content-type, x-test-secret',
+        // Cookie no request — alguns clientes mandam mesmo em preflight
+        // (browsers não, mas curl/proxy podem). Garante que o handler
+        // não REFLETE cookie de volta via Set-Cookie.
+        'cookie': 'session=stolen-session-id; tracking=hostile-value',
+      },
+    })
+
+    // ----- (D) Faixa de status HTTP válida (100–599) -----
+    // HTTP não define 6xx. Se algum dia o handler retornar status fora da
+    // faixa, capturamos aqui antes de qualquer outra asserção.
+    if (preflight.status < 100 || preflight.status >= 600) {
+      throw new Error(
+        `OPTIONS retornou status ${preflight.status}, fora da faixa HTTP válida (100–599). ` +
+        `HTTP não define códigos 6xx — handler real deve responder 200.`,
+      )
+    }
+    assertEquals(preflight.status, 200, 'preflight cross-origin deve responder 200')
+
+    // ----- (A) Allow-Credentials ausente + Allow-Origin "*" literal -----
+    assertEquals(
+      preflight.headers.get('access-control-allow-credentials'),
+      null,
+      'OPTIONS: Access-Control-Allow-Credentials NÃO pode estar presente (incompatível com Allow-Origin "*")',
+    )
+    const credLeak: string[] = []
+    for (const [name, value] of preflight.headers) {
+      if (name.toLowerCase() === 'access-control-allow-credentials') {
+        credLeak.push(`${name}=${value}`)
+      }
+    }
+    assertEquals(credLeak, [], `OPTIONS: nenhum Allow-Credentials permitido — vazamentos: ${JSON.stringify(credLeak)}`)
+
+    const allowOrigin = preflight.headers.get('access-control-allow-origin')
+    assertEquals(
+      allowOrigin,
+      '*',
+      `OPTIONS: Allow-Origin deve ser exatamente "*" literal, recebido: ${JSON.stringify(allowOrigin)}`,
+    )
+    if (allowOrigin === HOSTILE_ORIGIN) {
+      throw new Error(`OPTIONS: Allow-Origin ECOOU o Origin hostil "${HOSTILE_ORIGIN}" — falha crítica de CORS`)
+    }
+
+    // ----- (B) Ausência total de cookies -----
+    assertEquals(
+      preflight.headers.get('set-cookie'),
+      null,
+      'OPTIONS: preflight NUNCA deve setar cookies (Set-Cookie ausente)',
+    )
+    assertEquals(
+      preflight.headers.get('set-cookie2'),
+      null,
+      'OPTIONS: preflight NUNCA deve setar cookies legacy (Set-Cookie2 ausente)',
+    )
+    const cookieLeak: string[] = []
+    for (const [name, value] of preflight.headers) {
+      const lower = name.toLowerCase()
+      if (lower === 'set-cookie' || lower === 'set-cookie2') {
+        cookieLeak.push(`${name}=${value}`)
+      }
+    }
+    assertEquals(
+      cookieLeak,
+      [],
+      `OPTIONS: nenhum cabeçalho de cookie permitido (qualquer capitalização) — vazamentos: ${JSON.stringify(cookieLeak)}`,
+    )
+
+    // ----- (C) Cache CORS sano -----
+    // (C.1) Max-Age presente e razoável (handler usa 86400 = 1 dia).
+    const maxAge = preflight.headers.get('access-control-max-age')
+    assertEquals(
+      maxAge,
+      '86400',
+      `OPTIONS: Max-Age deve ser "86400" (1 dia) para reduzir preflights repetidos. Recebido: ${JSON.stringify(maxAge)}`,
+    )
+    // Sanidade numérica defensiva — não pode ser 0 (desabilita cache) nem
+    // negativo (browsers rejeitam).
+    const maxAgeNum = Number(maxAge)
+    if (!Number.isFinite(maxAgeNum) || maxAgeNum <= 0) {
+      throw new Error(`OPTIONS: Max-Age inválido para cache (${maxAge}). Deve ser inteiro positivo.`)
+    }
+
+    // (C.2) Sem Vary: Origin nem Vary: Cookie — Allow-Origin é "*" estático
+    // e o handler não lê cookies. Tolera Vary: Accept-Encoding (injetado pelo
+    // runtime para negociação de compressão, independente do handler).
+    const varyHeader = preflight.headers.get('vary')
+    if (varyHeader !== null) {
+      const tokens = varyHeader.split(',').map((t) => t.trim().toLowerCase())
+      assertEquals(
+        tokens.includes('origin'),
+        false,
+        `OPTIONS: Vary NÃO pode listar "Origin" — Allow-Origin é estático "*". Vary recebido: "${varyHeader}"`,
+      )
+      assertEquals(
+        tokens.includes('cookie'),
+        false,
+        `OPTIONS: Vary NÃO pode listar "Cookie" — preflight não lê cookies. Vary recebido: "${varyHeader}"`,
+      )
+      assertEquals(
+        tokens.includes('*'),
+        false,
+        `OPTIONS: Vary NÃO pode ser "*" — força revalidação total no cache. Vary recebido: "${varyHeader}"`,
+      )
+    }
+
+    // ----- Sanidade final -----
+    // createClient nunca é chamado em preflight (handler retorna antes).
+    assertEquals(ctx._calls, 0, 'preflight nunca deve invocar createClient')
+    // Allow-Methods canônico deve permanecer estável.
+    assertEquals(
+      preflight.headers.get('access-control-allow-methods'),
+      'POST, OPTIONS',
+      'OPTIONS: Allow-Methods deve ser exatamente "POST, OPTIONS"',
+    )
+
+    await preflight.text()
+  } finally {
+    await ctx.stop()
+  }
+})
