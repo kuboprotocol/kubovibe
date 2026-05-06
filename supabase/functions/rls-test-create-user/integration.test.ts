@@ -826,3 +826,72 @@ Deno.test('HTTP integration: OPTIONS without Origin + WRONG x-test-secret return
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: OPTIONS with VALID x-test-secret — Allow-Headers is the static full list, including the requested content-type and x-test-secret tokens', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    // Contrato atual do handler: o preflight devolve sempre a lista CORS
+    // ESTÁTICA completa em Access-Control-Allow-Headers, independente do
+    // que o cliente solicita em Access-Control-Request-Headers. Esse é o
+    // padrão recomendado para edge functions Supabase.
+    //
+    // Aqui o cliente solicita explicitamente apenas "content-type" e
+    // "x-test-secret". O teste valida que:
+    //   1. Esses dois tokens solicitados ESTÃO presentes em Allow-Headers
+    //      (sem eles o navegador bloquearia o POST real).
+    //   2. Os demais headers default (authorization, apikey, x-client-info)
+    //      TAMBÉM estão presentes — confirmando o contrato estático.
+    const res = await fetch(`${ctx.url}/`, {
+      method: 'OPTIONS',
+      headers: {
+        'origin': 'https://app.kubovibe.dev',
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'content-type, x-test-secret',
+        'x-test-secret': SECRET,
+      },
+    })
+
+    assertEquals(res.status, 200, 'preflight com secret válido deve responder 200')
+
+    const allowed = res.headers.get('access-control-allow-headers') ?? ''
+    assert(allowed.length > 0, 'allow-headers deve estar presente')
+
+    // Tokenização defensiva (case/whitespace-insensitive).
+    const tokens = allowed
+      .split(',')
+      .map((t) => t.trim().toLowerCase())
+      .filter((t) => t.length > 0)
+
+    // (1) Tokens efetivamente solicitados pelo cliente devem estar autorizados.
+    const requested = ['content-type', 'x-test-secret']
+    for (const t of requested) {
+      assert(
+        tokens.includes(t),
+        `allow-headers deve conter token solicitado "${t}" (got: "${allowed}")`,
+      )
+    }
+
+    // (2) Contrato estático: lista completa também é devolvida, mesmo que
+    // o cliente não tenha solicitado esses tokens em Request-Headers.
+    const staticExtras = ['authorization', 'apikey', 'x-client-info']
+    for (const t of staticExtras) {
+      assert(
+        tokens.includes(t),
+        `allow-headers (lista estática) deve conter "${t}" mesmo sem ser solicitado (got: "${allowed}")`,
+      )
+    }
+
+    // Sanidade dos demais headers CORS.
+    assertEquals(res.headers.get('access-control-allow-origin'), '*')
+    const methods = (res.headers.get('access-control-allow-methods') ?? '').toUpperCase()
+    assert(methods.includes('POST'), `allow-methods deve listar POST (got: "${methods}")`)
+    assert(methods.includes('OPTIONS'), `allow-methods deve listar OPTIONS (got: "${methods}")`)
+
+    await res.text()
+
+    // Preflight nunca pode validar secret nem instanciar Supabase client.
+    assertEquals(ctx._calls, 0, 'OPTIONS jamais deve chamar createClient')
+  } finally {
+    await ctx.stop()
+  }
+})
