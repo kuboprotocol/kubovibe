@@ -2743,3 +2743,155 @@ Deno.test('HTTP integration: 200 OK response with hostile Cookie — NEVER Set-C
     await ctx.stop()
   }
 })
+
+// ============================================================
+// Access-Control-Allow-Methods contract on CORS preflight
+// ------------------------------------------------------------
+// O handler em index.ts declara:
+//   'Access-Control-Allow-Methods': 'POST, OPTIONS'
+// Estes testes blindam esse contrato contra regressões: garantem que
+// (a) o header está presente em respostas de preflight (OPTIONS),
+// (b) lista exatamente POST e OPTIONS,
+// (c) NUNCA inclui métodos perigosos/desnecessários (GET, PUT, PATCH,
+//     DELETE, HEAD, CONNECT, TRACE, *), o que reduziria a superfície
+//     CORS exposta a origens hostis,
+// (d) o contrato é estável independentemente dos headers de preflight
+//     (Access-Control-Request-Method / -Headers / Origin variados).
+// ============================================================
+
+function parseAllowMethods(h: string | null): string[] {
+  if (!h) return []
+  return h.split(',').map((s) => s.trim().toUpperCase()).filter(Boolean)
+}
+
+const FORBIDDEN_METHODS = ['GET', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'CONNECT', 'TRACE', '*']
+
+Deno.test('HTTP integration: CORS preflight — Allow-Methods is present and equals exactly "POST, OPTIONS"', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    // Preflight clássico: OPTIONS + Origin + Access-Control-Request-Method.
+    const variants: Array<{ name: string; init: RequestInit }> = [
+      {
+        name: 'preflight POST from browser-like origin',
+        init: {
+          method: 'OPTIONS',
+          headers: {
+            'Origin': 'https://app.kubovibe.dev',
+            'Access-Control-Request-Method': 'POST',
+            'Access-Control-Request-Headers': 'x-test-secret, content-type',
+          },
+        },
+      },
+      {
+        name: 'preflight from hostile origin',
+        init: {
+          method: 'OPTIONS',
+          headers: {
+            'Origin': 'https://evil.example.com',
+            'Access-Control-Request-Method': 'POST',
+            'Access-Control-Request-Headers': 'x-test-secret',
+          },
+        },
+      },
+      {
+        name: 'preflight requesting a forbidden method (DELETE) — server must NOT echo it',
+        init: {
+          method: 'OPTIONS',
+          headers: {
+            'Origin': 'https://evil.example.com',
+            'Access-Control-Request-Method': 'DELETE',
+            'Access-Control-Request-Headers': 'authorization',
+          },
+        },
+      },
+      {
+        name: 'bare OPTIONS without preflight headers',
+        init: { method: 'OPTIONS' },
+      },
+    ]
+
+    for (const v of variants) {
+      const res = await fetch(`${ctx.url}/`, v.init)
+      // body fully consumed to release the connection
+      await res.text()
+
+      assertEquals(res.status, 200, `[${v.name}] status preflight deve ser 200`)
+
+      const raw = res.headers.get('access-control-allow-methods')
+      assertExists(raw, `[${v.name}] Allow-Methods deve estar presente em preflight`)
+
+      // Igualdade exata de string (contrato literal do handler).
+      assertEquals(
+        raw,
+        'POST, OPTIONS',
+        `[${v.name}] Allow-Methods deve ser literalmente "POST, OPTIONS"`,
+      )
+
+      // Igualdade de conjunto (defesa contra reordenação futura).
+      const methods = parseAllowMethods(raw)
+      assertEquals(
+        methods.sort(),
+        ['OPTIONS', 'POST'],
+        `[${v.name}] Allow-Methods deve conter exatamente {POST, OPTIONS}`,
+      )
+
+      // Nenhum método perigoso pode aparecer.
+      for (const forbidden of FORBIDDEN_METHODS) {
+        assert(
+          !methods.includes(forbidden),
+          `[${v.name}] Allow-Methods NÃO pode incluir "${forbidden}" (vazaria superfície CORS)`,
+        )
+      }
+
+      // Allow-Origin deve permanecer literal "*" (não eco do Origin).
+      const allowOrigin = res.headers.get('access-control-allow-origin')
+      assert(
+        allowOrigin === '*' || allowOrigin === null,
+        `[${v.name}] Allow-Origin deve ser "*" ou ausente, got: ${allowOrigin}`,
+      )
+
+      // Preflight não invoca createClient — sanidade.
+      assertEquals(ctx._calls, 0, `[${v.name}] preflight não pode instanciar Supabase client`)
+    }
+  } finally {
+    await ctx.stop()
+  }
+})
+
+Deno.test('HTTP integration: CORS preflight — Allow-Methods header is case-insensitive readable & no duplicate methods', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    const res = await fetch(`${ctx.url}/`, {
+      method: 'OPTIONS',
+      headers: {
+        'Origin': 'https://evil.example.com',
+        'Access-Control-Request-Method': 'POST',
+      },
+    })
+    await res.text()
+
+    // Defesa contra capitalização exótica do header name.
+    const variants = [
+      'access-control-allow-methods',
+      'Access-Control-Allow-Methods',
+      'ACCESS-CONTROL-ALLOW-METHODS',
+    ]
+    for (const name of variants) {
+      const v = res.headers.get(name)
+      assertExists(v, `header "${name}" deve ser legível (Headers é case-insensitive)`)
+      assertEquals(v, 'POST, OPTIONS', `header "${name}" deve retornar "POST, OPTIONS"`)
+    }
+
+    // Garante NÃO duplicação (alguns proxies podem somar headers).
+    const methods = parseAllowMethods(res.headers.get('access-control-allow-methods'))
+    const unique = Array.from(new Set(methods))
+    assertEquals(
+      methods.length,
+      unique.length,
+      'Allow-Methods não pode conter métodos duplicados',
+    )
+    assertEquals(methods.length, 2, 'Allow-Methods deve listar exatamente 2 métodos')
+  } finally {
+    await ctx.stop()
+  }
+})
