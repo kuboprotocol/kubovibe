@@ -1712,3 +1712,96 @@ Deno.test('HTTP integration: POST 401 (permission denied) MUST NOT include Allow
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: cross-origin HEAD request MUST NOT include Allow-Credentials and MUST keep Allow-Origin "*"', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    // Por que HEAD merece teste DEDICADO (além de GET):
+    //   * HEAD é frequentemente usado por health-checkers, monitores, crawlers
+    //     e proxies para validar disponibilidade SEM baixar o body. Mesmo que
+    //     o handler responda 405 (método não suportado), o contrato CORS DEVE
+    //     ser idêntico aos demais métodos — Allow-Origin "*" estático e
+    //     Allow-Credentials AUSENTE.
+    //   * Diferente de GET, respostas a HEAD por spec NÃO devem ter body, mas
+    //     PODEM (e devem) carregar todos os response headers como se fosse o
+    //     GET equivalente. Isso significa que `corsHeaders` ainda é spreadado
+    //     via json() mesmo no caminho 405, e qualquer vazamento de
+    //     Allow-Credentials apareceria aqui.
+    //   * Browsers AVALIAM Allow-Credentials + Allow-Origin "*" no caminho de
+    //     HEAD cross-origin do mesmo jeito que avaliam para GET/POST. A
+    //     combinação inválida bloquearia a resposta inteira, mascarando 405
+    //     com erro genérico de CORS.
+    //
+    // Validação tripla:
+    //   (1) headers.get('access-control-allow-credentials') === null
+    //   (2) Iteração case-insensitive sobre todos os headers (protege contra
+    //       reverse-proxies que normalizam capitalização de forma diferente).
+    //   (3) headers.get('access-control-allow-origin') === '*' literal (não
+    //       ecoa Origin recebido, não vira "null", sem vírgulas/espaços).
+
+    const HOSTILE_ORIGIN = 'https://attacker.example.com'
+
+    const res = await fetch(`${ctx.url}/`, {
+      method: 'HEAD',
+      headers: {
+        // Origin presente — reproduz cenário cross-origin real onde o browser
+        // AVALIA Allow-Credentials + Allow-Origin juntos. Sem Origin, o browser
+        // nem checa CORS, então o teste perderia o sinal.
+        'origin': HOSTILE_ORIGIN,
+      },
+    })
+
+    // Sanidade: HEAD não-suportado deve retornar 4xx (handler real: 405).
+    // Aceitamos qualquer < 500 para tolerar evolução futura (ex: health-check
+    // que aceite HEAD com 200). Se for >= 500, é bug independente.
+    if (res.status >= 500) {
+      // Drena o body antes de lançar para evitar resource leak.
+      try { await res.body?.cancel() } catch { /* ignore */ }
+      throw new Error(`HEAD retornou ${res.status}, esperado < 500 (handler real retorna 405)`)
+    }
+
+    // (1) .get() direto — Allow-Credentials ausente.
+    assertEquals(
+      res.headers.get('access-control-allow-credentials'),
+      null,
+      `HEAD ${res.status}: Access-Control-Allow-Credentials NÃO pode estar presente em resposta cross-origin (incompatível com Allow-Origin "*")`,
+    )
+
+    // (2) Varredura case-insensitive — captura variantes capitalizadas
+    // que possam escapar de .get().
+    const leaks: string[] = []
+    for (const [name, value] of res.headers) {
+      if (name.toLowerCase() === 'access-control-allow-credentials') {
+        leaks.push(`${name}=${value}`)
+      }
+    }
+    assertEquals(
+      leaks,
+      [],
+      `HEAD ${res.status}: nenhum cabeçalho Allow-Credentials permitido (qualquer capitalização) — vazamentos: ${JSON.stringify(leaks)}`,
+    )
+
+    // (3) Allow-Origin permanece exatamente "*" — NÃO ecoa o Origin hostil,
+    // NÃO vira "null", NÃO contém vírgulas/espaços.
+    const allowOrigin = res.headers.get('access-control-allow-origin')
+    assertEquals(
+      allowOrigin,
+      '*',
+      `HEAD ${res.status}: Allow-Origin deve ser exatamente "*" literal, recebido: ${JSON.stringify(allowOrigin)}`,
+    )
+    // Sanidade defensiva: garante que o handler NÃO ecoou o Origin hostil
+    // (vetor clássico de CORS misconfig).
+    if (allowOrigin === HOSTILE_ORIGIN) {
+      throw new Error(`HEAD ${res.status}: Allow-Origin ECOOU o Origin hostil "${HOSTILE_ORIGIN}" — falha crítica de CORS`)
+    }
+
+    // HEAD não-suportado nunca invoca createClient (handler rejeita método antes).
+    assertEquals(ctx._calls, 0, 'HEAD não-suportado nunca deve chamar createClient')
+
+    // Drena qualquer body residual (HEAD por spec não tem body, mas algumas
+    // implementações enviam Content-Length sem payload — drenar é seguro).
+    try { await res.body?.cancel() } catch { /* ignore */ }
+  } finally {
+    await ctx.stop()
+  }
+})
