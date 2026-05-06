@@ -4063,3 +4063,180 @@ Deno.test('HTTP integration: 401/403 auth-rejection — uniform CORS contract ac
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: OPTIONS — Allow-Origin is ALWAYS literal "*" (no Origin → "*"; any Origin/casing → never echo)', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    const EXPECTED = '*'
+
+    // ---- PARTE 1: OPTIONS SEM Origin → sempre '*' literal ----
+    const NO_ORIGIN_SCENARIOS: Array<{ name: string; init: RequestInit }> = [
+      { name: 'OPTIONS puro',                          init: { method: 'OPTIONS' } },
+      { name: 'OPTIONS + Request-Method',              init: { method: 'OPTIONS', headers: { 'access-control-request-method': 'POST' } } },
+      { name: 'OPTIONS + Request-Headers',             init: { method: 'OPTIONS', headers: { 'access-control-request-method': 'POST', 'access-control-request-headers': 'content-type' } } },
+      { name: 'OPTIONS + Cookie hostil sem Origin',    init: { method: 'OPTIONS', headers: { 'cookie': 'sid=stolen; auth=fake' } } },
+      { name: 'OPTIONS + Authorization sem Origin',    init: { method: 'OPTIONS', headers: { 'authorization': 'Bearer token' } } },
+      { name: 'OPTIONS + Referer sem Origin',          init: { method: 'OPTIONS', headers: { 'referer': 'https://evil.example.com/page' } } },
+      { name: 'OPTIONS + User-Agent custom sem Origin',init: { method: 'OPTIONS', headers: { 'user-agent': 'curl/8.4.0' } } },
+    ]
+
+    for (const sc of NO_ORIGIN_SCENARIOS) {
+      // Garantir que Origin de fato não está sendo enviado.
+      const sent = new Headers((sc.init.headers ?? {}) as HeadersInit)
+      assert(!sent.has('origin'), `[${sc.name}] cenário inválido: Origin não pode estar presente`)
+
+      // 2 tentativas idempotentes.
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        const res = await fetch(`${ctx.url}/`, sc.init)
+        await res.text()
+
+        assertEquals(res.status, 200, `[NO ORIGIN | ${sc.name}] tentativa ${attempt}: status deve ser 200`)
+        const allowOrigin = res.headers.get('access-control-allow-origin')
+        assertEquals(
+          allowOrigin,
+          EXPECTED,
+          `[NO ORIGIN | ${sc.name}] tentativa ${attempt}: Allow-Origin deve ser '*' literal`,
+        )
+        // NUNCA literal 'null'.
+        assert(allowOrigin !== 'null', `[NO ORIGIN | ${sc.name}] Allow-Origin NUNCA pode ser 'null'`)
+        // NUNCA Allow-Credentials (incompatível com '*').
+        assertEquals(
+          res.headers.get('access-control-allow-credentials'), null,
+          `[NO ORIGIN | ${sc.name}] Allow-Credentials NUNCA pode aparecer`,
+        )
+      }
+    }
+
+    // ---- PARTE 2: OPTIONS COM Origin em variações de casing → nunca eco ----
+    // O fetch normaliza o NOME do header para lower-case, mas o VALOR é preservado.
+    // Validamos que diferentes valores de Origin (incluindo casing exótico no host,
+    // schemas, e nomes de header em variantes) jamais resultam em eco do Origin.
+    const ORIGIN_VALUES_VARIANTS: string[] = [
+      // Casing variado no host/scheme.
+      'https://app.kubovibe.dev',
+      'https://APP.KUBOVIBE.DEV',
+      'HTTPS://app.kubovibe.dev',
+      'https://App.KuBoViBe.Dev',
+      // Cross-origin hostis com casing.
+      'https://evil.example.com',
+      'https://EVIL.EXAMPLE.COM',
+      'https://EvIl.ExAmPlE.cOm',
+      // Origin literal 'null' em casings (browsers só enviam 'null' lowercase, mas defesa).
+      'null',
+      'NULL',
+      'Null',
+      // Schemas variados.
+      'http://localhost:5173',
+      'HTTP://LOCALHOST:5173',
+      // Porta exótica.
+      'https://attacker.example.com:31337',
+      // Valores com path/query (inválidos por RFC mas defesa).
+      'https://app.kubovibe.dev/path',
+      // Wildcard literal enviado pelo cliente.
+      '*',
+      // Tentativa de injection (runtime pode rejeitar).
+      'https://evil.com\r\nset-cookie: pwn=1',
+    ]
+
+    // Variantes do NOME do header Origin — fetch normaliza para lowercase, mas
+    // garantimos que o servidor lê via Headers.get (case-insensitive) e não ecoa.
+    const ORIGIN_HEADER_NAME_VARIANTS = ['origin', 'Origin', 'ORIGIN', 'OrIgIn']
+
+    for (const headerName of ORIGIN_HEADER_NAME_VARIANTS) {
+      for (const originValue of ORIGIN_VALUES_VARIANTS) {
+        let res: Response
+        try {
+          res = await fetch(`${ctx.url}/`, {
+            method: 'OPTIONS',
+            headers: {
+              [headerName]: originValue,
+              'access-control-request-method': 'POST',
+            },
+          })
+        } catch (e) {
+          // CRLF injection deve ser rejeitada pelo runtime (defesa de baixo nível).
+          if (originValue.includes('\r\n')) {
+            assert(
+              e instanceof TypeError,
+              `[name=${headerName} | value=${originValue}]: runtime deve rejeitar CRLF com TypeError`,
+            )
+            continue
+          }
+          throw new Error(`[name=${headerName} | value=${originValue}]: fetch falhou: ${(e as Error).message}`)
+        }
+        await res.text()
+
+        const ctxLabel = `[name=${headerName} | value=${JSON.stringify(originValue)}]`
+
+        // (1) Status 200.
+        assertEquals(res.status, 200, `${ctxLabel}: status deve ser 200`)
+
+        // (2) Allow-Origin SEMPRE '*' literal — jamais eco.
+        const allowOrigin = res.headers.get('access-control-allow-origin')
+        assertEquals(
+          allowOrigin,
+          EXPECTED,
+          `${ctxLabel}: Allow-Origin deve ser '*' literal`,
+        )
+
+        // (3) NUNCA igualar o valor de Origin recebido (exceto quando cliente mandou '*' literal,
+        // caso degenerado em que coincide — mas mesmo assim handler não está "ecoando").
+        if (originValue !== '*') {
+          assert(
+            allowOrigin !== originValue,
+            `${ctxLabel}: Allow-Origin NÃO PODE ecoar o valor de Origin recebido`,
+          )
+        }
+
+        // (4) NUNCA literal 'null' (em qualquer casing) — handler retorna '*'.
+        assert(
+          allowOrigin !== 'null' && allowOrigin !== 'NULL' && allowOrigin !== 'Null',
+          `${ctxLabel}: Allow-Origin NUNCA pode ser 'null' em qualquer casing`,
+        )
+
+        // (5) NUNCA versão lowercase do Origin recebido.
+        if (originValue !== '*') {
+          assert(
+            allowOrigin?.toLowerCase() !== originValue.toLowerCase(),
+            `${ctxLabel}: Allow-Origin NÃO PODE ser variação case-insensitive do Origin`,
+          )
+        }
+
+        // (6) Allow-Credentials NUNCA presente (incompatível com '*').
+        assertEquals(
+          res.headers.get('access-control-allow-credentials'),
+          null,
+          `${ctxLabel}: Allow-Credentials NUNCA pode aparecer`,
+        )
+
+        // (7) Vary NUNCA contém 'origin' — eliminaria valor do '*' como cache key.
+        const vary = res.headers.get('vary')
+        if (vary !== null) {
+          const tokens = vary.split(',').map((s) => s.trim().toLowerCase())
+          assert(
+            !tokens.includes('origin'),
+            `${ctxLabel}: Vary NÃO PODE conter 'origin' (incompatível com Allow-Origin: '*')`,
+          )
+        }
+
+        // (8) Allow-Origin aparece exatamente 1x (sem duplicação por proxy).
+        let occurrences = 0
+        for (const [name] of res.headers) {
+          if (name.toLowerCase() === 'access-control-allow-origin') occurrences++
+        }
+        assertEquals(
+          occurrences, 1,
+          `${ctxLabel}: Allow-Origin deve aparecer exatamente 1x, encontrou ${occurrences}`,
+        )
+      }
+    }
+
+    // (9) Garantia: nenhum createClient instanciado em qualquer preflight.
+    assertEquals(
+      ctx._calls, 0,
+      'createClient NUNCA pode ser invocado em OPTIONS preflight',
+    )
+  } finally {
+    await ctx.stop()
+  }
+})
