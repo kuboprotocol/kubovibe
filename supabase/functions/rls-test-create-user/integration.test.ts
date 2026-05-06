@@ -2390,3 +2390,119 @@ Deno.test('HTTP integration: cross-origin OPTIONS preflight WITH Cookie header �
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: hostile Cookie on cross-origin (HEAD/GET/POST/OPTIONS) — explicit assertion: NEVER Set-Cookie, NEVER Allow-Credentials', async () => {
+  const HOSTILE_ORIGIN = 'https://evil.example.com'
+  const HOSTILE_COOKIE = [
+    'sid=stolen-session-abc123',
+    'auth=fake-jwt-token',
+    'csrf=hijack-token',
+    'theme=dark',
+    'tracking=xyz',
+  ].join('; ')
+
+  const variants: Array<{
+    method: 'HEAD' | 'GET' | 'POST' | 'OPTIONS'
+    extraHeaders?: Record<string, string>
+    body?: string
+  }> = [
+    { method: 'HEAD' },
+    { method: 'GET' },
+    { method: 'POST', extraHeaders: { 'content-type': 'application/json', 'x-test-secret': SECRET }, body: JSON.stringify({}) },
+    { method: 'POST', extraHeaders: { 'content-type': 'application/json' }, body: JSON.stringify({}) },
+    { method: 'OPTIONS', extraHeaders: { 'access-control-request-method': 'POST', 'access-control-request-headers': 'content-type, x-test-secret' } },
+  ]
+
+  for (const v of variants) {
+    const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+    const label = `${v.method}${v.extraHeaders?.['x-test-secret'] ? '+secret' : ''}`
+    try {
+      const res = await fetch(ctx.url, {
+        method: v.method,
+        headers: {
+          'origin': HOSTILE_ORIGIN,
+          'cookie': HOSTILE_COOKIE,
+          ...(v.extraHeaders ?? {}),
+        },
+        body: v.body,
+      })
+
+      // Sanidade: nenhum 5xx por causa de cookies hostis.
+      assert(res.status < 500, `${label}: cookies hostis não podem causar 5xx, recebido ${res.status}`)
+
+      // ────────────────────────────────────────────────────────────────
+      // ASSERÇÃO EXPLÍCITA #1 — NUNCA Set-Cookie (nem Set-Cookie2).
+      // ────────────────────────────────────────────────────────────────
+      const setCookie = res.headers.get('set-cookie')
+      assertEquals(
+        setCookie,
+        null,
+        `${label}: response NUNCA pode conter Set-Cookie quando cookies hostis são enviados — recebido: ${JSON.stringify(setCookie)}`,
+      )
+      const setCookie2 = res.headers.get('set-cookie2')
+      assertEquals(
+        setCookie2,
+        null,
+        `${label}: response NUNCA pode conter Set-Cookie2 quando cookies hostis são enviados — recebido: ${JSON.stringify(setCookie2)}`,
+      )
+
+      // Varredura case-insensitive — bloqueia qualquer capitalização exótica
+      // injetada por reverse proxy (ex: "SET-COOKIE", "Set-cookie").
+      const cookieLeak: string[] = []
+      for (const [name, value] of res.headers) {
+        const ln = name.toLowerCase()
+        if (ln === 'set-cookie' || ln === 'set-cookie2') {
+          cookieLeak.push(`${name}=${value}`)
+        }
+      }
+      assertEquals(
+        cookieLeak,
+        [],
+        `${label}: nenhum Set-Cookie/Set-Cookie2 permitido (qualquer capitalização) — vazamentos: ${JSON.stringify(cookieLeak)}`,
+      )
+
+      // ────────────────────────────────────────────────────────────────
+      // ASSERÇÃO EXPLÍCITA #2 — NUNCA Access-Control-Allow-Credentials.
+      // Crítico: Cookie no request NÃO pode induzir credentials:true,
+      // que combinado com Allow-Origin "*" é o vetor clássico de CORS
+      // bypass (browsers rejeitam, mas servidores mal-configurados emitem).
+      // ────────────────────────────────────────────────────────────────
+      const allowCreds = res.headers.get('access-control-allow-credentials')
+      assertEquals(
+        allowCreds,
+        null,
+        `${label}: response NUNCA pode conter Access-Control-Allow-Credentials quando cookies hostis são enviados — recebido: ${JSON.stringify(allowCreds)}`,
+      )
+
+      const credLeak: string[] = []
+      for (const [name, value] of res.headers) {
+        if (name.toLowerCase() === 'access-control-allow-credentials') {
+          credLeak.push(`${name}=${value}`)
+        }
+      }
+      assertEquals(
+        credLeak,
+        [],
+        `${label}: nenhum Allow-Credentials permitido (qualquer capitalização) — vazamentos: ${JSON.stringify(credLeak)}`,
+      )
+
+      // ────────────────────────────────────────────────────────────────
+      // ASSERÇÃO COMPLEMENTAR #3 — Allow-Origin permanece "*" (ou null
+      // para HEAD, dependendo do handler) e NUNCA ecoa o Origin hostil.
+      // ────────────────────────────────────────────────────────────────
+      const allowOrigin = res.headers.get('access-control-allow-origin')
+      assert(
+        allowOrigin === '*' || allowOrigin === null,
+        `${label}: Allow-Origin deve ser "*" ou ausente, recebido ${JSON.stringify(allowOrigin)}`,
+      )
+      assert(
+        allowOrigin !== HOSTILE_ORIGIN,
+        `${label}: Allow-Origin ECOOU o Origin hostil "${HOSTILE_ORIGIN}"`,
+      )
+
+      await res.text()
+    } finally {
+      await ctx.stop()
+    }
+  }
+})
