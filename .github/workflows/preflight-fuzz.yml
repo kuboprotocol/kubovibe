@@ -11,6 +11,10 @@ on:
         description: 'Optional Deno test name pattern filter (default: all preflight fuzz tests)'
         required: false
         default: ''
+      fc_seed:
+        description: 'Optional FC_SEED to reproduce a specific fast-check counterexample'
+        required: false
+        default: ''
 
 # Allow the PR-comment step to write to the PR; allow checks-action to publish
 # a dedicated GitHub Check Run with the fuzz status and artifact link.
