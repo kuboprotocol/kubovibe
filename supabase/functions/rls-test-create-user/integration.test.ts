@@ -9242,9 +9242,10 @@ Deno.test('HTTP integration: OPTIONS preflight — fast-check property-based SHR
     const counterexamples: Array<{ tokensBefore: Token[]; tokensAfter: Token[]; method: string; reason: string }> = []
 
     // Captura pré-shrink: substituímos o run para registrar o primeiro fail "bruto".
-    let firstRawFailure: { tokens: Token[]; method: string; reason: string } | null = null
+    type RawFailure = { tokens: Token[]; method: string; reason: string }
+    let firstRawFailure: RawFailure | null = null
 
-    const property = fc.asyncProperty(payloadArb, async (tokens) => {
+    const property = fc.asyncProperty(payloadArb, async (tokens: Token[]) => {
       executions++
       const method = buildRequestMethod(tokens, MARKER)
       const resp = await sendRaw(method)
