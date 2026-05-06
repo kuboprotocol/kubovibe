@@ -9284,11 +9284,12 @@ Deno.test('HTTP integration: OPTIONS preflight — fast-check property-based SHR
       const respShrunk = await sendRaw(shrunkMethod)
       const reasonShrunk = checkInvariants(respShrunk, MARKER)
 
+      const raw = firstRawFailure as RawFailure | null
       counterexamples.push({
-        tokensBefore: firstRawFailure?.tokens ?? shrunkTokens,
+        tokensBefore: raw?.tokens ?? shrunkTokens,
         tokensAfter: shrunkTokens,
         method: shrunkMethod,
-        reason: reasonShrunk || (firstRawFailure?.reason ?? 'unknown'),
+        reason: reasonShrunk || (raw?.reason ?? 'unknown'),
       })
 
       const prevFails = await readJson<Array<Record<string, unknown>>>(FAILURES_FILE, [])
@@ -9299,10 +9300,10 @@ Deno.test('HTTP integration: OPTIONS preflight — fast-check property-based SHR
         counterexamplePath: runResult.counterexamplePath,
         numShrinks: runResult.numShrinks,
         original: {
-          tokens: firstRawFailure?.tokens ?? null,
-          method: firstRawFailure?.method ?? null,
-          reason: firstRawFailure?.reason ?? null,
-          length: firstRawFailure?.method.length ?? null,
+          tokens: raw?.tokens ?? null,
+          method: raw?.method ?? null,
+          reason: raw?.reason ?? null,
+          length: raw?.method.length ?? null,
         },
         minimized: {
           tokens: shrunkTokens,
