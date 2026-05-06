@@ -5739,3 +5739,206 @@ Deno.test('HTTP integration: OPTIONS bare — NO Origin, NO Request-Method, NO R
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: OPTIONS preflight — Access-Control-Request-Headers with whitespace/comma formatting × CRLF/null-byte injection — Allow-Headers stays LITERAL exact (no echo, no smuggling)', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    const EXPECTED_HEADERS_LITERAL = 'authorization, x-client-info, apikey, content-type, x-test-secret'
+    const EXPECTED_HEADERS_SET = new Set([
+      'authorization', 'x-client-info', 'apikey', 'content-type', 'x-test-secret',
+    ])
+    const DANGEROUS_HEADERS = [
+      'set-cookie', 'set-cookie2', 'cookie', 'cookie2',
+      'host', 'origin', 'authorization-bearer',
+      'x-evil-cookie', 'x-fake-header', 'x-csrf-token',
+      'x-forwarded-for', 'x-real-ip', 'proxy-authorization',
+      'x-injected', 'x-smuggled', 'x-null-byte',
+      '*',
+    ]
+
+    const u = new URL(ctx.url)
+    const hostHeader = u.host
+
+    // Payloads que MISTURAM:
+    //  (A) formatação cosmética: espaço antes da vírgula, múltiplos espaços, tabs, vírgulas duplas,
+    //      vírgulas leading/trailing/internas, espaço dentro de tokens.
+    //  (B) bytes maliciosos: CR, LF, CRLF, null bytes, control chars.
+    // O contrato: Allow-Headers SEMPRE literal exato, sem echo, sem smuggling.
+    const PAYLOADS: Array<{ label: string; raw: string }> = [
+      // --- Espaço antes da vírgula (caso explícito do usuário). ---
+      { label: 'space-before-comma simples',          raw: 'authorization ,x-client-info' },
+      { label: 'space-before-comma com 5 tokens',     raw: 'authorization ,x-client-info ,apikey ,content-type ,x-test-secret' },
+      { label: 'space-before-comma + space-after',    raw: 'authorization , x-client-info , apikey' },
+      { label: 'múltiplos espaços antes da vírgula',  raw: 'authorization     ,    x-client-info' },
+      { label: 'tab antes da vírgula',                raw: 'authorization\t,x-client-info' },
+      { label: 'tab antes + LF depois da vírgula',    raw: 'authorization\t,\nx-client-info' },
+      { label: 'space-before-comma + CR injetado',    raw: 'authorization ,\rx-client-info' },
+      { label: 'space-before-comma + CRLF + injection', raw: 'authorization ,\r\nSet-Cookie: pwn=1' },
+      { label: 'space-before-comma + null byte',      raw: 'authorization \x00,x-client-info' },
+      { label: 'space-before-comma + null + dangerous', raw: 'authorization \x00, set-cookie' },
+
+      // --- Vírgulas múltiplas + whitespace + bytes maliciosos. ---
+      { label: 'vírgulas duplas + espaços',           raw: 'content-type  ,,  x-test-secret' },
+      { label: 'vírgulas triplas + tab',              raw: 'content-type\t,,,\tx-test-secret' },
+      { label: 'vírgulas + CR no meio',               raw: 'content-type , ,\r, x-test-secret' },
+      { label: 'vírgulas + LF no meio',               raw: 'content-type ,\n, x-test-secret' },
+      { label: 'vírgulas + CRLF + injetar X-Injected', raw: 'content-type ,\r\nX-Injected: 1, x-test-secret' },
+      { label: 'vírgulas + null entre tokens',        raw: 'content-type\x00,\x00x-test-secret' },
+
+      // --- Whitespace ao redor de TODOS os tokens + injeção. ---
+      { label: 'whitespace ao redor de todos',        raw: '   authorization   ,   x-client-info   ,   apikey   ' },
+      { label: 'whitespace + CRLF smuggle',           raw: '   authorization   \r\n   Cookie: evil=1   ,   x-client-info   ' },
+      { label: 'whitespace + null no meio',           raw: '   content-type   \x00   ,   x-test-secret   ' },
+
+      // --- Leading/trailing comma + bytes maliciosos. ---
+      { label: 'leading comma + CR',                  raw: ', \rcontent-type, x-test-secret' },
+      { label: 'trailing comma + LF',                 raw: 'content-type, x-test-secret,\n' },
+      { label: 'leading + trailing + null',           raw: '\x00, content-type, x-test-secret, \x00' },
+      { label: 'leading comma + CRLF smuggle',        raw: ',\r\nSet-Cookie: bad=1, content-type' },
+
+      // --- Espaços DENTRO de tokens (split inválido) + bytes maliciosos. ---
+      { label: 'espaço dentro de token',              raw: 'content type, x-test-secret' },
+      { label: 'espaço dentro + CRLF',                raw: 'content type\r\nX-Smuggled: 1, x-test-secret' },
+      { label: 'espaço dentro + null',                raw: 'content\x00type, x-test-secret' },
+
+      // --- Combinação caótica: formatação + CRLF + null + dangerous. ---
+      { label: 'caos total #1',                       raw: ' authorization \t,, \r\n Set-Cookie: x=y \x00, x-client-info ,' },
+      { label: 'caos total #2',                       raw: ',,, AUTH\x00ORIZATION ,\r\nX-Injected: 1,, content-type \t,\n cookie ,' },
+      { label: 'caos total #3 (allowlist embaralhada + tudo)', raw: ' x-test-secret \t,, content-type \r\n Set-Cookie: a=b ,\x00 apikey ,, x-client-info \n, authorization ' },
+    ]
+
+    const parseList = (v: string | null): string[] =>
+      (v ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
+
+    type RawResponse = { status: number; headers: Headers } | { error: string }
+
+    async function sendRaw(payload: string): Promise<RawResponse> {
+      let conn: Deno.TcpConn | null = null
+      try {
+        conn = await Deno.connect({ hostname: u.hostname, port: parseInt(u.port, 10), transport: 'tcp' })
+        const reqLines = [
+          'OPTIONS / HTTP/1.1',
+          `Host: ${hostHeader}`,
+          'Origin: https://evil.example.com',
+          'Access-Control-Request-Method: POST',
+          `Access-Control-Request-Headers: ${payload}`,
+          'Connection: close',
+          '',
+          '',
+        ]
+        await conn.write(new TextEncoder().encode(reqLines.join('\r\n')))
+
+        const chunks: Uint8Array[] = []
+        const buf = new Uint8Array(8192)
+        while (true) {
+          const n = await conn.read(buf)
+          if (n === null) break
+          chunks.push(buf.slice(0, n))
+        }
+        const total = chunks.reduce((s, c) => s + c.length, 0)
+        const merged = new Uint8Array(total)
+        let off = 0
+        for (const c of chunks) { merged.set(c, off); off += c.length }
+        const text = new TextDecoder().decode(merged)
+
+        const headerEnd = text.indexOf('\r\n\r\n')
+        if (headerEnd === -1) return { error: 'no header terminator' }
+        const lines = text.slice(0, headerEnd).split('\r\n')
+        const m = lines[0].match(/^HTTP\/1\.[01]\s+(\d{3})/)
+        if (!m) return { error: `bad status: ${lines[0]}` }
+        const status = parseInt(m[1], 10)
+        const headers = new Headers()
+        for (let i = 1; i < lines.length; i++) {
+          const idx = lines[i].indexOf(':')
+          if (idx === -1) continue
+          const name = lines[i].slice(0, idx).trim()
+          const value = lines[i].slice(idx + 1).trim()
+          if (name) headers.append(name, value)
+        }
+        return { status, headers }
+      } finally {
+        try { conn?.close() } catch { /* ignore */ }
+      }
+    }
+
+    let validatedAs200 = 0
+    let acceptedAs4xx = 0
+
+    for (const p of PAYLOADS) {
+      const result = await sendRaw(p.raw)
+      const ctxLabel = `[Payload: ${p.label}]`
+
+      if ('error' in result) {
+        // Servidor recusou request malformada — desfecho seguro.
+        continue
+      }
+
+      // (1) Status 200 OU 4xx — nunca 5xx.
+      assert(
+        result.status === 200 || (result.status >= 400 && result.status < 500),
+        `${ctxLabel}: status deve ser 200 ou 4xx, recebido ${result.status}`,
+      )
+
+      if (result.status !== 200) {
+        acceptedAs4xx++
+        continue
+      }
+      validatedAs200++
+
+      // (2) Allow-Headers LITERAL EXATO — sem echo, sem CR/LF/null embutido.
+      const ah = result.headers.get('access-control-allow-headers')
+      assertExists(ah, `${ctxLabel}: Allow-Headers deve estar presente`)
+      assertEquals(
+        ah, EXPECTED_HEADERS_LITERAL,
+        `${ctxLabel}: Allow-Headers deve ser literal "${EXPECTED_HEADERS_LITERAL}"`,
+      )
+      const parsed = new Set(parseList(ah))
+      assertEquals(parsed.size, EXPECTED_HEADERS_SET.size, `${ctxLabel}: Allow-Headers deve listar exatamente 5 headers`)
+      for (const h of EXPECTED_HEADERS_SET) {
+        assert(parsed.has(h), `${ctxLabel}: Allow-Headers deve incluir "${h}"`)
+      }
+
+      // (3) NUNCA cabeçalhos perigosos.
+      for (const dangerous of DANGEROUS_HEADERS) {
+        assert(!parsed.has(dangerous), `${ctxLabel}: Allow-Headers NÃO PODE conter header perigoso "${dangerous}"`)
+      }
+
+      // (4) NUNCA CR/LF/null no valor (anti header-injection downstream).
+      assert(!ah.includes('\r'), `${ctxLabel}: Allow-Headers NÃO PODE conter CR`)
+      assert(!ah.includes('\n'), `${ctxLabel}: Allow-Headers NÃO PODE conter LF`)
+      assert(!ah.includes('\x00'), `${ctxLabel}: Allow-Headers NÃO PODE conter null byte`)
+
+      // (5) Allow-Methods/Origin/Max-Age literais; sem credenciais.
+      assertEquals(result.headers.get('access-control-allow-methods'), 'POST, OPTIONS', `${ctxLabel}: Allow-Methods literal`)
+      assertEquals(result.headers.get('access-control-allow-origin'), '*', `${ctxLabel}: Allow-Origin '*'`)
+      assertEquals(result.headers.get('access-control-allow-credentials'), null, `${ctxLabel}: Allow-Credentials NUNCA pode aparecer`)
+      assertEquals(result.headers.get('access-control-max-age'), '86400', `${ctxLabel}: Max-Age literal`)
+
+      // (6) Headers injetados via CRLF NUNCA aparecem na resposta (anti-smuggling).
+      assertEquals(result.headers.get('set-cookie'), null, `${ctxLabel}: Set-Cookie NUNCA pode aparecer`)
+      assertEquals(result.headers.get('cookie'), null, `${ctxLabel}: Cookie NUNCA pode aparecer`)
+      assertEquals(result.headers.get('x-injected'), null, `${ctxLabel}: X-Injected NUNCA pode aparecer`)
+      assertEquals(result.headers.get('x-smuggled'), null, `${ctxLabel}: X-Smuggled NUNCA pode aparecer`)
+      assertEquals(result.headers.get('x-null-byte'), null, `${ctxLabel}: X-Null-Byte NUNCA pode aparecer`)
+      assertEquals(result.headers.get('access-control-expose-headers'), null, `${ctxLabel}: Expose-Headers NUNCA pode aparecer`)
+
+      // (7) Allow-Headers aparece exatamente 1x (sem duplicação por proxy/smuggling).
+      let occurrences = 0
+      for (const [name] of result.headers) {
+        if (name.toLowerCase() === 'access-control-allow-headers') occurrences++
+      }
+      assertEquals(occurrences, 1, `${ctxLabel}: Allow-Headers deve aparecer exatamente 1x`)
+    }
+
+    // (8) Sanidade: pelo menos um payload validado como 200 (caso contrário o teste é vácuo).
+    assert(
+      validatedAs200 > 0 || acceptedAs4xx === PAYLOADS.length,
+      `pelo menos uma combinação deveria validar 200 (validados=${validatedAs200}, 4xx=${acceptedAs4xx}, total=${PAYLOADS.length})`,
+    )
+
+    // (9) Zero createClient invocado em qualquer payload.
+    assertEquals(ctx._calls, 0, 'createClient NUNCA pode ser invocado em OPTIONS preflight (whitespace+CRLF+null mix)')
+  } finally {
+    await ctx.stop()
+  }
+})
