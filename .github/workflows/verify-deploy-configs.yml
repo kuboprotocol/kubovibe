@@ -10,41 +10,75 @@ jobs:
   verify-deploy-configs:
     name: vercel.json + render.yaml at repo root
     runs-on: ubuntu-latest
+    env:
+      JOB_LABEL: verify-deploy-configs
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # Reset per-step status accumulator. Each subsequent step appends
+      # one row to /tmp/summary-rows.tsv (TSV: step\tstatus\tdetail) and
+      # the final "Render job summary" step renders a markdown table to
+      # $GITHUB_STEP_SUMMARY. No actions/cache involved.
+      - name: Init step-result accumulator
+        run: |
+          : > /tmp/summary-rows.tsv
+          echo "JOB_LABEL=${JOB_LABEL}" >> "$GITHUB_ENV"
+
+      # PyYAML is NOT preinstalled on ubuntu-latest's system python3.
+      # Without this step, every `import yaml` step below ModuleNotFoundError's
+      # — which was the silent root cause of this workflow's red badge.
+      - name: Install PyYAML (required by render.yaml validators)
+        run: |
+          python3 -m pip install --quiet --disable-pip-version-check pyyaml
+          python3 -c "import yaml; print('PyYAML', yaml.__version__)"
+          echo -e "Install PyYAML\t✅ ok\tPyYAML available for render.yaml parsing" >> /tmp/summary-rows.tsv
 
       - name: Assert vercel.json exists at repo root
         run: |
           if [ ! -f vercel.json ]; then
             echo "::error file=vercel.json::Missing vercel.json at repo root — Vercel deploy will skip *.lovable.app → kubovibe.dev redirect rules."
+            echo -e "vercel.json exists\t❌ fail\tFile missing at repo root" >> /tmp/summary-rows.tsv
             exit 1
           fi
-          echo "✓ vercel.json present ($(wc -c < vercel.json) bytes)"
+          BYTES=$(wc -c < vercel.json)
+          echo "✓ vercel.json present (${BYTES} bytes)"
+          echo -e "vercel.json exists\t✅ ok\t${BYTES} bytes" >> /tmp/summary-rows.tsv
 
       - name: Assert render.yaml exists at repo root
         run: |
           if [ ! -f render.yaml ]; then
             echo "::error file=render.yaml::Missing render.yaml at repo root — Render Blueprint will not apply redirect/SPA rules."
+            echo -e "render.yaml exists\t❌ fail\tFile missing at repo root" >> /tmp/summary-rows.tsv
             exit 1
           fi
-          echo "✓ render.yaml present ($(wc -c < render.yaml) bytes)"
+          BYTES=$(wc -c < render.yaml)
+          echo "✓ render.yaml present (${BYTES} bytes)"
+          echo -e "render.yaml exists\t✅ ok\t${BYTES} bytes" >> /tmp/summary-rows.tsv
 
       - name: Validate vercel.json is parseable JSON
         run: |
-          node -e "JSON.parse(require('fs').readFileSync('vercel.json','utf8'))" \
-            || { echo "::error file=vercel.json::Invalid JSON"; exit 1; }
+          if ! node -e "JSON.parse(require('fs').readFileSync('vercel.json','utf8'))"; then
+            echo "::error file=vercel.json::Invalid JSON"
+            echo -e "vercel.json valid JSON\t❌ fail\tJSON.parse threw" >> /tmp/summary-rows.tsv
+            exit 1
+          fi
           echo "✓ vercel.json is valid JSON"
+          echo -e "vercel.json valid JSON\t✅ ok\tParsed cleanly" >> /tmp/summary-rows.tsv
 
       - name: Validate render.yaml is parseable YAML
         run: |
-          python3 -c "import yaml,sys; yaml.safe_load(open('render.yaml'))" \
-            || { echo "::error file=render.yaml::Invalid YAML"; exit 1; }
+          if ! python3 -c "import yaml,sys; yaml.safe_load(open('render.yaml'))"; then
+            echo "::error file=render.yaml::Invalid YAML"
+            echo -e "render.yaml valid YAML\t❌ fail\tyaml.safe_load threw" >> /tmp/summary-rows.tsv
+            exit 1
+          fi
           echo "✓ render.yaml is valid YAML"
+          echo -e "render.yaml valid YAML\t✅ ok\tParsed cleanly" >> /tmp/summary-rows.tsv
 
       - name: Assert canonical-domain redirect rule is present in vercel.json
         run: |
-          node -e "
+          if ! node -e "
             const c = JSON.parse(require('fs').readFileSync('vercel.json','utf8'));
             const r = (c.redirects || []).find(x =>
               (x.has || []).some(h => h.type === 'host' && h.value.replace(/\\\\/g,'').includes('lovable.app')) &&
@@ -53,12 +87,16 @@ jobs:
             );
             if (!r) { console.error('Missing 301 *.lovable.app → kubovibe.dev redirect in vercel.json'); process.exit(1); }
             console.log('✓ vercel.json contains canonical-domain 301 redirect');
-          "
+          "; then
+            echo -e "vercel.json 301 rule\t❌ fail\tMissing *.lovable.app → kubovibe.dev permanent redirect" >> /tmp/summary-rows.tsv
+            exit 1
+          fi
+          echo -e "vercel.json 301 rule\t✅ ok\t*.lovable.app → kubovibe.dev (permanent)" >> /tmp/summary-rows.tsv
 
       - name: Assert canonical-domain redirect rule is present in render.yaml
         run: |
-          python3 -c "
-          import yaml, sys, re
+          if ! python3 - <<'PY'
+          import yaml, sys
           c = yaml.safe_load(open('render.yaml'))
           ok = False
           for svc in c.get('services', []):
@@ -72,7 +110,39 @@ jobs:
               print('Missing 301 *.lovable.app → kubovibe.dev redirect in render.yaml', file=sys.stderr)
               sys.exit(1)
           print('✓ render.yaml contains canonical-domain 301 redirect')
-          "
+          PY
+          then
+            echo -e "render.yaml 301 rule\t❌ fail\tMissing *.lovable.app → kubovibe.dev 301 redirect" >> /tmp/summary-rows.tsv
+            exit 1
+          fi
+          echo -e "render.yaml 301 rule\t✅ ok\t*.lovable.app → kubovibe.dev (status 301)" >> /tmp/summary-rows.tsv
+
+      # Always render the summary, even if a previous step failed — so the
+      # PR/run page shows exactly which check failed without scrolling logs.
+      - name: Render job summary
+        if: always()
+        run: |
+          {
+            echo "## 🚦 Verify deploy configs — \`${JOB_LABEL}\`"
+            echo ""
+            echo "Static validation of \`vercel.json\` and \`render.yaml\` at repo root."
+            echo "_No \`actions/cache\` used in this workflow — each run is fully reproducible._"
+            echo ""
+            echo "| # | Check | Status | Detail |"
+            echo "|---|---|---|---|"
+            i=0
+            if [ -s /tmp/summary-rows.tsv ]; then
+              while IFS=$'\t' read -r step status detail; do
+                i=$((i+1))
+                echo "| ${i} | ${step} | ${status} | ${detail} |"
+              done < /tmp/summary-rows.tsv
+            else
+              echo "| — | (no checks recorded) | ⚪ n/a | accumulator empty |"
+            fi
+            echo ""
+            echo "**Overall:** \`${{ job.status }}\` · runner \`${{ runner.os }}\` · commit \`${{ github.sha }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
 
   live-redirect-curl-check:
     name: Live 301 redirect (curl)
