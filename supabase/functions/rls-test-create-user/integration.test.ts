@@ -382,3 +382,88 @@ Deno.test('HTTP integration: OPTIONS without Origin header + WRONG x-test-secret
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: OPTIONS with whitespace-only x-test-secret (" ") returns 200 + CORS, no createClient', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    // Preflight (OPTIONS) é tratado ANTES da validação de secret. O contrato:
+    //   - status SEMPRE 200 (nunca 401), pois browsers descartariam a resposta
+    //     real se o preflight falhasse — gerando erro de CORS em vez de 401.
+    //   - allow-origin: * e allow-headers presentes mesmo com secret esquisito.
+    //   - createClient nunca é chamado em OPTIONS.
+    const res = await fetch(`${ctx.url}/`, {
+      method: 'OPTIONS',
+      headers: {
+        'x-test-secret': ' ',
+        'origin': 'https://app.kubovibe.dev',
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'x-test-secret, content-type',
+      },
+    })
+
+    assertEquals(res.status, 200, 'preflight com secret " " deve responder 200, não 401')
+    assertEquals(res.headers.get('access-control-allow-origin'), '*')
+
+    const allowed = res.headers.get('access-control-allow-headers') ?? ''
+    assert(allowed.length > 0, 'allow-headers deve estar presente')
+    assert(allowed.includes('x-test-secret'), 'allow-headers deve listar x-test-secret')
+    assert(allowed.includes('content-type'), 'allow-headers deve listar content-type')
+    assert(allowed.includes('authorization'), 'allow-headers deve listar authorization')
+
+    await res.text()
+    assertEquals(ctx._calls, 0, 'OPTIONS jamais deve chamar createClient')
+  } finally {
+    await ctx.stop()
+  }
+})
+
+Deno.test('HTTP integration: POST with invalid JSON body returns CORS headers (200 with valid secret, 401 with invalid)', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    // (1) JSON malformado + secret VÁLIDO -> 200 (handler não consome body)
+    //     mas a resposta DEVE conter CORS para o browser conseguir lê-la.
+    const okRes = await fetch(`${ctx.url}/`, {
+      method: 'POST',
+      headers: {
+        'x-test-secret': SECRET,
+        'origin': 'https://app.kubovibe.dev',
+        'content-type': 'application/json',
+      },
+      body: '{this-is-not-valid-json,,,',
+    })
+    assertEquals(okRes.status, 200)
+    assertEquals(okRes.headers.get('access-control-allow-origin'), '*', 'CORS obrigatório em 200')
+    const okAllowed = okRes.headers.get('access-control-allow-headers') ?? ''
+    assert(okAllowed.includes('x-test-secret'), 'allow-headers deve listar x-test-secret em 200')
+    assert(okAllowed.includes('content-type'), 'allow-headers deve listar content-type em 200')
+    const okBody = await okRes.json()
+    assertEquals(typeof okBody.access_token, 'string')
+
+    const callsAfterOk = ctx._calls
+
+    // (2) JSON malformado + secret INVÁLIDO -> 401 ainda com CORS completo.
+    const badRes = await fetch(`${ctx.url}/`, {
+      method: 'POST',
+      headers: {
+        'x-test-secret': 'wrong-secret',
+        'origin': 'https://app.kubovibe.dev',
+        'content-type': 'application/json',
+      },
+      body: '<<not-json>>',
+    })
+    assertEquals(badRes.status, 401)
+    assertEquals(badRes.headers.get('access-control-allow-origin'), '*', 'CORS obrigatório em 401')
+    const badAllowed = badRes.headers.get('access-control-allow-headers') ?? ''
+    assert(badAllowed.includes('x-test-secret'), 'allow-headers deve listar x-test-secret em 401')
+    assert(badAllowed.includes('content-type'), 'allow-headers deve listar content-type em 401')
+    assert(badAllowed.includes('authorization'), 'allow-headers deve listar authorization em 401')
+    assertEquals(badRes.headers.get('content-type'), 'application/json')
+    const badBody = await badRes.json()
+    assertEquals(badBody, { error: 'unauthorized' })
+
+    // Body inválido + secret errado não pode tocar createClient.
+    assertEquals(ctx._calls, callsAfterOk, 'sem createClient extra para body inválido + secret errado')
+  } finally {
+    await ctx.stop()
+  }
+})
