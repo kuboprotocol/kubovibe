@@ -734,3 +734,50 @@ Deno.test('HTTP integration: OPTIONS with Origin + WRONG Access-Control-Request-
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: OPTIONS with VALID x-test-secret — Allow-Headers includes content-type and x-test-secret', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    // Foco: garantir que o preflight com secret VÁLIDO devolve um
+    // Allow-Headers cuja lista de tokens (separados por vírgula) inclui
+    // exatamente "content-type" e "x-test-secret" — os dois headers
+    // mínimos que o cliente real do app envia em POSTs.
+    const res = await fetch(`${ctx.url}/`, {
+      method: 'OPTIONS',
+      headers: {
+        'origin': 'https://app.kubovibe.dev',
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'content-type, x-test-secret',
+        'x-test-secret': SECRET,
+      },
+    })
+
+    assertEquals(res.status, 200, 'preflight com secret válido deve responder 200')
+
+    const allowed = res.headers.get('access-control-allow-headers') ?? ''
+    assert(allowed.length > 0, 'allow-headers deve estar presente')
+
+    // Parse defensivo: tokeniza por vírgula e normaliza para lowercase/trim,
+    // assim o teste não depende de espaçamento ou caixa do header.
+    const tokens = allowed
+      .split(',')
+      .map((t) => t.trim().toLowerCase())
+      .filter((t) => t.length > 0)
+
+    assert(
+      tokens.includes('content-type'),
+      `allow-headers deve conter token "content-type" (got: "${allowed}")`,
+    )
+    assert(
+      tokens.includes('x-test-secret'),
+      `allow-headers deve conter token "x-test-secret" (got: "${allowed}")`,
+    )
+
+    await res.text()
+
+    // Preflight nunca pode instanciar Supabase client.
+    assertEquals(ctx._calls, 0, 'OPTIONS jamais deve chamar createClient')
+  } finally {
+    await ctx.stop()
+  }
+})
