@@ -167,7 +167,34 @@ jobs:
                 ' "$FUZZ_STATE_DIR/failures.json" 2>/dev/null || \
                   echo "(failed to parse failures.json — see raw test log)"
               else
-                echo "(no persisted failure file — see raw test log)"
+                echo "(no persisted manual-shrinker failure file — see fast-check section below or raw log)"
+              fi
+              echo "\`\`\`"
+              echo ""
+              echo "### fast-check minimized counterexample (Access-Control-Request-Method)"
+              echo ""
+              echo "\`\`\`"
+              if [ -f "$FUZZ_STATE_DIR/fc-failures.json" ]; then
+                jq -r '
+                  if length == 0 then "(fast-check: no persisted counterexample — see test log)"
+                  else
+                    .[-1] |
+                    "Seed:               \(.seed)\n" +
+                    "Marker:             \(.marker)\n" +
+                    "Counterexample path: \(.counterexamplePath // "n/a")\n" +
+                    "Shrinks:            \(.numShrinks // 0)\n" +
+                    "Original reason:    \(.original.reason // "n/a")\n" +
+                    "Original length:    \(.original.length // "n/a")\n" +
+                    "Original method:    \(.original.method // "n/a" | tojson)\n" +
+                    "Shrunk reason:      \(.minimized.reason // "n/a")\n" +
+                    "Shrunk length:      \(.minimized.length // "n/a")\n" +
+                    "Shrunk method:      \(.minimized.method | tojson)\n" +
+                    "Repro:              \(.reproCommand // "n/a")"
+                  end
+                ' "$FUZZ_STATE_DIR/fc-failures.json" 2>/dev/null || \
+                  echo "(fast-check: failed to parse fc-failures.json — see raw test log)"
+              else
+                echo "(fast-check: no persisted counterexample file — see raw test log)"
               fi
               echo "\`\`\`"
               echo ""
@@ -181,6 +208,17 @@ jobs:
               echo "\`\`\`bash"
               echo "deno test --allow-net --allow-env --allow-read --allow-write \\"
               echo "  --filter \"${TEST_NAME_PATTERN}\" \\"
+              echo "  supabase/functions/rls-test-create-user/integration.test.ts"
+              echo "\`\`\`"
+              echo ""
+              echo "**Reproduce the fast-check counterexample with its seed:**"
+              echo "\`\`\`bash"
+              if [ -f "$FUZZ_STATE_DIR/fc-failures.json" ]; then
+                FC_SEED_LAST=$(jq -r '.[-1].seed // empty' "$FUZZ_STATE_DIR/fc-failures.json" 2>/dev/null)
+              fi
+              echo "FC_SEED=${FC_SEED_LAST:-<seed-from-fc-failures.json>} \\"
+              echo "  deno test --allow-net --allow-env --allow-read --allow-write \\"
+              echo "  --filter \"fast-check property-based SHRINKING\" \\"
               echo "  supabase/functions/rls-test-create-user/integration.test.ts"
               echo "\`\`\`"
             fi
