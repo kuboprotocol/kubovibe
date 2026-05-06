@@ -12,10 +12,12 @@ on:
         required: false
         default: ''
 
-# Allow the PR-comment step to write to the PR; cancel superseded runs.
+# Allow the PR-comment step to write to the PR; allow checks-action to publish
+# a dedicated GitHub Check Run with the fuzz status and artifact link.
 permissions:
   contents: read
   pull-requests: write
+  checks: write
 
 concurrency:
   group: preflight-fuzz-${{ github.workflow }}-${{ github.ref }}
