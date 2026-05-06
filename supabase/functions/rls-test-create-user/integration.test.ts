@@ -2632,3 +2632,114 @@ Deno.test('HTTP integration: Vary header contract — MUST NOT include Origin/Co
     }
   }
 })
+
+Deno.test('HTTP integration: 200 OK response with hostile Cookie — NEVER Set-Cookie/Set-Cookie2 (exhaustive casing variants)', async () => {
+  const HOSTILE_ORIGIN = 'https://evil.example.com'
+  // Cookies hostis com nomes que tipicamente disparam middlewares de
+  // session refresh (sid/session/auth/jwt/csrf), maximizando a chance de
+  // expor um handler que reflita Set-Cookie por engano.
+  const HOSTILE_COOKIE = [
+    'sid=stolen-session-abc123',
+    'session=hijacked',
+    'auth=fake-jwt-token-xyz',
+    'jwt=eyJfake',
+    'csrf=hijack-token',
+    'remember_me=1',
+  ].join('; ')
+
+  // Variantes de casing exaustivas — cobre toda combinação plausível de
+  // mistura de maiúsculas/minúsculas que algum reverse proxy ou runtime
+  // poderia injetar. fetch() normaliza nomes de header para lowercase
+  // ao iterar, mas a varredura .toLowerCase() blinda contra implementações
+  // não-conformes.
+  const FORBIDDEN_COOKIE_HEADERS = [
+    'set-cookie',
+    'Set-Cookie',
+    'SET-COOKIE',
+    'Set-cookie',
+    'set-Cookie',
+    'sEt-CoOkIe',
+    'set-cookie2',
+    'Set-Cookie2',
+    'SET-COOKIE2',
+    'Set-cookie2',
+    'set-Cookie2',
+  ]
+
+  // Múltiplas execuções no mesmo servidor para garantir idempotência:
+  // um handler bug-prone poderia emitir Set-Cookie só na 2ª chamada
+  // (ex: lazy session bootstrap).
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const res = await fetch(ctx.url, {
+        method: 'POST',
+        headers: {
+          'origin': HOSTILE_ORIGIN,
+          'cookie': HOSTILE_COOKIE,
+          'content-type': 'application/json',
+          'x-test-secret': SECRET,
+        },
+        body: JSON.stringify({}),
+      })
+
+      // Sanidade: este teste cobre EXCLUSIVAMENTE o caminho 200 OK.
+      assertEquals(res.status, 200, `attempt #${attempt}: response com secret válido deve ser 200`)
+
+      // ────────────────────────────────────────────────────────────────
+      // (1) Checagem direta por nome canônico — Headers.get() é
+      // case-insensitive na spec, então um único get('set-cookie')
+      // captura qualquer capitalização vinda do servidor.
+      // ────────────────────────────────────────────────────────────────
+      const setCookie = res.headers.get('set-cookie')
+      assertEquals(
+        setCookie,
+        null,
+        `attempt #${attempt}: 200 OK NUNCA pode conter Set-Cookie — recebido ${JSON.stringify(setCookie)}`,
+      )
+      const setCookie2 = res.headers.get('set-cookie2')
+      assertEquals(
+        setCookie2,
+        null,
+        `attempt #${attempt}: 200 OK NUNCA pode conter Set-Cookie2 — recebido ${JSON.stringify(setCookie2)}`,
+      )
+
+      // ────────────────────────────────────────────────────────────────
+      // (2) Varredura exaustiva por TODAS as variantes de casing.
+      // Usa Headers.has() — também case-insensitive, mas testar cada
+      // variante explicitamente documenta o contrato e blinda contra
+      // qualquer runtime futuro que viole a spec.
+      // ────────────────────────────────────────────────────────────────
+      for (const variant of FORBIDDEN_COOKIE_HEADERS) {
+        const present = res.headers.has(variant)
+        assertEquals(
+          present,
+          false,
+          `attempt #${attempt}: 200 OK NUNCA pode conter header "${variant}" (qualquer casing) — has() retornou true`,
+        )
+      }
+
+      // ────────────────────────────────────────────────────────────────
+      // (3) Iteração final case-insensitive — pega qualquer header cujo
+      // nome normalizado bata com set-cookie / set-cookie2, independente
+      // do casing original recebido.
+      // ────────────────────────────────────────────────────────────────
+      const cookieLeak: Array<{ name: string; value: string }> = []
+      for (const [name, value] of res.headers) {
+        const ln = name.toLowerCase()
+        if (ln === 'set-cookie' || ln === 'set-cookie2') {
+          cookieLeak.push({ name, value })
+        }
+      }
+      assertEquals(
+        cookieLeak,
+        [],
+        `attempt #${attempt}: vazamento de Set-Cookie/Set-Cookie2 detectado (qualquer casing) — ${JSON.stringify(cookieLeak)}`,
+      )
+
+      await res.text()
+    }
+  } finally {
+    await ctx.stop()
+  }
+})
