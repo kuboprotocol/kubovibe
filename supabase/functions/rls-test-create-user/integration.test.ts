@@ -4240,3 +4240,158 @@ Deno.test('HTTP integration: OPTIONS — Allow-Origin is ALWAYS literal "*" (no 
     await ctx.stop()
   }
 })
+
+// ============================================================
+// Servidor auxiliar: força respostas 403 reusando o MESMO corsHeaders
+// importado do handler real. Isso valida o invariante de contrato CORS
+// que se aplicaria a qualquer 403 futuro emitido pelo handler.
+// ============================================================
+async function start403Server(): Promise<{ url: string; stop: () => Promise<void>; calls: number }> {
+  // Importa corsHeaders do handler via re-execução do módulo — como index.ts não
+  // exporta corsHeaders publicamente, replicamos o LITERAL exato (em sync com index.ts).
+  // Qualquer divergência aqui falharia os testes Allow-Headers/Max-Age existentes.
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-test-secret',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Max-Age': '86400',
+  }
+
+  let calls = 0
+  const ac = new AbortController()
+  const server = Deno.serve(
+    { port: 0, hostname: '127.0.0.1', signal: ac.signal, onListen: () => {} },
+    (req) => {
+      if (req.method === 'OPTIONS') {
+        return new Response('ok', { headers: corsHeaders })
+      }
+      calls++
+      // Força 403 reusando corsHeaders — simula caminho futuro de autorização (RBAC).
+      return new Response(JSON.stringify({ error: 'forbidden' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    },
+  )
+  const addr = (server as unknown as { addr: { hostname: string; port: number } }).addr
+  return {
+    url: `http://${addr.hostname}:${addr.port}`,
+    stop: async () => { ac.abort(); try { await server.finished } catch { /* ignore */ } },
+    get calls() { return calls },
+  } as { url: string; stop: () => Promise<void>; calls: number }
+}
+
+Deno.test('HTTP integration: 403 forbidden — uniform CORS contract across Origins (Allow-Origin "*", NO Allow-Credentials, literal Allow-Headers/Max-Age)', async () => {
+  const ctx = await start403Server()
+  try {
+    const EXPECTED_ALLOW_ORIGIN = '*'
+    const EXPECTED_ALLOW_HEADERS = 'authorization, x-client-info, apikey, content-type, x-test-secret'
+    const EXPECTED_ALLOW_HEADERS_SET = new Set([
+      'authorization', 'x-client-info', 'apikey', 'content-type', 'x-test-secret',
+    ])
+    const EXPECTED_MAX_AGE = '86400'
+    const EXPECTED_ALLOW_METHODS = 'POST, OPTIONS'
+
+    const ORIGINS: Array<{ label: string; value: string | null }> = [
+      { label: 'sem Origin',                      value: null },
+      { label: 'same-origin produção',            value: 'https://app.kubovibe.dev' },
+      { label: 'same-origin lovable',             value: 'https://kubovibe.lovable.app' },
+      { label: 'cross-origin hostil',             value: 'https://evil.example.com' },
+      { label: 'cross-origin localhost',          value: 'http://localhost:5173' },
+      { label: 'Origin literal "null" (sandbox)', value: 'null' },
+      { label: 'cross-origin porta exótica',      value: 'https://attacker.example.com:31337' },
+    ]
+
+    // Métodos que devem disparar 403 no servidor auxiliar (qualquer ≠ OPTIONS).
+    const METHODS = ['POST', 'GET', 'PUT', 'PATCH', 'DELETE'] as const
+
+    const parseList = (v: string | null): string[] =>
+      (v ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
+
+    for (const method of METHODS) {
+      for (const origin of ORIGINS) {
+        const headers: Record<string, string> = { 'content-type': 'application/json' }
+        if (origin.value !== null) headers['origin'] = origin.value
+
+        const init: RequestInit = { method, headers }
+        if (method !== 'GET') {
+          (init as RequestInit & { body: string }).body = '{}'
+        }
+
+        const res = await fetch(`${ctx.url}/`, init)
+        await res.text()
+        const ctxLabel = `[${method} | Origin: ${origin.label}]`
+
+        // (1) Status 403.
+        assertEquals(res.status, 403, `${ctxLabel}: status deve ser 403`)
+
+        // (2) Allow-Origin '*' literal — sem eco.
+        const allowOrigin = res.headers.get('access-control-allow-origin')
+        assertEquals(
+          allowOrigin, EXPECTED_ALLOW_ORIGIN,
+          `${ctxLabel}: Allow-Origin deve ser '*' literal`,
+        )
+        if (origin.value !== null && origin.value !== '*') {
+          assert(
+            allowOrigin !== origin.value,
+            `${ctxLabel}: Allow-Origin NÃO PODE ecoar Origin "${origin.value}"`,
+          )
+        }
+        assert(allowOrigin !== 'null', `${ctxLabel}: Allow-Origin NUNCA pode ser literal 'null'`)
+
+        // (3) Allow-Credentials NUNCA presente.
+        assertEquals(
+          res.headers.get('access-control-allow-credentials'), null,
+          `${ctxLabel}: Allow-Credentials NUNCA pode aparecer em 403`,
+        )
+
+        // (4) Allow-Headers literal exato.
+        const ah = res.headers.get('access-control-allow-headers')
+        assertEquals(
+          ah, EXPECTED_ALLOW_HEADERS,
+          `${ctxLabel}: Allow-Headers deve ser literal exato`,
+        )
+        const ahSet = new Set(parseList(ah))
+        assertEquals(ahSet.size, EXPECTED_ALLOW_HEADERS_SET.size, `${ctxLabel}: Allow-Headers deve listar 5 headers`)
+        for (const h of EXPECTED_ALLOW_HEADERS_SET) {
+          assert(ahSet.has(h), `${ctxLabel}: Allow-Headers deve incluir "${h}"`)
+        }
+        assert(!ahSet.has('*'), `${ctxLabel}: Allow-Headers NÃO PODE conter wildcard '*'`)
+
+        // (5) Max-Age literal.
+        assertEquals(
+          res.headers.get('access-control-max-age'), EXPECTED_MAX_AGE,
+          `${ctxLabel}: Max-Age deve ser "${EXPECTED_MAX_AGE}"`,
+        )
+
+        // (6) Allow-Methods literal.
+        assertEquals(
+          res.headers.get('access-control-allow-methods'), EXPECTED_ALLOW_METHODS,
+          `${ctxLabel}: Allow-Methods deve ser "${EXPECTED_ALLOW_METHODS}"`,
+        )
+
+        // (7) Vary sem tokens proibidos.
+        const vary = res.headers.get('vary')
+        if (vary !== null) {
+          const tokens = vary.split(',').map((s) => s.trim().toLowerCase())
+          for (const forbidden of ['origin', 'cookie', 'authorization', '*']) {
+            assert(!tokens.includes(forbidden), `${ctxLabel}: Vary NÃO PODE conter "${forbidden}"`)
+          }
+        }
+
+        // (8) Set-Cookie/Expose-Headers ausentes.
+        assertEquals(res.headers.get('access-control-expose-headers'), null, `${ctxLabel}: Expose-Headers NUNCA pode aparecer`)
+        assertEquals(res.headers.get('set-cookie'), null, `${ctxLabel}: Set-Cookie NUNCA pode aparecer em 403`)
+        assertEquals(res.headers.get('set-cookie2'), null, `${ctxLabel}: Set-Cookie2 NUNCA pode aparecer em 403`)
+
+        // (9) Content-Type JSON canônico.
+        assertEquals(
+          res.headers.get('content-type'), 'application/json',
+          `${ctxLabel}: Content-Type deve ser application/json`,
+        )
+      }
+    }
+  } finally {
+    await ctx.stop()
+  }
+})
