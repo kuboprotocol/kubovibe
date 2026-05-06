@@ -222,8 +222,8 @@ jobs:
                 echo ""
               fi
 
-              # fast-check counterexample (request-method category only).
-              if [ -f "$FUZZ_STATE_DIR/fc-failures.json" ] && [ "$CATEGORY_ID" = "request-method" ]; then
+              # fast-check counterexample (request-method + request-headers).
+              if [ -f "$FUZZ_STATE_DIR/fc-failures.json" ] && { [ "$CATEGORY_ID" = "request-method" ] || [ "$CATEGORY_ID" = "request-headers" ]; }; then
                 echo "### fast-check minimized counterexample"
                 echo ""
                 echo '```'
