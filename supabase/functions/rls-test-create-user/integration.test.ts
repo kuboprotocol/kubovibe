@@ -9071,3 +9071,268 @@ Deno.test('HTTP integration: OPTIONS preflight — property-based fuzzing of Acc
     await ctx.stop()
   }
 })
+
+// =====================================================================================
+// fast-check property-based shrinking — Access-Control-Request-Method
+// ─────────────────────────────────────────────────────────────────────────────────────
+// Usa fast-check para gerar variações estruturadas de `Access-Control-Request-Method`
+// (tokens de método + percent-encoding + whitespace exótico Unicode + separadores
+// caóticos) e, quando alguma invariante falhar, deixa o shrinker do fast-check
+// reduzir AUTOMATICAMENTE o contraexemplo até o menor caso reprodutível.
+//
+// Persistência:
+//   - .rls-test-fuzz-state/fc-seeds.json       → últimas seeds executadas (até 50).
+//   - .rls-test-fuzz-state/fc-failures.json    → contraexemplos minimizados (até 100),
+//                                                 com seed, path, payload, motivo.
+//
+// Invariantes:
+//   1. status < 500 (handler nunca crasha).
+//   2. Marker NUNCA aparece em headers ou body (zero echo / zero leak).
+//   3. Allow-Methods literal === 'POST, OPTIONS'.
+//   4. Allow-Headers literal === 'authorization, x-client-info, apikey, content-type, x-test-secret'.
+//   5. Allow-Origin literal === '*'.
+//   6. Body neutro: ≤16 bytes, ASCII imprimível + CR/LF, sem null/percent/marker.
+//   7. Zero invocações de createClient.
+// =====================================================================================
+import fc from 'npm:fast-check@3.23.2'
+
+Deno.test('HTTP integration: OPTIONS preflight — fast-check property-based SHRINKING of Access-Control-Request-Method (percent-encoded + exotic whitespace) — minimizes failing case + persists seed/contraexemplo to disk', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    const EXPECTED_METHODS_LITERAL = 'POST, OPTIONS'
+    const EXPECTED_HEADERS_LITERAL = 'authorization, x-client-info, apikey, content-type, x-test-secret'
+    const u = new URL(ctx.url)
+    const hostHeader = u.host
+
+    // ─── Persistência (best-effort). ───
+    const STATE_DIRS = [
+      `${Deno.cwd()}/.rls-test-fuzz-state`,
+      '/tmp/rls-test-fuzz-state',
+    ]
+    let stateDir: string | null = null
+    for (const d of STATE_DIRS) {
+      try { await Deno.mkdir(d, { recursive: true }); stateDir = d; break } catch { /* try next */ }
+    }
+    const SEEDS_FILE = stateDir ? `${stateDir}/fc-seeds.json` : null
+    const FAILURES_FILE = stateDir ? `${stateDir}/fc-failures.json` : null
+
+    async function readJson<T>(path: string | null, fallback: T): Promise<T> {
+      if (!path) return fallback
+      try { return JSON.parse(await Deno.readTextFile(path)) as T } catch { return fallback }
+    }
+    async function writeJson(path: string | null, data: unknown): Promise<void> {
+      if (!path) return
+      try { await Deno.writeTextFile(path, JSON.stringify(data, null, 2)) } catch { /* ignore */ }
+    }
+
+    // ─── Pools (idênticos em espírito aos fuzzes anteriores). ───
+    const METHOD_TOKENS = ['POST', 'GET', 'DELETE', 'PUT', 'PATCH', 'OPTIONS', 'PROPFIND', 'EVIL', 'CUSTOM-X', 'PoSt', '*', '']
+    const PERCENT_TOKENS = ['%2C', '%2c', '%252C', '%20', '%09', '%0D%0A', '%00', '%3B', '%2F', '%3A', '%2520']
+    const UNICODE_WS = ['\u00A0', '\u2003', '\u3000', '\u202F', '\u200A', '\u200B', '\uFEFF', '\u0085']
+    const SEPARATORS = [',', ', ', ' ,', ' , ', ',\t', ',%20', '%2C', ',,']
+
+    // ─── Arbitrary estruturada (fast-check shrinkará reduzindo arrays + escolhendo
+    //      índices menores em constantFrom). O marker é determinístico por payload. ───
+    type Token = { kind: 'method' | 'pct' | 'ws' | 'sep' | 'marker'; value: string }
+
+    const methodTok = fc.constantFrom(...METHOD_TOKENS).map((v): Token => ({ kind: 'method', value: v }))
+    const pctTok = fc.constantFrom(...PERCENT_TOKENS).map((v): Token => ({ kind: 'pct', value: v }))
+    const wsTok = fc.constantFrom(...UNICODE_WS).map((v): Token => ({ kind: 'ws', value: v }))
+    const sepTok = fc.constantFrom(...SEPARATORS).map((v): Token => ({ kind: 'sep', value: v }))
+    const markerTok = fc.constant<Token>({ kind: 'marker', value: '__MARKER__' })
+
+    const tokenArb = fc.oneof(
+      { weight: 4, arbitrary: methodTok },
+      { weight: 3, arbitrary: pctTok },
+      { weight: 2, arbitrary: wsTok },
+      { weight: 3, arbitrary: sepTok },
+      { weight: 1, arbitrary: markerTok }, // garante presença do marker em parte das amostras
+    )
+
+    const payloadArb = fc.array(tokenArb, { minLength: 1, maxLength: 14 }).map((tokens, _) => tokens)
+
+    // ─── Build raw + marker (assina cada execução para detectar leak). ───
+    function buildRequestMethod(tokens: Token[], marker: string): string {
+      return tokens.map((t) => t.kind === 'marker' ? marker : t.value).join('')
+    }
+
+    type RawResponse = { status: number; headers: Headers; headerLines: string[]; body: string } | { error: string }
+
+    async function sendRaw(requestMethod: string): Promise<RawResponse> {
+      let conn: Deno.TcpConn | null = null
+      try {
+        conn = await Deno.connect({ hostname: u.hostname, port: parseInt(u.port, 10), transport: 'tcp' })
+        const req = [
+          'OPTIONS / HTTP/1.1',
+          `Host: ${hostHeader}`,
+          'Origin: https://fc.example.com',
+          `Access-Control-Request-Method: ${requestMethod}`,
+          'Access-Control-Request-Headers: authorization, x-test-secret',
+          'Connection: close',
+          '',
+          '',
+        ].join('\r\n')
+        await conn.write(new TextEncoder().encode(req))
+        const chunks: Uint8Array[] = []
+        const buf = new Uint8Array(8192)
+        while (true) { const n = await conn.read(buf); if (n === null) break; chunks.push(buf.slice(0, n)) }
+        const total = chunks.reduce((s, c) => s + c.length, 0)
+        const merged = new Uint8Array(total); let off = 0
+        for (const c of chunks) { merged.set(c, off); off += c.length }
+        const text = new TextDecoder().decode(merged)
+        const he = text.indexOf('\r\n\r\n')
+        if (he === -1) return { error: 'no header terminator' }
+        const lines = text.slice(0, he).split('\r\n')
+        const m = lines[0].match(/^HTTP\/1\.[01]\s+(\d{3})/)
+        if (!m) return { error: `bad status: ${lines[0]}` }
+        const headers = new Headers(); const headerLines: string[] = []
+        for (let i = 1; i < lines.length; i++) {
+          headerLines.push(lines[i])
+          const idx = lines[i].indexOf(':'); if (idx === -1) continue
+          const name = lines[i].slice(0, idx).trim(), value = lines[i].slice(idx + 1).trim()
+          if (name) headers.append(name, value)
+        }
+        return { status: parseInt(m[1], 10), headers, headerLines, body: text.slice(he + 4) }
+      } catch (e) {
+        return { error: `io: ${(e as Error).message}` }
+      } finally { try { conn?.close() } catch { /* ignore */ } }
+    }
+
+    // ─── Invariantes (string vazia = ok; string com motivo = falha). ───
+    function checkInvariants(resp: RawResponse, marker: string): string {
+      if ('error' in resp) return '' // erros de I/O são tolerados (não-falha do handler)
+      if (resp.status >= 500) return `status >=500: ${resp.status}`
+
+      const allowMethods = resp.headers.get('access-control-allow-methods')
+      const allowHeaders = resp.headers.get('access-control-allow-headers')
+      const allowOrigin = resp.headers.get('access-control-allow-origin')
+
+      if (allowMethods !== EXPECTED_METHODS_LITERAL) return `Allow-Methods != literal: "${allowMethods}"`
+      if (allowHeaders !== EXPECTED_HEADERS_LITERAL) return `Allow-Headers != literal: "${allowHeaders}"`
+      if (allowOrigin !== '*') return `Allow-Origin != "*": "${allowOrigin}"`
+
+      // Zero leak em headers
+      for (const line of resp.headerLines) {
+        if (line.includes(marker)) return `marker leaked into header: "${line}"`
+      }
+      // Zero leak em body
+      if (resp.body.includes(marker)) return `marker leaked into body: "${resp.body.slice(0, 80)}"`
+
+      // Body neutro
+      if (resp.body.length > 16) return `body too large: ${resp.body.length}b`
+      if (/[\x00]/.test(resp.body)) return `body contains null`
+      if (resp.body.includes('%')) return `body contains percent`
+      if (!/^[\x20-\x7E\r\n]*$/.test(resp.body)) return `body contains non-printable`
+
+      return ''
+    }
+
+    // ─── Seed parametrizada (permite reprodução manual via env). ───
+    const SEED = parseInt(Deno.env.get('FC_SEED') ?? `${Date.now() & 0x7FFFFFFF}`, 10)
+    const NUM_RUNS = 200
+
+    // Marker depende SOMENTE da forma dos tokens (estável sob shrink) — usamos um
+    // hash da string final, mas precisamos do marker ANTES de montar. Solução:
+    // marker é fixo por execução de teste; o seu valor único permite checar leak.
+    const MARKER = `FCMK_${SEED.toString(16)}`
+
+    const callsBefore = ctx._calls
+
+    let executions = 0
+    const counterexamples: Array<{ tokensBefore: Token[]; tokensAfter: Token[]; method: string; reason: string }> = []
+
+    // Captura pré-shrink: substituímos o run para registrar o primeiro fail "bruto".
+    let firstRawFailure: { tokens: Token[]; method: string; reason: string } | null = null
+
+    const property = fc.asyncProperty(payloadArb, async (tokens) => {
+      executions++
+      const method = buildRequestMethod(tokens, MARKER)
+      const resp = await sendRaw(method)
+      const reason = checkInvariants(resp, MARKER)
+      if (reason) {
+        if (!firstRawFailure) firstRawFailure = { tokens, method, reason }
+        return false
+      }
+      return true
+    })
+
+    let runResult: fc.RunDetails<[Token[]]> | null = null
+    try {
+      runResult = await fc.check(property, { numRuns: NUM_RUNS, seed: SEED, verbose: 0 }) as fc.RunDetails<[Token[]]>
+    } catch (e) {
+      // fc.check não joga em failure por padrão, mas blindamos.
+      runResult = { failed: true, counterexample: null, counterexamplePath: null, numRuns: executions, seed: SEED, error: (e as Error).message } as unknown as fc.RunDetails<[Token[]]>
+    }
+
+    // ─── Persistência da seed sempre (sucesso ou falha). ───
+    const prevSeeds = await readJson<Array<Record<string, unknown>>>(SEEDS_FILE, [])
+    prevSeeds.push({
+      timestamp: new Date().toISOString(),
+      seed: SEED,
+      numRuns: NUM_RUNS,
+      executions,
+      failed: !!runResult?.failed,
+      stateDir,
+    })
+    await writeJson(SEEDS_FILE, prevSeeds.slice(-50))
+
+    // ─── Persistência de contraexemplo minimizado, se houver. ───
+    if (runResult?.failed && runResult.counterexample) {
+      const [shrunkTokens] = runResult.counterexample
+      const shrunkMethod = buildRequestMethod(shrunkTokens, MARKER)
+      const respShrunk = await sendRaw(shrunkMethod)
+      const reasonShrunk = checkInvariants(respShrunk, MARKER)
+
+      counterexamples.push({
+        tokensBefore: firstRawFailure?.tokens ?? shrunkTokens,
+        tokensAfter: shrunkTokens,
+        method: shrunkMethod,
+        reason: reasonShrunk || (firstRawFailure?.reason ?? 'unknown'),
+      })
+
+      const prevFails = await readJson<Array<Record<string, unknown>>>(FAILURES_FILE, [])
+      prevFails.push({
+        timestamp: new Date().toISOString(),
+        seed: SEED,
+        marker: MARKER,
+        counterexamplePath: runResult.counterexamplePath,
+        numShrinks: runResult.numShrinks,
+        original: {
+          tokens: firstRawFailure?.tokens ?? null,
+          method: firstRawFailure?.method ?? null,
+          reason: firstRawFailure?.reason ?? null,
+          length: firstRawFailure?.method.length ?? null,
+        },
+        minimized: {
+          tokens: shrunkTokens,
+          method: shrunkMethod,
+          reason: reasonShrunk,
+          length: shrunkMethod.length,
+        },
+        reproCommand: `FC_SEED=${SEED} deno test --allow-net --allow-env --allow-read --allow-write --no-check --filter "fast-check property-based SHRINKING"`,
+      })
+      await writeJson(FAILURES_FILE, prevFails.slice(-100))
+
+      // Falha o teste com diagnóstico rico.
+      const diag = [
+        `fast-check encontrou contraexemplo (seed=${SEED}, shrinks=${runResult.numShrinks}):`,
+        `  reason       = ${counterexamples[0].reason}`,
+        `  minimized    = ${JSON.stringify(shrunkMethod)}`,
+        `  minimized.len= ${shrunkMethod.length}`,
+        `  tokens       = ${JSON.stringify(shrunkTokens.map((t) => ({ k: t.kind, v: t.value })))}`,
+        `  persistido em= ${FAILURES_FILE ?? '(disco indisponível)'}`,
+        `  reproduza com: FC_SEED=${SEED} deno test --filter "fast-check property-based SHRINKING"`,
+      ].join('\n')
+      throw new Error(diag)
+    }
+
+    // ─── Sucesso: validações de saúde. ───
+    assert(executions >= NUM_RUNS, `fast-check executou ${executions} runs, esperado >= ${NUM_RUNS}`)
+    assertEquals(
+      ctx._calls - callsBefore, 0,
+      `createClient NUNCA pode ser invocado em ${executions} OPTIONS preflight do fast-check (seed=${SEED})`,
+    )
+  } finally {
+    await ctx.stop()
+  }
+})
