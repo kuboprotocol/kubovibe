@@ -1277,3 +1277,101 @@ Deno.test('HTTP integration: OPTIONS preflight — Allow-Origin is exactly "*" a
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: OPTIONS preflight — Access-Control-Allow-Credentials MUST be absent', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    // Por que esse teste é DEDICADO (e não só uma asserção dentro de outro):
+    //   * `Allow-Credentials: true` combinado com `Allow-Origin: "*"` é
+    //     EXPLICITAMENTE rejeitado pela CORS spec (Fetch §3.2). Browsers
+    //     bloqueiam a resposta inteira, derrubando 100% dos clientes.
+    //   * Mesmo com origem específica, habilitar credentials nessa edge
+    //     vazaria cookies/Authorization para qualquer página que faça
+    //     cross-origin request — risco de CSRF amplificado.
+    //   * O handler NUNCA declara esse header em corsHeaders. Esse teste
+    //     blinda contra adição acidental futura (ex: copiar/colar de outra
+    //     edge function que precise de auth com cookie).
+    //
+    // Validação tripla para máxima robustez:
+    //   (1) headers.get(...) === null em ambos OPTIONS comum e POST (caminho
+    //       de erro), pois Allow-Credentials, se vazasse, viria de corsHeaders
+    //       e contaminaria TODAS as respostas, não só o preflight.
+    //   (2) Iteração case-insensitive sobre todos os headers para detectar
+    //       qualquer variação de capitalização que pudesse escapar do .get().
+    //   (3) Valor literal — se um dia alguém adicionar com valor "false",
+    //       ainda assim falhamos, pois a spec não permite o header com NENHUM
+    //       valor numa resposta com Allow-Origin "*".
+
+    // ----- Cenário A: OPTIONS preflight -----
+    const preflight = await fetch(`${ctx.url}/`, {
+      method: 'OPTIONS',
+      headers: {
+        'origin': 'https://app.kubovibe.dev',
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'content-type, x-test-secret',
+      },
+    })
+    assertEquals(preflight.status, 200, 'preflight deve responder 200')
+
+    // (1) .get() direto.
+    assertEquals(
+      preflight.headers.get('access-control-allow-credentials'),
+      null,
+      'OPTIONS: Access-Control-Allow-Credentials NÃO pode estar presente (incompatível com Allow-Origin "*")',
+    )
+
+    // (2) Varredura case-insensitive — protege contra Headers que retornem
+    // capitalização diferente (browsers normalizam, mas reverse-proxies podem
+    // injetar variantes mistas tipo "Access-Control-Allow-Credentials").
+    const preflightLeak: string[] = []
+    for (const [name, value] of preflight.headers) {
+      if (name.toLowerCase() === 'access-control-allow-credentials') {
+        preflightLeak.push(`${name}=${value}`)
+      }
+    }
+    assertEquals(
+      preflightLeak,
+      [],
+      `OPTIONS: nenhum cabeçalho Allow-Credentials (qualquer capitalização) é permitido — vazamentos: ${JSON.stringify(preflightLeak)}`,
+    )
+
+    await preflight.text()
+
+    // ----- Cenário B: POST com secret inválido (caminho de erro 401) -----
+    // Garante que a mesma proteção vale fora do preflight, já que o header,
+    // se adicionado por engano, viria do spread {...corsHeaders} usado em
+    // TODAS as respostas (json() helper), não só no OPTIONS.
+    const errResp = await fetch(`${ctx.url}/`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-test-secret': 'wrong-secret',
+      },
+      body: JSON.stringify({ email: 'a@b.com', password: 'pw' }),
+    })
+    assertEquals(errResp.status, 401, 'POST com secret errado deve retornar 401')
+    assertEquals(
+      errResp.headers.get('access-control-allow-credentials'),
+      null,
+      'POST 401: Access-Control-Allow-Credentials NÃO pode estar presente em respostas de erro',
+    )
+    const errLeak: string[] = []
+    for (const [name, value] of errResp.headers) {
+      if (name.toLowerCase() === 'access-control-allow-credentials') {
+        errLeak.push(`${name}=${value}`)
+      }
+    }
+    assertEquals(
+      errLeak,
+      [],
+      `POST 401: nenhum cabeçalho Allow-Credentials permitido — vazamentos: ${JSON.stringify(errLeak)}`,
+    )
+    await errResp.text()
+
+    // Sanidade: o preflight ainda devolve Allow-Origin "*" (combinação que
+    // PRECISA estar livre de Allow-Credentials para ser válida).
+    assertEquals(preflight.headers.get('access-control-allow-origin'), '*')
+  } finally {
+    await ctx.stop()
+  }
+})
