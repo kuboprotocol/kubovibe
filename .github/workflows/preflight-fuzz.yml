@@ -28,11 +28,10 @@ jobs:
     runs-on: ubuntu-latest
     env:
       JOB_LABEL: preflight-fuzz
-      # Default pattern matches every property-based fuzz / shrinking test we ship.
-      # Override per-run via workflow_dispatch input.
+      # Default filter is a Deno --filter substring (NOT a regex).
+      # We run two passes to cover both fuzz families (see "Run preflight ..." step).
       TEST_NAME_PATTERN: >-
-        ${{ github.event.inputs.pattern ||
-            'OPTIONS preflight — (property-based fuzzing|fuzz with deterministic SHRINKING)' }}
+        ${{ github.event.inputs.pattern || 'OPTIONS preflight' }}
       # Persisted seeds + minimized failures land here.
       FUZZ_STATE_DIR: ${{ github.workspace }}/.rls-test-fuzz-state
     steps:
