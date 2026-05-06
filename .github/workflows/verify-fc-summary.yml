@@ -39,8 +39,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Run smoke tests
+      - name: Run verify-fc-summary smoke tests
         run: |
           chmod +x .github/scripts/verify-fc-summary.sh \
                    .github/scripts/test-verify-fc-summary.sh
           bash .github/scripts/test-verify-fc-summary.sh
+
+      - name: Run artifacts pagination harness
+        run: |
+          chmod +x .github/scripts/test-artifacts-pagination.sh
+          bash .github/scripts/test-artifacts-pagination.sh
+
