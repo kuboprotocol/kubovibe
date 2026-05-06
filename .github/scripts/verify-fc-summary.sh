@@ -136,7 +136,8 @@ _BOL="^${_S0}-${_S}"
 # metachars so URLs/tokens with dots (fc-seeds.json) or query strings don't
 # act as wildcards.
 ere_escape() {
-  printf '%s' "$1" | sed 's/[.[\]()$^*+?{}|\\/]/\\&/g'
+  # Use '#' as sed delimiter so '/' inside URLs doesn't terminate the s///.
+  printf '%s' "$1" | sed 's#[].[\(){}$^*+?|\\/]#\\&#g'
 }
 
 # Build the regex fragment matching a markdown inline link `[`token`](url)`
