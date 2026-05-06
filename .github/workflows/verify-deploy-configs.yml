@@ -16,69 +16,159 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Reset per-step status accumulator. Each subsequent step appends
-      # one row to /tmp/summary-rows.tsv (TSV: step\tstatus\tdetail) and
-      # the final "Render job summary" step renders a markdown table to
-      # $GITHUB_STEP_SUMMARY. No actions/cache involved.
-      - name: Init step-result accumulator
+      # Per-step status accumulator. Each subsequent step appends one row
+      # to /tmp/summary-rows.tsv (TSV: step\tstatus\tfile\tdetail) AND one
+      # JSON object to /tmp/audit.jsonl. The final steps render the
+      # markdown summary AND upload audit artifacts. No actions/cache used.
+      - name: Init audit accumulators
         run: |
           : > /tmp/summary-rows.tsv
+          : > /tmp/audit.jsonl
           echo "JOB_LABEL=${JOB_LABEL}" >> "$GITHUB_ENV"
+          echo "AUDIT_RUN_ID=${{ github.run_id }}-${{ github.run_attempt }}" >> "$GITHUB_ENV"
 
-      # PyYAML is NOT preinstalled on ubuntu-latest's system python3.
-      # Without this step, every `import yaml` step below ModuleNotFoundError's
-      # — which was the silent root cause of this workflow's red badge.
+      # Shared helper sourced by every step below to (1) emit a GitHub
+      # annotation pinned to file/line/title, (2) append a TSV row for the
+      # markdown summary, (3) append a JSONL audit record. Centralizing
+      # avoids drift between annotation text and audit payload.
+      - name: Install audit helper
+        run: |
+          mkdir -p /tmp/bin
+          cat > /tmp/bin/audit.sh <<'BASH'
+          #!/usr/bin/env bash
+          # audit.sh STEP STATUS FILE LINE TITLE DETAIL
+          #   STATUS = ok | fail
+          #   FILE   = vercel.json | render.yaml | (none)
+          #   LINE   = numeric line in FILE, or 0 if N/A
+          set -euo pipefail
+          STEP="$1"; STATUS="$2"; FILE="$3"; LINE="${4:-0}"; TITLE="$5"; DETAIL="$6"
+          ICON="✅ ok"; [ "$STATUS" = "fail" ] && ICON="❌ fail"
+          # 1. PR annotation (only on fail; ok stays quiet to reduce noise).
+          if [ "$STATUS" = "fail" ] && [ "$FILE" != "none" ] && [ -n "$FILE" ]; then
+            if [ "$LINE" -gt 0 ] 2>/dev/null; then
+              echo "::error file=${FILE},line=${LINE},title=${TITLE}::${DETAIL}"
+            else
+              echo "::error file=${FILE},title=${TITLE}::${DETAIL}"
+            fi
+          elif [ "$STATUS" = "fail" ]; then
+            echo "::error title=${TITLE}::${DETAIL}"
+          fi
+          # 2. Markdown summary row.
+          printf '%s\t%s\t%s\t%s\n' "$STEP" "$ICON" "${FILE}${LINE:+:$LINE}" "$DETAIL" >> /tmp/summary-rows.tsv
+          # 3. JSONL audit record (one object per line, jq-friendly).
+          # Escape DETAIL/TITLE for JSON via python (always available).
+          python3 - "$STEP" "$STATUS" "$FILE" "$LINE" "$TITLE" "$DETAIL" <<'PY' >> /tmp/audit.jsonl
+          import json, sys, os, datetime
+          step, status, file_, line, title, detail = sys.argv[1:7]
+          rec = {
+            "ts": datetime.datetime.utcnow().isoformat(timespec="seconds") + "Z",
+            "step": step,
+            "status": status,
+            "file": None if file_ in ("none", "") else file_,
+            "line": int(line) if line.isdigit() and int(line) > 0 else None,
+            "title": title,
+            "detail": detail,
+            "run_id": os.environ.get("GITHUB_RUN_ID"),
+            "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
+            "sha": os.environ.get("GITHUB_SHA"),
+            "ref": os.environ.get("GITHUB_REF"),
+            "actor": os.environ.get("GITHUB_ACTOR"),
+            "workflow": os.environ.get("GITHUB_WORKFLOW"),
+            "job": os.environ.get("GITHUB_JOB"),
+          }
+          print(json.dumps(rec, ensure_ascii=False))
+          PY
+          BASH
+          chmod +x /tmp/bin/audit.sh
+          echo "/tmp/bin" >> "$GITHUB_PATH"
+
       - name: Install PyYAML (required by render.yaml validators)
         run: |
-          python3 -m pip install --quiet --disable-pip-version-check pyyaml
-          python3 -c "import yaml; print('PyYAML', yaml.__version__)"
-          echo -e "Install PyYAML\t✅ ok\tPyYAML available for render.yaml parsing" >> /tmp/summary-rows.tsv
+          if python3 -m pip install --quiet --disable-pip-version-check pyyaml \
+             && python3 -c "import yaml; print('PyYAML', yaml.__version__)"; then
+            audit.sh "Install PyYAML" ok none 0 "PyYAML installed" "PyYAML available for render.yaml parsing"
+          else
+            audit.sh "Install PyYAML" fail none 0 "PyYAML install failed" "pip install pyyaml returned non-zero"
+            exit 1
+          fi
 
       - name: Assert vercel.json exists at repo root
         run: |
           if [ ! -f vercel.json ]; then
-            echo "::error file=vercel.json::Missing vercel.json at repo root — Vercel deploy will skip *.lovable.app → kubovibe.dev redirect rules."
-            echo -e "vercel.json exists\t❌ fail\tFile missing at repo root" >> /tmp/summary-rows.tsv
+            audit.sh "vercel.json exists" fail "vercel.json" 0 \
+              "Missing vercel.json" \
+              "File missing at repo root — Vercel deploy will skip *.lovable.app → kubovibe.dev redirect rules."
             exit 1
           fi
           BYTES=$(wc -c < vercel.json)
           echo "✓ vercel.json present (${BYTES} bytes)"
-          echo -e "vercel.json exists\t✅ ok\t${BYTES} bytes" >> /tmp/summary-rows.tsv
+          audit.sh "vercel.json exists" ok "vercel.json" 0 "Present" "${BYTES} bytes"
 
       - name: Assert render.yaml exists at repo root
         run: |
           if [ ! -f render.yaml ]; then
-            echo "::error file=render.yaml::Missing render.yaml at repo root — Render Blueprint will not apply redirect/SPA rules."
-            echo -e "render.yaml exists\t❌ fail\tFile missing at repo root" >> /tmp/summary-rows.tsv
+            audit.sh "render.yaml exists" fail "render.yaml" 0 \
+              "Missing render.yaml" \
+              "File missing at repo root — Render Blueprint will not apply redirect/SPA rules."
             exit 1
           fi
           BYTES=$(wc -c < render.yaml)
           echo "✓ render.yaml present (${BYTES} bytes)"
-          echo -e "render.yaml exists\t✅ ok\t${BYTES} bytes" >> /tmp/summary-rows.tsv
+          audit.sh "render.yaml exists" ok "render.yaml" 0 "Present" "${BYTES} bytes"
 
       - name: Validate vercel.json is parseable JSON
         run: |
-          if ! node -e "JSON.parse(require('fs').readFileSync('vercel.json','utf8'))"; then
-            echo "::error file=vercel.json::Invalid JSON"
-            echo -e "vercel.json valid JSON\t❌ fail\tJSON.parse threw" >> /tmp/summary-rows.tsv
+          # Capture the JSON parser's line number on failure so the PR
+          # annotation points to the EXACT offending line.
+          set +e
+          OUT=$(node -e "try { JSON.parse(require('fs').readFileSync('vercel.json','utf8')); } catch(e){ console.error(e.message); process.exit(1);}" 2>&1)
+          RC=$?
+          set -e
+          if [ "$RC" -ne 0 ]; then
+            # Node's SyntaxError text often contains "at position N" — convert to line.
+            POS=$(echo "$OUT" | grep -oE 'position [0-9]+' | head -1 | awk '{print $2}')
+            LINE=0
+            if [ -n "${POS:-}" ]; then
+              LINE=$(head -c "$POS" vercel.json | wc -l | tr -d ' ')
+              LINE=$((LINE + 1))
+            fi
+            audit.sh "vercel.json valid JSON" fail "vercel.json" "$LINE" \
+              "Invalid JSON" "JSON.parse threw: ${OUT}"
             exit 1
           fi
           echo "✓ vercel.json is valid JSON"
-          echo -e "vercel.json valid JSON\t✅ ok\tParsed cleanly" >> /tmp/summary-rows.tsv
+          audit.sh "vercel.json valid JSON" ok "vercel.json" 0 "Valid JSON" "Parsed cleanly"
 
       - name: Validate render.yaml is parseable YAML
         run: |
-          if ! python3 -c "import yaml,sys; yaml.safe_load(open('render.yaml'))"; then
-            echo "::error file=render.yaml::Invalid YAML"
-            echo -e "render.yaml valid YAML\t❌ fail\tyaml.safe_load threw" >> /tmp/summary-rows.tsv
+          set +e
+          OUT=$(python3 -c "
+          import yaml, sys
+          try:
+              yaml.safe_load(open('render.yaml'))
+          except yaml.YAMLError as e:
+              mark = getattr(e, 'problem_mark', None)
+              if mark is not None:
+                  print(f'LINE={mark.line + 1}', file=sys.stderr)
+              print(str(e), file=sys.stderr)
+              sys.exit(1)
+          " 2>&1)
+          RC=$?
+          set -e
+          if [ "$RC" -ne 0 ]; then
+            LINE=$(echo "$OUT" | grep -oE 'LINE=[0-9]+' | head -1 | cut -d= -f2)
+            LINE=${LINE:-0}
+            audit.sh "render.yaml valid YAML" fail "render.yaml" "$LINE" \
+              "Invalid YAML" "yaml.safe_load threw: ${OUT}"
             exit 1
           fi
           echo "✓ render.yaml is valid YAML"
-          echo -e "render.yaml valid YAML\t✅ ok\tParsed cleanly" >> /tmp/summary-rows.tsv
+          audit.sh "render.yaml valid YAML" ok "render.yaml" 0 "Valid YAML" "Parsed cleanly"
 
       - name: Assert canonical-domain redirect rule is present in vercel.json
         run: |
-          if ! node -e "
+          set +e
+          OUT=$(node -e "
             const c = JSON.parse(require('fs').readFileSync('vercel.json','utf8'));
             const r = (c.redirects || []).find(x =>
               (x.has || []).some(h => h.type === 'host' && h.value.replace(/\\\\/g,'').includes('lovable.app')) &&
@@ -86,16 +176,26 @@ jobs:
               x.permanent === true
             );
             if (!r) { console.error('Missing 301 *.lovable.app → kubovibe.dev redirect in vercel.json'); process.exit(1); }
-            console.log('✓ vercel.json contains canonical-domain 301 redirect');
-          "; then
-            echo -e "vercel.json 301 rule\t❌ fail\tMissing *.lovable.app → kubovibe.dev permanent redirect" >> /tmp/summary-rows.tsv
+            console.log('OK');
+          " 2>&1)
+          RC=$?
+          set -e
+          if [ "$RC" -ne 0 ]; then
+            # Pin annotation to the line where "redirects" key starts (or 1 if not found).
+            LINE=$(grep -nE '"redirects"[[:space:]]*:' vercel.json | head -1 | cut -d: -f1)
+            LINE=${LINE:-1}
+            audit.sh "vercel.json 301 rule" fail "vercel.json" "$LINE" \
+              "Canonical 301 missing" \
+              "Missing redirect entry: host *.lovable.app → kubovibe.dev (permanent=true)"
             exit 1
           fi
-          echo -e "vercel.json 301 rule\t✅ ok\t*.lovable.app → kubovibe.dev (permanent)" >> /tmp/summary-rows.tsv
+          audit.sh "vercel.json 301 rule" ok "vercel.json" 0 "Canonical 301 present" \
+            "*.lovable.app → kubovibe.dev (permanent)"
 
       - name: Assert canonical-domain redirect rule is present in render.yaml
         run: |
-          if ! python3 - <<'PY'
+          set +e
+          OUT=$(python3 - <<'PY' 2>&1
           import yaml, sys
           c = yaml.safe_load(open('render.yaml'))
           ok = False
@@ -109,16 +209,24 @@ jobs:
           if not ok:
               print('Missing 301 *.lovable.app → kubovibe.dev redirect in render.yaml', file=sys.stderr)
               sys.exit(1)
-          print('✓ render.yaml contains canonical-domain 301 redirect')
+          print('OK')
           PY
-          then
-            echo -e "render.yaml 301 rule\t❌ fail\tMissing *.lovable.app → kubovibe.dev 301 redirect" >> /tmp/summary-rows.tsv
+          )
+          RC=$?
+          set -e
+          if [ "$RC" -ne 0 ]; then
+            # Pin annotation to the "routes:" line of the first service block.
+            LINE=$(grep -nE '^[[:space:]]*routes:[[:space:]]*$' render.yaml | head -1 | cut -d: -f1)
+            LINE=${LINE:-1}
+            audit.sh "render.yaml 301 rule" fail "render.yaml" "$LINE" \
+              "Canonical 301 missing" \
+              "Missing route: type=redirect, status=301, host=*.lovable.app, destination=*.kubovibe.dev"
             exit 1
           fi
-          echo -e "render.yaml 301 rule\t✅ ok\t*.lovable.app → kubovibe.dev (status 301)" >> /tmp/summary-rows.tsv
+          audit.sh "render.yaml 301 rule" ok "render.yaml" 0 "Canonical 301 present" \
+            "*.lovable.app → kubovibe.dev (status 301)"
 
-      # Always render the summary, even if a previous step failed — so the
-      # PR/run page shows exactly which check failed without scrolling logs.
+      # Always render the summary, even if a previous step failed.
       - name: Render job summary
         if: always()
         run: |
@@ -126,22 +234,68 @@ jobs:
             echo "## 🚦 Verify deploy configs — \`${JOB_LABEL}\`"
             echo ""
             echo "Static validation of \`vercel.json\` and \`render.yaml\` at repo root."
-            echo "_No \`actions/cache\` used in this workflow — each run is fully reproducible._"
+            echo "_No \`actions/cache\` used — each run is fully reproducible._"
+            echo "_Failed checks are also pinned as inline PR annotations on the offending file/line._"
             echo ""
-            echo "| # | Check | Status | Detail |"
-            echo "|---|---|---|---|"
+            echo "| # | Check | Status | File:Line | Detail |"
+            echo "|---|---|---|---|---|"
             i=0
             if [ -s /tmp/summary-rows.tsv ]; then
-              while IFS=$'\t' read -r step status detail; do
+              while IFS=$'\t' read -r step status fileline detail; do
                 i=$((i+1))
-                echo "| ${i} | ${step} | ${status} | ${detail} |"
+                echo "| ${i} | ${step} | ${status} | \`${fileline:-—}\` | ${detail} |"
               done < /tmp/summary-rows.tsv
             else
-              echo "| — | (no checks recorded) | ⚪ n/a | accumulator empty |"
+              echo "| — | (no checks recorded) | ⚪ n/a | — | accumulator empty |"
             fi
             echo ""
-            echo "**Overall:** \`${{ job.status }}\` · runner \`${{ runner.os }}\` · commit \`${{ github.sha }}\`"
+            echo "**Overall:** \`${{ job.status }}\` · runner \`${{ runner.os }}\` · commit \`${{ github.sha }}\` · attempt \`${{ github.run_attempt }}\`"
+            echo ""
+            echo "📎 Detailed audit (JSONL + summary copy) is attached as artifact \`verify-deploy-configs-audit-${{ github.run_id }}-${{ github.run_attempt }}\`."
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # Persist machine-readable audit so reviewers / external tooling can
+      # consume the run programmatically (jq-friendly JSONL + plain TSV +
+      # rendered markdown). Always uploaded, even on failure.
+      - name: Stage audit artifacts
+        if: always()
+        run: |
+          mkdir -p /tmp/audit-out
+          cp /tmp/audit.jsonl       /tmp/audit-out/audit.jsonl       || true
+          cp /tmp/summary-rows.tsv  /tmp/audit-out/summary-rows.tsv  || true
+          # Build a self-contained markdown report (mirror of step summary).
+          {
+            echo "# Verify deploy configs — audit"
+            echo ""
+            echo "- Workflow: \`${GITHUB_WORKFLOW}\`"
+            echo "- Job: \`${GITHUB_JOB}\` (\`${JOB_LABEL}\`)"
+            echo "- Run: \`${GITHUB_RUN_ID}\` attempt \`${GITHUB_RUN_ATTEMPT}\`"
+            echo "- SHA: \`${GITHUB_SHA}\`"
+            echo "- Ref: \`${GITHUB_REF}\`"
+            echo "- Actor: \`${GITHUB_ACTOR}\`"
+            echo "- Status: \`${{ job.status }}\`"
+            echo ""
+            echo "| # | Check | Status | File:Line | Detail |"
+            echo "|---|---|---|---|---|"
+            i=0
+            if [ -s /tmp/summary-rows.tsv ]; then
+              while IFS=$'\t' read -r step status fileline detail; do
+                i=$((i+1))
+                echo "| ${i} | ${step} | ${status} | \`${fileline:-—}\` | ${detail} |"
+              done < /tmp/summary-rows.tsv
+            fi
+          } > /tmp/audit-out/audit.md
+          ls -la /tmp/audit-out/
+
+      - name: Upload audit artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-deploy-configs-audit-${{ github.run_id }}-${{ github.run_attempt }}
+          path: /tmp/audit-out/
+          retention-days: 30
+          if-no-files-found: warn
+
 
 
   live-redirect-curl-check:
