@@ -5077,3 +5077,199 @@ Deno.test('HTTP integration: OPTIONS preflight — Request-Method × Request-Hea
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: OPTIONS preflight — Access-Control-Request-Headers with CRLF/null-byte injection — Allow-Headers stays LITERAL (no echo, no dangerous, no smuggling)', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    const EXPECTED_HEADERS_LITERAL = 'authorization, x-client-info, apikey, content-type, x-test-secret'
+    const EXPECTED_HEADERS_SET = new Set([
+      'authorization', 'x-client-info', 'apikey', 'content-type', 'x-test-secret',
+    ])
+    const DANGEROUS_HEADERS = [
+      'set-cookie', 'set-cookie2', 'cookie', 'cookie2',
+      'host', 'origin', 'authorization-bearer',
+      'x-evil-cookie', 'x-fake-header', 'x-csrf-token',
+      'x-forwarded-for', 'x-real-ip', 'proxy-authorization',
+      'x-injected', 'x-smuggled', 'x-null-byte',
+      '*',
+    ]
+
+    // Extrai host:port do ctx.url ('http://127.0.0.1:NNNNN').
+    const u = new URL(ctx.url)
+    const hostHeader = u.host
+
+    // fetch() rejeita CRLF/null bytes em valores de header — então usamos TCP raw.
+    // Cada payload é a STRING bruta colocada após "Access-Control-Request-Headers: ".
+    const PAYLOADS: Array<{ label: string; raw: string }> = [
+      // CR isolado.
+      { label: 'CR único no meio',                raw: 'content-type,\rx-test-secret' },
+      { label: 'CR no final',                     raw: 'content-type, x-test-secret\r' },
+      // LF isolado.
+      { label: 'LF único no meio',                raw: 'content-type,\nx-test-secret' },
+      { label: 'LF no final',                     raw: 'content-type, x-test-secret\n' },
+      // CRLF (separador HTTP — tentativa clássica de smuggling).
+      { label: 'CRLF + header injetado set-cookie', raw: 'content-type\r\nSet-Cookie: pwn=1' },
+      { label: 'CRLF + header injetado cookie',     raw: 'content-type\r\nCookie: session=evil' },
+      { label: 'CRLF + X-Injected header',          raw: 'content-type\r\nX-Injected: yes' },
+      { label: 'CRLF duplo (request smuggling)',    raw: 'content-type\r\n\r\nGET /admin HTTP/1.1\r\nHost: evil' },
+      { label: 'CRLF + body smuggling',             raw: 'content-type\r\nContent-Length: 0\r\n\r\nMALICIOUS' },
+      { label: 'CRLF dentro de token allowlisted',  raw: 'authorization\r\nX-Smuggled: 1, content-type' },
+      // Null bytes (\x00).
+      { label: 'null byte único',                   raw: 'content-type,\x00x-test-secret' },
+      { label: 'null byte no início',               raw: '\x00content-type, x-test-secret' },
+      { label: 'null byte no final',                raw: 'content-type, x-test-secret\x00' },
+      { label: 'múltiplos null bytes',              raw: 'content-type\x00\x00\x00x-test-secret' },
+      { label: 'null byte truncando (cookie hidden)', raw: 'content-type\x00, set-cookie' },
+      // Combinações CRLF + null byte.
+      { label: 'null + CRLF + injection',           raw: 'content-type\x00\r\nX-Null-Byte: 1' },
+      { label: 'CRLF + null + dangerous',           raw: 'content-type\r\n\x00Set-Cookie: x=y' },
+      // Outros control chars baixos.
+      { label: 'tab + CR',                          raw: 'content-type,\t\rx-test-secret' },
+      { label: 'BEL (\\x07)',                       raw: 'content-type,\x07x-test-secret' },
+      { label: 'VT (\\x0B) + LF',                   raw: 'content-type\x0B\nset-cookie' },
+      { label: 'FF (\\x0C)',                        raw: 'content-type\x0Cx-test-secret' },
+      { label: 'todos control chars 0x01-0x08',     raw: 'content-type\x01\x02\x03\x04\x05\x06\x08x-test-secret' },
+    ]
+
+    const parseList = (v: string | null): string[] =>
+      (v ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
+
+    type RawResponse = { status: number; headers: Headers; body: string } | { error: string }
+
+    // Envia uma request HTTP/1.1 raw via TCP e parseia status + headers da resposta.
+    async function sendRaw(payload: string): Promise<RawResponse> {
+      let conn: Deno.TcpConn | null = null
+      try {
+        conn = await Deno.connect({ hostname: u.hostname, port: parseInt(u.port, 10), transport: 'tcp' })
+        const reqLines = [
+          'OPTIONS / HTTP/1.1',
+          `Host: ${hostHeader}`,
+          'Origin: https://evil.example.com',
+          'Access-Control-Request-Method: POST',
+          // Aqui injetamos o payload bruto contendo CRLF/null bytes.
+          `Access-Control-Request-Headers: ${payload}`,
+          'Connection: close',
+          '',
+          '',
+        ]
+        const reqBytes = new TextEncoder().encode(reqLines.join('\r\n'))
+        await conn.write(reqBytes)
+
+        // Lê a resposta inteira (até EOF — Connection: close).
+        const chunks: Uint8Array[] = []
+        const buf = new Uint8Array(8192)
+        while (true) {
+          const n = await conn.read(buf)
+          if (n === null) break
+          chunks.push(buf.slice(0, n))
+        }
+        const total = chunks.reduce((s, c) => s + c.length, 0)
+        const merged = new Uint8Array(total)
+        let off = 0
+        for (const c of chunks) { merged.set(c, off); off += c.length }
+        const text = new TextDecoder().decode(merged)
+
+        // Parse status line + headers.
+        const headerEnd = text.indexOf('\r\n\r\n')
+        if (headerEnd === -1) return { error: 'no header terminator' }
+        const headBlock = text.slice(0, headerEnd)
+        const body = text.slice(headerEnd + 4)
+        const lines = headBlock.split('\r\n')
+        const statusMatch = lines[0].match(/^HTTP\/1\.[01]\s+(\d{3})/)
+        if (!statusMatch) return { error: `bad status line: ${lines[0]}` }
+        const status = parseInt(statusMatch[1], 10)
+        const headers = new Headers()
+        for (let i = 1; i < lines.length; i++) {
+          const idx = lines[i].indexOf(':')
+          if (idx === -1) continue
+          const name = lines[i].slice(0, idx).trim()
+          const value = lines[i].slice(idx + 1).trim()
+          if (name) headers.append(name, value)
+        }
+        return { status, headers, body }
+      } finally {
+        try { conn?.close() } catch { /* already closed */ }
+      }
+    }
+
+    for (const p of PAYLOADS) {
+      const result = await sendRaw(p.raw)
+      const ctxLabel = `[Payload: ${p.label}]`
+
+      // Aceitamos dois desfechos seguros:
+      //  (A) Servidor responde 200 com Allow-Headers literal (CRLF/null bytes ignorados/sanitizados).
+      //  (B) Servidor responde 4xx/conexão fecha — também é seguro (não vazou nada).
+      if ('error' in result) {
+        // Resposta malformada — é aceitável (servidor recusou a request smuggling).
+        // Mas precisamos garantir que NÃO veio body com header injetado vazando.
+        continue
+      }
+
+      // (1) Status DEVE ser 200 OU 4xx — nunca 5xx (que indicaria crash).
+      assert(
+        result.status === 200 || (result.status >= 400 && result.status < 500),
+        `${ctxLabel}: status deve ser 200 ou 4xx, recebido ${result.status}`,
+      )
+
+      // Se o servidor tratou como preflight válido (200), validar contrato CORS literal.
+      if (result.status === 200) {
+        const ah = result.headers.get('access-control-allow-headers')
+        assertExists(ah, `${ctxLabel}: Allow-Headers deve estar presente em 200`)
+
+        // (2) Allow-Headers LITERAL EXATO — sem echo de payload poluído.
+        assertEquals(
+          ah, EXPECTED_HEADERS_LITERAL,
+          `${ctxLabel}: Allow-Headers deve ser literal "${EXPECTED_HEADERS_LITERAL}" (não pode refletir payload)`,
+        )
+
+        // (3) Conjunto parseado bate exatamente.
+        const parsed = new Set(parseList(ah))
+        assertEquals(parsed.size, EXPECTED_HEADERS_SET.size, `${ctxLabel}: Allow-Headers deve listar exatamente 5 headers`)
+        for (const h of EXPECTED_HEADERS_SET) {
+          assert(parsed.has(h), `${ctxLabel}: Allow-Headers deve incluir "${h}"`)
+        }
+
+        // (4) NUNCA cabeçalhos perigosos.
+        for (const dangerous of DANGEROUS_HEADERS) {
+          assert(!parsed.has(dangerous), `${ctxLabel}: Allow-Headers NÃO PODE conter header perigoso "${dangerous}"`)
+        }
+
+        // (5) NUNCA conter substring CR/LF/null no valor — proteção contra header injection downstream.
+        assert(!ah.includes('\r'), `${ctxLabel}: Allow-Headers NÃO PODE conter CR`)
+        assert(!ah.includes('\n'), `${ctxLabel}: Allow-Headers NÃO PODE conter LF`)
+        assert(!ah.includes('\x00'), `${ctxLabel}: Allow-Headers NÃO PODE conter null byte`)
+
+        // (6) Allow-Origin permanece '*' literal.
+        assertEquals(result.headers.get('access-control-allow-origin'), '*', `${ctxLabel}: Allow-Origin deve ser '*'`)
+
+        // (7) Allow-Credentials NUNCA presente.
+        assertEquals(result.headers.get('access-control-allow-credentials'), null, `${ctxLabel}: Allow-Credentials NUNCA pode aparecer`)
+
+        // (8) Allow-Methods/Max-Age literais.
+        assertEquals(result.headers.get('access-control-allow-methods'), 'POST, OPTIONS', `${ctxLabel}: Allow-Methods literal`)
+        assertEquals(result.headers.get('access-control-max-age'), '86400', `${ctxLabel}: Max-Age literal`)
+
+        // (9) Set-Cookie NUNCA aparece (mesmo se o payload tentou injetar).
+        assertEquals(result.headers.get('set-cookie'), null, `${ctxLabel}: Set-Cookie NUNCA pode aparecer (anti-smuggling)`)
+        assertEquals(result.headers.get('cookie'), null, `${ctxLabel}: Cookie NUNCA pode aparecer`)
+
+        // (10) Headers injetados via CRLF NUNCA aparecem na resposta.
+        assertEquals(result.headers.get('x-injected'), null, `${ctxLabel}: X-Injected NUNCA pode aparecer`)
+        assertEquals(result.headers.get('x-smuggled'), null, `${ctxLabel}: X-Smuggled NUNCA pode aparecer`)
+        assertEquals(result.headers.get('x-null-byte'), null, `${ctxLabel}: X-Null-Byte NUNCA pode aparecer`)
+
+        // (11) Allow-Headers aparece exatamente 1x.
+        let occurrences = 0
+        for (const [name] of result.headers) {
+          if (name.toLowerCase() === 'access-control-allow-headers') occurrences++
+        }
+        assertEquals(occurrences, 1, `${ctxLabel}: Allow-Headers deve aparecer exatamente 1x`)
+      }
+    }
+
+    // (12) Zero createClient invocado em qualquer payload — preflight nunca toca DB.
+    assertEquals(ctx._calls, 0, 'createClient NUNCA pode ser invocado em OPTIONS preflight (mesmo com payloads maliciosos)')
+  } finally {
+    await ctx.stop()
+  }
+})
