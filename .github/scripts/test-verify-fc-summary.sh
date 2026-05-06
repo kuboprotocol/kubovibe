@@ -420,6 +420,20 @@ run_case "BAD: mix canonical+fallback for fc-seeds.json" \
 run_case "BAD: mix canonical+fallback for fc-failures.json" \
   "${MIX_FAILURES}"  1 1 1 "https://example.com/seeds" "https://example.com/failures"
 
+echo ""
+echo "── cross-contamination: swapped tokens (must fail) ──"
+# Each of these fixtures has exactly ONE bullet per token (so the count-only
+# check would falsely accept them) — the validator must catch the label↔token
+# mismatch instead.
+run_case "BAD: SEEDS prefix wraps fc-failures.json (canonical)" \
+  "${SEEDS_PREFIX_WITH_FAILURES_TOKEN}" 1 1 1 "https://example.com/seeds" "https://example.com/failures"
+run_case "BAD: FAILURES prefix wraps fc-seeds.json (canonical)" \
+  "${FAILURES_PREFIX_WITH_SEEDS_TOKEN}" 1 1 1 "https://example.com/seeds" "https://example.com/failures"
+run_case "BAD: both canonical bullets swapped (seeds↔failures)" \
+  "${SWAP_CANONICAL}" 1 1 1 "https://example.com/seeds" "https://example.com/failures"
+run_case "BAD: both fallback markers swapped (seeds↔failures)" \
+  "${SWAP_FALLBACK}"  1 0 0 "" ""
+
 # ─── summary ─────────────────────────────────────────────────────────────────
 
 echo ""
