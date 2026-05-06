@@ -3292,3 +3292,106 @@ Deno.test('HTTP integration: bare OPTIONS (no preflight headers) — returns 200
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: 405 method_not_allowed with hostile Cookie — NEVER Set-Cookie/Set-Cookie2 (exhaustive casing variants)', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    // O handler retorna 405 para QUALQUER método ≠ POST/OPTIONS.
+    // Invariante: nenhuma resposta 405 pode emitir Set-Cookie/Set-Cookie2,
+    // mesmo quando o cliente envia cookies hostis e Origin cross-origin.
+    const HOSTILE_COOKIE =
+      'sid=stolen-session-abc123; session=hijacked; auth=fake-jwt-token-xyz; jwt=eyJfake; csrf=hijack-token; remember_me=1; admin=true'
+    const HOSTILE_ORIGIN = 'https://evil.example.com'
+
+    // 15 variantes de casing exaustivas para set-cookie / set-cookie2.
+    const COOKIE_HEADER_VARIANTS = [
+      'set-cookie', 'Set-Cookie', 'SET-COOKIE', 'set-Cookie', 'Set-cookie',
+      'SET-cookie', 'set-COOKIE', 'sEt-CoOkIe',
+      'set-cookie2', 'Set-Cookie2', 'SET-COOKIE2', 'set-Cookie2', 'Set-cookie2',
+      'SET-cookie2', 'sEt-CoOkIe2',
+    ]
+
+    // Métodos que devem disparar 405 (handler aceita apenas POST/OPTIONS).
+    const METHODS_405 = ['GET', 'PUT', 'PATCH', 'DELETE', 'HEAD'] as const
+
+    const baseHeaders = {
+      'content-type': 'application/json',
+      'origin': HOSTILE_ORIGIN,
+      'cookie': HOSTILE_COOKIE,
+      'authorization': 'Bearer attacker-jwt-token',
+      'x-test-secret': SECRET, // mesmo com secret CORRETO, método inválido = 405
+    }
+
+    for (const method of METHODS_405) {
+      // 2 tentativas idempotentes por método.
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        const init: RequestInit = { method, headers: baseHeaders }
+        // GET/HEAD não podem ter body; demais podem ter body vazio JSON.
+        if (method !== 'GET' && method !== 'HEAD') {
+          (init as RequestInit & { body: string }).body = '{}'
+        }
+
+        const res = await fetch(`${ctx.url}/`, init)
+        await res.text() // consumir body sempre (HEAD retorna body vazio mas ainda exige consumo)
+
+        // (1) Status esperado.
+        assertEquals(
+          res.status,
+          405,
+          `[${method}] tentativa ${attempt}: status esperado 405`,
+        )
+
+        // (2) Checagem canônica case-insensitive via Headers.get().
+        assertEquals(
+          res.headers.get('set-cookie'),
+          null,
+          `[${method}] tentativa ${attempt}: Set-Cookie NUNCA pode aparecer em 405`,
+        )
+        assertEquals(
+          res.headers.get('set-cookie2'),
+          null,
+          `[${method}] tentativa ${attempt}: Set-Cookie2 NUNCA pode aparecer em 405`,
+        )
+
+        // (3) Headers.has() em todas as 15 variantes de casing.
+        for (const variant of COOKIE_HEADER_VARIANTS) {
+          assert(
+            !res.headers.has(variant),
+            `[${method}] tentativa ${attempt}: header "${variant}" NÃO PODE existir em 405`,
+          )
+        }
+
+        // (4) Iteração case-insensitive sobre TODOS os headers — captura vazamentos não documentados.
+        for (const [name] of res.headers) {
+          const lower = name.toLowerCase()
+          assert(
+            lower !== 'set-cookie' && lower !== 'set-cookie2',
+            `[${method}] tentativa ${attempt}: header "${name}" vazou cookie em 405`,
+          )
+        }
+
+        // (5) Garantia complementar: 405 não pode conter Allow-Credentials
+        // (incompatível com Allow-Origin: '*') nem ecoar Origin hostil.
+        assertEquals(
+          res.headers.get('access-control-allow-credentials'),
+          null,
+          `[${method}] tentativa ${attempt}: Allow-Credentials NUNCA pode aparecer em 405`,
+        )
+        const allowOrigin = res.headers.get('access-control-allow-origin')
+        assert(
+          allowOrigin === '*' || allowOrigin === null,
+          `[${method}] tentativa ${attempt}: Allow-Origin deve ser '*' ou ausente, recebeu "${allowOrigin}"`,
+        )
+      }
+    }
+
+    // (6) Garantia final: nenhum createClient instanciado em qualquer 405.
+    assertEquals(
+      ctx._calls,
+      0,
+      'createClient NUNCA pode ser invocado em respostas 405',
+    )
+  } finally {
+    await ctx.stop()
+  }
+})
