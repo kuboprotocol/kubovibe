@@ -2047,3 +2047,114 @@ Deno.test('HTTP integration: minimal cross-origin OPTIONS (Origin only, no Acces
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: cross-origin GET — no Allow-Credentials, Allow-Origin "*"', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    const HOSTILE_ORIGIN = 'https://evil.example.com'
+    const res = await fetch(ctx.url, {
+      method: 'GET',
+      headers: { 'origin': HOSTILE_ORIGIN },
+    })
+
+    // Aceita qualquer status < 500 (handler real costuma responder 405/404 a GET).
+    assert(res.status < 500, `GET cross-origin não deve gerar 5xx, recebido ${res.status}`)
+
+    // (1) Allow-Credentials ausente — checagem direta.
+    assertEquals(
+      res.headers.get('access-control-allow-credentials'),
+      null,
+      'GET cross-origin: Access-Control-Allow-Credentials NÃO pode estar presente',
+    )
+
+    // (1b) Varredura case-insensitive defensiva.
+    const credLeak: string[] = []
+    for (const [name, value] of res.headers) {
+      if (name.toLowerCase() === 'access-control-allow-credentials') {
+        credLeak.push(`${name}=${value}`)
+      }
+    }
+    assertEquals(
+      credLeak,
+      [],
+      `GET cross-origin: nenhum Allow-Credentials permitido (qualquer capitalização) — vazamentos: ${JSON.stringify(credLeak)}`,
+    )
+
+    // (2) Allow-Origin literal "*" — não pode ecoar Origin hostil.
+    const allowOrigin = res.headers.get('access-control-allow-origin')
+    assertEquals(
+      allowOrigin,
+      '*',
+      `GET cross-origin: Allow-Origin deve ser exatamente "*", recebido ${JSON.stringify(allowOrigin)}`,
+    )
+    assert(
+      allowOrigin !== HOSTILE_ORIGIN,
+      `GET cross-origin: Allow-Origin ECOOU o Origin hostil "${HOSTILE_ORIGIN}"`,
+    )
+
+    await res.text()
+  } finally {
+    await ctx.stop()
+  }
+})
+
+Deno.test('HTTP integration: cross-origin POST — no Allow-Credentials, Allow-Origin "*" (both with and without valid secret)', async () => {
+  const HOSTILE_ORIGIN = 'https://evil.example.com'
+
+  for (const variant of ['valid-secret', 'no-secret'] as const) {
+    const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+    try {
+      const headers: Record<string, string> = {
+        'origin': HOSTILE_ORIGIN,
+        'content-type': 'application/json',
+      }
+      if (variant === 'valid-secret') headers['x-test-secret'] = SECRET
+
+      const res = await fetch(ctx.url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({}),
+      })
+
+      // Status esperado: 200 (com secret) ou 401 (sem secret).
+      const expected = variant === 'valid-secret' ? 200 : 401
+      assertEquals(res.status, expected, `POST cross-origin (${variant}): status esperado ${expected}`)
+
+      // (1) Allow-Credentials ausente — checagem direta.
+      assertEquals(
+        res.headers.get('access-control-allow-credentials'),
+        null,
+        `POST cross-origin (${variant}): Access-Control-Allow-Credentials NÃO pode estar presente`,
+      )
+
+      // (1b) Varredura case-insensitive defensiva.
+      const credLeak: string[] = []
+      for (const [name, value] of res.headers) {
+        if (name.toLowerCase() === 'access-control-allow-credentials') {
+          credLeak.push(`${name}=${value}`)
+        }
+      }
+      assertEquals(
+        credLeak,
+        [],
+        `POST cross-origin (${variant}): nenhum Allow-Credentials permitido (qualquer capitalização) — vazamentos: ${JSON.stringify(credLeak)}`,
+      )
+
+      // (2) Allow-Origin literal "*".
+      const allowOrigin = res.headers.get('access-control-allow-origin')
+      assertEquals(
+        allowOrigin,
+        '*',
+        `POST cross-origin (${variant}): Allow-Origin deve ser exatamente "*", recebido ${JSON.stringify(allowOrigin)}`,
+      )
+      assert(
+        allowOrigin !== HOSTILE_ORIGIN,
+        `POST cross-origin (${variant}): Allow-Origin ECOOU o Origin hostil "${HOSTILE_ORIGIN}"`,
+      )
+
+      await res.text()
+    } finally {
+      await ctx.stop()
+    }
+  }
+})
