@@ -4719,3 +4719,172 @@ Deno.test('HTTP integration: OPTIONS WITH Origin — Access-Control-Request-Meth
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: OPTIONS WITH Origin — Allow-Headers stays LITERAL exact across all Request-Headers variants and Origins (no echo, no dangerous headers)', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    const EXPECTED_LITERAL = 'authorization, x-client-info, apikey, content-type, x-test-secret'
+    const EXPECTED_SET = new Set([
+      'authorization', 'x-client-info', 'apikey', 'content-type', 'x-test-secret',
+    ])
+    const DANGEROUS_HEADERS = [
+      'set-cookie', 'set-cookie2', 'cookie', 'cookie2',
+      'host', 'origin', 'authorization-bearer',
+      'x-evil-cookie', 'x-fake-header', 'x-csrf-token',
+      'x-forwarded-for', 'x-real-ip', 'proxy-authorization',
+      '*',
+    ]
+
+    // Origens diversas — Allow-Headers deve ser idêntico para todas.
+    const ORIGINS: Array<{ label: string; value: string }> = [
+      { label: 'same-origin produção',     value: 'https://app.kubovibe.dev' },
+      { label: 'same-origin lovable',      value: 'https://kubovibe.lovable.app' },
+      { label: 'cross-origin hostil',      value: 'https://evil.example.com' },
+      { label: 'localhost dev',            value: 'http://localhost:5173' },
+      { label: 'Origin literal "null"',    value: 'null' },
+      { label: 'porta exótica',            value: 'https://attacker.example.com:31337' },
+    ]
+
+    // Variantes hostis/exóticas de Request-Headers — todas devem ser ignoradas.
+    const REQUEST_HEADER_VARIANTS: Array<{ label: string; value: string }> = [
+      // Casing.
+      { label: 'lowercase canônico',           value: 'content-type, x-test-secret' },
+      { label: 'Title-Case',                   value: 'Content-Type, X-Test-Secret' },
+      { label: 'UPPERCASE',                    value: 'CONTENT-TYPE, X-TEST-SECRET' },
+      { label: 'mIxEd CaSiNg',                 value: 'CoNtEnT-TyPe, X-tEsT-sEcReT' },
+      // Spacing.
+      { label: 'sem espaço pós-vírgula',       value: 'content-type,x-test-secret' },
+      { label: 'múltiplos espaços',            value: 'content-type,    x-test-secret' },
+      { label: 'tab como separador',           value: 'content-type,\tx-test-secret' },
+      { label: 'espaços ao redor',             value: '  content-type  ,  x-test-secret  ' },
+      // Vírgulas.
+      { label: 'trailing comma',               value: 'content-type, x-test-secret,' },
+      { label: 'leading comma',                value: ', content-type, x-test-secret' },
+      { label: 'duplas vírgulas (token vazio)', value: 'content-type,, x-test-secret' },
+      // Tentativas de injetar headers perigosos.
+      { label: 'tentar injetar set-cookie',    value: 'content-type, set-cookie' },
+      { label: 'tentar injetar cookie',        value: 'cookie, content-type' },
+      { label: 'tentar injetar wildcard',      value: '*' },
+      { label: 'tentar injetar host',          value: 'host, content-type' },
+      { label: 'tentar injetar x-evil',        value: 'x-evil-cookie, x-fake-header' },
+      { label: 'tentar injetar csrf',          value: 'x-csrf-token, content-type' },
+      { label: 'tentar injetar proxy-auth',    value: 'proxy-authorization, content-type' },
+      // Headers absurdos.
+      { label: 'só headers fora da allowlist', value: 'x-fake-1, x-fake-2, x-fake-3' },
+      { label: 'mix allowed + dangerous',      value: 'content-type, set-cookie, cookie, x-evil' },
+      // Edge cases.
+      { label: 'string vazia',                 value: '' },
+      { label: 'só whitespace',                value: '   ' },
+      { label: 'só vírgulas',                  value: ',,,' },
+    ]
+
+    const parseList = (v: string | null): string[] =>
+      (v ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
+
+    for (const origin of ORIGINS) {
+      for (const variant of REQUEST_HEADER_VARIANTS) {
+        const res = await fetch(`${ctx.url}/`, {
+          method: 'OPTIONS',
+          headers: {
+            'origin': origin.value,
+            'access-control-request-method': 'POST',
+            'access-control-request-headers': variant.value,
+          },
+        })
+        await res.text()
+
+        const ctxLabel = `[Origin: ${origin.label} | Request-Headers: ${variant.label}]`
+
+        // (1) Status 200.
+        assertEquals(res.status, 200, `${ctxLabel}: preflight deve retornar 200`)
+
+        // (2) Allow-Headers LITERAL EXATO — handler não ramifica por Origin nem por Request-Headers.
+        const ah = res.headers.get('access-control-allow-headers')
+        assertExists(ah, `${ctxLabel}: Allow-Headers deve estar presente`)
+        assertEquals(
+          ah,
+          EXPECTED_LITERAL,
+          `${ctxLabel}: Allow-Headers deve ser literal "${EXPECTED_LITERAL}"`,
+        )
+
+        // (3) Conjunto parseado bate exatamente — 5 headers, sem extras nem omissões.
+        const parsed = new Set(parseList(ah))
+        assertEquals(
+          parsed.size, EXPECTED_SET.size,
+          `${ctxLabel}: Allow-Headers deve listar exatamente ${EXPECTED_SET.size} headers`,
+        )
+        for (const h of EXPECTED_SET) {
+          assert(parsed.has(h), `${ctxLabel}: Allow-Headers deve incluir "${h}"`)
+        }
+
+        // (4) NUNCA cabeçalhos perigosos — defesa exaustiva.
+        for (const dangerous of DANGEROUS_HEADERS) {
+          assert(
+            !parsed.has(dangerous),
+            `${ctxLabel}: Allow-Headers NÃO PODE conter header perigoso "${dangerous}"`,
+          )
+        }
+
+        // (5) NUNCA ecoar tokens da Request-Headers que não sejam allowlisted.
+        // Extrai tokens enviados (lowercase) e verifica que nenhum não-allowlisted aparece.
+        const sentTokens = parseList(variant.value)
+        for (const sent of sentTokens) {
+          if (!EXPECTED_SET.has(sent)) {
+            assert(
+              !parsed.has(sent),
+              `${ctxLabel}: Allow-Headers NÃO PODE ecoar token não-allowlisted "${sent}"`,
+            )
+          }
+        }
+
+        // (6) Allow-Origin permanece '*' literal — sem eco mesmo com Origin presente.
+        const allowOrigin = res.headers.get('access-control-allow-origin')
+        assertEquals(allowOrigin, '*', `${ctxLabel}: Allow-Origin deve ser '*' literal`)
+        assert(allowOrigin !== origin.value, `${ctxLabel}: Allow-Origin NÃO PODE ecoar Origin`)
+        assert(allowOrigin !== 'null', `${ctxLabel}: Allow-Origin NUNCA pode ser 'null'`)
+
+        // (7) Allow-Credentials NUNCA presente.
+        assertEquals(
+          res.headers.get('access-control-allow-credentials'), null,
+          `${ctxLabel}: Allow-Credentials NUNCA pode aparecer`,
+        )
+
+        // (8) Allow-Methods + Max-Age permanecem literais.
+        assertEquals(
+          res.headers.get('access-control-allow-methods'), 'POST, OPTIONS',
+          `${ctxLabel}: Allow-Methods deve permanecer 'POST, OPTIONS'`,
+        )
+        assertEquals(
+          res.headers.get('access-control-max-age'), '86400',
+          `${ctxLabel}: Max-Age deve permanecer '86400'`,
+        )
+
+        // (9) Set-Cookie / Set-Cookie2 / Expose-Headers NUNCA presentes.
+        assertEquals(res.headers.get('set-cookie'), null, `${ctxLabel}: Set-Cookie NUNCA pode aparecer`)
+        assertEquals(res.headers.get('set-cookie2'), null, `${ctxLabel}: Set-Cookie2 NUNCA pode aparecer`)
+        assertEquals(
+          res.headers.get('access-control-expose-headers'), null,
+          `${ctxLabel}: Expose-Headers NUNCA pode aparecer em preflight`,
+        )
+
+        // (10) Allow-Headers aparece exatamente 1x (sem duplicação por proxy).
+        let occurrences = 0
+        for (const [name] of res.headers) {
+          if (name.toLowerCase() === 'access-control-allow-headers') occurrences++
+        }
+        assertEquals(
+          occurrences, 1,
+          `${ctxLabel}: Allow-Headers deve aparecer exatamente 1x`,
+        )
+      }
+    }
+
+    // (11) Garantia: nenhum createClient instanciado em qualquer preflight.
+    assertEquals(
+      ctx._calls, 0,
+      'createClient NUNCA pode ser invocado em OPTIONS preflight',
+    )
+  } finally {
+    await ctx.stop()
+  }
+})
