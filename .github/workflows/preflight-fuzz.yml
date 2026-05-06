@@ -86,14 +86,20 @@ jobs:
 
       - name: Run preflight OPTIONS fuzz tests
         id: fuzz
+        env:
+          # Forwarded into the fast-check test for deterministic reproduction.
+          FC_SEED: ${{ github.event.inputs.fc_seed }}
         run: |
           set -o pipefail
           mkdir -p reports
           # Deno --filter is a substring match (regex requires /.../ syntax).
           # Run each fuzz family in its own pass so failures stay attributable.
+          # The fast-check shrinking test is added so PRs fail with the
+          # minimized Access-Control-Request-Method counterexample.
           FILTERS=(
             "property-based fuzzing"
             "fuzz with deterministic SHRINKING"
+            "fast-check property-based SHRINKING"
           )
           # Allow workflow_dispatch override.
           if [ -n "${{ github.event.inputs.pattern }}" ]; then
