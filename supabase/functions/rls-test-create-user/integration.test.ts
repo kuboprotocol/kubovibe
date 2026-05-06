@@ -5942,3 +5942,209 @@ Deno.test('HTTP integration: OPTIONS preflight — Access-Control-Request-Header
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: OPTIONS preflight — Access-Control-Request-Headers with obs-fold (CRLF + SP/HTAB) variants — Allow-Headers stays LITERAL exact (no echo, no smuggling, no dangerous)', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    const EXPECTED_HEADERS_LITERAL = 'authorization, x-client-info, apikey, content-type, x-test-secret'
+    const EXPECTED_HEADERS_SET = new Set([
+      'authorization', 'x-client-info', 'apikey', 'content-type', 'x-test-secret',
+    ])
+    const DANGEROUS_HEADERS = [
+      'set-cookie', 'set-cookie2', 'cookie', 'cookie2',
+      'host', 'origin', 'authorization-bearer',
+      'x-evil-cookie', 'x-fake-header', 'x-csrf-token',
+      'x-forwarded-for', 'x-real-ip', 'proxy-authorization',
+      'x-folded', 'x-injected', 'x-smuggled',
+      '*',
+    ]
+
+    const u = new URL(ctx.url)
+    const hostHeader = u.host
+
+    // RFC 7230 §3.2.4: obs-fold = CRLF 1*( SP / HTAB ).
+    // Servidores HTTP modernos DEVEM rejeitar (400) ou substituir por SP em mensagens recebidas.
+    // O contrato a validar: independente de qual caminho o servidor escolher,
+    // Allow-Headers permanece literal exato — nunca ecoa, nunca quebra-linha, nunca vaza dangerous.
+    const PAYLOADS: Array<{ label: string; raw: string }> = [
+      // --- obs-fold canônico (CRLF + 1 SP). ---
+      { label: 'obs-fold CRLF+SP simples',                  raw: 'authorization,\r\n x-client-info' },
+      { label: 'obs-fold CRLF+SP no início',                raw: '\r\n authorization, x-client-info' },
+      { label: 'obs-fold CRLF+SP no fim',                   raw: 'authorization, x-client-info\r\n ' },
+      { label: 'obs-fold CRLF+SP entre 5 tokens allowlist', raw: 'authorization,\r\n x-client-info,\r\n apikey,\r\n content-type,\r\n x-test-secret' },
+
+      // --- obs-fold com HTAB. ---
+      { label: 'obs-fold CRLF+HTAB simples',                raw: 'authorization,\r\n\tx-client-info' },
+      { label: 'obs-fold CRLF+HTAB múltiplo',               raw: 'content-type,\r\n\t\t\tx-test-secret' },
+
+      // --- obs-fold com múltiplos SP/HTAB combinados. ---
+      { label: 'obs-fold CRLF+SP+SP+HTAB',                  raw: 'authorization,\r\n  \tx-client-info' },
+      { label: 'obs-fold CRLF+10 espaços',                  raw: 'content-type,\r\n          x-test-secret' },
+      { label: 'obs-fold misto SP/HTAB intercalado',        raw: 'authorization,\r\n \t \t x-client-info,\r\n\t \t apikey' },
+
+      // --- obs-fold encadeado (múltiplos folds na mesma linha). ---
+      { label: 'obs-fold encadeado 2x',                     raw: 'authorization,\r\n x-client-info,\r\n apikey' },
+      { label: 'obs-fold encadeado 4x',                     raw: 'authorization,\r\n x-client-info,\r\n apikey,\r\n content-type,\r\n x-test-secret' },
+      { label: 'obs-fold encadeado mix SP/HTAB',            raw: 'authorization,\r\n x-client-info,\r\n\tapikey,\r\n  content-type,\r\n\t\tx-test-secret' },
+
+      // --- obs-fold MALICIOSO: tentando injetar headers via fold. ---
+      // Se o servidor "desdobrar" incorretamente, o atacante poderia smuggling.
+      // Diferença chave de CRLF puro: aqui o próximo byte É SP/HTAB, então é fold válido (não nova header line).
+      { label: 'obs-fold tentando esconder set-cookie',     raw: 'content-type,\r\n set-cookie' },
+      { label: 'obs-fold tentando esconder cookie',         raw: 'content-type,\r\n\tcookie' },
+      { label: 'obs-fold tentando esconder x-injected',     raw: 'content-type,\r\n x-injected' },
+      { label: 'obs-fold antes de payload smuggling',       raw: 'content-type,\r\n x-folded\r\nSet-Cookie: pwn=1' },
+
+      // --- obs-fold + null bytes combinados. ---
+      { label: 'obs-fold + null byte no fold',              raw: 'content-type,\r\n \x00x-test-secret' },
+      { label: 'obs-fold + null antes do CRLF',             raw: 'content-type\x00,\r\n x-test-secret' },
+
+      // --- obs-fold com casing variado nos tokens. ---
+      { label: 'obs-fold + UPPERCASE',                      raw: 'AUTHORIZATION,\r\n X-CLIENT-INFO' },
+      { label: 'obs-fold + Title-Case',                     raw: 'Authorization,\r\n\tX-Client-Info' },
+      { label: 'obs-fold + mIxEd',                          raw: 'AuThOrIzAtIoN,\r\n X-cLiEnT-iNfO' },
+
+      // --- obs-fold em torno de vírgulas exóticas. ---
+      { label: 'obs-fold + vírgulas duplas',                raw: 'content-type,,\r\n x-test-secret' },
+      { label: 'obs-fold + leading comma',                  raw: ',\r\n content-type, x-test-secret' },
+      { label: 'obs-fold + trailing comma',                 raw: 'content-type, x-test-secret,\r\n ' },
+    ]
+
+    const parseList = (v: string | null): string[] =>
+      (v ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
+
+    type RawResponse = { status: number; headers: Headers } | { error: string }
+
+    async function sendRaw(payload: string): Promise<RawResponse> {
+      let conn: Deno.TcpConn | null = null
+      try {
+        conn = await Deno.connect({ hostname: u.hostname, port: parseInt(u.port, 10), transport: 'tcp' })
+        const reqLines = [
+          'OPTIONS / HTTP/1.1',
+          `Host: ${hostHeader}`,
+          'Origin: https://evil.example.com',
+          'Access-Control-Request-Method: POST',
+          `Access-Control-Request-Headers: ${payload}`,
+          'Connection: close',
+          '',
+          '',
+        ]
+        await conn.write(new TextEncoder().encode(reqLines.join('\r\n')))
+
+        const chunks: Uint8Array[] = []
+        const buf = new Uint8Array(8192)
+        while (true) {
+          const n = await conn.read(buf)
+          if (n === null) break
+          chunks.push(buf.slice(0, n))
+        }
+        const total = chunks.reduce((s, c) => s + c.length, 0)
+        const merged = new Uint8Array(total)
+        let off = 0
+        for (const c of chunks) { merged.set(c, off); off += c.length }
+        const text = new TextDecoder().decode(merged)
+
+        const headerEnd = text.indexOf('\r\n\r\n')
+        if (headerEnd === -1) return { error: 'no header terminator' }
+        const lines = text.slice(0, headerEnd).split('\r\n')
+        const m = lines[0].match(/^HTTP\/1\.[01]\s+(\d{3})/)
+        if (!m) return { error: `bad status: ${lines[0]}` }
+        const status = parseInt(m[1], 10)
+        const headers = new Headers()
+        for (let i = 1; i < lines.length; i++) {
+          const idx = lines[i].indexOf(':')
+          if (idx === -1) continue
+          const name = lines[i].slice(0, idx).trim()
+          const value = lines[i].slice(idx + 1).trim()
+          if (name) headers.append(name, value)
+        }
+        return { status, headers }
+      } finally {
+        try { conn?.close() } catch { /* ignore */ }
+      }
+    }
+
+    let validatedAs200 = 0
+    let acceptedAs4xx = 0
+
+    for (const p of PAYLOADS) {
+      const result = await sendRaw(p.raw)
+      const ctxLabel = `[obs-fold payload: ${p.label}]`
+
+      if ('error' in result) {
+        // Servidor recusou — RFC 7230 explicitly permite responder 400 a obs-fold. Seguro.
+        acceptedAs4xx++
+        continue
+      }
+
+      // (1) Status 200 OU 4xx — nunca 5xx (que indicaria crash no parser de obs-fold).
+      assert(
+        result.status === 200 || (result.status >= 400 && result.status < 500),
+        `${ctxLabel}: status deve ser 200 ou 4xx, recebido ${result.status}`,
+      )
+
+      if (result.status !== 200) {
+        acceptedAs4xx++
+        continue
+      }
+      validatedAs200++
+
+      // (2) Allow-Headers LITERAL EXATO — sem echo do payload com fold.
+      const ah = result.headers.get('access-control-allow-headers')
+      assertExists(ah, `${ctxLabel}: Allow-Headers deve estar presente`)
+      assertEquals(
+        ah, EXPECTED_HEADERS_LITERAL,
+        `${ctxLabel}: Allow-Headers deve ser literal "${EXPECTED_HEADERS_LITERAL}"`,
+      )
+
+      // (3) Conjunto parseado bate exatamente.
+      const parsed = new Set(parseList(ah))
+      assertEquals(parsed.size, EXPECTED_HEADERS_SET.size, `${ctxLabel}: Allow-Headers deve listar exatamente 5 headers`)
+      for (const h of EXPECTED_HEADERS_SET) {
+        assert(parsed.has(h), `${ctxLabel}: Allow-Headers deve incluir "${h}"`)
+      }
+
+      // (4) NUNCA cabeçalhos perigosos (mesmo se obs-fold tentou esconder).
+      for (const dangerous of DANGEROUS_HEADERS) {
+        assert(!parsed.has(dangerous), `${ctxLabel}: Allow-Headers NÃO PODE conter header perigoso "${dangerous}"`)
+      }
+
+      // (5) Allow-Headers NUNCA contém CR/LF/null embutido (anti header-injection downstream).
+      assert(!ah.includes('\r'), `${ctxLabel}: Allow-Headers NÃO PODE conter CR`)
+      assert(!ah.includes('\n'), `${ctxLabel}: Allow-Headers NÃO PODE conter LF`)
+      assert(!ah.includes('\x00'), `${ctxLabel}: Allow-Headers NÃO PODE conter null byte`)
+
+      // (6) Outros campos CORS literais.
+      assertEquals(result.headers.get('access-control-allow-methods'), 'POST, OPTIONS', `${ctxLabel}: Allow-Methods literal`)
+      assertEquals(result.headers.get('access-control-allow-origin'), '*', `${ctxLabel}: Allow-Origin '*'`)
+      assertEquals(result.headers.get('access-control-allow-credentials'), null, `${ctxLabel}: Allow-Credentials NUNCA`)
+      assertEquals(result.headers.get('access-control-max-age'), '86400', `${ctxLabel}: Max-Age literal`)
+
+      // (7) Headers smuggling NUNCA aparecem na resposta (anti obs-fold smuggling).
+      assertEquals(result.headers.get('set-cookie'), null, `${ctxLabel}: Set-Cookie NUNCA pode aparecer`)
+      assertEquals(result.headers.get('cookie'), null, `${ctxLabel}: Cookie NUNCA pode aparecer`)
+      assertEquals(result.headers.get('x-injected'), null, `${ctxLabel}: X-Injected NUNCA pode aparecer`)
+      assertEquals(result.headers.get('x-folded'), null, `${ctxLabel}: X-Folded NUNCA pode aparecer`)
+      assertEquals(result.headers.get('x-smuggled'), null, `${ctxLabel}: X-Smuggled NUNCA pode aparecer`)
+      assertEquals(result.headers.get('access-control-expose-headers'), null, `${ctxLabel}: Expose-Headers NUNCA pode aparecer`)
+
+      // (8) Allow-Headers aparece exatamente 1x.
+      let occurrences = 0
+      for (const [name] of result.headers) {
+        if (name.toLowerCase() === 'access-control-allow-headers') occurrences++
+      }
+      assertEquals(occurrences, 1, `${ctxLabel}: Allow-Headers deve aparecer exatamente 1x`)
+    }
+
+    // (9) Sanidade da matriz: total de payloads cobertos.
+    assertEquals(
+      validatedAs200 + acceptedAs4xx, PAYLOADS.length,
+      `todos os ${PAYLOADS.length} payloads obs-fold devem ser cobertos (200=${validatedAs200}, 4xx/erro=${acceptedAs4xx})`,
+    )
+
+    // (10) Zero createClient invocado mesmo com obs-fold maliciosos.
+    assertEquals(ctx._calls, 0, 'createClient NUNCA pode ser invocado em OPTIONS preflight (obs-fold)')
+  } finally {
+    await ctx.stop()
+  }
+})
