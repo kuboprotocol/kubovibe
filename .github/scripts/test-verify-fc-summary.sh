@@ -335,6 +335,30 @@ run_case "BAD: stray seeds inline link while not staged" \
 run_case "BAD: stray failures inline link while not staged" \
   "${STRAY_FAILURES}" 1 0 0 "" ""
 
+echo ""
+echo "── presence: missing bullets (must fail) ──"
+run_case "BAD: fc-seeds bullet missing entirely (staged)" \
+  "${MISSING_SEEDS}"    1 1 1 "https://example.com/seeds" "https://example.com/failures"
+run_case "BAD: fc-failures bullet missing entirely (staged)" \
+  "${MISSING_FAILURES}" 1 1 1 "https://example.com/seeds" "https://example.com/failures"
+run_case "BAD: BOTH bullets missing (section header only, staged)" \
+  "${MISSING_BOTH}"     1 1 1 "https://example.com/seeds" "https://example.com/failures"
+run_case "BAD: BOTH bullets missing (not staged either)" \
+  "${MISSING_BOTH}"     1 0 0 "" ""
+
+echo ""
+echo "── uniqueness: duplicate bullets (must fail) ──"
+run_case "BAD: duplicate canonical fc-seeds bullet" \
+  "${DUP_SEEDS_CANONICAL}"    1 1 1 "https://example.com/seeds" "https://example.com/failures"
+run_case "BAD: duplicate canonical fc-failures bullet" \
+  "${DUP_FAILURES_CANONICAL}" 1 1 1 "https://example.com/seeds" "https://example.com/failures"
+run_case "BAD: duplicate fallback fc-seeds marker (not staged)" \
+  "${DUP_SEEDS_FALLBACK}"     1 0 0 "" ""
+run_case "BAD: mix canonical+fallback for fc-seeds.json" \
+  "${MIX_SEEDS}"     1 1 1 "https://example.com/seeds" "https://example.com/failures"
+run_case "BAD: mix canonical+fallback for fc-failures.json" \
+  "${MIX_FAILURES}"  1 1 1 "https://example.com/seeds" "https://example.com/failures"
+
 # ─── summary ─────────────────────────────────────────────────────────────────
 
 echo ""
