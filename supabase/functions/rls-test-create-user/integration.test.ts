@@ -9149,7 +9149,7 @@ Deno.test('HTTP integration: OPTIONS preflight — fast-check property-based SHR
       { weight: 1, arbitrary: markerTok }, // garante presença do marker em parte das amostras
     )
 
-    const payloadArb = fc.array(tokenArb, { minLength: 1, maxLength: 14 }).map((tokens, _) => tokens)
+    const payloadArb: fc.Arbitrary<Token[]> = fc.array(tokenArb, { minLength: 1, maxLength: 14 })
 
     // ─── Build raw + marker (assina cada execução para detectar leak). ───
     function buildRequestMethod(tokens: Token[], marker: string): string {
