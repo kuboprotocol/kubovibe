@@ -544,7 +544,61 @@ jobs:
             fi
           fi
 
-          echo "✅ ${SUMMARY_NAME} validated (seeds=${SEEDS_VALIDATED}, failures=${FAILURES_VALIDATED})."
+          # 6. Reinforced integrity checks — catch silent regressions in the
+          # append step that wouldn't be visible from links alone.
+
+          # 6a. The "🎯 fast-check direct downloads" header must appear EXACTLY
+          # ONCE in the per-category summary (no duplicate appends, no drift
+          # from cross-category contamination).
+          HEADER_COUNT=$(grep -Fc "🎯 fast-check direct downloads (${FC_HEADER_LABEL})" "${SUMMARY_FILE}" || true)
+          if [ "${HEADER_COUNT}" != "1" ]; then
+            fail "Expected exactly 1 fast-check section header for ${FC_HEADER_LABEL}, found ${HEADER_COUNT}"
+          fi
+
+          # 6b. The wrong-category header MUST NOT leak into this summary.
+          OTHER_LABEL="Access-Control-Request-Headers"
+          [ "${FC_HEADER_LABEL}" = "Access-Control-Request-Headers" ] && OTHER_LABEL="Access-Control-Request-Method"
+          if grep -Fq "🎯 fast-check direct downloads (${OTHER_LABEL})" "${SUMMARY_FILE}"; then
+            fail "Cross-category contamination: ${SUMMARY_NAME} contains the ${OTHER_LABEL} section"
+          fi
+
+          # 6c. When a file is staged, its inline link line must be on its own
+          # line (not concatenated/escaped) AND the URL must look like an
+          # actual https:// GitHub artifact URL — protects against future
+          # bugs where artifact-url returns empty/garbled values.
+          if [ "${STAGED_FC_SEEDS:-0}" = "1" ]; then
+            case "${FC_SEEDS_URL}" in
+              https://*) : ;;
+              *) fail "fc-seeds.json URL is not https:// (got: ${FC_SEEDS_URL})" ;;
+            esac
+            grep -Eq "^- 🌱 \*\*Seeds executed.*\[\`fc-seeds\.json\`\]\(${FC_SEEDS_URL//\//\\/}\)" "${SUMMARY_FILE}" \
+              || fail "fc-seeds.json inline link not formatted as a bullet line in ${SUMMARY_NAME}"
+          fi
+          if [ "${STAGED_FC_FAILURES:-0}" = "1" ]; then
+            case "${FC_FAILURES_URL}" in
+              https://*) : ;;
+              *) fail "fc-failures.json URL is not https:// (got: ${FC_FAILURES_URL})" ;;
+            esac
+            grep -Eq "^- 💥 \*\*Minimized counterexamples.*\[\`fc-failures\.json\`\]\(${FC_FAILURES_URL//\//\\/}\)" "${SUMMARY_FILE}" \
+              || fail "fc-failures.json inline link not formatted as a bullet line in ${SUMMARY_NAME}"
+          fi
+
+          # 6d. Defensive: ensure no literal placeholder leaked into the
+          # summary (e.g. unrendered ${VAR}, "null", "undefined").
+          for bad in '${FC_SEEDS_URL}' '${FC_FAILURES_URL}' '](null)' '](undefined)' '](  )'; do
+            if grep -Fq "${bad}" "${SUMMARY_FILE}"; then
+              fail "Found unresolved placeholder/garbage in ${SUMMARY_NAME}: ${bad}"
+            fi
+          done
+
+          # 6e. Summary must be small enough to fit in a sticky PR comment
+          # (GitHub hard cap: 65536 chars). Warn-fail at 60000 to keep margin.
+          SUMMARY_BYTES=$(wc -c < "${SUMMARY_FILE}")
+          if [ "${SUMMARY_BYTES}" -gt 60000 ]; then
+            fail "${SUMMARY_NAME} is too large for a sticky PR comment (${SUMMARY_BYTES} bytes > 60000)"
+          fi
+
+          echo "✅ ${SUMMARY_NAME} validated (seeds=${SEEDS_VALIDATED}, failures=${FAILURES_VALIDATED}, size=${SUMMARY_BYTES}B, header_count=${HEADER_COUNT})."
           {
             echo ""
             echo "### ✅ Summary self-check (${FC_HEADER_LABEL})"
