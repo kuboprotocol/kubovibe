@@ -71,7 +71,10 @@ jobs:
       CATEGORY_ID: ${{ matrix.id }}
       CATEGORY_LABEL: ${{ matrix.label }}
       FUZZ_STATE_DIR: ${{ github.workspace }}/.rls-test-fuzz-state
-      ARTIFACT_NAME: preflight-fuzz-${{ matrix.id }}-${{ github.run_id }}
+      # Standardized artifact naming → easy GitHub UI search:
+      #   preflight-fuzz-<category>-<file>-run<run_number>-<run_id>
+      # The trailing run_id keeps names unique across re-runs (required by v4).
+      ARTIFACT_NAME: preflight-fuzz-${{ matrix.id }}-bundle-run${{ github.run_number }}-${{ github.run_id }}
     steps:
       # Skip categories the user didn't request via workflow_dispatch.
       - name: Determine if this category should run
@@ -321,7 +324,7 @@ jobs:
         id: upload_seeds
         uses: actions/upload-artifact@v4
         with:
-          name: preflight-fuzz-${{ matrix.id }}-seeds-${{ github.run_id }}
+          name: preflight-fuzz-${{ matrix.id }}-seeds-run${{ github.run_number }}-${{ github.run_id }}
           path: reports/seeds/seeds.json
           if-no-files-found: ignore
           retention-days: 14
@@ -331,7 +334,7 @@ jobs:
         id: upload_failures
         uses: actions/upload-artifact@v4
         with:
-          name: preflight-fuzz-${{ matrix.id }}-failures-${{ github.run_id }}
+          name: preflight-fuzz-${{ matrix.id }}-failures-run${{ github.run_number }}-${{ github.run_id }}
           path: reports/failures/failures.json
           if-no-files-found: ignore
           retention-days: 14
@@ -341,7 +344,7 @@ jobs:
         id: upload_log
         uses: actions/upload-artifact@v4
         with:
-          name: preflight-fuzz-${{ matrix.id }}-log-${{ github.run_id }}
+          name: preflight-fuzz-${{ matrix.id }}-log-run${{ github.run_number }}-${{ github.run_id }}
           path: reports/log/fuzz-${{ matrix.id }}.log
           if-no-files-found: ignore
           retention-days: 14
@@ -351,7 +354,7 @@ jobs:
         id: upload_fc_seeds
         uses: actions/upload-artifact@v4
         with:
-          name: preflight-fuzz-fc-seeds-${{ github.run_id }}
+          name: preflight-fuzz-${{ matrix.id }}-fc-seeds-run${{ github.run_number }}-${{ github.run_id }}
           path: reports/fc-seeds/fc-seeds.json
           if-no-files-found: ignore
           retention-days: 14
@@ -361,7 +364,7 @@ jobs:
         id: upload_fc_failures
         uses: actions/upload-artifact@v4
         with:
-          name: preflight-fuzz-fc-failures-${{ github.run_id }}
+          name: preflight-fuzz-${{ matrix.id }}-fc-failures-run${{ github.run_number }}-${{ github.run_id }}
           path: reports/fc-failures/fc-failures.json
           if-no-files-found: ignore
           retention-days: 14
@@ -492,5 +495,5 @@ jobs:
           output: |
             {
               "title": "${{ steps.agg.outputs.title }}",
-              "summary": "Per-category Check Runs (each with its own artifact link):\n\n- **Preflight CORS Fuzz / Origin** → artifact `preflight-fuzz-origin-${{ github.run_id }}`\n- **Preflight CORS Fuzz / Request-Method** → artifact `preflight-fuzz-request-method-${{ github.run_id }}`\n- **Preflight CORS Fuzz / Request-Headers** → artifact `preflight-fuzz-request-headers-${{ github.run_id }}`\n\nMatrix job result: `${{ needs.preflight-fuzz.result }}`.\n\n🔗 [Workflow run page](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+              "summary": "Per-category Check Runs (each with its own artifacts):\n\n- **Preflight CORS Fuzz / Origin** → search GitHub Actions artifacts for `preflight-fuzz-origin-*-run${{ github.run_number }}-${{ github.run_id }}`\n- **Preflight CORS Fuzz / Request-Method** → search for `preflight-fuzz-request-method-*-run${{ github.run_number }}-${{ github.run_id }}` (includes `fc-seeds`/`fc-failures`)\n- **Preflight CORS Fuzz / Request-Headers** → search for `preflight-fuzz-request-headers-*-run${{ github.run_number }}-${{ github.run_id }}`\n\nNaming pattern: `preflight-fuzz-<category>-<file>-run<run_number>-<run_id>` (file ∈ `bundle`, `seeds`, `failures`, `log`, `fc-seeds`, `fc-failures`).\n\nMatrix job result: `${{ needs.preflight-fuzz.result }}`.\n\n🔗 [Workflow run page](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
             }
