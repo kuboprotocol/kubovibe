@@ -2508,3 +2508,127 @@ Deno.test('HTTP integration: hostile Cookie on cross-origin (HEAD/GET/POST/OPTIO
     }
   }
 })
+
+Deno.test('HTTP integration: CORS responses MUST NOT leak Access-Control-Expose-Headers across all methods/statuses', async () => {
+  const HOSTILE_ORIGIN = 'https://evil.example.com'
+
+  const variants: Array<{
+    method: 'HEAD' | 'GET' | 'POST' | 'OPTIONS'
+    extraHeaders?: Record<string, string>
+    body?: string
+    label: string
+  }> = [
+    { method: 'OPTIONS', extraHeaders: { 'access-control-request-method': 'POST', 'access-control-request-headers': 'content-type, x-test-secret' }, label: 'OPTIONS preflight' },
+    { method: 'OPTIONS', label: 'OPTIONS bare' },
+    { method: 'POST', extraHeaders: { 'content-type': 'application/json', 'x-test-secret': SECRET }, body: JSON.stringify({}), label: 'POST 200' },
+    { method: 'POST', extraHeaders: { 'content-type': 'application/json' }, body: JSON.stringify({}), label: 'POST 401' },
+    { method: 'POST', extraHeaders: { 'content-type': 'application/json', 'x-test-secret': 'wrong' }, body: JSON.stringify({}), label: 'POST wrong-secret' },
+    { method: 'GET', label: 'GET' },
+    { method: 'HEAD', label: 'HEAD' },
+  ]
+
+  for (const v of variants) {
+    const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+    try {
+      const res = await fetch(ctx.url, {
+        method: v.method,
+        headers: { 'origin': HOSTILE_ORIGIN, ...(v.extraHeaders ?? {}) },
+        body: v.body,
+      })
+
+      // (1) Checagem direta — Expose-Headers NÃO pode estar presente.
+      // O handler não expõe nenhum header customizado ao cliente cross-origin
+      // (não há body fields que dependam de header inspection no JS do
+      // browser), então emitir Expose-Headers é leak de superfície.
+      const expose = res.headers.get('access-control-expose-headers')
+      assertEquals(
+        expose,
+        null,
+        `${v.label}: Access-Control-Expose-Headers NÃO pode estar presente — recebido: ${JSON.stringify(expose)}`,
+      )
+
+      // (1b) Varredura case-insensitive defensiva contra reverse proxies.
+      const exposeLeak: string[] = []
+      for (const [name, value] of res.headers) {
+        if (name.toLowerCase() === 'access-control-expose-headers') {
+          exposeLeak.push(`${name}=${value}`)
+        }
+      }
+      assertEquals(
+        exposeLeak,
+        [],
+        `${v.label}: nenhum Expose-Headers permitido (qualquer capitalização) — vazamentos: ${JSON.stringify(exposeLeak)}`,
+      )
+
+      await res.text()
+    } finally {
+      await ctx.stop()
+    }
+  }
+})
+
+Deno.test('HTTP integration: Vary header contract — MUST NOT include Origin/Cookie/Authorization/* (Allow-Origin is literal "*", caching by Origin would be wrong)', async () => {
+  const HOSTILE_ORIGIN = 'https://evil.example.com'
+
+  // Tokens proibidos no Vary. "Origin" é o caso crítico: como o servidor
+  // sempre devolve Allow-Origin: "*" (independente do request), incluir
+  // "Vary: Origin" forçaria caches a manter uma entrada por Origin sem
+  // benefício, e indica handler com lógica de eco escondida.
+  // "Cookie" e "Authorization" no Vary indicam que a resposta varia com
+  // credenciais — incompatível com Allow-Origin: "*".
+  // "*" no Vary desabilita cache totalmente — também não esperado aqui.
+  const FORBIDDEN_VARY_TOKENS = ['origin', 'cookie', 'authorization', '*']
+
+  const variants: Array<{
+    method: 'HEAD' | 'GET' | 'POST' | 'OPTIONS'
+    extraHeaders?: Record<string, string>
+    body?: string
+    label: string
+  }> = [
+    { method: 'OPTIONS', extraHeaders: { 'access-control-request-method': 'POST', 'access-control-request-headers': 'content-type, x-test-secret' }, label: 'OPTIONS preflight' },
+    { method: 'POST', extraHeaders: { 'content-type': 'application/json', 'x-test-secret': SECRET }, body: JSON.stringify({}), label: 'POST 200' },
+    { method: 'POST', extraHeaders: { 'content-type': 'application/json' }, body: JSON.stringify({}), label: 'POST 401' },
+    { method: 'GET', label: 'GET' },
+    { method: 'HEAD', label: 'HEAD' },
+  ]
+
+  for (const v of variants) {
+    const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+    try {
+      const res = await fetch(ctx.url, {
+        method: v.method,
+        headers: { 'origin': HOSTILE_ORIGIN, ...(v.extraHeaders ?? {}) },
+        body: v.body,
+      })
+
+      // Coleta TODAS as instâncias de Vary (case-insensitive) — HTTP permite
+      // múltiplos Vary, alguns proxies também duplicam.
+      const varyValues: string[] = []
+      for (const [name, value] of res.headers) {
+        if (name.toLowerCase() === 'vary') varyValues.push(value)
+      }
+
+      // Sano se: (a) não há Vary, OU (b) Vary só contém tokens neutros
+      // tipo "Accept-Encoding" (injetado pelo runtime de compressão).
+      if (varyValues.length > 0) {
+        // Junta todos os Vary, normaliza e quebra por vírgula.
+        const tokens = varyValues
+          .join(',')
+          .split(',')
+          .map((t) => t.trim().toLowerCase())
+          .filter(Boolean)
+
+        for (const forbidden of FORBIDDEN_VARY_TOKENS) {
+          assert(
+            !tokens.includes(forbidden),
+            `${v.label}: Vary NÃO pode conter token "${forbidden}" — Vary completo: ${JSON.stringify(varyValues)}`,
+          )
+        }
+      }
+
+      await res.text()
+    } finally {
+      await ctx.stop()
+    }
+  }
+})
