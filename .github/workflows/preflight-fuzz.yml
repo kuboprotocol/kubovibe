@@ -71,7 +71,10 @@ jobs:
       CATEGORY_ID: ${{ matrix.id }}
       CATEGORY_LABEL: ${{ matrix.label }}
       FUZZ_STATE_DIR: ${{ github.workspace }}/.rls-test-fuzz-state
-      ARTIFACT_NAME: preflight-fuzz-${{ matrix.id }}-${{ github.run_id }}
+      # Standardized artifact naming → easy GitHub UI search:
+      #   preflight-fuzz-<category>-<file>-run<run_number>-<run_id>
+      # The trailing run_id keeps names unique across re-runs (required by v4).
+      ARTIFACT_NAME: preflight-fuzz-${{ matrix.id }}-bundle-run${{ github.run_number }}-${{ github.run_id }}
     steps:
       # Skip categories the user didn't request via workflow_dispatch.
       - name: Determine if this category should run
