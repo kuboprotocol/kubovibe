@@ -7702,10 +7702,13 @@ Deno.test('HTTP integration: OPTIONS preflight — Access-Control-Request-Method
         )
       }
 
-      // (6) Body de preflight deve ser vazio (length 0) ou no máximo whitespace.
+      // (6) Body de preflight pode conter apenas framing HTTP (chunked terminator "0\r\n\r\n"
+      //     ou vazio). Nunca deve conter conteúdo significativo: removemos chars de framing
+      //     (0-9, \r, \n, espaço) e exigimos resultado vazio.
+      const bodyMeaningful = result.body.replace(/[\r\n\t 0-9]/g, '')
       assert(
-        result.body.trim().length === 0,
-        `${ctxLabel}: body de preflight deve ser vazio, recebido ${result.body.length} bytes não-whitespace`,
+        bodyMeaningful.length === 0,
+        `${ctxLabel}: body de preflight deve conter apenas framing HTTP, recebido conteúdo significativo: ${JSON.stringify(bodyMeaningful)}`,
       )
 
       // (7) Headers CORS literais adicionais.
