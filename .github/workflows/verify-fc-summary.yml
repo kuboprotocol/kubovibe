@@ -1,0 +1,44 @@
+name: Verify FC Summary Script
+
+# Fast lint-style job that exercises .github/scripts/verify-fc-summary.sh
+# against a fixture matrix (canonical bullets + drift cases). Runs on any
+# change to either the verify script, its test harness, or this workflow,
+# so contract drift between writer (preflight-fuzz.yml) and validator is
+# caught BEFORE the full fuzz matrix burns minutes failing on the same issue.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/scripts/verify-fc-summary.sh'
+      - '.github/scripts/test-verify-fc-summary.sh'
+      - '.github/workflows/verify-fc-summary.yml'
+  pull_request:
+    paths:
+      - '.github/scripts/verify-fc-summary.sh'
+      - '.github/scripts/test-verify-fc-summary.sh'
+      - '.github/workflows/verify-fc-summary.yml'
+      - '.github/workflows/preflight-fuzz.yml'  # writer side — keep in sync
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-fc-summary-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: verify-fc-summary smoke tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run smoke tests
+        run: |
+          chmod +x .github/scripts/verify-fc-summary.sh \
+                   .github/scripts/test-verify-fc-summary.sh
+          bash .github/scripts/test-verify-fc-summary.sh
