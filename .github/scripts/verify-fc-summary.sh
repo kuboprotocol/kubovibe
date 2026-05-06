@@ -136,6 +136,49 @@ assert_bullet_line() {
   fi
 }
 
+# Assert that exactly ONE bullet line in ${SUMMARY_FILE} mentions the given
+# token (e.g. "fc-seeds.json"). Counts BOTH canonical inline-link bullets
+# and the documented fallback markers. A bullet line is identified by the
+# leading "- " marker. Fails on:
+#   - 0 occurrences  → the section silently dropped the file entirely
+#   - >1 occurrences → duplicate render (writer drift, append ran twice,
+#                      cross-category contamination, etc.)
+# This runs BEFORE the conditional content checks so duplicates are
+# caught even when one of the duplicates happens to match the expected
+# canonical bullet.
+assert_single_bullet_for() {
+  local token="$1"   # e.g. "fc-seeds.json"
+  # Match lines starting with "- " that contain the token. -F is fixed-
+  # string for the token; we use grep -E for the line anchor.
+  local count
+  count=$(grep -cE "^- .*$(printf '%s' "${token}" | sed 's/[][\\.^$*+?(){}|/]/\\&/g')" "${SUMMARY_FILE}" || true)
+  count="${count:-0}"
+
+  if [ "${count}" = "0" ]; then
+    echo "::error title=${CONTEXT_LABEL} missing bullet::No bullet line mentions '${token}' in ${CONTEXT_LABEL}"
+    echo "Expected exactly 1 bullet (canonical inline link OR fallback marker)."
+    echo "Lines mentioning '${token}' (any context):"
+    grep -n -F -- "${token}" "${SUMMARY_FILE}" | sed 's/^/  /' || echo "  (none — token absent from file)"
+    fail "Section is missing the '${token}' bullet entirely (writer skipped append?)"
+  fi
+
+  if [ "${count}" -gt 1 ]; then
+    echo "::error title=${CONTEXT_LABEL} duplicate bullet::Found ${count} bullet lines mentioning '${token}' in ${CONTEXT_LABEL}; expected exactly 1"
+    echo "Offending bullet lines (with line numbers):"
+    grep -nE "^- .*$(printf '%s' "${token}" | sed 's/[][\\.^$*+?(){}|/]/\\&/g')" "${SUMMARY_FILE}" \
+      | sed 's/^/  /'
+    fail "Duplicate '${token}' bullet detected (${count} occurrences); writer/append ran more than once or cross-category contamination"
+  fi
+}
+
+# ─── presence + uniqueness gate (runs FIRST) ─────────────────────────────────
+# Must hold regardless of whether STAGED_FC_* is 1 or 0 — both the canonical
+# inline bullet and the fallback marker count as "the one bullet for this
+# file". This guards against silent drops AND duplicate renders.
+
+assert_single_bullet_for "fc-seeds.json"
+assert_single_bullet_for "fc-failures.json"
+
 # ─── fc-seeds.json — conditional on STAGED_FC_SEEDS ──────────────────────────
 
 SEEDS_RESULT="skipped"
