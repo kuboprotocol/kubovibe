@@ -1456,3 +1456,94 @@ Deno.test('HTTP integration: OPTIONS preflight — Vary: Origin and Access-Contr
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: POST responses (200 success + 401 unauthorized) MUST NOT include Access-Control-Allow-Credentials', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    // Por que esse teste é DEDICADO ao caminho POST (e não só ao OPTIONS):
+    //   * `corsHeaders` é spreadado em TODAS as respostas via o helper json(),
+    //     então um vazamento acidental de Allow-Credentials apareceria igual
+    //     em sucesso (200) e erro (401). Validar ambos os caminhos blinda
+    //     contra qualquer divergência futura entre branches do handler.
+    //   * Allow-Credentials: true + Allow-Origin: "*" é REJEITADO pela CORS
+    //     spec (Fetch §3.2). Qualquer resposta — preflight, sucesso ou erro —
+    //     com essa combinação seria bloqueada pelo browser, derrubando 100%
+    //     dos clientes cross-origin.
+    //   * Como o handler nunca usa cookies/Authorization auto-enviados pelo
+    //     browser, habilitar credentials seria também uma vulnerabilidade
+    //     CSRF amplificada. Esse contrato precisa ser blindado nos dois
+    //     status codes mais comuns do endpoint (sucesso + falha de auth).
+    //
+    // Validação dupla por resposta:
+    //   (1) headers.get(...) === null
+    //   (2) Iteração case-insensitive sobre todos os headers (protege contra
+    //       capitalização não-canônica vinda de reverse-proxies).
+
+    // ----- Cenário A: POST 200 (secret correto) -----
+    const okRes = await fetch(`${ctx.url}/`, {
+      method: 'POST',
+      headers: {
+        'x-test-secret': SECRET,
+        'content-type': 'application/json',
+        // Origin presente intencionalmente — reproduz cenário real cross-origin
+        // onde o browser AVALIA Allow-Credentials junto com Allow-Origin "*".
+        'origin': 'https://app.kubovibe.dev',
+      },
+    })
+    assertEquals(okRes.status, 200, 'POST com secret correto deve retornar 200')
+
+    assertEquals(
+      okRes.headers.get('access-control-allow-credentials'),
+      null,
+      'POST 200: Access-Control-Allow-Credentials NÃO pode estar presente (incompatível com Allow-Origin "*")',
+    )
+    const okLeak: string[] = []
+    for (const [name, value] of okRes.headers) {
+      if (name.toLowerCase() === 'access-control-allow-credentials') {
+        okLeak.push(`${name}=${value}`)
+      }
+    }
+    assertEquals(
+      okLeak,
+      [],
+      `POST 200: nenhum cabeçalho Allow-Credentials permitido (qualquer capitalização) — vazamentos: ${JSON.stringify(okLeak)}`,
+    )
+    // Sanidade: a resposta de sucesso ainda devolve Allow-Origin "*" — combinação
+    // que SÓ é válida na ausência de Allow-Credentials.
+    assertEquals(okRes.headers.get('access-control-allow-origin'), '*')
+    await okRes.text()
+
+    // ----- Cenário B: POST 401 (secret errado) -----
+    const errRes = await fetch(`${ctx.url}/`, {
+      method: 'POST',
+      headers: {
+        'x-test-secret': 'definitely-wrong-secret',
+        'content-type': 'application/json',
+        'origin': 'https://app.kubovibe.dev',
+      },
+      body: JSON.stringify({ email: 'a@b.com', password: 'pw' }),
+    })
+    assertEquals(errRes.status, 401, 'POST com secret errado deve retornar 401')
+
+    assertEquals(
+      errRes.headers.get('access-control-allow-credentials'),
+      null,
+      'POST 401: Access-Control-Allow-Credentials NÃO pode estar presente em respostas de erro',
+    )
+    const errLeak: string[] = []
+    for (const [name, value] of errRes.headers) {
+      if (name.toLowerCase() === 'access-control-allow-credentials') {
+        errLeak.push(`${name}=${value}`)
+      }
+    }
+    assertEquals(
+      errLeak,
+      [],
+      `POST 401: nenhum cabeçalho Allow-Credentials permitido (qualquer capitalização) — vazamentos: ${JSON.stringify(errLeak)}`,
+    )
+    assertEquals(errRes.headers.get('access-control-allow-origin'), '*')
+    await errRes.text()
+  } finally {
+    await ctx.stop()
+  }
+})
