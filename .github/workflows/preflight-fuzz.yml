@@ -417,17 +417,20 @@ jobs:
 
       # Append a fast-check-specific section with INLINE direct download links
       # right next to the contextual explanation, so reviewers reading the PR
-      # comment / summary-request-method.md don't need to scroll to find them.
+      # comment / summary-<category>.md don't need to scroll to find them.
+      # Runs for BOTH request-method and request-headers because the shared
+      # fast-check SHRINKING suite produces fc-seeds/fc-failures in either job.
       - name: Append fast-check artifact links to summary
-        if: always() && steps.gate.outputs.should_run == 'true' && matrix.id == 'request-method'
+        if: always() && steps.gate.outputs.should_run == 'true' && (matrix.id == 'request-method' || matrix.id == 'request-headers')
         env:
           FC_SEEDS_URL: ${{ steps.links.outputs.fc_seeds_url }}
           FC_FAILURES_URL: ${{ steps.links.outputs.fc_failures_url }}
           SUMMARY_FILE: ${{ steps.summary.outputs.summary_file }}
+          FC_HEADER_LABEL: ${{ matrix.id == 'request-method' && 'Access-Control-Request-Method' || 'Access-Control-Request-Headers' }}
         run: |
           {
             echo ""
-            echo "### 🎯 fast-check direct downloads (Access-Control-Request-Method)"
+            echo "### 🎯 fast-check direct downloads (${FC_HEADER_LABEL})"
             echo ""
             if [ -n "${FC_SEEDS_URL}" ]; then
               echo "- 🌱 **Seeds executed (last 50 runs):** [\`fc-seeds.json\`](${FC_SEEDS_URL})"
@@ -446,28 +449,30 @@ jobs:
           # Re-emit the augmented summary into the GitHub Actions UI panel.
           {
             echo ""
-            echo "### 🎯 fast-check direct downloads"
+            echo "### 🎯 fast-check direct downloads (${FC_HEADER_LABEL})"
             [ -n "${FC_SEEDS_URL}" ]    && echo "- [fc-seeds.json](${FC_SEEDS_URL})"
             [ -n "${FC_FAILURES_URL}" ] && echo "- [fc-failures.json](${FC_FAILURES_URL})"
           } >> "$GITHUB_STEP_SUMMARY"
 
       # Self-test: assert the append step actually injected the inline
       # fc-seeds.json / fc-failures.json links (or the documented fallback
-      # markers) into BOTH summary-request-method.md and the GITHUB_STEP_SUMMARY
+      # markers) into BOTH summary-<category>.md and the GITHUB_STEP_SUMMARY
       # mirror. Fails the job loudly with a diff if the contract is broken,
       # so a future refactor can never silently drop the inline links from
-      # the sticky PR comment body.
+      # the sticky PR comment body. Runs for request-method AND request-headers.
       - name: Verify fast-check inline links present in summary
-        if: always() && steps.gate.outputs.should_run == 'true' && matrix.id == 'request-method'
+        if: always() && steps.gate.outputs.should_run == 'true' && (matrix.id == 'request-method' || matrix.id == 'request-headers')
         env:
           FC_SEEDS_URL: ${{ steps.links.outputs.fc_seeds_url }}
           FC_FAILURES_URL: ${{ steps.links.outputs.fc_failures_url }}
           SUMMARY_FILE: ${{ steps.summary.outputs.summary_file }}
+          SUMMARY_NAME: summary-${{ matrix.id }}.md
+          FC_HEADER_LABEL: ${{ matrix.id == 'request-method' && 'Access-Control-Request-Method' || 'Access-Control-Request-Headers' }}
         run: |
           set -euo pipefail
 
           fail() {
-            echo "::error title=summary-request-method.md contract violation::$1"
+            echo "::error title=${SUMMARY_NAME} contract violation::$1"
             echo "----- BEGIN ${SUMMARY_FILE} -----"
             sed -n '1,400p' "${SUMMARY_FILE}" || true
             echo "----- END ${SUMMARY_FILE} -----"
@@ -479,8 +484,8 @@ jobs:
           fi
 
           # 1. Section header must exist (proves the append step ran).
-          grep -Fq "🎯 fast-check direct downloads (Access-Control-Request-Method)" "${SUMMARY_FILE}" \
-            || fail "Missing section header for fast-check direct downloads"
+          grep -Fq "🎯 fast-check direct downloads (${FC_HEADER_LABEL})" "${SUMMARY_FILE}" \
+            || fail "Missing section header for fast-check direct downloads (${FC_HEADER_LABEL})"
 
           # 2. fc-seeds.json — inline link to FC_SEEDS_URL or documented fallback.
           if [ -n "${FC_SEEDS_URL}" ]; then
@@ -504,10 +509,12 @@ jobs:
           grep -Fq "uploaded as standalone GitHub artifacts" "${SUMMARY_FILE}" \
             || fail "Missing contextual explanation about standalone artifacts"
 
-          # 5. Validate GITHUB_STEP_SUMMARY mirror (Actions UI panel).
+          # 5. Validate GITHUB_STEP_SUMMARY mirror (Actions UI panel) — scoped
+          # by FC_HEADER_LABEL so request-method and request-headers don't
+          # cross-validate each other's section.
           if [ -n "${GITHUB_STEP_SUMMARY:-}" ] && [ -f "${GITHUB_STEP_SUMMARY}" ]; then
-            grep -Fq "🎯 fast-check direct downloads" "${GITHUB_STEP_SUMMARY}" \
-              || fail "GITHUB_STEP_SUMMARY missing fast-check section"
+            grep -Fq "🎯 fast-check direct downloads (${FC_HEADER_LABEL})" "${GITHUB_STEP_SUMMARY}" \
+              || fail "GITHUB_STEP_SUMMARY missing fast-check section for ${FC_HEADER_LABEL}"
             if [ -n "${FC_SEEDS_URL}" ]; then
               grep -Fq "[fc-seeds.json](${FC_SEEDS_URL})" "${GITHUB_STEP_SUMMARY}" \
                 || fail "GITHUB_STEP_SUMMARY missing inline fc-seeds.json link"
@@ -518,11 +525,11 @@ jobs:
             fi
           fi
 
-          echo "✅ summary-request-method.md contains the expected inline fc-seeds/fc-failures links (sticky PR body source validated)."
+          echo "✅ ${SUMMARY_NAME} contains the expected inline fc-seeds/fc-failures links (sticky PR body source validated)."
           {
             echo ""
-            echo "### ✅ Summary self-check"
-            echo "- \`summary-request-method.md\`: inline fast-check links validated"
+            echo "### ✅ Summary self-check (${FC_HEADER_LABEL})"
+            echo "- \`${SUMMARY_NAME}\`: inline fast-check links validated"
             echo "- Sticky PR comment source: OK"
           } >> "$GITHUB_STEP_SUMMARY"
 
