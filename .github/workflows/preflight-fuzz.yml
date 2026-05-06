@@ -7,17 +7,16 @@ on:
     branches: [main]
   workflow_dispatch:
     inputs:
-      pattern:
-        description: 'Optional Deno test name pattern filter (default: all preflight fuzz tests)'
+      category:
+        description: 'Run only one category (origin | request-method | request-headers | all)'
         required: false
-        default: ''
+        default: 'all'
       fc_seed:
-        description: 'Optional FC_SEED to reproduce a specific fast-check counterexample'
+        description: 'Optional FC_SEED to reproduce a specific fast-check counterexample (request-method only)'
         required: false
         default: ''
 
-# Allow the PR-comment step to write to the PR; allow checks-action to publish
-# a dedicated GitHub Check Run with the fuzz status and artifact link.
+# Allow PR comments + dedicated GitHub Check Runs (one per category).
 permissions:
   contents: read
   pull-requests: write
@@ -28,52 +27,96 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # ─────────────────────────────────────────────────────────────────────
+  # One job per fuzz category. Each job:
+  #  - Runs only the Deno --filter substrings owned by that category.
+  #  - Uploads its OWN artifact (seeds + failures + log).
+  #  - Publishes its OWN GitHub Check Run with details_url → its artifact.
+  #  - Posts a sticky PR comment with a category-scoped header.
+  # ─────────────────────────────────────────────────────────────────────
   preflight-fuzz:
-    name: Preflight OPTIONS fuzz (Deno)
+    name: ${{ matrix.label }}
     timeout-minutes: 15
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: origin
+            label: Preflight Fuzz — Origin
+            check_name: Preflight CORS Fuzz / Origin
+            sticky_header: preflight-fuzz-origin
+            # Substring matches the Origin-focused fuzz test names.
+            filters: |
+              property-based fuzzing of Origin
+          - id: request-method
+            label: Preflight Fuzz — Request-Method
+            check_name: Preflight CORS Fuzz / Request-Method
+            sticky_header: preflight-fuzz-request-method
+            # Covers: original Method fuzz, manual-shrinker test, fast-check shrinker.
+            filters: |
+              property-based fuzzing of Access-Control-Request-Method
+              fuzz with deterministic SHRINKING
+              fast-check property-based SHRINKING
+          - id: request-headers
+            label: Preflight Fuzz — Request-Headers
+            check_name: Preflight CORS Fuzz / Request-Headers
+            sticky_header: preflight-fuzz-request-headers
+            filters: |
+              property-based fuzzing of Access-Control-Request-Headers
     env:
-      JOB_LABEL: preflight-fuzz
-      # Default filter is a Deno --filter substring (NOT a regex).
-      # We run two passes to cover both fuzz families (see "Run preflight ..." step).
-      TEST_NAME_PATTERN: >-
-        ${{ github.event.inputs.pattern || 'OPTIONS preflight' }}
-      # Persisted seeds + minimized failures land here.
+      CATEGORY_ID: ${{ matrix.id }}
+      CATEGORY_LABEL: ${{ matrix.label }}
       FUZZ_STATE_DIR: ${{ github.workspace }}/.rls-test-fuzz-state
+      ARTIFACT_NAME: preflight-fuzz-${{ matrix.id }}-${{ github.run_id }}
     steps:
+      # Skip categories the user didn't request via workflow_dispatch.
+      - name: Determine if this category should run
+        id: gate
+        run: |
+          REQ="${{ github.event.inputs.category }}"
+          if [ -z "$REQ" ] || [ "$REQ" = "all" ] || [ "$REQ" = "${CATEGORY_ID}" ]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping ${CATEGORY_ID} (workflow_dispatch requested '${REQ}')"
+          fi
+
       - name: Checkout
+        if: steps.gate.outputs.should_run == 'true'
         uses: actions/checkout@v4
 
       - name: Set up Deno
+        if: steps.gate.outputs.should_run == 'true'
         uses: denoland/setup-deno@v2
         with:
           deno-version: v1.x
 
-      # The fuzz tests pull seeds/minimized payloads from prior runs to grow
-      # coverage over time. Restore them, but never fail the build if missing.
-      - name: Restore persisted fuzz state (seeds + failures)
-        id: cache-fuzz-state
+      # Per-category cache so seeds/failures of one category never pollute another.
+      - name: Restore persisted fuzz state (per category)
+        if: steps.gate.outputs.should_run == 'true'
         uses: actions/cache@v4
         with:
           path: ${{ env.FUZZ_STATE_DIR }}
-          key: preflight-fuzz-state-${{ github.ref_name }}-${{ github.run_id }}
+          key: preflight-fuzz-state-${{ matrix.id }}-${{ github.ref_name }}-${{ github.run_id }}
           restore-keys: |
-            preflight-fuzz-state-${{ github.ref_name }}-
-            preflight-fuzz-state-main-
-            preflight-fuzz-state-
+            preflight-fuzz-state-${{ matrix.id }}-${{ github.ref_name }}-
+            preflight-fuzz-state-${{ matrix.id }}-main-
+            preflight-fuzz-state-${{ matrix.id }}-
 
       - name: Prepare fuzz state dir
+        if: steps.gate.outputs.should_run == 'true'
         run: |
           mkdir -p "$FUZZ_STATE_DIR"
-          echo "Seeds file: $FUZZ_STATE_DIR/seeds.json"
-          echo "Failures file: $FUZZ_STATE_DIR/failures.json"
-          [ -f "$FUZZ_STATE_DIR/seeds.json" ] && \
-            echo "Existing seeds: $(jq 'length' "$FUZZ_STATE_DIR/seeds.json" 2>/dev/null || echo '?')" || \
-            echo "No prior seeds (first run on this branch)"
+          echo "Category: ${CATEGORY_ID}"
+          for f in seeds.json failures.json fc-seeds.json fc-failures.json; do
+            if [ -f "$FUZZ_STATE_DIR/$f" ]; then
+              echo "  - $f: $(jq 'length' "$FUZZ_STATE_DIR/$f" 2>/dev/null || echo '?') entries"
+            fi
+          done
 
-      # Load env vars used by the integration tests (SUPABASE_URL, anon key, etc.)
-      # exactly the way the test files expect via `dotenv/load.ts`.
       - name: Synthesize .env for tests
+        if: steps.gate.outputs.should_run == 'true'
         run: |
           cat > .env <<EOF
           VITE_SUPABASE_URL=https://ci-fuzz.example.supabase.co
@@ -84,32 +127,24 @@ jobs:
           RLS_TEST_SECRET=integration-test-secret
           EOF
 
-      - name: Run preflight OPTIONS fuzz tests
+      - name: Run ${{ matrix.label }}
+        if: steps.gate.outputs.should_run == 'true'
         id: fuzz
         env:
-          # Forwarded into the fast-check test for deterministic reproduction.
           FC_SEED: ${{ github.event.inputs.fc_seed }}
         run: |
           set -o pipefail
           mkdir -p reports
-          # Deno --filter is a substring match (regex requires /.../ syntax).
-          # Run each fuzz family in its own pass so failures stay attributable.
-          # The fast-check shrinking test is added so PRs fail with the
-          # minimized Access-Control-Request-Method counterexample.
-          FILTERS=(
-            "property-based fuzzing"
-            "fuzz with deterministic SHRINKING"
-            "fast-check property-based SHRINKING"
-          )
-          # Allow workflow_dispatch override.
-          if [ -n "${{ github.event.inputs.pattern }}" ]; then
-            FILTERS=("${{ github.event.inputs.pattern }}")
-          fi
+          LOG=reports/fuzz-${CATEGORY_ID}.log
+          : > "$LOG"
 
-          overall_status=0
-          : > reports/fuzz-output.log
+          # Read non-empty filter lines from the matrix into an array.
+          mapfile -t FILTERS < <(printf '%s\n' "${{ matrix.filters }}" | sed '/^[[:space:]]*$/d' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+          echo "Filters for ${CATEGORY_ID}: ${FILTERS[*]}"
+
+          overall=0
           for f in "${FILTERS[@]}"; do
-            echo "::group::[${JOB_LABEL}] deno test --filter \"${f}\""
+            echo "::group::[${CATEGORY_ID}] deno test --filter \"${f}\""
             deno test \
               --allow-net \
               --allow-env \
@@ -118,182 +153,195 @@ jobs:
               --no-check \
               --filter "${f}" \
               supabase/functions/rls-test-create-user/integration.test.ts \
-              2>&1 | tee -a reports/fuzz-output.log
+              2>&1 | tee -a "$LOG"
             status=${PIPESTATUS[0]}
             echo "::endgroup::"
-            if [ "${status}" != "0" ]; then overall_status="${status}"; fi
+            if [ "${status}" != "0" ]; then overall="${status}"; fi
           done
-          echo "exit_code=${overall_status}" >> "$GITHUB_OUTPUT"
-          exit "${overall_status}"
 
-      # Always extract minimized failure (if any) for the PR comment.
-      - name: Extract minimized failure summary
-        if: always()
+          echo "exit_code=${overall}" >> "$GITHUB_OUTPUT"
+          echo "log_file=${LOG}" >> "$GITHUB_OUTPUT"
+          exit "${overall}"
+
+      # Build the per-category Markdown summary (success or minimized failure).
+      - name: Build category failure summary
+        if: always() && steps.gate.outputs.should_run == 'true'
         id: summary
         run: |
           mkdir -p reports
-          SUMMARY_FILE=reports/failure-summary.md
+          SUMMARY_FILE="reports/summary-${CATEGORY_ID}.md"
+          LOG="${{ steps.fuzz.outputs.log_file }}"
           {
-            echo "## 🧪 Preflight OPTIONS Fuzz — Run #${{ github.run_number }}"
+            echo "## 🧪 ${CATEGORY_LABEL} — Run #${{ github.run_number }}"
             echo ""
+            echo "- Category: \`${CATEGORY_ID}\`"
             echo "- Workflow: \`${{ github.workflow }}\`"
             echo "- Commit: \`${{ github.sha }}\`"
             echo "- Trigger: \`${{ github.event_name }}\`"
-            echo "- Pattern: \`${TEST_NAME_PATTERN}\`"
             echo ""
             if [ "${{ steps.fuzz.outputs.exit_code }}" = "0" ]; then
-              echo "✅ **All preflight invariants held.** No marker leaks, no unexpected headers, no CR/LF/null in Allow-Methods/Allow-Headers, neutral body."
+              echo "✅ **All invariants held for ${CATEGORY_ID}.**"
             else
-              echo "❌ **Invariant violation detected.** See minimized payload below."
+              echo "❌ **Invariant violation in ${CATEGORY_ID} fuzz.**"
               echo ""
-              echo "### Minimized failing payload"
-              echo ""
-              echo "\`\`\`"
-              # Pull the most recent shrunk failure from persisted state if present.
-              if [ -f "$FUZZ_STATE_DIR/failures.json" ]; then
+
+              # Manual-shrinker payload (used by request-method category).
+              if [ -f "$FUZZ_STATE_DIR/failures.json" ] && [ "$CATEGORY_ID" = "request-method" ]; then
+                echo "### Minimized failing payload (manual shrinker)"
+                echo ""
+                echo '```'
                 jq -r '
                   if length == 0 then "(no persisted failure on disk — see test log)"
                   else
                     .[-1] |
-                    "Seed:           0x\((.seed) | tostring | tonumber | tostring)\n" +
-                    "Index:          \(.index)\n" +
-                    "Found at:       \(.foundAt)\n" +
+                    "Seed:            \(.seed)\n" +
+                    "Index:           \(.index)\n" +
+                    "Found at:        \(.foundAt)\n" +
                     "Original reason: \(.originalReason)\n" +
                     "Shrunk reason:   \(.shrunkReason)\n" +
                     "Shrink iters:    \(.shrinkIterations)\n" +
                     "\nORIGINAL payload:\n\(.original | tojson)\n" +
                     "\nSHRUNK payload:\n\(.shrunk | tojson)"
                   end
-                ' "$FUZZ_STATE_DIR/failures.json" 2>/dev/null || \
-                  echo "(failed to parse failures.json — see raw test log)"
-              else
-                echo "(no persisted manual-shrinker failure file — see fast-check section below or raw log)"
+                ' "$FUZZ_STATE_DIR/failures.json" 2>/dev/null || echo "(failed to parse failures.json)"
+                echo '```'
+                echo ""
               fi
-              echo "\`\`\`"
-              echo ""
-              echo "### fast-check minimized counterexample (Access-Control-Request-Method)"
-              echo ""
-              echo "\`\`\`"
-              if [ -f "$FUZZ_STATE_DIR/fc-failures.json" ]; then
+
+              # fast-check counterexample (request-method category only).
+              if [ -f "$FUZZ_STATE_DIR/fc-failures.json" ] && [ "$CATEGORY_ID" = "request-method" ]; then
+                echo "### fast-check minimized counterexample"
+                echo ""
+                echo '```'
                 jq -r '
-                  if length == 0 then "(fast-check: no persisted counterexample — see test log)"
+                  if length == 0 then "(fast-check: no persisted counterexample)"
                   else
                     .[-1] |
-                    "Seed:               \(.seed)\n" +
-                    "Marker:             \(.marker)\n" +
-                    "Counterexample path: \(.counterexamplePath // "n/a")\n" +
-                    "Shrinks:            \(.numShrinks // 0)\n" +
-                    "Original reason:    \(.original.reason // "n/a")\n" +
-                    "Original length:    \(.original.length // "n/a")\n" +
-                    "Original method:    \(.original.method // "n/a" | tojson)\n" +
-                    "Shrunk reason:      \(.minimized.reason // "n/a")\n" +
-                    "Shrunk length:      \(.minimized.length // "n/a")\n" +
-                    "Shrunk method:      \(.minimized.method | tojson)\n" +
-                    "Repro:              \(.reproCommand // "n/a")"
+                    "Seed:            \(.seed)\n" +
+                    "Marker:          \(.marker)\n" +
+                    "Shrinks:         \(.numShrinks // 0)\n" +
+                    "Original reason: \(.original.reason // "n/a")\n" +
+                    "Original len:    \(.original.length // "n/a")\n" +
+                    "Original method: \(.original.method // "n/a" | tojson)\n" +
+                    "Shrunk reason:   \(.minimized.reason // "n/a")\n" +
+                    "Shrunk len:      \(.minimized.length // "n/a")\n" +
+                    "Shrunk method:   \(.minimized.method | tojson)\n" +
+                    "Repro:           \(.reproCommand // "n/a")"
                   end
-                ' "$FUZZ_STATE_DIR/fc-failures.json" 2>/dev/null || \
-                  echo "(fast-check: failed to parse fc-failures.json — see raw test log)"
-              else
-                echo "(fast-check: no persisted counterexample file — see raw test log)"
+                ' "$FUZZ_STATE_DIR/fc-failures.json" 2>/dev/null || echo "(failed to parse fc-failures.json)"
+                echo '```'
+                echo ""
               fi
-              echo "\`\`\`"
-              echo ""
+
               echo "### Test log (last 80 lines)"
               echo ""
-              echo "\`\`\`"
-              tail -n 80 reports/fuzz-output.log 2>/dev/null || echo "(no log captured)"
-              echo "\`\`\`"
+              echo '```'
+              tail -n 80 "$LOG" 2>/dev/null || echo "(no log captured)"
+              echo '```'
               echo ""
               echo "**To reproduce locally:**"
-              echo "\`\`\`bash"
-              echo "deno test --allow-net --allow-env --allow-read --allow-write \\"
-              echo "  --filter \"${TEST_NAME_PATTERN}\" \\"
-              echo "  supabase/functions/rls-test-create-user/integration.test.ts"
-              echo "\`\`\`"
-              echo ""
-              echo "**Reproduce the fast-check counterexample with its seed:**"
-              echo "\`\`\`bash"
-              if [ -f "$FUZZ_STATE_DIR/fc-failures.json" ]; then
-                FC_SEED_LAST=$(jq -r '.[-1].seed // empty' "$FUZZ_STATE_DIR/fc-failures.json" 2>/dev/null)
-              fi
-              echo "FC_SEED=${FC_SEED_LAST:-<seed-from-fc-failures.json>} \\"
-              echo "  deno test --allow-net --allow-env --allow-read --allow-write \\"
-              echo "  --filter \"fast-check property-based SHRINKING\" \\"
-              echo "  supabase/functions/rls-test-create-user/integration.test.ts"
-              echo "\`\`\`"
+              echo '```bash'
+              while IFS= read -r f; do
+                [ -z "$f" ] && continue
+                echo "deno test --allow-net --allow-env --allow-read --allow-write \\"
+                echo "  --filter \"${f}\" \\"
+                echo "  supabase/functions/rls-test-create-user/integration.test.ts"
+              done <<< "${{ matrix.filters }}"
+              echo '```'
             fi
           } > "$SUMMARY_FILE"
 
-          # Surface the same summary in the GitHub Actions UI.
           cat "$SUMMARY_FILE" >> "$GITHUB_STEP_SUMMARY"
           echo "summary_file=${SUMMARY_FILE}" >> "$GITHUB_OUTPUT"
 
-      # Persist seeds + minimized failures so the next run inherits them.
-      - name: Upload fuzz state + reports as artifacts
-        if: always()
+      # One artifact per category, scoped to its own seeds/failures/logs.
+      - name: Upload ${{ matrix.id }} artifact
+        if: always() && steps.gate.outputs.should_run == 'true'
         id: upload
         uses: actions/upload-artifact@v4
         with:
-          name: preflight-fuzz-state-${{ github.run_id }}
+          name: ${{ env.ARTIFACT_NAME }}
           path: |
             ${{ env.FUZZ_STATE_DIR }}/**
-            reports/**
+            reports/summary-${{ matrix.id }}.md
+            reports/fuzz-${{ matrix.id }}.log
           if-no-files-found: ignore
           retention-days: 14
 
-      # Compose the artifact link (upload-artifact@v4 exposes `artifact-url`,
-      # but we always also fall back to the run's Artifacts tab URL).
       - name: Compute artifact link
-        if: always()
+        if: always() && steps.gate.outputs.should_run == 'true'
         id: links
         run: |
           ARTIFACT_URL="${{ steps.upload.outputs.artifact-url }}"
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          FALLBACK_URL="${RUN_URL}#artifacts"
-          if [ -z "${ARTIFACT_URL}" ]; then ARTIFACT_URL="${FALLBACK_URL}"; fi
+          if [ -z "${ARTIFACT_URL}" ]; then ARTIFACT_URL="${RUN_URL}#artifacts"; fi
           {
             echo "artifact_url=${ARTIFACT_URL}"
             echo "run_url=${RUN_URL}"
           } >> "$GITHUB_OUTPUT"
 
-          # Append the artifact link to the human-readable summary + step summary.
           {
             echo ""
-            echo "### 📦 Artifacts (seeds + failures)"
-            echo ""
-            echo "- [Download \`preflight-fuzz-state-${{ github.run_id }}\`](${ARTIFACT_URL})"
+            echo "### 📦 Artifact for \`${CATEGORY_ID}\`"
+            echo "- [Download \`${ARTIFACT_NAME}\`](${ARTIFACT_URL})"
             echo "- [Workflow run page](${RUN_URL})"
-            echo ""
-            echo "Contents: \`seeds.json\`, \`failures.json\`, \`fc-seeds.json\`, \`fc-failures.json\`, \`reports/fuzz-output.log\`."
-          } >> reports/failure-summary.md
+          } >> "${{ steps.summary.outputs.summary_file }}"
 
-          {
-            echo ""
-            echo "### 📦 Artifacts"
-            echo "- [preflight-fuzz-state-${{ github.run_id }}](${ARTIFACT_URL})"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      # Publish a dedicated, visually distinct GitHub Check Run so the fuzz
-      # result shows up as its own status on PRs and commits, with a direct
-      # link to the seeds/failures artifact.
-      - name: Publish GitHub Check (Preflight Fuzz)
-        if: always()
+      # Dedicated GitHub Check Run per category — visible as its own status
+      # on PRs and commits, with details_url pointing at the category artifact.
+      - name: Publish GitHub Check (${{ matrix.label }})
+        if: always() && steps.gate.outputs.should_run == 'true'
         uses: LouisBrunner/checks-action@v2.0.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          name: Preflight CORS Fuzz
+          name: ${{ matrix.check_name }}
           conclusion: ${{ steps.fuzz.outputs.exit_code == '0' && 'success' || 'failure' }}
           details_url: ${{ steps.links.outputs.artifact_url }}
           output: |
             {
-              "title": "${{ steps.fuzz.outputs.exit_code == '0' && '✅ All preflight invariants held' || '❌ Invariant violation — minimized payload available' }}",
-              "summary": "Run #${{ github.run_number }} on `${{ github.ref_name }}` (`${{ github.sha }}`).\n\n**Status:** ${{ steps.fuzz.outputs.exit_code == '0' && 'PASS' || 'FAIL' }}\n**Filter:** `${{ env.TEST_NAME_PATTERN }}`\n\n📦 [Download seeds + failures artifact](${{ steps.links.outputs.artifact_url }})\n🔗 [Workflow run page](${{ steps.links.outputs.run_url }})\n\nThe artifact contains:\n- `seeds.json` / `fc-seeds.json` — last 50 seeds executed\n- `failures.json` / `fc-failures.json` — minimized counter-examples (up to 100)\n- `reports/fuzz-output.log` — full Deno test log\n\nReproduce locally with the seed printed in the failure file:\n```bash\nFC_SEED=<seed> deno test --allow-net --allow-env --allow-read --allow-write \\\n  --filter \"${{ env.TEST_NAME_PATTERN }}\" \\\n  supabase/functions/rls-test-create-user/integration.test.ts\n```"
+              "title": "${{ steps.fuzz.outputs.exit_code == '0' && format('✅ {0} — invariants held', matrix.label) || format('❌ {0} — invariant violation', matrix.label) }}",
+              "summary": "Category: `${{ matrix.id }}`\nRun #${{ github.run_number }} on `${{ github.ref_name }}` (`${{ github.sha }}`).\n\n**Status:** ${{ steps.fuzz.outputs.exit_code == '0' && 'PASS' || 'FAIL' }}\n\n📦 [Download `${{ env.ARTIFACT_NAME }}`](${{ steps.links.outputs.artifact_url }})\n🔗 [Workflow run page](${{ steps.links.outputs.run_url }})\n\nArtifact contains: `seeds.json`, `failures.json`, `fc-seeds.json`, `fc-failures.json` (when applicable) and `reports/fuzz-${{ matrix.id }}.log`."
             }
 
-      # On PRs: post (or update) a sticky comment with the minimized failure.
-      - name: Comment on PR with fuzz result
-        if: always() && github.event_name == 'pull_request'
+      # Sticky PR comment per category (header is unique → no overwrites).
+      - name: Comment on PR (${{ matrix.label }})
+        if: always() && steps.gate.outputs.should_run == 'true' && github.event_name == 'pull_request'
         uses: marocchino/sticky-pull-request-comment@v2
         with:
-          header: preflight-fuzz
+          header: ${{ matrix.sticky_header }}
           path: ${{ steps.summary.outputs.summary_file }}
+
+  # Aggregate Check Run so a single required status can gate merges.
+  preflight-fuzz-aggregate:
+    name: Preflight CORS Fuzz / All
+    needs: preflight-fuzz
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      checks: write
+      contents: read
+    steps:
+      - name: Compute aggregate conclusion
+        id: agg
+        run: |
+          R='${{ needs.preflight-fuzz.result }}'
+          if [ "$R" = "success" ]; then
+            echo "conclusion=success" >> "$GITHUB_OUTPUT"
+            echo "title=✅ All preflight fuzz categories passed" >> "$GITHUB_OUTPUT"
+          else
+            echo "conclusion=failure" >> "$GITHUB_OUTPUT"
+            echo "title=❌ One or more preflight fuzz categories failed" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish aggregate Check
+        uses: LouisBrunner/checks-action@v2.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          name: Preflight CORS Fuzz / All
+          conclusion: ${{ steps.agg.outputs.conclusion }}
+          details_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          output: |
+            {
+              "title": "${{ steps.agg.outputs.title }}",
+              "summary": "Per-category Check Runs (each with its own artifact link):\n\n- **Preflight CORS Fuzz / Origin** → artifact `preflight-fuzz-origin-${{ github.run_id }}`\n- **Preflight CORS Fuzz / Request-Method** → artifact `preflight-fuzz-request-method-${{ github.run_id }}`\n- **Preflight CORS Fuzz / Request-Headers** → artifact `preflight-fuzz-request-headers-${{ github.run_id }}`\n\nMatrix job result: `${{ needs.preflight-fuzz.result }}`.\n\n🔗 [Workflow run page](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+            }
