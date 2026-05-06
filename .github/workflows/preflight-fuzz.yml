@@ -439,8 +439,84 @@ jobs:
             [ -n "${FC_FAILURES_URL}" ] && echo "- [fc-failures.json](${FC_FAILURES_URL})"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # Self-test: assert the append step actually injected the inline
+      # fc-seeds.json / fc-failures.json links (or the documented fallback
+      # markers) into BOTH summary-request-method.md and the GITHUB_STEP_SUMMARY
+      # mirror. Fails the job loudly with a diff if the contract is broken,
+      # so a future refactor can never silently drop the inline links from
+      # the sticky PR comment body.
+      - name: Verify fast-check inline links present in summary
+        if: always() && steps.gate.outputs.should_run == 'true' && matrix.id == 'request-method'
+        env:
+          FC_SEEDS_URL: ${{ steps.links.outputs.fc_seeds_url }}
+          FC_FAILURES_URL: ${{ steps.links.outputs.fc_failures_url }}
+          SUMMARY_FILE: ${{ steps.summary.outputs.summary_file }}
+        run: |
+          set -euo pipefail
+
+          fail() {
+            echo "::error title=summary-request-method.md contract violation::$1"
+            echo "----- BEGIN ${SUMMARY_FILE} -----"
+            sed -n '1,400p' "${SUMMARY_FILE}" || true
+            echo "----- END ${SUMMARY_FILE} -----"
+            exit 1
+          }
+
+          if [ ! -s "${SUMMARY_FILE}" ]; then
+            fail "Summary file is missing or empty: ${SUMMARY_FILE}"
+          fi
+
+          # 1. Section header must exist (proves the append step ran).
+          grep -Fq "🎯 fast-check direct downloads (Access-Control-Request-Method)" "${SUMMARY_FILE}" \
+            || fail "Missing section header for fast-check direct downloads"
+
+          # 2. fc-seeds.json — inline link to FC_SEEDS_URL or documented fallback.
+          if [ -n "${FC_SEEDS_URL}" ]; then
+            grep -Fq "[\`fc-seeds.json\`](${FC_SEEDS_URL})" "${SUMMARY_FILE}" \
+              || fail "Expected inline link to fc-seeds.json (${FC_SEEDS_URL}) not found"
+          else
+            grep -Fq "\`fc-seeds.json\` — _(not produced in this run)_" "${SUMMARY_FILE}" \
+              || fail "Expected fc-seeds.json fallback marker not found"
+          fi
+
+          # 3. fc-failures.json — same contract.
+          if [ -n "${FC_FAILURES_URL}" ]; then
+            grep -Fq "[\`fc-failures.json\`](${FC_FAILURES_URL})" "${SUMMARY_FILE}" \
+              || fail "Expected inline link to fc-failures.json (${FC_FAILURES_URL}) not found"
+          else
+            grep -Fq "\`fc-failures.json\` — _(no failures persisted in this run — invariants held)_" "${SUMMARY_FILE}" \
+              || fail "Expected fc-failures.json fallback marker not found"
+          fi
+
+          # 4. Contextual paragraph must remain.
+          grep -Fq "uploaded as standalone GitHub artifacts" "${SUMMARY_FILE}" \
+            || fail "Missing contextual explanation about standalone artifacts"
+
+          # 5. Validate GITHUB_STEP_SUMMARY mirror (Actions UI panel).
+          if [ -n "${GITHUB_STEP_SUMMARY:-}" ] && [ -f "${GITHUB_STEP_SUMMARY}" ]; then
+            grep -Fq "🎯 fast-check direct downloads" "${GITHUB_STEP_SUMMARY}" \
+              || fail "GITHUB_STEP_SUMMARY missing fast-check section"
+            if [ -n "${FC_SEEDS_URL}" ]; then
+              grep -Fq "[fc-seeds.json](${FC_SEEDS_URL})" "${GITHUB_STEP_SUMMARY}" \
+                || fail "GITHUB_STEP_SUMMARY missing inline fc-seeds.json link"
+            fi
+            if [ -n "${FC_FAILURES_URL}" ]; then
+              grep -Fq "[fc-failures.json](${FC_FAILURES_URL})" "${GITHUB_STEP_SUMMARY}" \
+                || fail "GITHUB_STEP_SUMMARY missing inline fc-failures.json link"
+            fi
+          fi
+
+          echo "✅ summary-request-method.md contains the expected inline fc-seeds/fc-failures links (sticky PR body source validated)."
+          {
+            echo ""
+            echo "### ✅ Summary self-check"
+            echo "- \`summary-request-method.md\`: inline fast-check links validated"
+            echo "- Sticky PR comment source: OK"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       # Dedicated GitHub Check Run per category — visible as its own status
       # on PRs and commits, with details_url pointing at the category artifact.
+
       - name: Publish GitHub Check (${{ matrix.label }})
         if: always() && steps.gate.outputs.should_run == 'true'
         uses: LouisBrunner/checks-action@v2.0.0
