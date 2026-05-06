@@ -1048,3 +1048,108 @@ Deno.test('HTTP integration: OPTIONS with INVALID x-test-secret — preflight is
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: OPTIONS preflight — Allow-Headers is EXACTLY the canonical set, no extras', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    // Contrato estático declarado em corsHeaders no index.ts:
+    //   'Access-Control-Allow-Headers':
+    //     'authorization, x-client-info, apikey, content-type, x-test-secret'
+    //
+    // Esse teste blinda quatro propriedades ao mesmo tempo:
+    //   (1) Forma canônica LITERAL — string exata, vírgula + espaço único,
+    //       ordem fixa. Proxies/CDNs cacheiam preflight pelo valor literal,
+    //       então qualquer drift silencioso invalida cache sem motivo.
+    //   (2) Conjunto exato — exatamente os 5 tokens canônicos, nada além.
+    //       Vazar tokens não suportados (ex: "x-admin-token") pode iludir
+    //       clientes a enviarem headers que o handler simplesmente ignora.
+    //   (3) Sem duplicatas — cada token aparece uma única vez.
+    //   (4) Sem tokens vazios — nada de trailing/leading comma.
+    const res = await fetch(`${ctx.url}/`, {
+      method: 'OPTIONS',
+      headers: {
+        'origin': 'https://app.kubovibe.dev',
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'content-type, x-test-secret',
+      },
+    })
+
+    assertEquals(res.status, 200, 'preflight deve responder 200')
+
+    const allowed = res.headers.get('access-control-allow-headers')
+    assertExists(allowed, 'access-control-allow-headers deve estar presente')
+
+    // (1) Forma canônica literal exata.
+    const CANONICAL = 'authorization, x-client-info, apikey, content-type, x-test-secret'
+    assertEquals(
+      allowed,
+      CANONICAL,
+      `allow-headers deve ser EXATAMENTE a string canônica "${CANONICAL}" (got: "${allowed}")`,
+    )
+
+    // (2) + (3) + (4) Conjunto exato via tokenização defensiva.
+    const tokens = allowed.split(',').map((t) => t.trim().toLowerCase())
+
+    // Sem tokens vazios (defesa contra trailing/leading/double comma).
+    for (const t of tokens) {
+      assert(t.length > 0, `allow-headers não deve conter tokens vazios (got: "${allowed}")`)
+    }
+
+    // Ordem canônica fixa.
+    const EXPECTED_ORDERED = [
+      'authorization',
+      'x-client-info',
+      'apikey',
+      'content-type',
+      'x-test-secret',
+    ]
+    assertEquals(
+      tokens,
+      EXPECTED_ORDERED,
+      `tokens devem ser exatamente ${JSON.stringify(EXPECTED_ORDERED)} nesta ordem (got: ${JSON.stringify(tokens)})`,
+    )
+
+    // (3) Sem duplicatas (Set-size invariant).
+    assertEquals(
+      new Set(tokens).size,
+      tokens.length,
+      `allow-headers não deve conter tokens duplicados (got: ${JSON.stringify(tokens)})`,
+    )
+
+    // (2) Conjunto fechado — nenhum token "inesperado" presente.
+    const ALLOWED_SET = new Set(EXPECTED_ORDERED)
+    const FORBIDDEN_SAMPLES = [
+      'x-admin-token',
+      'x-supabase-auth',
+      'cookie',
+      'x-forwarded-for',
+      'x-real-ip',
+      'x-csrf-token',
+      'x-api-key',
+    ]
+    for (const t of tokens) {
+      assert(
+        ALLOWED_SET.has(t),
+        `Token inesperado em allow-headers: "${t}" (canônico: ${JSON.stringify(EXPECTED_ORDERED)})`,
+      )
+    }
+    for (const f of FORBIDDEN_SAMPLES) {
+      assert(
+        !tokens.includes(f),
+        `Token proibido "${f}" não pode aparecer em allow-headers (got: "${allowed}")`,
+      )
+    }
+
+    // Sanidade dos demais headers CORS.
+    assertEquals(res.headers.get('access-control-allow-origin'), '*')
+    assertEquals(res.headers.get('access-control-allow-methods'), 'POST, OPTIONS')
+    assertEquals(res.headers.get('access-control-max-age'), '86400')
+
+    await res.text()
+
+    // Preflight nunca pode instanciar Supabase client.
+    assertEquals(ctx._calls, 0, 'OPTIONS jamais deve chamar createClient')
+  } finally {
+    await ctx.stop()
+  }
+})
