@@ -12,10 +12,12 @@ on:
         required: false
         default: ''
 
-# Allow the PR-comment step to write to the PR; cancel superseded runs.
+# Allow the PR-comment step to write to the PR; allow checks-action to publish
+# a dedicated GitHub Check Run with the fuzz status and artifact link.
 permissions:
   contents: read
   pull-requests: write
+  checks: write
 
 concurrency:
   group: preflight-fuzz-${{ github.workflow }}-${{ github.ref }}
@@ -181,6 +183,7 @@ jobs:
       # Persist seeds + minimized failures so the next run inherits them.
       - name: Upload fuzz state + reports as artifacts
         if: always()
+        id: upload
         uses: actions/upload-artifact@v4
         with:
           name: preflight-fuzz-state-${{ github.run_id }}
@@ -189,6 +192,55 @@ jobs:
             reports/**
           if-no-files-found: ignore
           retention-days: 14
+
+      # Compose the artifact link (upload-artifact@v4 exposes `artifact-url`,
+      # but we always also fall back to the run's Artifacts tab URL).
+      - name: Compute artifact link
+        if: always()
+        id: links
+        run: |
+          ARTIFACT_URL="${{ steps.upload.outputs.artifact-url }}"
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          FALLBACK_URL="${RUN_URL}#artifacts"
+          if [ -z "${ARTIFACT_URL}" ]; then ARTIFACT_URL="${FALLBACK_URL}"; fi
+          {
+            echo "artifact_url=${ARTIFACT_URL}"
+            echo "run_url=${RUN_URL}"
+          } >> "$GITHUB_OUTPUT"
+
+          # Append the artifact link to the human-readable summary + step summary.
+          {
+            echo ""
+            echo "### 📦 Artifacts (seeds + failures)"
+            echo ""
+            echo "- [Download \`preflight-fuzz-state-${{ github.run_id }}\`](${ARTIFACT_URL})"
+            echo "- [Workflow run page](${RUN_URL})"
+            echo ""
+            echo "Contents: \`seeds.json\`, \`failures.json\`, \`fc-seeds.json\`, \`fc-failures.json\`, \`reports/fuzz-output.log\`."
+          } >> reports/failure-summary.md
+
+          {
+            echo ""
+            echo "### 📦 Artifacts"
+            echo "- [preflight-fuzz-state-${{ github.run_id }}](${ARTIFACT_URL})"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Publish a dedicated, visually distinct GitHub Check Run so the fuzz
+      # result shows up as its own status on PRs and commits, with a direct
+      # link to the seeds/failures artifact.
+      - name: Publish GitHub Check (Preflight Fuzz)
+        if: always()
+        uses: LouisBrunner/checks-action@v2.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          name: Preflight CORS Fuzz
+          conclusion: ${{ steps.fuzz.outputs.exit_code == '0' && 'success' || 'failure' }}
+          details_url: ${{ steps.links.outputs.artifact_url }}
+          output: |
+            {
+              "title": "${{ steps.fuzz.outputs.exit_code == '0' && '✅ All preflight invariants held' || '❌ Invariant violation — minimized payload available' }}",
+              "summary": "Run #${{ github.run_number }} on `${{ github.ref_name }}` (`${{ github.sha }}`).\n\n**Status:** ${{ steps.fuzz.outputs.exit_code == '0' && 'PASS' || 'FAIL' }}\n**Filter:** `${{ env.TEST_NAME_PATTERN }}`\n\n📦 [Download seeds + failures artifact](${{ steps.links.outputs.artifact_url }})\n🔗 [Workflow run page](${{ steps.links.outputs.run_url }})\n\nThe artifact contains:\n- `seeds.json` / `fc-seeds.json` — last 50 seeds executed\n- `failures.json` / `fc-failures.json` — minimized counter-examples (up to 100)\n- `reports/fuzz-output.log` — full Deno test log\n\nReproduce locally with the seed printed in the failure file:\n```bash\nFC_SEED=<seed> deno test --allow-net --allow-env --allow-read --allow-write \\\n  --filter \"${{ env.TEST_NAME_PATTERN }}\" \\\n  supabase/functions/rls-test-create-user/integration.test.ts\n```"
+            }
 
       # On PRs: post (or update) a sticky comment with the minimized failure.
       - name: Comment on PR with fuzz result
