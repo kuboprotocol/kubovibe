@@ -46,14 +46,17 @@ jobs:
             label: Preflight Fuzz — Origin
             check_name: Preflight CORS Fuzz / Origin
             sticky_header: preflight-fuzz-origin
-            # Substring matches the Origin-focused fuzz test names.
+            # No property-based fuzz exists for Origin yet — run the
+            # deterministic OPTIONS-preflight Origin contract tests instead.
             filters: |
-              property-based fuzzing of Origin
+              Allow-Origin is exactly
+              Vary: Origin and Access-Control-Expose-Headers MUST be absent
+              cross-origin — no Allow-Credentials
           - id: request-method
             label: Preflight Fuzz — Request-Method
             check_name: Preflight CORS Fuzz / Request-Method
             sticky_header: preflight-fuzz-request-method
-            # Covers: original Method fuzz, manual-shrinker test, fast-check shrinker.
+            # Covers: Method fuzz, manual-shrinker test, fast-check shrinker.
             filters: |
               property-based fuzzing of Access-Control-Request-Method
               fuzz with deterministic SHRINKING
