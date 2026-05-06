@@ -21,6 +21,8 @@ permissions:
   contents: read
   pull-requests: write
   checks: write
+  actions: read   # required by `Verify summary_url resolves to expected artifact`
+                  # to call /repos/{owner}/{repo}/actions/runs/{id}/artifacts
 
 concurrency:
   group: preflight-fuzz-${{ github.workflow }}-${{ github.ref }}
