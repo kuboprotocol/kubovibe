@@ -8382,3 +8382,419 @@ Deno.test('HTTP integration: OPTIONS preflight — property-based fuzzing of Acc
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: OPTIONS preflight — fuzz with deterministic SHRINKING + seed/failure persistence — finds minimal failing case, persists to disk, validates neutral body', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    const EXPECTED_METHODS_LITERAL = 'POST, OPTIONS'
+    const EXPECTED_HEADERS_LITERAL = 'authorization, x-client-info, apikey, content-type, x-test-secret'
+
+    const ALLOWED_RESPONSE_HEADERS = new Set([
+      'access-control-allow-origin', 'access-control-allow-methods',
+      'access-control-allow-headers', 'access-control-max-age',
+      'content-length', 'content-type', 'date', 'connection', 'keep-alive', 'vary',
+    ])
+
+    const u = new URL(ctx.url)
+    const hostHeader = u.host
+
+    // ─── PRNG determinístico (mulberry32) — seed parametrizada para reprodutibilidade. ───
+    const makeRng = (seed: number) => {
+      let _state = seed >>> 0
+      return (): number => {
+        _state = (_state + 0x6D2B79F5) >>> 0
+        let t = _state
+        t = Math.imul(t ^ (t >>> 15), t | 1)
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+      }
+    }
+
+    // ─── Geração estruturada baseada em seed (determinística e shrinkable). ───
+    interface FuzzPayload {
+      origin: string | null
+      requestMethod: string | null
+      requestHeaders: string | null
+      extraHeaders: Array<[string, string]>
+      marker: string
+    }
+
+    const HEADER_TOKENS = [
+      'authorization', 'x-client-info', 'apikey', 'content-type', 'x-test-secret',
+      'set-cookie', 'cookie', 'host', 'x-injected', 'x-evil-header', '*', '',
+    ]
+    const METHOD_TOKENS = [
+      'POST', 'GET', 'DELETE', 'PROPFIND', 'CUSTOM-METHOD', 'EVIL', '*', '', 'PoSt',
+    ]
+    const ORIGIN_HOSTS = [
+      'https://example.com', 'https://EVIL.attacker.com', 'http://localhost', 'null',
+    ]
+    const PERCENT_TOKENS = ['%2C', '%2c', '%252C', '%20', '%09', '%0D%0A', '%00', '%3B', '%2F', '%3A']
+    const UNICODE_WS = ['\u00A0', '\u2003', '\u3000', '\u202F', '\u200A', '\u200B', '\uFEFF']
+    const SEPARATORS = [',', ', ', ' ,', ' , ', ',\t', ',%20', '%2C']
+    const EXTRA_HEADER_NAMES = ['X-Forwarded-For', 'X-Real-IP', 'X-Custom', 'Referer']
+
+    const generate = (seed: number, index: number): FuzzPayload => {
+      const rng = makeRng(seed ^ (index * 0x9E3779B1))
+      const choice = <T,>(arr: readonly T[]): T => arr[Math.floor(rng() * arr.length)]
+      const maybe = (p: number) => rng() < p
+      const intIn = (n: number) => Math.floor(rng() * n)
+
+      const marker = `SHRINK${index.toString().padStart(4, '0')}_${(seed >>> 0).toString(16)}`
+
+      const fuzz = (pool: readonly string[], maxParts: number, includeMarker = false): string => {
+        const parts: string[] = []
+        const n = 1 + intIn(maxParts)
+        const markerPos = includeMarker ? intIn(n + 1) : -1
+        for (let k = 0; k <= n; k++) {
+          if (k > 0) parts.push(choice(SEPARATORS))
+          if (maybe(0.3)) parts.push(choice(UNICODE_WS))
+          if (k === markerPos) {
+            if (maybe(0.4)) parts.push(choice(PERCENT_TOKENS))
+            parts.push(marker)
+            if (maybe(0.4)) parts.push(choice(PERCENT_TOKENS))
+          } else if (k < n) {
+            parts.push(choice(pool))
+            if (maybe(0.35)) parts.push(choice(PERCENT_TOKENS))
+          }
+          if (maybe(0.25)) parts.push(choice(UNICODE_WS))
+        }
+        return parts.join('')
+      }
+
+      const origin = maybe(0.85)
+        ? (maybe(0.3) ? `${choice(ORIGIN_HOSTS)}/${marker}` : choice(ORIGIN_HOSTS))
+        : null
+      const requestMethod = maybe(0.9) ? fuzz(METHOD_TOKENS, 3, maybe(0.4)) : null
+      const requestHeaders = maybe(0.9) ? fuzz(HEADER_TOKENS, 4, maybe(0.5)) : null
+      const extraHeaders: Array<[string, string]> = []
+      const extraN = intIn(4)
+      for (let k = 0; k < extraN; k++) {
+        extraHeaders.push([choice(EXTRA_HEADER_NAMES), maybe(0.3) ? `${marker}-x` : `v${intIn(1000)}`])
+      }
+      return { origin, requestMethod, requestHeaders, extraHeaders, marker }
+    }
+
+    type InvariantResult = { ok: true } | { ok: false; reason: string }
+    type RawResponse = { status: number; headers: Headers; headerLines: string[]; body: string } | { error: string }
+
+    async function sendRaw(p: FuzzPayload): Promise<RawResponse> {
+      let conn: Deno.TcpConn | null = null
+      try {
+        conn = await Deno.connect({ hostname: u.hostname, port: parseInt(u.port, 10), transport: 'tcp' })
+        const reqLines = ['OPTIONS / HTTP/1.1', `Host: ${hostHeader}`]
+        if (p.origin !== null) reqLines.push(`Origin: ${p.origin}`)
+        if (p.requestMethod !== null) reqLines.push(`Access-Control-Request-Method: ${p.requestMethod}`)
+        if (p.requestHeaders !== null) reqLines.push(`Access-Control-Request-Headers: ${p.requestHeaders}`)
+        for (const [k, v] of p.extraHeaders) {
+          const sn = k.replace(/[\r\n:]/g, ''), sv = v.replace(/[\r\n]/g, '')
+          if (sn) reqLines.push(`${sn}: ${sv}`)
+        }
+        reqLines.push('Connection: close', '', '')
+        await conn.write(new TextEncoder().encode(reqLines.join('\r\n')))
+
+        const chunks: Uint8Array[] = []
+        const buf = new Uint8Array(8192)
+        while (true) { const n = await conn.read(buf); if (n === null) break; chunks.push(buf.slice(0, n)) }
+        const total = chunks.reduce((s, c) => s + c.length, 0)
+        const merged = new Uint8Array(total)
+        let off = 0; for (const c of chunks) { merged.set(c, off); off += c.length }
+        const text = new TextDecoder().decode(merged)
+        const he = text.indexOf('\r\n\r\n')
+        if (he === -1) return { error: 'no header terminator' }
+        const lines = text.slice(0, he).split('\r\n')
+        const m = lines[0].match(/^HTTP\/1\.[01]\s+(\d{3})/)
+        if (!m) return { error: `bad status: ${lines[0]}` }
+        const headers = new Headers(); const headerLines: string[] = []
+        for (let i = 1; i < lines.length; i++) {
+          headerLines.push(lines[i])
+          const idx = lines[i].indexOf(':'); if (idx === -1) continue
+          const name = lines[i].slice(0, idx).trim(), value = lines[i].slice(idx + 1).trim()
+          if (name) headers.append(name, value)
+        }
+        return { status: parseInt(m[1], 10), headers, headerLines, body: text.slice(he + 4) }
+      } catch (e) {
+        return { error: `io: ${(e as Error).message}` }
+      } finally { try { conn?.close() } catch { /* ignore */ } }
+    }
+
+    // ─── Verifica TODAS as invariantes; retorna primeira violação. ───
+    const checkInvariants = (p: FuzzPayload, r: RawResponse): InvariantResult => {
+      if ('error' in r) return { ok: true } // erros de conexão não falham o teste
+      if (r.status >= 500) return { ok: false, reason: `status 5xx: ${r.status}` }
+      const ml = p.marker.toLowerCase()
+
+      // Marker NUNCA vaza para body — vale para 4xx e 200.
+      if (r.body.toLowerCase().includes(ml)) return { ok: false, reason: `marker leak in body: ${JSON.stringify(r.body)}` }
+      for (const [name, value] of r.headers) {
+        if (value.toLowerCase().includes(ml)) return { ok: false, reason: `marker leak in header value "${name}: ${value}"` }
+        if (name.toLowerCase().includes(ml)) return { ok: false, reason: `marker leak in header name "${name}"` }
+        if (name.toLowerCase() === 'set-cookie') return { ok: false, reason: `Set-Cookie present` }
+      }
+      if (r.status !== 200) return { ok: true }
+
+      // 200: invariantes completas.
+      for (const [name] of r.headers) {
+        if (!ALLOWED_RESPONSE_HEADERS.has(name.toLowerCase())) return { ok: false, reason: `unexpected header "${name}"` }
+      }
+      const am = r.headers.get('access-control-allow-methods')
+      const ah = r.headers.get('access-control-allow-headers')
+      if (am !== EXPECTED_METHODS_LITERAL) return { ok: false, reason: `Allow-Methods != literal, got ${JSON.stringify(am)}` }
+      if (ah !== EXPECTED_HEADERS_LITERAL) return { ok: false, reason: `Allow-Headers != literal, got ${JSON.stringify(ah)}` }
+      for (const [field, value] of [['Allow-Methods', am], ['Allow-Headers', ah]] as const) {
+        if (value!.includes('\r') || value!.includes('\n') || value!.includes('\x00') || value!.includes('\t') || value!.includes('%')) {
+          return { ok: false, reason: `${field} contains CR/LF/null/HTAB/%` }
+        }
+        for (const ch of value!) {
+          const code = ch.charCodeAt(0)
+          if (code < 0x20 || code > 0x7E) return { ok: false, reason: `${field} non-ASCII U+${code.toString(16)}` }
+        }
+      }
+      if (r.headers.get('access-control-allow-origin') !== '*') return { ok: false, reason: `Allow-Origin != '*'` }
+      if (r.headers.get('access-control-max-age') !== '86400') return { ok: false, reason: `Max-Age != '86400'` }
+      if (r.headers.get('access-control-allow-credentials') !== null) return { ok: false, reason: `Allow-Credentials present` }
+      // Body neutro.
+      if (r.body.length > 16) return { ok: false, reason: `body too large: ${r.body.length}b` }
+      if (r.body.includes('\x00') || r.body.includes('%')) return { ok: false, reason: `body contains null/%` }
+      for (const ch of r.body) {
+        const code = ch.charCodeAt(0)
+        if (!((code >= 0x20 && code <= 0x7E) || code === 0x0D || code === 0x0A)) {
+          return { ok: false, reason: `body non-printable U+${code.toString(16)}` }
+        }
+      }
+      return { ok: true }
+    }
+
+    // ─── SHRINKING manual: dado payload falho, gera variantes "menores" e
+    //     retorna a menor que ainda falha. Estratégia: remover campos opcionais,
+    //     truncar strings, remover percent/unicode/separadores. ───
+    const measure = (p: FuzzPayload): number => {
+      let s = 0
+      if (p.origin) s += p.origin.length + 10
+      if (p.requestMethod) s += p.requestMethod.length + 10
+      if (p.requestHeaders) s += p.requestHeaders.length + 10
+      for (const [k, v] of p.extraHeaders) s += k.length + v.length + 5
+      return s
+    }
+
+    const shrinkCandidates = (p: FuzzPayload): FuzzPayload[] => {
+      const out: FuzzPayload[] = []
+      // 1) Remove cada campo opcional.
+      if (p.origin !== null) out.push({ ...p, origin: null })
+      if (p.requestMethod !== null) out.push({ ...p, requestMethod: null })
+      if (p.requestHeaders !== null) out.push({ ...p, requestHeaders: null })
+      if (p.extraHeaders.length > 0) {
+        out.push({ ...p, extraHeaders: [] })
+        // Remove cada extra individual.
+        for (let i = 0; i < p.extraHeaders.length; i++) {
+          out.push({ ...p, extraHeaders: p.extraHeaders.filter((_, j) => j !== i) })
+        }
+      }
+      // 2) Truncar metade de cada string (preservando marker se possível).
+      const truncateKeepingMarker = (s: string, marker: string): string[] => {
+        const cands: string[] = []
+        if (s.length > 1) cands.push(s.slice(0, Math.floor(s.length / 2)))
+        if (s.length > 1) cands.push(s.slice(Math.ceil(s.length / 2)))
+        // Versão só com marker.
+        if (s.includes(marker)) cands.push(marker)
+        return cands.filter((c) => c !== s)
+      }
+      if (p.requestMethod) for (const t of truncateKeepingMarker(p.requestMethod, p.marker)) out.push({ ...p, requestMethod: t })
+      if (p.requestHeaders) for (const t of truncateKeepingMarker(p.requestHeaders, p.marker)) out.push({ ...p, requestHeaders: t })
+      if (p.origin) for (const t of truncateKeepingMarker(p.origin, p.marker)) out.push({ ...p, origin: t })
+      // 3) Remover percent-tokens e unicode WS.
+      const stripChars = (s: string): string[] => {
+        const cands: string[] = []
+        let stripped = s
+        for (const tok of [...PERCENT_TOKENS, ...UNICODE_WS]) {
+          if (stripped.includes(tok)) {
+            const candidate = stripped.split(tok).join('')
+            if (candidate !== s && candidate.length > 0) cands.push(candidate)
+          }
+        }
+        return cands
+      }
+      if (p.requestMethod) for (const t of stripChars(p.requestMethod)) out.push({ ...p, requestMethod: t })
+      if (p.requestHeaders) for (const t of stripChars(p.requestHeaders)) out.push({ ...p, requestHeaders: t })
+      return out
+    }
+
+    const shrink = async (initial: FuzzPayload, initialReason: string): Promise<{ payload: FuzzPayload; reason: string; iterations: number }> => {
+      let current = initial
+      let currentReason = initialReason
+      let iterations = 0
+      const MAX_ITERATIONS = 100
+
+      while (iterations < MAX_ITERATIONS) {
+        iterations++
+        const candidates = shrinkCandidates(current).sort((a, b) => measure(a) - measure(b))
+        let foundSmaller = false
+        for (const cand of candidates) {
+          if (measure(cand) >= measure(current)) continue
+          const r = await sendRaw(cand)
+          const inv = checkInvariants(cand, r)
+          if (!inv.ok) {
+            current = cand
+            currentReason = inv.reason
+            foundSmaller = true
+            break
+          }
+        }
+        if (!foundSmaller) break
+      }
+      return { payload: current, reason: currentReason, iterations }
+    }
+
+    // ─── Persistência: arquivo de seeds + falhas reduzidas. ───
+    // Tenta múltiplos caminhos e cai para in-memory se sandbox bloquear writes.
+    const PERSIST_CANDIDATES = [
+      '/tmp/rls-test-fuzz-state',
+      `${Deno.cwd()}/.rls-test-fuzz-state`,
+    ]
+    let PERSIST_DIR: string | null = null
+    for (const cand of PERSIST_CANDIDATES) {
+      try {
+        Deno.mkdirSync(cand, { recursive: true })
+        // Verifica write real.
+        const probe = `${cand}/.write-probe`
+        Deno.writeTextFileSync(probe, 'ok')
+        try { Deno.removeSync(probe) } catch { /* ignore */ }
+        PERSIST_DIR = cand
+        break
+      } catch { /* try next */ }
+    }
+    const SEEDS_FILE = PERSIST_DIR ? `${PERSIST_DIR}/seeds.json` : null
+    const FAILURES_FILE = PERSIST_DIR ? `${PERSIST_DIR}/failures.json` : null
+
+    interface PersistedSeed { seed: number; runAt: string; n: number }
+    interface PersistedFailure {
+      seed: number; index: number; foundAt: string;
+      original: FuzzPayload; originalReason: string;
+      shrunk: FuzzPayload; shrunkReason: string; shrinkIterations: number;
+    }
+
+    const loadJson = <T,>(path: string | null, fallback: T): T => {
+      if (!path) return fallback
+      try { return JSON.parse(Deno.readTextFileSync(path)) } catch { return fallback }
+    }
+    let persistWritesOk = 0
+    let persistWritesFailed = 0
+    const saveJson = (path: string | null, data: unknown): boolean => {
+      if (!path) { persistWritesFailed++; return false }
+      try {
+        Deno.writeTextFileSync(path, JSON.stringify(data, null, 2))
+        persistWritesOk++
+        return true
+      } catch {
+        persistWritesFailed++
+        return false
+      }
+    }
+
+    const seedsHistory: PersistedSeed[] = loadJson(SEEDS_FILE, [])
+    const failuresHistory: PersistedFailure[] = loadJson(FAILURES_FILE, [])
+
+    // Seed do run: escolhida deterministicamente baseada no histórico (rotação).
+    const SEED = (0xBADC0FFE ^ (seedsHistory.length * 0x12345)) >>> 0
+    const N = 250
+
+    seedsHistory.push({ seed: SEED, runAt: new Date().toISOString(), n: N })
+    const seedSaved = saveJson(SEEDS_FILE, seedsHistory.slice(-50)) // mantém últimos 50
+
+    let validatedAs200 = 0
+    let acceptedAs4xx = 0
+    let connErrors = 0
+    let foundFailures = 0
+    const newFailures: PersistedFailure[] = []
+
+    for (let i = 0; i < N; i++) {
+      const p = generate(SEED, i)
+      const r = await sendRaw(p)
+      if ('error' in r) { connErrors++; continue }
+      const inv = checkInvariants(p, r)
+
+      if (!inv.ok) {
+        // Encontrou falha → SHRINK.
+        const shrunk = await shrink(p, inv.reason)
+        const failure: PersistedFailure = {
+          seed: SEED, index: i, foundAt: new Date().toISOString(),
+          original: p, originalReason: inv.reason,
+          shrunk: shrunk.payload, shrunkReason: shrunk.reason, shrinkIterations: shrunk.iterations,
+        }
+        newFailures.push(failure)
+        failuresHistory.push(failure)
+        saveJson(FAILURES_FILE, failuresHistory.slice(-100))
+        foundFailures++
+        // Falha imediata com payload reduzido reportado.
+        throw new Error(
+          `Fuzz #${i} (seed=0x${SEED.toString(16)}) violou invariante.\n` +
+          `  Original (${measure(p)}b): ${JSON.stringify(p)}\n` +
+          `  Original reason: ${inv.reason}\n` +
+          `  Shrunk (${measure(shrunk.payload)}b, ${shrunk.iterations} iters): ${JSON.stringify(shrunk.payload)}\n` +
+          `  Shrunk reason: ${shrunk.reason}\n` +
+          `  Persisted to: ${FAILURES_FILE}`,
+        )
+      }
+
+      if (r.status === 200) validatedAs200++
+      else acceptedAs4xx++
+    }
+
+    // ─── Verificações finais (caminho feliz: zero falhas). ───
+    assertEquals(foundFailures, 0, `nenhuma falha esperada, encontradas ${foundFailures}`)
+    assertEquals(newFailures.length, 0, 'newFailures deve estar vazio em sucesso')
+    assertEquals(
+      validatedAs200 + acceptedAs4xx + connErrors, N,
+      `cobertura total (200=${validatedAs200}, 4xx=${acceptedAs4xx}, errors=${connErrors})`,
+    )
+    assert(validatedAs200 >= N / 2, `>=${N / 2} respostas 200, recebido ${validatedAs200}`)
+    assert(connErrors < N * 0.05, `erros de conexão muito altos: ${connErrors}/${N}`)
+    assertEquals(ctx._calls, 0, `createClient NUNCA pode ser invocado em ${N} fuzzes`)
+
+    // ─── Sanity da persistência: SE writes funcionaram, validar conteúdo no disco;
+    //     SE não (sandbox sem --allow-write), validar contadores in-memory. ───
+    if (PERSIST_DIR && seedSaved) {
+      const seedsAfter = loadJson<PersistedSeed[]>(SEEDS_FILE, [])
+      assert(seedsAfter.length >= 1, 'seeds devem ser persistidas no disco')
+      assert(seedsAfter.some((s) => s.seed === SEED), 'seed deste run deve estar persistida')
+      assert(persistWritesOk >= 1, 'pelo menos 1 write bem-sucedido')
+    } else {
+      // Persistência indisponível: in-memory ainda funciona.
+      assert(seedsHistory.length >= 1, 'seedsHistory in-memory deve ter pelo menos 1 entry')
+      assert(seedsHistory.some((s) => s.seed === SEED), 'seed deste run deve estar in-memory')
+    }
+
+    // ─── Self-test do shrinker: força payload sintético "falho" (cuja string contém
+    //     deliberadamente o padrão alvo) e verifica que o shrinker reduz para algo menor. ───
+    const fakeFailure: FuzzPayload = {
+      origin: 'https://example.com/SHRINKTEST', requestMethod: 'POST%2C%20DELETE\u00A0EXTRA',
+      requestHeaders: 'authorization%2Cx-evil%2C\u2003injected', extraHeaders: [['X-Custom', 'noise']],
+      marker: 'NEVER_MATCHES_RESPONSE_XYZ',
+    }
+    // Invariante artificial: "payload contém EXTRA" (sempre falha).
+    const artificialCheck = (p: FuzzPayload): InvariantResult => {
+      const all = `${p.origin ?? ''}|${p.requestMethod ?? ''}|${p.requestHeaders ?? ''}`
+      return all.includes('EXTRA') ? { ok: false, reason: 'contains EXTRA' } : { ok: true }
+    }
+    let cur = fakeFailure
+    let curReason = 'contains EXTRA'
+    for (let it = 0; it < 50; it++) {
+      const cands = shrinkCandidates(cur).sort((a, b) => measure(a) - measure(b))
+      let smaller = false
+      for (const c of cands) {
+        if (measure(c) >= measure(cur)) continue
+        const inv = artificialCheck(c)
+        if (!inv.ok) { cur = c; curReason = inv.reason; smaller = true; break }
+      }
+      if (!smaller) break
+    }
+    assert(measure(cur) < measure(fakeFailure), `shrinker deve reduzir: ${measure(fakeFailure)} -> ${measure(cur)}`)
+    assertEquals(curReason, 'contains EXTRA', 'shrinker preserva a falha')
+    assert(
+      (cur.requestMethod ?? '').includes('EXTRA') || (cur.requestHeaders ?? '').includes('EXTRA') || (cur.origin ?? '').includes('EXTRA'),
+      'shrunk ainda deve conter EXTRA (preservou a propriedade falha)',
+    )
+  } finally {
+    await ctx.stop()
+  }
+})
