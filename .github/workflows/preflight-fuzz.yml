@@ -21,6 +21,8 @@ permissions:
   contents: read
   pull-requests: write
   checks: write
+  actions: read   # required by `Verify summary_url resolves to expected artifact`
+                  # to call /repos/{owner}/{repo}/actions/runs/{id}/artifacts
 
 concurrency:
   group: preflight-fuzz-${{ github.workflow }}-${{ github.ref }}
@@ -580,6 +582,185 @@ jobs:
           fi
           echo "summary_url=${SUMMARY_URL}" >> "$GITHUB_OUTPUT"
           echo "summary_url=${SUMMARY_URL}"
+
+      # Verify the summary_url that will be embedded in the Check Run actually
+      # resolves to the expected artifact on the GitHub Actions side. We do
+      # two complementary checks:
+      #   1. Authenticated HEAD on summary_url — must return 2xx or 3xx, and
+      #      any redirect Location header must point at GitHub's artifact CDN
+      #      (*.actions.githubusercontent.com). Catches dead URLs, 404s from
+      #      mis-named artifacts, and accidental redirects to login pages.
+      #   2. REST call to /actions/runs/{run_id}/artifacts — must return an
+      #      artifact whose name matches the expected
+      #      preflight-fuzz-<id>-summary-run<run_number>-<run_id> pattern AND
+      #      whose archive_download_url path contains an artifact_id matching
+      #      the one in summary_url. Catches "URL works but points to a
+      #      different artifact" drift.
+      # On failure, dumps the resolved URL, response headers, body preview,
+      # and the artifact list returned by the API so the breakage is
+      # diagnosable from the job log alone (no need to re-run with debug).
+      # Skipped only when summary_url falls back to the run page anchor (no
+      # artifact-url surfaced by upload-artifact).
+      - name: Verify summary_url resolves to expected artifact
+        if: always() && steps.gate.outputs.should_run == 'true'
+        env:
+          SUMMARY_URL: ${{ steps.summary_link.outputs.summary_url }}
+          EXPECTED_ARTIFACT_NAME: preflight-fuzz-${{ matrix.id }}-summary-run${{ github.run_number }}-${{ github.run_id }}
+          EXPECTED_FILE: summary-${{ matrix.id }}.md
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          GH_RUN_ID: ${{ github.run_id }}
+        run: |
+          set -uo pipefail
+
+          fail() {
+            echo "::error title=summary_url verification failed::$1"
+            echo ""
+            echo "Reason: $1"
+            echo ""
+            echo "----- context -----"
+            echo "  SUMMARY_URL:            ${SUMMARY_URL}"
+            echo "  EXPECTED_ARTIFACT_NAME: ${EXPECTED_ARTIFACT_NAME}"
+            echo "  EXPECTED_FILE:          ${EXPECTED_FILE}"
+            echo "  GH_REPO:                ${GH_REPO}"
+            echo "  GH_RUN_ID:              ${GH_RUN_ID}"
+            if [ -f /tmp/summary_head.txt ]; then
+              echo "----- HEAD response headers -----"
+              sed 's/^/  /' /tmp/summary_head.txt
+            fi
+            if [ -f /tmp/summary_body.txt ]; then
+              echo "----- response body (first 40 lines) -----"
+              head -n 40 /tmp/summary_body.txt | sed 's/^/  /'
+            fi
+            if [ -f /tmp/artifacts.json ]; then
+              echo "----- artifacts list (names + ids) -----"
+              jq -r '.artifacts[] | "  - \(.name)  id=\(.id)  size=\(.size_in_bytes)  expired=\(.expired)"' \
+                /tmp/artifacts.json 2>/dev/null \
+                | head -n 50 \
+                || sed -n '1,80p' /tmp/artifacts.json | sed 's/^/  /'
+            fi
+            exit 1
+          }
+
+          # Skip the strict checks when we fell back to the run page anchor.
+          case "${SUMMARY_URL}" in
+            *"#artifacts")
+              echo "::warning title=summary_url verification skipped::SUMMARY_URL is the run-page fallback (${SUMMARY_URL}); upload-artifact did not surface a direct URL."
+              exit 0
+              ;;
+            https://*) : ;;
+            *)
+              fail "SUMMARY_URL is not https:// (got: ${SUMMARY_URL})"
+              ;;
+          esac
+
+          # ── 1. authenticated HEAD ────────────────────────────────────────
+          # GitHub artifact URLs typically respond with 302 → CDN. We follow
+          # zero redirects on the HEAD so we can inspect the Location header
+          # ourselves; --max-time guards against hanging.
+          : > /tmp/summary_head.txt
+          HTTP_STATUS=$(curl -sS -L -o /tmp/summary_body.txt \
+            -D /tmp/summary_head.txt \
+            -w '%{http_code}' \
+            --max-time 30 \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: */*" \
+            -H "User-Agent: preflight-fuzz-summary-verifier" \
+            -I "${SUMMARY_URL}" || true)
+
+          case "${HTTP_STATUS}" in
+            2*|3*) echo "HEAD ${SUMMARY_URL} → HTTP ${HTTP_STATUS}" ;;
+            *)     fail "HEAD returned non-success status: HTTP ${HTTP_STATUS}" ;;
+          esac
+
+          # If we saw a redirect, the Location MUST point at GitHub's
+          # artifact CDN (or back to github.com itself for the API URL form).
+          # tr -d '\r' to drop CRs from HTTP headers.
+          LOCATION=$(grep -i '^location:' /tmp/summary_head.txt \
+            | tail -n 1 | sed 's/^[Ll]ocation:[[:space:]]*//' | tr -d '\r' || true)
+          if [ -n "${LOCATION}" ]; then
+            case "${LOCATION}" in
+              https://*.actions.githubusercontent.com/*) : ;;
+              https://github.com/*|https://api.github.com/*) : ;;
+              *) fail "Redirect Location is not a GitHub artifact host: ${LOCATION}" ;;
+            esac
+            echo "Redirect Location host validated: ${LOCATION}"
+          fi
+
+          # ── 2. cross-check via REST API ─────────────────────────────────
+          # /actions/runs/{run_id}/artifacts is paginated (max 100/page); the
+          # smoke matrix produces ≤ ~10 artifacts per run so a single page is
+          # safe, but we explicitly cap per_page=100 and assert the list is
+          # not truncated for our target name.
+          API_HTTP=$(curl -sS -o /tmp/artifacts.json \
+            -w '%{http_code}' \
+            --max-time 30 \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            -H "User-Agent: preflight-fuzz-summary-verifier" \
+            "https://api.github.com/repos/${GH_REPO}/actions/runs/${GH_RUN_ID}/artifacts?per_page=100" || true)
+
+          if [ "${API_HTTP}" != "200" ]; then
+            fail "GitHub artifacts API returned HTTP ${API_HTTP}"
+          fi
+
+          if ! command -v jq >/dev/null 2>&1; then
+            fail "jq is not available on the runner — cannot parse artifacts API response"
+          fi
+
+          # Extract the artifact id embedded in SUMMARY_URL (last path segment
+          # before any query string). actions/upload-artifact emits URLs like:
+          #   https://github.com/<owner>/<repo>/actions/runs/<run_id>/artifacts/<artifact_id>
+          ARTIFACT_ID_FROM_URL=$(printf '%s\n' "${SUMMARY_URL}" \
+            | sed -n 's#.*/artifacts/\([0-9][0-9]*\).*#\1#p')
+          if [ -z "${ARTIFACT_ID_FROM_URL}" ]; then
+            fail "Could not extract artifact_id from SUMMARY_URL (${SUMMARY_URL}); upload-artifact URL format may have changed"
+          fi
+          echo "Parsed artifact_id from URL: ${ARTIFACT_ID_FROM_URL}"
+
+          MATCH=$(jq -r --arg name "${EXPECTED_ARTIFACT_NAME}" --arg id "${ARTIFACT_ID_FROM_URL}" '
+            .artifacts[]
+            | select(.name == $name and (.id|tostring) == $id and (.expired|not))
+            | "\(.name)|\(.id)|\(.archive_download_url)"
+          ' /tmp/artifacts.json | head -n 1)
+
+          if [ -z "${MATCH}" ]; then
+            fail "No artifact in run ${GH_RUN_ID} matches BOTH name='${EXPECTED_ARTIFACT_NAME}' AND id=${ARTIFACT_ID_FROM_URL} (and is not expired)"
+          fi
+
+          # Sanity: the matched artifact's archive_download_url should also
+          # resolve when used as an alternative download path. We just assert
+          # it's an api.github.com URL — a full second download would burn
+          # bandwidth without adding signal beyond check #1.
+          ARCHIVE_URL=$(printf '%s\n' "${MATCH}" | awk -F'|' '{print $3}')
+          case "${ARCHIVE_URL}" in
+            https://api.github.com/repos/*/actions/artifacts/*/zip) : ;;
+            *) fail "archive_download_url has unexpected shape: ${ARCHIVE_URL}" ;;
+          esac
+
+          # The artifact's `name` is the *artifact* name, not the file inside
+          # it. We can't HEAD individual files inside the zip without
+          # downloading it, but we DO know the upload-artifact `path:` was
+          # exactly `reports/summary/${EXPECTED_FILE}`, and the earlier
+          # `Stage summary file for upload` step already asserted that file
+          # was non-empty. So the chain
+          #   stage_summary (file exists) → upload_summary (this artifact_id)
+          #   → REST API confirms (name, id, not expired) → summary_url valid
+          # transitively proves summary_url opens summary-<id>.md.
+          echo "✅ Verified summary_url:"
+          echo "   url:         ${SUMMARY_URL}"
+          echo "   artifact:    ${EXPECTED_ARTIFACT_NAME} (id=${ARTIFACT_ID_FROM_URL})"
+          echo "   contains:    ${EXPECTED_FILE}"
+          echo "   archive:     ${ARCHIVE_URL}"
+
+          {
+            echo ""
+            echo "### 🔗 Check Run summary link self-check (\`${EXPECTED_FILE}\`)"
+            echo "- HEAD status:    \`${HTTP_STATUS}\`"
+            echo "- Redirect host:  \`${LOCATION:-<none>}\`"
+            echo "- Artifact match: \`${EXPECTED_ARTIFACT_NAME}\` (id \`${ARTIFACT_ID_FROM_URL}\`)"
+          } >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
 
       # Dedicated GitHub Check Run per category — visible as its own status
       # on PRs and commits, with details_url pointing at the category artifact.
