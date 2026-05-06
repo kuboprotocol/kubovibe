@@ -188,6 +188,38 @@ Deno.test('HTTP integration: whitespace-only x-test-secret (" ") -> 401, body {e
   }
 })
 
+Deno.test('HTTP integration: whitespace-only x-test-secret (" ") -> 401 includes CORS headers', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    const res = await fetch(`${ctx.url}/`, {
+      method: 'POST',
+      headers: {
+        'x-test-secret': ' ',
+        'origin': 'https://app.kubovibe.dev',
+        'content-type': 'application/json',
+      },
+    })
+
+    assertEquals(res.status, 401)
+
+    // CORS obrigatório mesmo em 401, senão o browser bloqueia a leitura do erro.
+    assertEquals(res.headers.get('access-control-allow-origin'), '*', 'allow-origin deve ser *')
+    const allowed = res.headers.get('access-control-allow-headers') ?? ''
+    assert(allowed.length > 0, 'allow-headers deve estar presente')
+    assert(allowed.includes('x-test-secret'), 'allow-headers deve listar x-test-secret')
+    assert(allowed.includes('content-type'), 'allow-headers deve listar content-type')
+    assert(allowed.includes('authorization'), 'allow-headers deve listar authorization')
+
+    assertEquals(res.headers.get('content-type'), 'application/json')
+    const body = await res.json()
+    assertEquals(body, { error: 'unauthorized' })
+
+    assertEquals(ctx._calls, 0, 'createClient não deve ser chamado com secret whitespace-only')
+  } finally {
+    await ctx.stop()
+  }
+})
+
 Deno.test('HTTP integration: CORS preflight (OPTIONS) responds 200 with allowed headers', async () => {
   const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
   try {
