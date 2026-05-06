@@ -244,18 +244,18 @@ assert_single_bullet_for "fc-seeds.json"
 assert_single_bullet_for "fc-failures.json"
 
 # ─── cross-contamination gate ────────────────────────────────────────────────
-# Canonical bullet prefixes must own their respective token. Fallback
-# markers also have category-specific emoji+text that must not point at
-# the opposite file.
+# Canonical bullet signatures must own their respective token. Fallback
+# markers also have category-specific emoji that must not point at the
+# opposite file. Signatures are tolerant ERE regexes (whitespace, indent,
+# **/__ bold synonyms) — see assert_no_cross_contamination().
 assert_no_cross_contamination \
-  "${SEEDS_BULLET_PREFIX}"    "fc-seeds.json"    "fc-failures.json" "seeds canonical bullet"
+  "${SEEDS_CANONICAL_SIG}"    "fc-seeds.json"    "fc-failures.json" "seeds canonical bullet"
 assert_no_cross_contamination \
-  "${FAILURES_BULLET_PREFIX}" "fc-failures.json" "fc-seeds.json"    "failures canonical bullet"
-# Fallback marker prefixes (must match the writer's exact strings).
+  "${FAILURES_CANONICAL_SIG}" "fc-failures.json" "fc-seeds.json"    "failures canonical bullet"
 assert_no_cross_contamination \
-  '- 🌱 `'  "fc-seeds.json"    "fc-failures.json" "seeds fallback marker"
+  "${SEEDS_FALLBACK_SIG}"     "fc-seeds.json"    "fc-failures.json" "seeds fallback marker"
 assert_no_cross_contamination \
-  '- 💥 `'  "fc-failures.json" "fc-seeds.json"    "failures fallback marker"
+  "${FAILURES_FALLBACK_SIG}"  "fc-failures.json" "fc-seeds.json"    "failures fallback marker"
 
 
 # ─── fc-seeds.json — conditional on STAGED_FC_SEEDS ──────────────────────────
@@ -269,20 +269,19 @@ if [ "${STAGED_FC_SEEDS}" = "1" ]; then
     https://*) : ;;
     *) fail "fc-seeds.json URL is not https:// (got: ${FC_SEEDS_URL})" ;;
   esac
-  assert_contains "[\`fc-seeds.json\`](${FC_SEEDS_URL})" \
-    "Missing inline fc-seeds.json link to ${FC_SEEDS_URL} in ${CONTEXT_LABEL}"
-  # Strict bullet-format check: the writer emits a full canonical bullet,
-  # so reject any drift (e.g. missing emoji, missing bold label, wrong dash).
-  assert_bullet_line \
-    "${SEEDS_BULLET_PREFIX}[\`fc-seeds.json\`](${FC_SEEDS_URL})" \
-    "fc-seeds.json" \
-    "fc-seeds.json inline link is not formatted as the canonical bullet '${SEEDS_BULLET_PREFIX}[\`fc-seeds.json\`](URL)' in ${CONTEXT_LABEL}"
+  # Tolerant canonical-bullet check (whitespace/markdown variations OK,
+  # but emoji + label words + token + URL must all be present and correct).
+  assert_canonical_bullet \
+    "🌱" "Seeds executed (last 50 runs):" "fc-seeds.json" "${FC_SEEDS_URL}" \
+    "fc-seeds.json bullet does not match canonical shape '${SEEDS_BULLET_PREFIX}[\`fc-seeds.json\`](URL)' in ${CONTEXT_LABEL}"
   SEEDS_RESULT="link OK (${FC_SEEDS_URL})"
 else
   assert_contains "\`fc-seeds.json\` — _(not produced in this run)_" \
     "fc-seeds.json was not staged → ${CONTEXT_LABEL} must include the documented fallback marker"
-  # Defensive: when not staged, no stray inline link should exist.
-  if grep -Eq "\[\`fc-seeds\.json\`\]\(https://" "${SUMMARY_FILE}"; then
+  # Defensive: when not staged, no stray inline link should exist (tolerant
+  # to inner whitespace inside the link text/URL).
+  stray_seeds_re="\\[${_S0}\`fc-seeds\\.json\`${_S0}\\]${_S0}\\(${_S0}https://"
+  if grep -Eq -- "${stray_seeds_re}" "${SUMMARY_FILE}"; then
     fail "fc-seeds.json was NOT staged but ${CONTEXT_LABEL} contains a stray inline https link"
   fi
   SEEDS_RESULT="fallback marker (not staged)"
@@ -299,17 +298,15 @@ if [ "${STAGED_FC_FAILURES}" = "1" ]; then
     https://*) : ;;
     *) fail "fc-failures.json URL is not https:// (got: ${FC_FAILURES_URL})" ;;
   esac
-  assert_contains "[\`fc-failures.json\`](${FC_FAILURES_URL})" \
-    "Missing inline fc-failures.json link to ${FC_FAILURES_URL} in ${CONTEXT_LABEL}"
-  assert_bullet_line \
-    "${FAILURES_BULLET_PREFIX}[\`fc-failures.json\`](${FC_FAILURES_URL})" \
-    "fc-failures.json" \
-    "fc-failures.json inline link is not formatted as the canonical bullet '${FAILURES_BULLET_PREFIX}[\`fc-failures.json\`](URL)' in ${CONTEXT_LABEL}"
+  assert_canonical_bullet \
+    "💥" "Minimized counterexamples (last 100):" "fc-failures.json" "${FC_FAILURES_URL}" \
+    "fc-failures.json bullet does not match canonical shape '${FAILURES_BULLET_PREFIX}[\`fc-failures.json\`](URL)' in ${CONTEXT_LABEL}"
   FAILURES_RESULT="link OK (${FC_FAILURES_URL})"
 else
   assert_contains "\`fc-failures.json\` — _(no failures persisted in this run — invariants held)_" \
     "fc-failures.json was not staged → ${CONTEXT_LABEL} must include the documented fallback marker"
-  if grep -Eq "\[\`fc-failures\.json\`\]\(https://" "${SUMMARY_FILE}"; then
+  stray_failures_re="\\[${_S0}\`fc-failures\\.json\`${_S0}\\]${_S0}\\(${_S0}https://"
+  if grep -Eq -- "${stray_failures_re}" "${SUMMARY_FILE}"; then
     fail "fc-failures.json was NOT staged but ${CONTEXT_LABEL} contains a stray inline https link"
   fi
   FAILURES_RESULT="fallback marker (not staged)"
