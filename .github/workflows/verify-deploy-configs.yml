@@ -226,37 +226,8 @@ jobs:
           audit.sh "render.yaml 301 rule" ok "render.yaml" 0 "Canonical 301 present" \
             "*.lovable.app → kubovibe.dev (status 301)"
 
-      # Always render the summary, even if a previous step failed.
-      - name: Render job summary
-        if: always()
-        run: |
-          {
-            echo "## 🚦 Verify deploy configs — \`${JOB_LABEL}\`"
-            echo ""
-            echo "Static validation of \`vercel.json\` and \`render.yaml\` at repo root."
-            echo "_No \`actions/cache\` used — each run is fully reproducible._"
-            echo "_Failed checks are also pinned as inline PR annotations on the offending file/line._"
-            echo ""
-            echo "| # | Check | Status | File:Line | Detail |"
-            echo "|---|---|---|---|---|"
-            i=0
-            if [ -s /tmp/summary-rows.tsv ]; then
-              while IFS=$'\t' read -r step status fileline detail; do
-                i=$((i+1))
-                echo "| ${i} | ${step} | ${status} | \`${fileline:-—}\` | ${detail} |"
-              done < /tmp/summary-rows.tsv
-            else
-              echo "| — | (no checks recorded) | ⚪ n/a | — | accumulator empty |"
-            fi
-            echo ""
-            echo "**Overall:** \`${{ job.status }}\` · runner \`${{ runner.os }}\` · commit \`${{ github.sha }}\` · attempt \`${{ github.run_attempt }}\`"
-            echo ""
-            echo "📎 Detailed audit (JSONL + summary copy) is attached as artifact \`verify-deploy-configs-audit-${{ github.run_id }}-${{ github.run_attempt }}\`."
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      # Persist machine-readable audit so reviewers / external tooling can
-      # consume the run programmatically (jq-friendly JSONL + plain TSV +
-      # rendered markdown). Always uploaded, even on failure.
+      # Stage audit files BEFORE the summary, so the upload step can run
+      # before the summary and the summary can embed the artifact URL.
       - name: Stage audit artifacts
         if: always()
         run: |
@@ -287,7 +258,11 @@ jobs:
           } > /tmp/audit-out/audit.md
           ls -la /tmp/audit-out/
 
+      # Upload BEFORE summary so we can capture artifact-url and embed it.
+      # upload-artifact@v4 exposes outputs.artifact-url (deep-link to the
+      # artifact's download page on the run UI) and outputs.artifact-id.
       - name: Upload audit artifact
+        id: upload-audit
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -295,6 +270,54 @@ jobs:
           path: /tmp/audit-out/
           retention-days: 30
           if-no-files-found: warn
+
+      # Always render the summary (even on previous-step failure). Includes
+      # a direct hyperlink to the artifact uploaded above + a fallback link
+      # to the run's "Artifacts" tab when artifact-url is unavailable
+      # (e.g. upload itself failed).
+      - name: Render job summary
+        if: always()
+        env:
+          ARTIFACT_NAME: verify-deploy-configs-audit-${{ github.run_id }}-${{ github.run_attempt }}
+          ARTIFACT_URL: ${{ steps.upload-audit.outputs.artifact-url }}
+          ARTIFACT_ID: ${{ steps.upload-audit.outputs.artifact-id }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          {
+            echo "## 🚦 Verify deploy configs — \`${JOB_LABEL}\`"
+            echo ""
+            echo "Static validation of \`vercel.json\` and \`render.yaml\` at repo root."
+            echo "_No \`actions/cache\` used — each run is fully reproducible._"
+            echo "_Failed checks are also pinned as inline PR annotations on the offending file/line._"
+            echo ""
+            echo "| # | Check | Status | File:Line | Detail |"
+            echo "|---|---|---|---|---|"
+            i=0
+            if [ -s /tmp/summary-rows.tsv ]; then
+              while IFS=$'\t' read -r step status fileline detail; do
+                i=$((i+1))
+                echo "| ${i} | ${step} | ${status} | \`${fileline:-—}\` | ${detail} |"
+              done < /tmp/summary-rows.tsv
+            else
+              echo "| — | (no checks recorded) | ⚪ n/a | — | accumulator empty |"
+            fi
+            echo ""
+            echo "**Overall:** \`${{ job.status }}\` · runner \`${{ runner.os }}\` · commit \`${{ github.sha }}\` · attempt \`${{ github.run_attempt }}\`"
+            echo ""
+            echo "### 📎 Audit artifact"
+            if [ -n "${ARTIFACT_URL}" ]; then
+              echo ""
+              echo "- **Direct link:** [${ARTIFACT_NAME}](${ARTIFACT_URL})"
+              [ -n "${ARTIFACT_ID}" ] && echo "- **Artifact ID:** \`${ARTIFACT_ID}\`"
+              echo "- **Contents:** \`audit.jsonl\` (one JSON record per check) · \`summary-rows.tsv\` · \`audit.md\`"
+              echo "- **Retention:** 30 days"
+            else
+              echo ""
+              echo "- ⚠️ \`artifact-url\` not exposed by upload step (upload may have failed or skipped)."
+              echo "- Fallback: open the **Artifacts** section on the [run page](${RUN_URL}) and look for \`${ARTIFACT_NAME}\`."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
 
 
 
