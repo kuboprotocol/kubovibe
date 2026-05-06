@@ -2895,3 +2895,149 @@ Deno.test('HTTP integration: CORS preflight — Allow-Methods header is case-ins
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: 401/403 auth-rejection responses with hostile Cookie — NEVER Set-Cookie/Set-Cookie2 (exhaustive casing)', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    // O handler emite 401 para: (a) header secreto ausente, (b) header secreto incorreto.
+    // Não há caminho 403 neste handler, mas a asserção é defensiva: qualquer status
+    // de rejeição de auth (401/403) NÃO PODE conter Set-Cookie/Set-Cookie2 mesmo com
+    // cookies hostis enviados pelo cliente. O sweep abaixo cobre os 401 reais e
+    // valida o invariante que se aplicaria igualmente a um eventual 403 futuro.
+    const HOSTILE_COOKIE =
+      'sid=stolen-session-abc123; session=hijacked; auth=fake-jwt-token-xyz; jwt=eyJfake; csrf=hijack-token; remember_me=1; admin=true'
+
+    const HOSTILE_ORIGIN = 'https://evil.example.com'
+
+    // Variantes de casing exaustivas para set-cookie / set-cookie2.
+    const COOKIE_HEADER_VARIANTS = [
+      'set-cookie', 'Set-Cookie', 'SET-COOKIE', 'set-Cookie', 'Set-cookie',
+      'SET-cookie', 'set-COOKIE', 'sEt-CoOkIe',
+      'set-cookie2', 'Set-Cookie2', 'SET-COOKIE2', 'set-Cookie2', 'Set-cookie2',
+      'SET-cookie2', 'sEt-CoOkIe2',
+    ]
+
+    // Cenários que produzem 401/403-style rejections.
+    const scenarios: Array<{ name: string; expectedStatus: number; init: RequestInit }> = [
+      {
+        name: '401 — POST sem header x-test-secret',
+        expectedStatus: 401,
+        init: {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'origin': HOSTILE_ORIGIN,
+            'cookie': HOSTILE_COOKIE,
+          },
+        },
+      },
+      {
+        name: '401 — POST com x-test-secret incorreto',
+        expectedStatus: 401,
+        init: {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'origin': HOSTILE_ORIGIN,
+            'cookie': HOSTILE_COOKIE,
+            'x-test-secret': 'wrong-secret-attempt',
+          },
+        },
+      },
+      {
+        name: '401 — POST com x-test-secret vazio',
+        expectedStatus: 401,
+        init: {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'origin': HOSTILE_ORIGIN,
+            'cookie': HOSTILE_COOKIE,
+            'x-test-secret': '',
+          },
+        },
+      },
+      {
+        name: '401 — POST cross-origin, secret incorreto, cookies + Authorization hostis',
+        expectedStatus: 401,
+        init: {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'origin': HOSTILE_ORIGIN,
+            'cookie': HOSTILE_COOKIE,
+            'authorization': 'Bearer attacker-jwt-token',
+            'x-test-secret': 'definitely-not-the-secret',
+          },
+        },
+      },
+    ]
+
+    for (const sc of scenarios) {
+      // Executa 2x para garantir idempotência — nenhuma chamada pode emitir Set-Cookie.
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        const res = await fetch(`${ctx.url}/`, sc.init)
+        await res.text() // sempre consumir body (Deno fetch leak guard)
+
+        assertEquals(
+          res.status,
+          sc.expectedStatus,
+          `[${sc.name}] tentativa ${attempt}: status esperado ${sc.expectedStatus}`,
+        )
+
+        // (1) Checagem canônica — Headers.get é case-insensitive.
+        assertEquals(
+          res.headers.get('set-cookie'),
+          null,
+          `[${sc.name}] tentativa ${attempt}: Set-Cookie NUNCA deve aparecer em resposta ${sc.expectedStatus}`,
+        )
+        assertEquals(
+          res.headers.get('set-cookie2'),
+          null,
+          `[${sc.name}] tentativa ${attempt}: Set-Cookie2 NUNCA deve aparecer em resposta ${sc.expectedStatus}`,
+        )
+
+        // (2) Headers.has() em todas as variantes de casing — defesa contra runtimes exóticos.
+        for (const variant of COOKIE_HEADER_VARIANTS) {
+          assert(
+            !res.headers.has(variant),
+            `[${sc.name}] tentativa ${attempt}: header "${variant}" NÃO PODE existir em resposta ${sc.expectedStatus}`,
+          )
+        }
+
+        // (3) Iteração case-insensitive sobre todos os headers — captura vazamentos não documentados.
+        for (const [name] of res.headers) {
+          const lower = name.toLowerCase()
+          assert(
+            lower !== 'set-cookie' && lower !== 'set-cookie2',
+            `[${sc.name}] tentativa ${attempt}: header "${name}" vazou cookie em resposta ${sc.expectedStatus}`,
+          )
+        }
+
+        // (4) Garantia adicional: respostas de auth-rejection NÃO podem conter
+        // Access-Control-Allow-Credentials (incompatível com Allow-Origin: '*').
+        assertEquals(
+          res.headers.get('access-control-allow-credentials'),
+          null,
+          `[${sc.name}] tentativa ${attempt}: Allow-Credentials NUNCA deve aparecer`,
+        )
+
+        // (5) Sanidade: Allow-Origin permanece '*' literal (sem eco do Origin hostil).
+        const allowOrigin = res.headers.get('access-control-allow-origin')
+        assert(
+          allowOrigin === '*' || allowOrigin === null,
+          `[${sc.name}] tentativa ${attempt}: Allow-Origin deve ser '*' ou ausente, recebeu "${allowOrigin}"`,
+        )
+      }
+    }
+
+    // Garantia: nenhum createClient instanciado em qualquer cenário 401 — sem chance de vazar SERVICE_ROLE_KEY.
+    assertEquals(
+      ctx._calls,
+      0,
+      'createClient NUNCA deve ser invocado em respostas 401/403',
+    )
+  } finally {
+    await ctx.stop()
+  }
+})
