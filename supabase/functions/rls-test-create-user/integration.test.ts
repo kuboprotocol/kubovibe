@@ -5623,3 +5623,119 @@ Deno.test('HTTP integration: OPTIONS preflight — CRLF/null-byte in Request-Hea
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: OPTIONS bare — NO Origin, NO Request-Method, NO Request-Headers — Allow-Methods/Allow-Headers stay LITERAL exact (no echo, no leak, deterministic across N repetitions)', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    const EXPECTED_METHODS_LITERAL = 'POST, OPTIONS'
+    const EXPECTED_METHODS_SET = new Set(['post', 'options'])
+    const EXPECTED_HEADERS_LITERAL = 'authorization, x-client-info, apikey, content-type, x-test-secret'
+    const EXPECTED_HEADERS_SET = new Set([
+      'authorization', 'x-client-info', 'apikey', 'content-type', 'x-test-secret',
+    ])
+    const DANGEROUS_METHODS = ['get', 'put', 'patch', 'delete', 'head', 'connect', 'trace', 'propfind', 'custom-method', '*']
+    const DANGEROUS_HEADERS = [
+      'set-cookie', 'set-cookie2', 'cookie', 'cookie2',
+      'host', 'origin', 'authorization-bearer',
+      'x-evil-cookie', 'x-fake-header', 'x-csrf-token',
+      'x-forwarded-for', 'x-real-ip', 'proxy-authorization',
+      '*',
+    ]
+
+    const parseList = (v: string | null): string[] =>
+      (v ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
+
+    // Repete N vezes — preflight DEVE ser determinístico (sem state leak entre requests).
+    const REPETITIONS = 25
+    const responses: Array<{ status: number; am: string | null; ah: string | null; ao: string | null; ma: string | null }> = []
+
+    for (let i = 0; i < REPETITIONS; i++) {
+      // CRÍTICO: NENHUM header CORS enviado — request OPTIONS "nu".
+      const res = await fetch(`${ctx.url}/`, { method: 'OPTIONS' })
+      await res.text()
+      const ctxLabel = `[bare OPTIONS #${i + 1}]`
+
+      // (1) Status 200 — handler reconhece OPTIONS mesmo sem hints CORS.
+      assertEquals(res.status, 200, `${ctxLabel}: deve retornar 200`)
+
+      // (2) Allow-Methods LITERAL EXATO — não pode estar ausente, não pode ser '*', não pode ter dangerous.
+      const am = res.headers.get('access-control-allow-methods')
+      assertExists(am, `${ctxLabel}: Allow-Methods deve estar presente mesmo sem Request-Method`)
+      assertEquals(am, EXPECTED_METHODS_LITERAL, `${ctxLabel}: Allow-Methods deve ser literal "${EXPECTED_METHODS_LITERAL}"`)
+      const parsedMethods = new Set(parseList(am))
+      assertEquals(parsedMethods.size, EXPECTED_METHODS_SET.size, `${ctxLabel}: Allow-Methods deve listar exatamente 2 métodos`)
+      for (const m of EXPECTED_METHODS_SET) {
+        assert(parsedMethods.has(m), `${ctxLabel}: Allow-Methods deve incluir "${m}"`)
+      }
+      for (const dangerous of DANGEROUS_METHODS) {
+        assert(!parsedMethods.has(dangerous), `${ctxLabel}: Allow-Methods NÃO PODE conter "${dangerous}"`)
+      }
+
+      // (3) Allow-Headers LITERAL EXATO — não pode estar ausente, não pode ser '*', não pode ter dangerous.
+      const ah = res.headers.get('access-control-allow-headers')
+      assertExists(ah, `${ctxLabel}: Allow-Headers deve estar presente mesmo sem Request-Headers`)
+      assertEquals(ah, EXPECTED_HEADERS_LITERAL, `${ctxLabel}: Allow-Headers deve ser literal "${EXPECTED_HEADERS_LITERAL}"`)
+      const parsedHeaders = new Set(parseList(ah))
+      assertEquals(parsedHeaders.size, EXPECTED_HEADERS_SET.size, `${ctxLabel}: Allow-Headers deve listar exatamente 5 headers`)
+      for (const h of EXPECTED_HEADERS_SET) {
+        assert(parsedHeaders.has(h), `${ctxLabel}: Allow-Headers deve incluir "${h}"`)
+      }
+      for (const dangerous of DANGEROUS_HEADERS) {
+        assert(!parsedHeaders.has(dangerous), `${ctxLabel}: Allow-Headers NÃO PODE conter "${dangerous}"`)
+      }
+
+      // (4) Allow-Origin '*' literal mesmo sem Origin enviado.
+      const ao = res.headers.get('access-control-allow-origin')
+      assertEquals(ao, '*', `${ctxLabel}: Allow-Origin deve ser '*' literal`)
+      assert(ao !== 'null', `${ctxLabel}: Allow-Origin NUNCA pode ser 'null'`)
+
+      // (5) Allow-Credentials NUNCA presente.
+      assertEquals(res.headers.get('access-control-allow-credentials'), null, `${ctxLabel}: Allow-Credentials NUNCA pode aparecer`)
+
+      // (6) Max-Age literal '86400'.
+      const ma = res.headers.get('access-control-max-age')
+      assertEquals(ma, '86400', `${ctxLabel}: Max-Age deve ser '86400'`)
+
+      // (7) Vary não pode incluir 'origin' (incompatível com Allow-Origin '*').
+      const vary = res.headers.get('vary') ?? ''
+      assert(
+        !vary.toLowerCase().split(',').map((s) => s.trim()).includes('origin'),
+        `${ctxLabel}: Vary NÃO PODE incluir 'origin'`,
+      )
+
+      // (8) Cookies / Expose-Headers ausentes.
+      assertEquals(res.headers.get('set-cookie'), null, `${ctxLabel}: Set-Cookie NUNCA pode aparecer`)
+      assertEquals(res.headers.get('set-cookie2'), null, `${ctxLabel}: Set-Cookie2 NUNCA pode aparecer`)
+      assertEquals(res.headers.get('access-control-expose-headers'), null, `${ctxLabel}: Expose-Headers NUNCA pode aparecer`)
+
+      // (9) Allow-Methods e Allow-Headers aparecem exatamente 1x cada.
+      let methodsCount = 0, headersCount = 0
+      for (const [name] of res.headers) {
+        const lower = name.toLowerCase()
+        if (lower === 'access-control-allow-methods') methodsCount++
+        if (lower === 'access-control-allow-headers') headersCount++
+      }
+      assertEquals(methodsCount, 1, `${ctxLabel}: Allow-Methods deve aparecer exatamente 1x`)
+      assertEquals(headersCount, 1, `${ctxLabel}: Allow-Headers deve aparecer exatamente 1x`)
+
+      // (10) Body deve ser vazio em preflight (anti-leak).
+      // Já consumimos com res.text() acima — guardamos o que importa para comparar determinismo.
+      responses.push({ status: res.status, am, ah, ao, ma })
+    }
+
+    // (11) DETERMINISMO: todas as N respostas devem ser byte-idênticas nos campos CORS.
+    const first = responses[0]
+    for (let i = 1; i < responses.length; i++) {
+      assertEquals(responses[i].status, first.status, `repetição #${i + 1}: status divergiu`)
+      assertEquals(responses[i].am, first.am, `repetição #${i + 1}: Allow-Methods divergiu`)
+      assertEquals(responses[i].ah, first.ah, `repetição #${i + 1}: Allow-Headers divergiu`)
+      assertEquals(responses[i].ao, first.ao, `repetição #${i + 1}: Allow-Origin divergiu`)
+      assertEquals(responses[i].ma, first.ma, `repetição #${i + 1}: Max-Age divergiu`)
+    }
+
+    // (12) Zero createClient invocado em qualquer das N requests bare.
+    assertEquals(ctx._calls, 0, 'createClient NUNCA pode ser invocado em OPTIONS preflight bare')
+  } finally {
+    await ctx.stop()
+  }
+})
