@@ -434,6 +434,96 @@ run_case "BAD: both canonical bullets swapped (seeds↔failures)" \
 run_case "BAD: both fallback markers swapped (seeds↔failures)" \
   "${SWAP_FALLBACK}"  1 0 0 "" ""
 
+# ─── tolerant-regex variations (link/whitespace/markdown) ────────────────────
+# These exercise the refactored regex matcher: shapes that are SEMANTICALLY
+# equivalent to the canonical writer output must be ACCEPTED. Shapes that
+# change meaning (wrong URL, wrong token, wrong emoji) must still FAIL.
+
+# 1) Prettier-style spaces inside the inline link: `[ \`tok\` ]( url )`.
+TOL_LINK_SPACES="${WORKDIR}/tol_link_spaces.md"
+write_fixture "${TOL_LINK_SPACES}" \
+  '- 🌱 **Seeds executed (last 50 runs):** [ `fc-seeds.json` ]( https://example.com/seeds )' \
+  '- 💥 **Minimized counterexamples (last 100):** [ `fc-failures.json` ]( https://example.com/failures )'
+
+# 2) Multiple spaces between bullet dash, emoji, label, and link.
+TOL_EXTRA_WS="${WORKDIR}/tol_extra_ws.md"
+write_fixture "${TOL_EXTRA_WS}" \
+  '-   🌱   **Seeds executed (last 50 runs):**   [`fc-seeds.json`](https://example.com/seeds)' \
+  '-   💥   **Minimized counterexamples (last 100):**   [`fc-failures.json`](https://example.com/failures)'
+
+# 3) Tabs instead of spaces (markdown-tolerant).
+TOL_TABS="${WORKDIR}/tol_tabs.md"
+write_fixture "${TOL_TABS}" \
+  "$(printf -- '-\t🌱\t**Seeds executed (last 50 runs):**\t[`fc-seeds.json`](https://example.com/seeds)')" \
+  "$(printf -- '-\t💥\t**Minimized counterexamples (last 100):**\t[`fc-failures.json`](https://example.com/failures)')"
+
+# 4) Leading indent (e.g. nested list context) — must still match.
+TOL_INDENT="${WORKDIR}/tol_indent.md"
+write_fixture "${TOL_INDENT}" \
+  '  - 🌱 **Seeds executed (last 50 runs):** [`fc-seeds.json`](https://example.com/seeds)' \
+  '  - 💥 **Minimized counterexamples (last 100):** [`fc-failures.json`](https://example.com/failures)'
+
+# 5) `__bold__` instead of `**bold**` (CommonMark synonym).
+TOL_UNDERSCORE_BOLD="${WORKDIR}/tol_underscore_bold.md"
+write_fixture "${TOL_UNDERSCORE_BOLD}" \
+  '- 🌱 __Seeds executed (last 50 runs):__ [`fc-seeds.json`](https://example.com/seeds)' \
+  '- 💥 __Minimized counterexamples (last 100):__ [`fc-failures.json`](https://example.com/failures)'
+
+# 6) Trailing whitespace on the line.
+TOL_TRAILING_WS="${WORKDIR}/tol_trailing_ws.md"
+write_fixture "${TOL_TRAILING_WS}" \
+  '- 🌱 **Seeds executed (last 50 runs):** [`fc-seeds.json`](https://example.com/seeds)   ' \
+  '- 💥 **Minimized counterexamples (last 100):** [`fc-failures.json`](https://example.com/failures)   '
+
+# 7) NEGATIVE: link uses wrong URL but inside Prettier-style spacing — must fail.
+TOL_LINK_SPACES_WRONG_URL="${WORKDIR}/tol_link_spaces_wrong_url.md"
+write_fixture "${TOL_LINK_SPACES_WRONG_URL}" \
+  '- 🌱 **Seeds executed (last 50 runs):** [ `fc-seeds.json` ]( https://wrong.example.com/seeds )' \
+  '- 💥 **Minimized counterexamples (last 100):** [`fc-failures.json`](https://example.com/failures)'
+
+# 8) NEGATIVE: tabs everywhere but emoji is wrong.
+TOL_TABS_WRONG_EMOJI="${WORKDIR}/tol_tabs_wrong_emoji.md"
+write_fixture "${TOL_TABS_WRONG_EMOJI}" \
+  "$(printf -- '-\t🌰\t**Seeds executed (last 50 runs):**\t[`fc-seeds.json`](https://example.com/seeds)')" \
+  "$(printf -- '-\t💥\t**Minimized counterexamples (last 100):**\t[`fc-failures.json`](https://example.com/failures)')"
+
+# 9) NEGATIVE: stray inline link with spaces inside (`[ … ]( … )`) when not staged.
+TOL_STRAY_SPACED="${WORKDIR}/tol_stray_spaced.md"
+cat > "${TOL_STRAY_SPACED}" <<EOF
+# Preflight CORS Fuzz — request-headers
+
+### 🎯 fast-check direct downloads (Access-Control-Request-Headers)
+
+- 🌱 [ \`fc-seeds.json\` ]( https://example.com/seeds )
+- 💥 \`fc-failures.json\` — _(no failures persisted in this run — invariants held)_
+
+_The two files above are uploaded as standalone GitHub artifacts so you can curl or download them without unpacking the full bundle._
+EOF
+
+echo ""
+echo "── tolerant-regex: link/whitespace variations (must PASS) ──"
+run_case "TOL: Prettier spaces inside inline link" \
+  "${TOL_LINK_SPACES}"      0 1 1 "https://example.com/seeds" "https://example.com/failures"
+run_case "TOL: extra spaces between bullet tokens" \
+  "${TOL_EXTRA_WS}"         0 1 1 "https://example.com/seeds" "https://example.com/failures"
+run_case "TOL: tabs as separators" \
+  "${TOL_TABS}"             0 1 1 "https://example.com/seeds" "https://example.com/failures"
+run_case "TOL: leading indent on bullet" \
+  "${TOL_INDENT}"           0 1 1 "https://example.com/seeds" "https://example.com/failures"
+run_case "TOL: __underscore bold__ instead of **bold**" \
+  "${TOL_UNDERSCORE_BOLD}"  0 1 1 "https://example.com/seeds" "https://example.com/failures"
+run_case "TOL: trailing whitespace on line" \
+  "${TOL_TRAILING_WS}"      0 1 1 "https://example.com/seeds" "https://example.com/failures"
+
+echo ""
+echo "── tolerant-regex: variations that still alter meaning (must FAIL) ──"
+run_case "TOL-NEG: spaced link but wrong URL" \
+  "${TOL_LINK_SPACES_WRONG_URL}" 1 1 1 "https://example.com/seeds" "https://example.com/failures"
+run_case "TOL-NEG: tabs everywhere but wrong emoji" \
+  "${TOL_TABS_WRONG_EMOJI}"      1 1 1 "https://example.com/seeds" "https://example.com/failures"
+run_case "TOL-NEG: stray spaced inline link while not staged" \
+  "${TOL_STRAY_SPACED}"          1 0 0 "" ""
+
 # ─── summary ─────────────────────────────────────────────────────────────────
 
 echo ""
