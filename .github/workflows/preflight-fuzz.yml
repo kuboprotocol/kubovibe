@@ -702,6 +702,9 @@ jobs:
           # We ALSO read `total_count` from page 1 and assert that the number
           # of merged artifacts equals it — any drift signals a missed page
           # (e.g. early break, network error swallowed by `|| true`).
+          if ! command -v jq >/dev/null 2>&1; then
+            fail "jq is not available on the runner — cannot parse paginated artifacts API response"
+          fi
           PAGE=1
           MAX_PAGES=50
           TOTAL_COUNT=""
