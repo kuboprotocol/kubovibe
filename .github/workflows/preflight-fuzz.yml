@@ -551,120 +551,61 @@ jobs:
 
       # Validate the EXACT file that will be posted as the sticky PR comment
       # body (marocchino reads `path:` verbatim, so this file IS the sticky
-      # body). Asserts are CONDITIONAL on steps.stage outputs:
-      #   - staged_fc_seeds == '1'    → require inline fc-seeds.json link
-      #   - staged_fc_failures == '1' → require inline fc-failures.json link
-      # Otherwise → require the documented fallback marker (or skip silently
-      # for categories that don't run fast-check at all, like origin).
-      # Runs only on pull_request because that's when the sticky comment is
-      # actually posted.
+      # body). Reuses .github/scripts/verify-fc-summary.sh, which dumps the
+      # relevant fc-* lines + full body on failure for easy CI debugging.
+      # Asserts are CONDITIONAL on staged_fc_seeds / staged_fc_failures.
+      # For categories that don't run fast-check (e.g. origin) we skip the
+      # script and only assert that the per-category direct-downloads block
+      # exists. Runs only on pull_request because that's when the sticky
+      # comment is actually posted.
       - name: Verify sticky PR comment body (fc-seeds/fc-failures contract)
         if: always() && steps.gate.outputs.should_run == 'true' && github.event_name == 'pull_request'
+        id: verify_sticky
         env:
-          STICKY_BODY: ${{ steps.summary.outputs.summary_file }}
-          STICKY_HEADER: ${{ matrix.sticky_header }}
+          SUMMARY_FILE: ${{ steps.summary.outputs.summary_file }}
+          CONTEXT_LABEL: sticky PR comment body (${{ matrix.sticky_header }})
           CATEGORY_ID: ${{ matrix.id }}
+          STICKY_HEADER: ${{ matrix.sticky_header }}
           STAGED_FC_SEEDS: ${{ steps.stage.outputs.staged_fc_seeds }}
           STAGED_FC_FAILURES: ${{ steps.stage.outputs.staged_fc_failures }}
           FC_SEEDS_URL: ${{ steps.links.outputs.fc_seeds_url }}
           FC_FAILURES_URL: ${{ steps.links.outputs.fc_failures_url }}
+          # Sticky body doesn't need the standalone-artifacts paragraph for
+          # non-fast-check categories, but the script handles fc-categories.
+          REQUIRE_CONTEXT_PARAGRAPH: '0'
         run: |
           set -euo pipefail
 
-          fail() {
-            echo "::error title=Sticky PR comment contract violation (${STICKY_HEADER})::$1"
-            echo "----- BEGIN sticky body (${STICKY_BODY}) -----"
-            sed -n '1,400p' "${STICKY_BODY}" || true
-            echo "----- END sticky body -----"
+          if [ ! -s "${SUMMARY_FILE}" ]; then
+            echo "::error title=Sticky body missing::${SUMMARY_FILE} not produced"
             exit 1
-          }
-
-          if [ ! -s "${STICKY_BODY}" ]; then
-            fail "Sticky PR comment body is missing or empty: ${STICKY_BODY}"
           fi
 
-          # Categories that don't run fast-check (e.g. origin) → only assert
-          # the body has SOME content and the per-category direct-downloads
-          # block exists. fc-* assertions are skipped entirely.
+          # Categories that don't run fast-check → skip the fc-* script and
+          # only assert the per-category direct-downloads block exists.
           if [ "${CATEGORY_ID}" != "request-method" ] && [ "${CATEGORY_ID}" != "request-headers" ]; then
-            grep -Fq "📦 Direct downloads for" "${STICKY_BODY}" \
-              || fail "Sticky body is missing the per-category direct-downloads block"
+            if ! grep -Fq "📦 Direct downloads for" "${SUMMARY_FILE}"; then
+              echo "::error title=Sticky body contract violation (${STICKY_HEADER})::Missing per-category direct-downloads block"
+              echo "----- BEGIN sticky body (${SUMMARY_FILE}) -----"
+              sed -n '1,400p' "${SUMMARY_FILE}" || true
+              echo "----- END sticky body -----"
+              exit 1
+            fi
             echo "✅ Sticky body for ${CATEGORY_ID} validated (no fast-check expected)."
             exit 0
           fi
 
-          # ── fast-check categories (request-method / request-headers) ──
+          # fast-check categories → delegate to the shared verifier.
+          chmod +x .github/scripts/verify-fc-summary.sh
+          .github/scripts/verify-fc-summary.sh
 
-          # fc-seeds.json — conditional on staged_fc_seeds.
-          SEEDS_RESULT=skipped
-          if [ "${STAGED_FC_SEEDS:-0}" = "1" ]; then
-            if [ -z "${FC_SEEDS_URL}" ]; then
-              fail "fc-seeds.json was staged but FC_SEEDS_URL is empty — sticky body would render a broken link"
-            fi
-            case "${FC_SEEDS_URL}" in
-              https://*) : ;;
-              *) fail "fc-seeds.json URL is not https:// (got: ${FC_SEEDS_URL})" ;;
-            esac
-            grep -Fq "[\`fc-seeds.json\`](${FC_SEEDS_URL})" "${STICKY_BODY}" \
-              || fail "Sticky body missing inline fc-seeds.json link to ${FC_SEEDS_URL}"
-            SEEDS_RESULT="link OK (${FC_SEEDS_URL})"
-          else
-            grep -Fq "\`fc-seeds.json\` — _(not produced in this run)_" "${STICKY_BODY}" \
-              || fail "fc-seeds.json not staged → sticky body must include the documented fallback marker"
-            # Defensive: a non-staged file must NOT have a stray https link to fc-seeds.json.
-            if grep -Eq "\[\`fc-seeds\.json\`\]\(https://" "${STICKY_BODY}"; then
-              fail "fc-seeds.json was NOT staged but sticky body contains a stray inline link"
-            fi
-            SEEDS_RESULT="fallback marker (not staged)"
-          fi
-
-          # fc-failures.json — conditional on staged_fc_failures.
-          FAILURES_RESULT=skipped
-          if [ "${STAGED_FC_FAILURES:-0}" = "1" ]; then
-            if [ -z "${FC_FAILURES_URL}" ]; then
-              fail "fc-failures.json was staged but FC_FAILURES_URL is empty — sticky body would render a broken link"
-            fi
-            case "${FC_FAILURES_URL}" in
-              https://*) : ;;
-              *) fail "fc-failures.json URL is not https:// (got: ${FC_FAILURES_URL})" ;;
-            esac
-            grep -Fq "[\`fc-failures.json\`](${FC_FAILURES_URL})" "${STICKY_BODY}" \
-              || fail "Sticky body missing inline fc-failures.json link to ${FC_FAILURES_URL}"
-            FAILURES_RESULT="link OK (${FC_FAILURES_URL})"
-          else
-            grep -Fq "\`fc-failures.json\` — _(no failures persisted in this run — invariants held)_" "${STICKY_BODY}" \
-              || fail "fc-failures.json not staged → sticky body must include the documented fallback marker"
-            if grep -Eq "\[\`fc-failures\.json\`\]\(https://" "${STICKY_BODY}"; then
-              fail "fc-failures.json was NOT staged but sticky body contains a stray inline link"
-            fi
-            FAILURES_RESULT="fallback marker (not staged)"
-          fi
-
-          # Final sanity: no unresolved env-var placeholders leak into the
-          # sticky body that the user will read on the PR.
-          for bad in '${FC_SEEDS_URL}' '${FC_FAILURES_URL}' '](null)' '](undefined)' '](  )' '](\n)'; do
-            if grep -Fq "${bad}" "${STICKY_BODY}"; then
-              fail "Unresolved placeholder/garbage in sticky body: ${bad}"
-            fi
-          done
-
-          STICKY_BYTES=$(wc -c < "${STICKY_BODY}")
-          if [ "${STICKY_BYTES}" -gt 60000 ]; then
-            fail "Sticky body too large for a PR comment (${STICKY_BYTES} > 60000 bytes; GitHub hard cap is 65536)"
-          fi
-
-          echo "✅ Sticky PR comment body validated for ${CATEGORY_ID}:"
-          echo "   header=${STICKY_HEADER}"
-          echo "   fc-seeds.json:    ${SEEDS_RESULT}"
-          echo "   fc-failures.json: ${FAILURES_RESULT}"
-          echo "   size=${STICKY_BYTES}B"
           {
             echo ""
             echo "### 💬 Sticky PR comment self-check (${CATEGORY_ID})"
             echo "- Header: \`${STICKY_HEADER}\`"
-            echo "- \`fc-seeds.json\`: ${SEEDS_RESULT}"
-            echo "- \`fc-failures.json\`: ${FAILURES_RESULT}"
-            echo "- Body size: ${STICKY_BYTES} bytes"
+            echo "- \`fc-seeds.json\`:    ${{ steps.verify_sticky.outputs.seeds_result || 'validated' }}"
+            echo "- \`fc-failures.json\`: ${{ steps.verify_sticky.outputs.failures_result || 'validated' }}"
+            echo "- Body size: ${{ steps.verify_sticky.outputs.size_bytes || 'n/a' }} bytes"
           } >> "$GITHUB_STEP_SUMMARY"
 
       # Stage + upload summary-<category>.md as a standalone artifact so it
