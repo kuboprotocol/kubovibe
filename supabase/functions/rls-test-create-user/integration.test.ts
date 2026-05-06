@@ -895,3 +895,74 @@ Deno.test('HTTP integration: OPTIONS with VALID x-test-secret — Allow-Headers 
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: OPTIONS with VALID x-test-secret — Allow-Methods is exactly "POST, OPTIONS" in canonical order/form', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    // Contrato: o handler declara estaticamente
+    //   'Access-Control-Allow-Methods': 'POST, OPTIONS'
+    // em corsHeaders. Esse teste blinda TRÊS propriedades simultaneamente,
+    // já que cada uma é importante por uma razão diferente:
+    //
+    //   (1) Conjunto exato — apenas POST e OPTIONS. Nenhum método extra
+    //       (GET/PUT/PATCH/DELETE/HEAD) deve vazar para o cliente, pois
+    //       o handler retorna 405 para qualquer um deles.
+    //   (2) Ordem canônica — "POST, OPTIONS" (POST primeiro). Alguns
+    //       proxies/CDNs fazem cache do preflight indexado pelo valor
+    //       literal; mudanças silenciosas de ordem invalidam caches sem
+    //       motivo e quebram nosso SLA de <300ms no primeiro POST.
+    //   (3) Forma canônica — vírgula + espaço único entre tokens, sem
+    //       trailing comma e sem whitespace nas pontas. RFC 7231 §5.3
+    //       permite variações, mas fixar a forma evita drift acidental.
+    const res = await fetch(`${ctx.url}/`, {
+      method: 'OPTIONS',
+      headers: {
+        'origin': 'https://app.kubovibe.dev',
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'content-type, x-test-secret',
+        'x-test-secret': SECRET,
+      },
+    })
+
+    assertEquals(res.status, 200, 'preflight com secret válido deve responder 200')
+
+    const methods = res.headers.get('access-control-allow-methods')
+    assertExists(methods, 'access-control-allow-methods deve estar presente')
+
+    // (3) Forma canônica — comparação literal exata.
+    assertEquals(
+      methods,
+      'POST, OPTIONS',
+      `allow-methods deve ser exatamente "POST, OPTIONS" em ordem canônica (got: "${methods}")`,
+    )
+
+    // (1) + (2) Conjunto e ordem — validação redundante via tokenização,
+    // garante que mesmo se a comparação literal mudar (ex: alguém trocar
+    // por valor equivalente), a ordem POST→OPTIONS continue exata.
+    const tokens = methods.split(',').map((t) => t.trim())
+    assertEquals(
+      tokens,
+      ['POST', 'OPTIONS'],
+      `tokens devem ser exatamente ["POST","OPTIONS"] nesta ordem (got: ${JSON.stringify(tokens)})`,
+    )
+
+    // Defesa explícita contra vazamento de métodos não suportados.
+    const upper = methods.toUpperCase()
+    for (const forbidden of ['GET', 'PUT', 'PATCH', 'DELETE', 'HEAD']) {
+      assert(
+        !upper.split(/[\s,]+/).includes(forbidden),
+        `allow-methods NÃO deve listar "${forbidden}" — handler retorna 405 (got: "${methods}")`,
+      )
+    }
+
+    // Sanidade dos demais headers CORS.
+    assertEquals(res.headers.get('access-control-allow-origin'), '*')
+
+    await res.text()
+
+    // Preflight nunca pode validar secret nem instanciar Supabase client.
+    assertEquals(ctx._calls, 0, 'OPTIONS jamais deve chamar createClient')
+  } finally {
+    await ctx.stop()
+  }
+})
