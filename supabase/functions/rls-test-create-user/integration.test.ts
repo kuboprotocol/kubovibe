@@ -8798,3 +8798,276 @@ Deno.test('HTTP integration: OPTIONS preflight — fuzz with deterministic SHRIN
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: OPTIONS preflight — property-based fuzzing of Access-Control-Request-Method (percent-encoded + exotic whitespace, 400 random variants) — markers NEVER leak to any header or body, neutral body', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    const EXPECTED_METHODS_LITERAL = 'POST, OPTIONS'
+    const EXPECTED_HEADERS_LITERAL = 'authorization, x-client-info, apikey, content-type, x-test-secret'
+
+    const ALLOWED_RESPONSE_HEADERS = new Set([
+      'access-control-allow-origin', 'access-control-allow-methods',
+      'access-control-allow-headers', 'access-control-max-age',
+      'content-length', 'content-type', 'date', 'connection', 'keep-alive', 'vary',
+    ])
+
+    const u = new URL(ctx.url)
+    const hostHeader = u.host
+
+    // ─── PRNG determinístico (mulberry32). ───
+    const SEED = 0xFEEDFACE
+    let _state = SEED >>> 0
+    const rng = (): number => {
+      _state = (_state + 0x6D2B79F5) >>> 0
+      let t = _state
+      t = Math.imul(t ^ (t >>> 15), t | 1)
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+    }
+    const randInt = (n: number) => Math.floor(rng() * n)
+    const choice = <T,>(arr: readonly T[]): T => arr[randInt(arr.length)]
+    const maybe = (p: number) => rng() < p
+
+    // ─── Pools focados em Access-Control-Request-Method. ───
+    const METHOD_TOKENS = [
+      'POST', 'GET', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD',
+      'TRACE', 'CONNECT', 'PROPFIND', 'PROPPATCH', 'MKCOL', 'COPY', 'MOVE',
+      'LOCK', 'UNLOCK', 'CUSTOM-METHOD', 'EVIL', 'PWN', 'INJECTED',
+      '*', '', 'post', 'PoSt', 'POST POST', 'a',
+    ]
+    const PERCENT_TOKENS = [
+      '%2C', '%2c',           // vírgula
+      '%252C', '%252c',       // duplo-encoded
+      '%20', '%09',           // espaço/tab
+      '%0D%0A', '%0A', '%0D', // CRLF/LF/CR
+      '%00',                  // null
+      '%3B', '%2F', '%3D', '%5C', '%22', '%27', '%3A',
+      '%50', '%4F',           // P/O — tentativas de ofuscar 'POST'
+    ]
+    const UNICODE_WS = [
+      '\u00A0', '\u2003', '\u3000', '\u202F', '\u200A', '\u2005',
+      '\u200B', '\u2028', '\u2029', '\uFEFF',
+    ]
+    const SEPARATORS = [
+      ',', ', ', ' ,', ' , ', ',,', ', ,', '\t,\t',
+      ',%20', '%20,', ',%2C', '%2C,', ',\t', ' ',
+    ]
+
+    interface FuzzPayload {
+      requestMethod: string
+      marker: string
+    }
+
+    // Constrói valor fuzzy de Access-Control-Request-Method contendo marker + chaos.
+    const genPayload = (i: number): FuzzPayload => {
+      const marker = `MFUZZ${i.toString().padStart(4, '0')}_${randInt(0xFFFFFF).toString(16).padStart(6, '0')}`
+      const parts: string[] = []
+      const n = 1 + randInt(4)
+
+      // Posição aleatória do marker entre tokens.
+      const markerPos = randInt(n + 1)
+
+      for (let k = 0; k <= n; k++) {
+        if (k > 0) parts.push(choice(SEPARATORS))
+        if (maybe(0.35)) parts.push(choice(UNICODE_WS))
+
+        if (k === markerPos) {
+          if (maybe(0.4)) parts.push(choice(PERCENT_TOKENS))
+          parts.push(marker)
+          if (maybe(0.4)) parts.push(choice(PERCENT_TOKENS))
+        } else if (k < n) {
+          parts.push(choice(METHOD_TOKENS))
+          if (maybe(0.4)) parts.push(choice(PERCENT_TOKENS))
+        }
+
+        if (maybe(0.25)) parts.push(choice(UNICODE_WS))
+      }
+
+      return { requestMethod: parts.join(''), marker }
+    }
+
+    type RawResponse = {
+      status: number
+      headers: Headers
+      headerLines: string[]
+      body: string
+    } | { error: string }
+
+    async function sendRaw(p: FuzzPayload): Promise<RawResponse> {
+      let conn: Deno.TcpConn | null = null
+      try {
+        conn = await Deno.connect({ hostname: u.hostname, port: parseInt(u.port, 10), transport: 'tcp' })
+        const reqLines = [
+          'OPTIONS / HTTP/1.1',
+          `Host: ${hostHeader}`,
+          'Origin: https://fuzz.example.com',
+          `Access-Control-Request-Method: ${p.requestMethod}`,
+          'Access-Control-Request-Headers: authorization, x-test-secret',
+          'Connection: close',
+          '',
+          '',
+        ]
+        await conn.write(new TextEncoder().encode(reqLines.join('\r\n')))
+
+        const chunks: Uint8Array[] = []
+        const buf = new Uint8Array(8192)
+        while (true) {
+          const n = await conn.read(buf)
+          if (n === null) break
+          chunks.push(buf.slice(0, n))
+        }
+        const total = chunks.reduce((s, c) => s + c.length, 0)
+        const merged = new Uint8Array(total)
+        let off = 0
+        for (const c of chunks) { merged.set(c, off); off += c.length }
+        const text = new TextDecoder().decode(merged)
+
+        const headerEnd = text.indexOf('\r\n\r\n')
+        if (headerEnd === -1) return { error: 'no header terminator' }
+        const lines = text.slice(0, headerEnd).split('\r\n')
+        const m = lines[0].match(/^HTTP\/1\.[01]\s+(\d{3})/)
+        if (!m) return { error: `bad status: ${lines[0]}` }
+        const status = parseInt(m[1], 10)
+        const headers = new Headers()
+        const headerLines: string[] = []
+        for (let i = 1; i < lines.length; i++) {
+          headerLines.push(lines[i])
+          const idx = lines[i].indexOf(':')
+          if (idx === -1) continue
+          const name = lines[i].slice(0, idx).trim()
+          const value = lines[i].slice(idx + 1).trim()
+          if (name) headers.append(name, value)
+        }
+        const body = text.slice(headerEnd + 4)
+        return { status, headers, headerLines, body }
+      } catch (e) {
+        return { error: `io error: ${(e as Error).message}` }
+      } finally {
+        try { conn?.close() } catch { /* ignore */ }
+      }
+    }
+
+    const N = 400
+    let validatedAs200 = 0
+    let acceptedAs4xx = 0
+    let connErrors = 0
+
+    for (let i = 0; i < N; i++) {
+      const p = genPayload(i)
+      const result = await sendRaw(p)
+      const ctxLabel = `[Fuzz #${i} marker=${p.marker} method=${JSON.stringify(p.requestMethod).slice(0, 120)}]`
+
+      if ('error' in result) { connErrors++; continue }
+
+      // ── (1) NUNCA 5xx. ──
+      assert(result.status < 500, `${ctxLabel}: status NUNCA pode ser 5xx, recebido ${result.status}`)
+
+      // ── Marker NUNCA pode vazar (vale para 4xx e 200). ──
+      const ml = p.marker.toLowerCase()
+      if (result.status !== 200) {
+        assert(!result.body.toLowerCase().includes(ml), `${ctxLabel}: marker vazou para body 4xx`)
+        for (const [name, value] of result.headers) {
+          assert(!value.toLowerCase().includes(ml), `${ctxLabel}: marker vazou para header 4xx "${name}: ${value}"`)
+          assert(!name.toLowerCase().includes(ml), `${ctxLabel}: marker vazou para nome de header 4xx "${name}"`)
+          assert(name.toLowerCase() !== 'set-cookie', `${ctxLabel}: 4xx NÃO PODE ter Set-Cookie`)
+        }
+        acceptedAs4xx++
+        continue
+      }
+      validatedAs200++
+
+      // ── (2) Allowlist estrita de headers. ──
+      for (const [name] of result.headers) {
+        const lower = name.toLowerCase()
+        assert(
+          ALLOWED_RESPONSE_HEADERS.has(lower),
+          `${ctxLabel}: header inesperado "${name}"`,
+        )
+      }
+
+      // ── (3) Allow-Methods/Allow-Headers literais exatos. ──
+      const am = result.headers.get('access-control-allow-methods')
+      const ah = result.headers.get('access-control-allow-headers')
+      assertEquals(am, EXPECTED_METHODS_LITERAL, `${ctxLabel}: Allow-Methods literal`)
+      assertEquals(ah, EXPECTED_HEADERS_LITERAL, `${ctxLabel}: Allow-Headers literal`)
+
+      // ── (4) Marker NUNCA aparece em headers, linhas brutas ou body. ──
+      for (const [name, value] of result.headers) {
+        assert(!value.toLowerCase().includes(ml), `${ctxLabel}: marker vazou para header "${name}: ${value}"`)
+        assert(!name.toLowerCase().includes(ml), `${ctxLabel}: marker vazou para nome de header "${name}"`)
+      }
+      for (const line of result.headerLines) {
+        assert(!line.toLowerCase().includes(ml), `${ctxLabel}: marker vazou para linha bruta "${line}"`)
+      }
+      assert(!result.body.toLowerCase().includes(ml), `${ctxLabel}: marker vazou para body "${result.body}"`)
+
+      // ── (5) Allow-Methods/Allow-Headers ASCII puro, sem CR/LF/null/HTAB/'%'. ──
+      for (const [field, value] of [['Allow-Methods', am!], ['Allow-Headers', ah!]] as const) {
+        assert(!value.includes('\r'), `${ctxLabel}: ${field} contém CR`)
+        assert(!value.includes('\n'), `${ctxLabel}: ${field} contém LF`)
+        assert(!value.includes('\x00'), `${ctxLabel}: ${field} contém null`)
+        assert(!value.includes('\t'), `${ctxLabel}: ${field} contém HTAB`)
+        assert(!value.includes('%'), `${ctxLabel}: ${field} contém '%'`)
+        for (const ch of value) {
+          const code = ch.charCodeAt(0)
+          assert(
+            code >= 0x20 && code <= 0x7E,
+            `${ctxLabel}: ${field} contém non-ASCII U+${code.toString(16).padStart(4, '0')}`,
+          )
+        }
+      }
+
+      // ── (6) Headers proibidos ausentes. ──
+      assertEquals(result.headers.get('set-cookie'), null, `${ctxLabel}: Set-Cookie NUNCA`)
+      assertEquals(result.headers.get('cookie'), null, `${ctxLabel}: Cookie NUNCA`)
+      assertEquals(result.headers.get('access-control-allow-credentials'), null, `${ctxLabel}: Allow-Credentials NUNCA`)
+      assertEquals(result.headers.get('access-control-expose-headers'), null, `${ctxLabel}: Expose-Headers NUNCA`)
+
+      // ── (7) Allow-Origin literal '*', Max-Age literal '86400'. ──
+      assertEquals(result.headers.get('access-control-allow-origin'), '*', `${ctxLabel}: Allow-Origin '*' literal`)
+      assertEquals(result.headers.get('access-control-max-age'), '86400', `${ctxLabel}: Max-Age literal`)
+
+      // ── (8) Cada header CORS aparece exatamente 1x. ──
+      const counts: Record<string, number> = {}
+      for (const [name] of result.headers) {
+        const lower = name.toLowerCase()
+        counts[lower] = (counts[lower] ?? 0) + 1
+      }
+      assertEquals(counts['access-control-allow-methods'], 1, `${ctxLabel}: Allow-Methods 1x`)
+      assertEquals(counts['access-control-allow-headers'], 1, `${ctxLabel}: Allow-Headers 1x`)
+      assertEquals(counts['access-control-allow-origin'], 1, `${ctxLabel}: Allow-Origin 1x`)
+
+      // ── (9) Body neutro: pequeno (<=16 bytes), sem null/percent/marker, ASCII imprimível. ──
+      assert(result.body.length <= 16, `${ctxLabel}: body deve ser <=16 bytes, recebido ${result.body.length}`)
+      assert(!result.body.includes('\x00'), `${ctxLabel}: body NÃO PODE conter null`)
+      assert(!result.body.includes('%'), `${ctxLabel}: body NÃO PODE conter '%'`)
+      for (const ch of result.body) {
+        const code = ch.charCodeAt(0)
+        assert(
+          (code >= 0x20 && code <= 0x7E) || code === 0x0D || code === 0x0A,
+          `${ctxLabel}: body contém char inesperado U+${code.toString(16).padStart(4, '0')}`,
+        )
+      }
+    }
+
+    // ── Cobertura. ──
+    assertEquals(
+      validatedAs200 + acceptedAs4xx + connErrors, N,
+      `todas as ${N} tentativas devem ser cobertas (200=${validatedAs200}, 4xx=${acceptedAs4xx}, errors=${connErrors})`,
+    )
+
+    // ── Sanidade: handler robusto, ≥50% retornam 200. ──
+    assert(
+      validatedAs200 >= N / 2,
+      `Esperado >=${N / 2} respostas 200, recebido ${validatedAs200}`,
+    )
+
+    // ── Erros de conexão raros (<5%). ──
+    assert(connErrors < N * 0.05, `Erros de conexão muito altos: ${connErrors}/${N}`)
+
+    // ── Zero createClient. ──
+    assertEquals(ctx._calls, 0, `createClient NUNCA pode ser invocado em ${N} OPTIONS preflight fuzz de Request-Method`)
+  } finally {
+    await ctx.stop()
+  }
+})
