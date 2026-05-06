@@ -3755,3 +3755,146 @@ Deno.test('HTTP integration: 405 method_not_allowed — CORS contract preserved 
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: OPTIONS without Origin — Access-Control-Request-Headers casing/spacing/comma variants — Allow-Headers stays LITERAL exact (no wildcard, no echo)', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    // Contrato literal do handler index.ts.
+    const EXPECTED_ALLOW_HEADERS = 'authorization, x-client-info, apikey, content-type, x-test-secret'
+    const EXPECTED_SET = new Set([
+      'authorization', 'x-client-info', 'apikey', 'content-type', 'x-test-secret',
+    ])
+
+    // Variantes de Access-Control-Request-Headers cobrindo:
+    //   - casing (lower / Title / UPPER / mixed)
+    //   - espaçamento (sem espaço, espaço único, múltiplos espaços, tab)
+    //   - vírgulas (trailing, leading, duplicadas, com espaços)
+    //   - quantidade (1 header, vários, todos, headers fora da allowlist)
+    //   - tokens vazios entre vírgulas
+    const REQUEST_HEADER_VARIANTS: Array<{ label: string; value: string }> = [
+      { label: 'single lowercase',                 value: 'content-type' },
+      { label: 'single Title-Case',                value: 'Content-Type' },
+      { label: 'single UPPERCASE',                 value: 'CONTENT-TYPE' },
+      { label: 'single mIxEd',                     value: 'CoNtEnT-TyPe' },
+      { label: 'two lowercase, single space',      value: 'content-type, x-test-secret' },
+      { label: 'two NO space after comma',         value: 'content-type,x-test-secret' },
+      { label: 'two MULTIPLE spaces',              value: 'content-type,    x-test-secret' },
+      { label: 'two tab separator',                value: 'content-type,\tx-test-secret' },
+      { label: 'three mixed casing',               value: 'Content-Type, X-Test-Secret, Authorization' },
+      { label: 'all 5 allowlisted',                value: 'authorization, x-client-info, apikey, content-type, x-test-secret' },
+      { label: 'all 5 in UPPERCASE',               value: 'AUTHORIZATION, X-CLIENT-INFO, APIKEY, CONTENT-TYPE, X-TEST-SECRET' },
+      { label: 'trailing comma',                   value: 'content-type, x-test-secret,' },
+      { label: 'leading comma',                    value: ', content-type, x-test-secret' },
+      { label: 'double comma (empty token)',       value: 'content-type,, x-test-secret' },
+      { label: 'spaces around tokens',             value: '   content-type   ,   x-test-secret   ' },
+      { label: 'header NOT in allowlist',          value: 'x-fake-header, x-evil-cookie' },
+      { label: 'mix of allowed + not allowed',     value: 'content-type, x-fake-header, x-test-secret' },
+      { label: 'wildcard requested by client',     value: '*' },
+      { label: 'empty string',                     value: '' },
+      { label: 'only commas',                      value: ',,,' },
+      { label: 'only whitespace',                  value: '   ' },
+      { label: 'header attempting injection',      value: 'content-type\r\nset-cookie: evil=1' },
+    ]
+
+    const parseList = (v: string | null): string[] =>
+      (v ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
+
+    for (const variant of REQUEST_HEADER_VARIANTS) {
+      // Construir Headers manualmente — fetch sanitiza alguns valores, mas Deno aceita
+      // a maioria via `Headers` literal. Wrap em try para variantes que o runtime rejeita
+      // (ex: CRLF injection — fetch deve recusar, validando defesa do runtime).
+      let res: Response
+      try {
+        res = await fetch(`${ctx.url}/`, {
+          method: 'OPTIONS',
+          headers: {
+            // SEM Origin (foco do teste).
+            'access-control-request-method': 'POST',
+            'access-control-request-headers': variant.value,
+          },
+        })
+      } catch (e) {
+        // Se o runtime rejeita o header (ex: CRLF), isso já valida a defesa.
+        // Esperamos rejeição apenas para a variante de injection.
+        if (variant.label === 'header attempting injection') {
+          assert(
+            e instanceof TypeError,
+            `[${variant.label}]: runtime deve rejeitar CRLF injection com TypeError`,
+          )
+          continue
+        }
+        throw new Error(`[${variant.label}]: fetch falhou inesperadamente: ${(e as Error).message}`)
+      }
+      await res.text()
+
+      // (1) Status 200 — preflight sempre aceito (handler não valida Request-Headers).
+      assertEquals(res.status, 200, `[${variant.label}]: preflight deve retornar 200`)
+
+      // (2) Allow-Headers — LITERAL EXATO, sem importar o que o cliente pediu.
+      const ah = res.headers.get('access-control-allow-headers')
+      assertExists(ah, `[${variant.label}]: Allow-Headers deve estar presente`)
+      assertEquals(
+        ah,
+        EXPECTED_ALLOW_HEADERS,
+        `[${variant.label}]: Allow-Headers deve ser literal "${EXPECTED_ALLOW_HEADERS}" (NÃO ecoar Request-Headers)`,
+      )
+
+      // (3) Conjunto parseado bate exatamente — 5 headers, sem extras, sem omissões.
+      const parsed = new Set(parseList(ah))
+      assertEquals(
+        parsed.size,
+        EXPECTED_SET.size,
+        `[${variant.label}]: Allow-Headers deve listar exatamente 5 headers`,
+      )
+      for (const h of EXPECTED_SET) {
+        assert(parsed.has(h), `[${variant.label}]: Allow-Headers deve incluir "${h}"`)
+      }
+
+      // (4) NUNCA wildcard '*' — incompatível com credenciais e ambíguo para browsers.
+      assert(
+        !parsed.has('*'),
+        `[${variant.label}]: Allow-Headers NÃO PODE conter wildcard '*'`,
+      )
+
+      // (5) NUNCA ecoar tokens não-allowlisted (ex: 'x-fake-header', 'x-evil-cookie',
+      // 'set-cookie') que o cliente possa ter pedido em Request-Headers.
+      const FORBIDDEN_ECHOES = [
+        'x-fake-header', 'x-evil-cookie', 'set-cookie', 'set-cookie2',
+        'cookie', 'host', 'origin',
+      ]
+      for (const f of FORBIDDEN_ECHOES) {
+        assert(
+          !parsed.has(f),
+          `[${variant.label}]: Allow-Headers NÃO PODE ecoar token não-allowlisted "${f}"`,
+        )
+      }
+
+      // (6) Sanidade: contrato CORS completo permanece estável independente da variante.
+      assertEquals(
+        res.headers.get('access-control-allow-origin'), '*',
+        `[${variant.label}]: Allow-Origin deve permanecer '*'`,
+      )
+      assertEquals(
+        res.headers.get('access-control-allow-methods'), 'POST, OPTIONS',
+        `[${variant.label}]: Allow-Methods deve permanecer 'POST, OPTIONS'`,
+      )
+      assertEquals(
+        res.headers.get('access-control-max-age'), '86400',
+        `[${variant.label}]: Max-Age deve permanecer '86400'`,
+      )
+      assertEquals(
+        res.headers.get('access-control-allow-credentials'), null,
+        `[${variant.label}]: Allow-Credentials NUNCA pode aparecer`,
+      )
+    }
+
+    // (7) Garantia: nenhum createClient instanciado em qualquer variante de preflight.
+    assertEquals(
+      ctx._calls,
+      0,
+      'createClient NUNCA pode ser invocado em OPTIONS preflight',
+    )
+  } finally {
+    await ctx.stop()
+  }
+})
