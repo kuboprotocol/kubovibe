@@ -467,3 +467,35 @@ Deno.test('HTTP integration: POST with invalid JSON body returns CORS headers (2
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: bare OPTIONS (no CORS request headers) + WRONG x-test-secret still returns default CORS headers', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    // Cenário "bare": cliente envia apenas OPTIONS + secret errado, sem nenhum
+    // dos headers padrão de preflight (Origin, Access-Control-Request-*).
+    // Comum em healthchecks, curl manual e probes server-to-server.
+    // Contrato: o handler ignora secret em OPTIONS e responde 200 + CORS default.
+    const res = await fetch(`${ctx.url}/`, {
+      method: 'OPTIONS',
+      headers: { 'x-test-secret': 'definitely-wrong-secret' },
+    })
+
+    assertEquals(res.status, 200, 'OPTIONS bare deve responder 200 mesmo sem headers CORS')
+
+    // Headers CORS default DEVEM estar presentes independentemente da request.
+    assertEquals(res.headers.get('access-control-allow-origin'), '*')
+    const allowed = res.headers.get('access-control-allow-headers') ?? ''
+    assert(allowed.length > 0, 'allow-headers default deve ser retornado')
+    assert(allowed.includes('x-test-secret'), 'allow-headers deve listar x-test-secret')
+    assert(allowed.includes('content-type'), 'allow-headers deve listar content-type')
+    assert(allowed.includes('authorization'), 'allow-headers deve listar authorization')
+    assert(allowed.includes('apikey'), 'allow-headers deve listar apikey')
+
+    await res.text()
+
+    // Preflight nunca pode validar secret nem instanciar Supabase client.
+    assertEquals(ctx._calls, 0, 'OPTIONS jamais deve chamar createClient')
+  } finally {
+    await ctx.stop()
+  }
+})
