@@ -966,3 +966,85 @@ Deno.test('HTTP integration: OPTIONS with VALID x-test-secret — Allow-Methods 
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: OPTIONS with INVALID x-test-secret — preflight is unauthenticated, returns 200 + canonical "POST, OPTIONS" (NOT 401)', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    // Contrato CORS por design (RFC 6454 / Fetch spec):
+    //   * Preflight é executado pelo BROWSER antes do POST real.
+    //   * O browser NUNCA carrega cabeçalhos de aplicação (como x-test-secret)
+    //     dentro do OPTIONS — eles só são enviados na request "real" depois.
+    //   * Logo, validar x-test-secret no OPTIONS quebraria todo cliente web,
+    //     pois o preflight retornaria 401 e o POST real nunca aconteceria.
+    //
+    // Este teste BLINDA esse contrato: garante que mesmo um OPTIONS com
+    // secret deliberadamente inválido (cenário hostil ou cliente malformado):
+    //   (1) responde 200 — NÃO 401/403/405,
+    //   (2) Allow-Methods continua exatamente "POST, OPTIONS" em forma canônica,
+    //   (3) tokens parseados são exatamente ["POST","OPTIONS"] (ordem fixa),
+    //   (4) nenhum método não suportado vaza,
+    //   (5) createClient NÃO é chamado (preflight não toca Supabase).
+    const res = await fetch(`${ctx.url}/`, {
+      method: 'OPTIONS',
+      headers: {
+        'origin': 'https://app.kubovibe.dev',
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'content-type, x-test-secret',
+        'x-test-secret': 'definitely-wrong-secret',
+      },
+    })
+
+    // (1) Status — preflight é incondicional.
+    assertEquals(
+      res.status,
+      200,
+      `OPTIONS com secret inválido DEVE retornar 200 (preflight CORS não autentica), got ${res.status}`,
+    )
+
+    const methods = res.headers.get('access-control-allow-methods')
+    assertExists(methods, 'access-control-allow-methods deve estar presente mesmo com secret inválido')
+
+    // (2) Forma canônica literal — "POST, OPTIONS" exato.
+    assertEquals(
+      methods,
+      'POST, OPTIONS',
+      `allow-methods deve ser exatamente "POST, OPTIONS" (canônico) mesmo com secret inválido (got: "${methods}")`,
+    )
+
+    // (3) Tokens em ordem fixa.
+    const tokens = methods.split(',').map((t) => t.trim())
+    assertEquals(
+      tokens,
+      ['POST', 'OPTIONS'],
+      `tokens devem ser exatamente ["POST","OPTIONS"] nesta ordem (got: ${JSON.stringify(tokens)})`,
+    )
+
+    // (4) Nenhum método não suportado.
+    const upper = methods.toUpperCase().split(/[\s,]+/).filter(Boolean)
+    for (const forbidden of ['GET', 'PUT', 'PATCH', 'DELETE', 'HEAD']) {
+      assert(
+        !upper.includes(forbidden),
+        `allow-methods NÃO deve listar "${forbidden}" (got: "${methods}")`,
+      )
+    }
+
+    // Sanidade dos demais headers CORS.
+    assertEquals(res.headers.get('access-control-allow-origin'), '*')
+    const allowed = res.headers.get('access-control-allow-headers') ?? ''
+    assert(
+      allowed.toLowerCase().includes('x-test-secret'),
+      `allow-headers deve listar x-test-secret mesmo no preflight rejeitado (got: "${allowed}")`,
+    )
+
+    await res.text()
+
+    // (5) Preflight nunca instancia o Supabase client — secret nem é lido.
+    assertEquals(
+      ctx._calls,
+      0,
+      'OPTIONS jamais deve chamar createClient, mesmo com secret inválido',
+    )
+  } finally {
+    await ctx.stop()
+  }
+})
