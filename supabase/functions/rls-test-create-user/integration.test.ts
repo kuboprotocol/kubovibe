@@ -781,3 +781,48 @@ Deno.test('HTTP integration: OPTIONS with VALID x-test-secret — Allow-Headers 
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: OPTIONS without Origin + WRONG x-test-secret returns full CORS headers (allow-origin + allow-headers)', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    // Cenário server-to-server: cliente envia OPTIONS sem Origin (probes,
+    // monitors, curl manual) e ainda passa um x-test-secret inválido. O
+    // handler deve devolver 200 + headers CORS default completos para que
+    // o contrato de preflight permaneça consistente independentemente do
+    // contexto de chamada.
+    const res = await fetch(`${ctx.url}/`, {
+      method: 'OPTIONS',
+      headers: { 'x-test-secret': 'definitely-wrong-secret' },
+    })
+
+    assertEquals(res.status, 200, 'OPTIONS sem Origin deve responder 200')
+
+    // Allow-Origin: wildcard padrão.
+    assertEquals(
+      res.headers.get('access-control-allow-origin'),
+      '*',
+      'allow-origin deve ser "*" mesmo sem Origin na request',
+    )
+
+    // Allow-Headers: lista completa via tokens normalizados.
+    const allowed = res.headers.get('access-control-allow-headers') ?? ''
+    assert(allowed.length > 0, 'allow-headers default deve estar presente')
+    const tokens = allowed
+      .split(',')
+      .map((t) => t.trim().toLowerCase())
+      .filter((t) => t.length > 0)
+
+    assert(tokens.includes('x-test-secret'), `allow-headers deve listar x-test-secret (got: "${allowed}")`)
+    assert(tokens.includes('content-type'), `allow-headers deve listar content-type (got: "${allowed}")`)
+    assert(tokens.includes('authorization'), `allow-headers deve listar authorization (got: "${allowed}")`)
+    assert(tokens.includes('apikey'), `allow-headers deve listar apikey (got: "${allowed}")`)
+    assert(tokens.includes('x-client-info'), `allow-headers deve listar x-client-info (got: "${allowed}")`)
+
+    await res.text()
+
+    // Preflight nunca pode validar secret nem instanciar Supabase client.
+    assertEquals(ctx._calls, 0, 'OPTIONS jamais deve chamar createClient')
+  } finally {
+    await ctx.stop()
+  }
+})
