@@ -83,21 +83,36 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p reports
-          echo "::group::[${JOB_LABEL}] deno test --filter \"${TEST_NAME_PATTERN}\""
-          # tee both raw + sanitized output so the PR comment step can quote it.
-          deno test \
-            --allow-net \
-            --allow-env \
-            --allow-read \
-            --allow-write \
-            --no-check \
-            --filter "${TEST_NAME_PATTERN}" \
-            supabase/functions/rls-test-create-user/integration.test.ts \
-            2>&1 | tee reports/fuzz-output.log
-          status=${PIPESTATUS[0]}
-          echo "::endgroup::"
-          echo "exit_code=${status}" >> "$GITHUB_OUTPUT"
-          exit "${status}"
+          # Deno --filter is a substring match (regex requires /.../ syntax).
+          # Run each fuzz family in its own pass so failures stay attributable.
+          FILTERS=(
+            "property-based fuzzing"
+            "fuzz with deterministic SHRINKING"
+          )
+          # Allow workflow_dispatch override.
+          if [ -n "${{ github.event.inputs.pattern }}" ]; then
+            FILTERS=("${{ github.event.inputs.pattern }}")
+          fi
+
+          overall_status=0
+          : > reports/fuzz-output.log
+          for f in "${FILTERS[@]}"; do
+            echo "::group::[${JOB_LABEL}] deno test --filter \"${f}\""
+            deno test \
+              --allow-net \
+              --allow-env \
+              --allow-read \
+              --allow-write \
+              --no-check \
+              --filter "${f}" \
+              supabase/functions/rls-test-create-user/integration.test.ts \
+              2>&1 | tee -a reports/fuzz-output.log
+            status=${PIPESTATUS[0]}
+            echo "::endgroup::"
+            if [ "${status}" != "0" ]; then overall_status="${status}"; fi
+          done
+          echo "exit_code=${overall_status}" >> "$GITHUB_OUTPUT"
+          exit "${overall_status}"
 
       # Always extract minimized failure (if any) for the PR comment.
       - name: Extract minimized failure summary
