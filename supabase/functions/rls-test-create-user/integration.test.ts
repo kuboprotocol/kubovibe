@@ -6371,3 +6371,212 @@ Deno.test('HTTP integration: OPTIONS preflight — Access-Control-Request-Header
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: OPTIONS preflight — Access-Control-Request-METHOD with obs-fold (CRLF + SP/HTAB) variants — Allow-Methods/Allow-Headers stay LITERAL exact (no echo, no smuggling, no leak)', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    const EXPECTED_METHODS_LITERAL = 'POST, OPTIONS'
+    const EXPECTED_METHODS_SET = new Set(['post', 'options'])
+    const EXPECTED_HEADERS_LITERAL = 'authorization, x-client-info, apikey, content-type, x-test-secret'
+    const EXPECTED_HEADERS_SET = new Set([
+      'authorization', 'x-client-info', 'apikey', 'content-type', 'x-test-secret',
+    ])
+    const DANGEROUS_METHODS = ['get', 'put', 'patch', 'delete', 'head', 'connect', 'trace', 'propfind', 'custom-method', '*']
+    const DANGEROUS_HEADERS = [
+      'set-cookie', 'set-cookie2', 'cookie', 'cookie2',
+      'host', 'origin', 'authorization-bearer',
+      'x-evil-cookie', 'x-fake-header', 'x-csrf-token',
+      'x-forwarded-for', 'x-real-ip', 'proxy-authorization',
+      'x-injected', 'x-smuggled', 'x-folded', 'x-method-injected',
+      '*',
+    ]
+
+    const u = new URL(ctx.url)
+    const hostHeader = u.host
+
+    // RFC 7230 §3.2.4: obs-fold = CRLF 1*( SP / HTAB ).
+    // Aplicado ao VALOR de Access-Control-Request-Method.
+    // Servidor deve responder 400 OU normalizar (substituir fold por SP) — em ambos os casos:
+    //  - Allow-Methods/Allow-Headers permanecem literais
+    //  - Nada do payload é ecoado
+    //  - Nenhum header smuggled aparece
+    const PAYLOADS: Array<{ label: string; raw: string }> = [
+      // --- obs-fold canônico no método. ---
+      { label: 'POST + CRLF+SP + sufixo',                raw: 'POST\r\n GET' },
+      { label: 'POST + CRLF+HTAB + sufixo',              raw: 'POST\r\n\tDELETE' },
+      { label: 'POST + CRLF+SP+SP+SP',                   raw: 'POST\r\n   ' },
+      { label: 'fold no início + POST',                  raw: '\r\n POST' },
+      { label: 'fold no fim de POST',                    raw: 'POST\r\n ' },
+      { label: 'fold encadeado 2x',                      raw: 'POST\r\n GET\r\n DELETE' },
+      { label: 'fold com HTAB encadeado',                raw: 'POST\r\n\tGET\r\n\tPATCH' },
+      { label: 'fold misto SP/HTAB',                     raw: 'POST\r\n \t \t GET' },
+
+      // --- obs-fold MALICIOSO: tentando injetar header via fold no valor do método. ---
+      // Se servidor "desdobrar" mal, atacante poderia smuggling X-Method-Injected.
+      { label: 'fold tentando injetar X-Method-Injected', raw: 'POST\r\n X-Method-Injected: 1' },
+      { label: 'fold tentando injetar Set-Cookie',        raw: 'POST\r\n Set-Cookie: pwn=1' },
+      { label: 'fold tentando injetar Cookie',            raw: 'POST\r\n\tCookie: session=evil' },
+      { label: 'fold + body smuggling',                   raw: 'POST\r\n Content-Length: 0\r\n\r\nMALICIOUS' },
+      { label: 'fold antes de CRLF duplo (smuggling)',    raw: 'POST\r\n X-Folded: 1\r\n\r\nGET /admin HTTP/1.1\r\nHost: evil' },
+
+      // --- obs-fold com método rejeitado escondido. ---
+      { label: 'fold escondendo DELETE',                 raw: 'POST\r\n DELETE' },
+      { label: 'fold escondendo PROPFIND',               raw: 'OPTIONS\r\n\tPROPFIND' },
+      { label: 'fold escondendo wildcard',               raw: 'POST\r\n *' },
+      { label: 'fold escondendo CUSTOM-METHOD',          raw: 'POST\r\n CUSTOM-METHOD' },
+
+      // --- obs-fold + casing variado. ---
+      { label: 'fold + lowercase post',                  raw: 'post\r\n get' },
+      { label: 'fold + mIxEd PoSt',                      raw: 'PoSt\r\n\tDeLeTe' },
+
+      // --- obs-fold + null bytes. ---
+      { label: 'fold + null no sufixo',                  raw: 'POST\r\n \x00GET' },
+      { label: 'fold + null antes do CRLF',              raw: 'POST\x00\r\n GET' },
+
+      // --- obs-fold em torno de método VAZIO. ---
+      { label: 'fold sem método',                        raw: '\r\n ' },
+      { label: 'fold + só whitespace',                   raw: '\r\n \t \t ' },
+    ]
+
+    const parseList = (v: string | null): string[] =>
+      (v ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
+
+    type RawResponse = { status: number; headers: Headers } | { error: string }
+
+    async function sendRaw(methodPayload: string): Promise<RawResponse> {
+      let conn: Deno.TcpConn | null = null
+      try {
+        conn = await Deno.connect({ hostname: u.hostname, port: parseInt(u.port, 10), transport: 'tcp' })
+        const reqLines = [
+          'OPTIONS / HTTP/1.1',
+          `Host: ${hostHeader}`,
+          'Origin: https://evil.example.com',
+          // Aqui injetamos o obs-fold no VALOR de Request-Method.
+          `Access-Control-Request-Method: ${methodPayload}`,
+          'Access-Control-Request-Headers: content-type, x-test-secret',
+          'Connection: close',
+          '',
+          '',
+        ]
+        await conn.write(new TextEncoder().encode(reqLines.join('\r\n')))
+
+        const chunks: Uint8Array[] = []
+        const buf = new Uint8Array(8192)
+        while (true) {
+          const n = await conn.read(buf)
+          if (n === null) break
+          chunks.push(buf.slice(0, n))
+        }
+        const total = chunks.reduce((s, c) => s + c.length, 0)
+        const merged = new Uint8Array(total)
+        let off = 0
+        for (const c of chunks) { merged.set(c, off); off += c.length }
+        const text = new TextDecoder().decode(merged)
+
+        const headerEnd = text.indexOf('\r\n\r\n')
+        if (headerEnd === -1) return { error: 'no header terminator' }
+        const lines = text.slice(0, headerEnd).split('\r\n')
+        const m = lines[0].match(/^HTTP\/1\.[01]\s+(\d{3})/)
+        if (!m) return { error: `bad status: ${lines[0]}` }
+        const status = parseInt(m[1], 10)
+        const headers = new Headers()
+        for (let i = 1; i < lines.length; i++) {
+          const idx = lines[i].indexOf(':')
+          if (idx === -1) continue
+          const name = lines[i].slice(0, idx).trim()
+          const value = lines[i].slice(idx + 1).trim()
+          if (name) headers.append(name, value)
+        }
+        return { status, headers }
+      } finally {
+        try { conn?.close() } catch { /* ignore */ }
+      }
+    }
+
+    let validatedAs200 = 0
+    let acceptedAs4xx = 0
+
+    for (const p of PAYLOADS) {
+      const result = await sendRaw(p.raw)
+      const ctxLabel = `[Method obs-fold payload: ${p.label}]`
+
+      if ('error' in result) { acceptedAs4xx++; continue }
+
+      // (1) Status 200 OU 4xx — nunca 5xx.
+      assert(
+        result.status === 200 || (result.status >= 400 && result.status < 500),
+        `${ctxLabel}: status deve ser 200 ou 4xx, recebido ${result.status}`,
+      )
+      if (result.status !== 200) { acceptedAs4xx++; continue }
+      validatedAs200++
+
+      // (2) Allow-Methods LITERAL EXATO — sem echo do método poluído.
+      const am = result.headers.get('access-control-allow-methods')
+      assertExists(am, `${ctxLabel}: Allow-Methods deve estar presente`)
+      assertEquals(am, EXPECTED_METHODS_LITERAL, `${ctxLabel}: Allow-Methods deve ser literal "${EXPECTED_METHODS_LITERAL}"`)
+      const parsedMethods = new Set(parseList(am))
+      assertEquals(parsedMethods.size, EXPECTED_METHODS_SET.size, `${ctxLabel}: Allow-Methods deve listar exatamente 2 métodos`)
+      for (const m of EXPECTED_METHODS_SET) {
+        assert(parsedMethods.has(m), `${ctxLabel}: Allow-Methods deve incluir "${m}"`)
+      }
+      for (const dangerous of DANGEROUS_METHODS) {
+        assert(!parsedMethods.has(dangerous), `${ctxLabel}: Allow-Methods NÃO PODE conter "${dangerous}"`)
+      }
+      assert(!am.includes('\r'), `${ctxLabel}: Allow-Methods NÃO PODE conter CR`)
+      assert(!am.includes('\n'), `${ctxLabel}: Allow-Methods NÃO PODE conter LF`)
+      assert(!am.includes('\x00'), `${ctxLabel}: Allow-Methods NÃO PODE conter null byte`)
+      assert(!am.includes('\t'), `${ctxLabel}: Allow-Methods NÃO PODE conter HTAB`)
+
+      // (3) Allow-Headers LITERAL EXATO — não pode ser afetado por obs-fold no Method.
+      const ah = result.headers.get('access-control-allow-headers')
+      assertExists(ah, `${ctxLabel}: Allow-Headers deve estar presente`)
+      assertEquals(ah, EXPECTED_HEADERS_LITERAL, `${ctxLabel}: Allow-Headers deve ser literal "${EXPECTED_HEADERS_LITERAL}"`)
+      const parsedHeaders = new Set(parseList(ah))
+      assertEquals(parsedHeaders.size, EXPECTED_HEADERS_SET.size, `${ctxLabel}: Allow-Headers deve listar exatamente 5 headers`)
+      for (const h of EXPECTED_HEADERS_SET) {
+        assert(parsedHeaders.has(h), `${ctxLabel}: Allow-Headers deve incluir "${h}"`)
+      }
+      for (const dangerous of DANGEROUS_HEADERS) {
+        assert(!parsedHeaders.has(dangerous), `${ctxLabel}: Allow-Headers NÃO PODE conter "${dangerous}"`)
+      }
+      assert(!ah.includes('\r'), `${ctxLabel}: Allow-Headers NÃO PODE conter CR`)
+      assert(!ah.includes('\n'), `${ctxLabel}: Allow-Headers NÃO PODE conter LF`)
+      assert(!ah.includes('\x00'), `${ctxLabel}: Allow-Headers NÃO PODE conter null byte`)
+
+      // (4) Allow-Origin/Credentials/Max-Age literais.
+      assertEquals(result.headers.get('access-control-allow-origin'), '*', `${ctxLabel}: Allow-Origin '*'`)
+      assertEquals(result.headers.get('access-control-allow-credentials'), null, `${ctxLabel}: Allow-Credentials NUNCA`)
+      assertEquals(result.headers.get('access-control-max-age'), '86400', `${ctxLabel}: Max-Age literal`)
+
+      // (5) Headers smuggled via obs-fold no método NUNCA aparecem na resposta.
+      assertEquals(result.headers.get('set-cookie'), null, `${ctxLabel}: Set-Cookie NUNCA`)
+      assertEquals(result.headers.get('cookie'), null, `${ctxLabel}: Cookie NUNCA`)
+      assertEquals(result.headers.get('x-injected'), null, `${ctxLabel}: X-Injected NUNCA`)
+      assertEquals(result.headers.get('x-smuggled'), null, `${ctxLabel}: X-Smuggled NUNCA`)
+      assertEquals(result.headers.get('x-folded'), null, `${ctxLabel}: X-Folded NUNCA`)
+      assertEquals(result.headers.get('x-method-injected'), null, `${ctxLabel}: X-Method-Injected NUNCA`)
+      assertEquals(result.headers.get('access-control-expose-headers'), null, `${ctxLabel}: Expose-Headers NUNCA`)
+
+      // (6) Allow-Methods e Allow-Headers aparecem exatamente 1x cada.
+      let methodsCount = 0, headersCount = 0
+      for (const [name] of result.headers) {
+        const lower = name.toLowerCase()
+        if (lower === 'access-control-allow-methods') methodsCount++
+        if (lower === 'access-control-allow-headers') headersCount++
+      }
+      assertEquals(methodsCount, 1, `${ctxLabel}: Allow-Methods deve aparecer exatamente 1x`)
+      assertEquals(headersCount, 1, `${ctxLabel}: Allow-Headers deve aparecer exatamente 1x`)
+    }
+
+    // (7) Sanidade: cobertura total da matriz.
+    assertEquals(
+      validatedAs200 + acceptedAs4xx, PAYLOADS.length,
+      `todos os ${PAYLOADS.length} payloads devem ser cobertos (200=${validatedAs200}, 4xx/erro=${acceptedAs4xx})`,
+    )
+
+    // (8) Zero createClient invocado.
+    assertEquals(ctx._calls, 0, 'createClient NUNCA pode ser invocado em OPTIONS preflight (obs-fold no Method)')
+  } finally {
+    await ctx.stop()
+  }
+})
