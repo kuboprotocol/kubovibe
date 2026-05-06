@@ -113,6 +113,29 @@ if [ -n "${FC_HEADER_LABEL}" ]; then
   fi
 fi
 
+# Expected canonical bullet formats (must match the `Append fast-check
+# artifact links to summary` step in .github/workflows/preflight-fuzz.yml).
+# Kept here so any drift between writer and validator fails CI loudly.
+SEEDS_BULLET_PREFIX='- 🌱 **Seeds executed (last 50 runs):** '
+FAILURES_BULLET_PREFIX='- 💥 **Minimized counterexamples (last 100):** '
+
+# Assert that a given inline link appears as a properly-formatted bullet line
+# (full line match, not just substring). $1=expected full line, $2=link token
+# used to locate candidate lines for the debug dump.
+assert_bullet_line() {
+  local expected_line="$1" link_token="$2" reason="$3"
+  # -F fixed-string, -x whole-line match, -- end of options (the expected
+  # line starts with "- " which would otherwise be parsed as a grep flag).
+  if ! grep -Fxq -- "${expected_line}" "${SUMMARY_FILE}"; then
+    echo "::error title=${CONTEXT_LABEL} bullet format violation::${reason}"
+    echo "Expected exact line:"
+    echo "  ${expected_line}"
+    echo "Candidate lines found in ${SUMMARY_FILE} (mentioning ${link_token}):"
+    grep -n -F -- "${link_token}" "${SUMMARY_FILE}" | sed 's/^/  /' || echo "  (none)"
+    fail "${reason}"
+  fi
+}
+
 # ─── fc-seeds.json — conditional on STAGED_FC_SEEDS ──────────────────────────
 
 SEEDS_RESULT="skipped"
@@ -126,6 +149,12 @@ if [ "${STAGED_FC_SEEDS}" = "1" ]; then
   esac
   assert_contains "[\`fc-seeds.json\`](${FC_SEEDS_URL})" \
     "Missing inline fc-seeds.json link to ${FC_SEEDS_URL} in ${CONTEXT_LABEL}"
+  # Strict bullet-format check: the writer emits a full canonical bullet,
+  # so reject any drift (e.g. missing emoji, missing bold label, wrong dash).
+  assert_bullet_line \
+    "${SEEDS_BULLET_PREFIX}[\`fc-seeds.json\`](${FC_SEEDS_URL})" \
+    "fc-seeds.json" \
+    "fc-seeds.json inline link is not formatted as the canonical bullet '${SEEDS_BULLET_PREFIX}[\`fc-seeds.json\`](URL)' in ${CONTEXT_LABEL}"
   SEEDS_RESULT="link OK (${FC_SEEDS_URL})"
 else
   assert_contains "\`fc-seeds.json\` — _(not produced in this run)_" \
@@ -150,6 +179,10 @@ if [ "${STAGED_FC_FAILURES}" = "1" ]; then
   esac
   assert_contains "[\`fc-failures.json\`](${FC_FAILURES_URL})" \
     "Missing inline fc-failures.json link to ${FC_FAILURES_URL} in ${CONTEXT_LABEL}"
+  assert_bullet_line \
+    "${FAILURES_BULLET_PREFIX}[\`fc-failures.json\`](${FC_FAILURES_URL})" \
+    "fc-failures.json" \
+    "fc-failures.json inline link is not formatted as the canonical bullet '${FAILURES_BULLET_PREFIX}[\`fc-failures.json\`](URL)' in ${CONTEXT_LABEL}"
   FAILURES_RESULT="link OK (${FC_FAILURES_URL})"
 else
   assert_contains "\`fc-failures.json\` — _(no failures persisted in this run — invariants held)_" \
