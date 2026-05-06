@@ -1,0 +1,185 @@
+name: Preflight CORS Fuzz
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      pattern:
+        description: 'Optional Deno test name pattern filter (default: all preflight fuzz tests)'
+        required: false
+        default: ''
+
+# Allow the PR-comment step to write to the PR; cancel superseded runs.
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: preflight-fuzz-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  preflight-fuzz:
+    name: Preflight OPTIONS fuzz (Deno)
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    env:
+      JOB_LABEL: preflight-fuzz
+      # Default pattern matches every property-based fuzz / shrinking test we ship.
+      # Override per-run via workflow_dispatch input.
+      TEST_NAME_PATTERN: >-
+        ${{ github.event.inputs.pattern ||
+            'OPTIONS preflight — (property-based fuzzing|fuzz with deterministic SHRINKING)' }}
+      # Persisted seeds + minimized failures land here.
+      FUZZ_STATE_DIR: ${{ github.workspace }}/.rls-test-fuzz-state
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v1.x
+
+      # The fuzz tests pull seeds/minimized payloads from prior runs to grow
+      # coverage over time. Restore them, but never fail the build if missing.
+      - name: Restore persisted fuzz state (seeds + failures)
+        id: cache-fuzz-state
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.FUZZ_STATE_DIR }}
+          key: preflight-fuzz-state-${{ github.ref_name }}-${{ github.run_id }}
+          restore-keys: |
+            preflight-fuzz-state-${{ github.ref_name }}-
+            preflight-fuzz-state-main-
+            preflight-fuzz-state-
+
+      - name: Prepare fuzz state dir
+        run: |
+          mkdir -p "$FUZZ_STATE_DIR"
+          echo "Seeds file: $FUZZ_STATE_DIR/seeds.json"
+          echo "Failures file: $FUZZ_STATE_DIR/failures.json"
+          [ -f "$FUZZ_STATE_DIR/seeds.json" ] && \
+            echo "Existing seeds: $(jq 'length' "$FUZZ_STATE_DIR/seeds.json" 2>/dev/null || echo '?')" || \
+            echo "No prior seeds (first run on this branch)"
+
+      # Load env vars used by the integration tests (SUPABASE_URL, anon key, etc.)
+      # exactly the way the test files expect via `dotenv/load.ts`.
+      - name: Synthesize .env for tests
+        run: |
+          cat > .env <<EOF
+          VITE_SUPABASE_URL=https://ci-fuzz.example.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY=ci-publishable-key
+          SUPABASE_URL=https://ci-fuzz.example.supabase.co
+          SUPABASE_ANON_KEY=ci-anon-key
+          SUPABASE_SERVICE_ROLE_KEY=ci-service-role-key
+          RLS_TEST_SECRET=integration-test-secret
+          EOF
+
+      - name: Run preflight OPTIONS fuzz tests
+        id: fuzz
+        run: |
+          set -o pipefail
+          mkdir -p reports
+          echo "::group::[${JOB_LABEL}] deno test --filter \"${TEST_NAME_PATTERN}\""
+          # tee both raw + sanitized output so the PR comment step can quote it.
+          deno test \
+            --allow-net \
+            --allow-env \
+            --allow-read \
+            --allow-write \
+            --no-check \
+            --filter "${TEST_NAME_PATTERN}" \
+            supabase/functions/rls-test-create-user/integration.test.ts \
+            2>&1 | tee reports/fuzz-output.log
+          status=${PIPESTATUS[0]}
+          echo "::endgroup::"
+          echo "exit_code=${status}" >> "$GITHUB_OUTPUT"
+          exit "${status}"
+
+      # Always extract minimized failure (if any) for the PR comment.
+      - name: Extract minimized failure summary
+        if: always()
+        id: summary
+        run: |
+          mkdir -p reports
+          SUMMARY_FILE=reports/failure-summary.md
+          {
+            echo "## 🧪 Preflight OPTIONS Fuzz — Run #${{ github.run_number }}"
+            echo ""
+            echo "- Workflow: \`${{ github.workflow }}\`"
+            echo "- Commit: \`${{ github.sha }}\`"
+            echo "- Trigger: \`${{ github.event_name }}\`"
+            echo "- Pattern: \`${TEST_NAME_PATTERN}\`"
+            echo ""
+            if [ "${{ steps.fuzz.outputs.exit_code }}" = "0" ]; then
+              echo "✅ **All preflight invariants held.** No marker leaks, no unexpected headers, no CR/LF/null in Allow-Methods/Allow-Headers, neutral body."
+            else
+              echo "❌ **Invariant violation detected.** See minimized payload below."
+              echo ""
+              echo "### Minimized failing payload"
+              echo ""
+              echo "\`\`\`"
+              # Pull the most recent shrunk failure from persisted state if present.
+              if [ -f "$FUZZ_STATE_DIR/failures.json" ]; then
+                jq -r '
+                  if length == 0 then "(no persisted failure on disk — see test log)"
+                  else
+                    .[-1] |
+                    "Seed:           0x\((.seed) | tostring | tonumber | tostring)\n" +
+                    "Index:          \(.index)\n" +
+                    "Found at:       \(.foundAt)\n" +
+                    "Original reason: \(.originalReason)\n" +
+                    "Shrunk reason:   \(.shrunkReason)\n" +
+                    "Shrink iters:    \(.shrinkIterations)\n" +
+                    "\nORIGINAL payload:\n\(.original | tojson)\n" +
+                    "\nSHRUNK payload:\n\(.shrunk | tojson)"
+                  end
+                ' "$FUZZ_STATE_DIR/failures.json" 2>/dev/null || \
+                  echo "(failed to parse failures.json — see raw test log)"
+              else
+                echo "(no persisted failure file — see raw test log)"
+              fi
+              echo "\`\`\`"
+              echo ""
+              echo "### Test log (last 80 lines)"
+              echo ""
+              echo "\`\`\`"
+              tail -n 80 reports/fuzz-output.log 2>/dev/null || echo "(no log captured)"
+              echo "\`\`\`"
+              echo ""
+              echo "**To reproduce locally:**"
+              echo "\`\`\`bash"
+              echo "deno test --allow-net --allow-env --allow-read --allow-write \\"
+              echo "  --filter \"${TEST_NAME_PATTERN}\" \\"
+              echo "  supabase/functions/rls-test-create-user/integration.test.ts"
+              echo "\`\`\`"
+            fi
+          } > "$SUMMARY_FILE"
+
+          # Surface the same summary in the GitHub Actions UI.
+          cat "$SUMMARY_FILE" >> "$GITHUB_STEP_SUMMARY"
+          echo "summary_file=${SUMMARY_FILE}" >> "$GITHUB_OUTPUT"
+
+      # Persist seeds + minimized failures so the next run inherits them.
+      - name: Upload fuzz state + reports as artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: preflight-fuzz-state-${{ github.run_id }}
+          path: |
+            ${{ env.FUZZ_STATE_DIR }}/**
+            reports/**
+          if-no-files-found: ignore
+          retention-days: 14
+
+      # On PRs: post (or update) a sticky comment with the minimized failure.
+      - name: Comment on PR with fuzz result
+        if: always() && github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: preflight-fuzz
+          path: ${{ steps.summary.outputs.summary_file }}
