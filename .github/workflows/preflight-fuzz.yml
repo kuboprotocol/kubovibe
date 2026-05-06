@@ -687,26 +687,88 @@ jobs:
             echo "Redirect Location host validated: ${LOCATION}"
           fi
 
-          # ── 2. cross-check via REST API ─────────────────────────────────
-          # /actions/runs/{run_id}/artifacts is paginated (max 100/page); the
-          # smoke matrix produces ≤ ~10 artifacts per run so a single page is
-          # safe, but we explicitly cap per_page=100 and assert the list is
-          # not truncated for our target name.
-          API_HTTP=$(curl -sS -o /tmp/artifacts.json \
-            -w '%{http_code}' \
-            --max-time 30 \
-            -H "Authorization: Bearer ${GH_TOKEN}" \
-            -H "Accept: application/vnd.github+json" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            -H "User-Agent: preflight-fuzz-summary-verifier" \
-            "https://api.github.com/repos/${GH_REPO}/actions/runs/${GH_RUN_ID}/artifacts?per_page=100" || true)
+          # ── 2. cross-check via REST API (paginated) ─────────────────────
+          # /actions/runs/{run_id}/artifacts caps at per_page=100. Even though
+          # this matrix usually produces ≤ 10 artifacts per run, runs that
+          # re-attempt jobs, share artifact retention windows, or get reused
+          # by other workflows can exceed 100 — in which case looking only at
+          # page 1 would silently miss the target artifact and falsely report
+          # the summary_url as broken (or worse, "valid" when it isn't).
+          #
+          # We follow the standard GitHub `Link: <…>; rel="next"` header until
+          # exhausted (capped at 50 pages = 5000 artifacts as a runaway guard)
+          # and merge every page's `.artifacts[]` array into ONE JSON document
+          # at /tmp/artifacts.json so the downstream jq match doesn't change.
+          # We ALSO read `total_count` from page 1 and assert that the number
+          # of merged artifacts equals it — any drift signals a missed page
+          # (e.g. early break, network error swallowed by `|| true`).
+          PAGE=1
+          MAX_PAGES=50
+          TOTAL_COUNT=""
+          MERGED="/tmp/artifacts.json"
+          PAGES_DIR="$(mktemp -d)"
+          : > /tmp/artifacts_pages_summary.txt
 
-          if [ "${API_HTTP}" != "200" ]; then
-            fail "GitHub artifacts API returned HTTP ${API_HTTP}"
+          NEXT_URL="https://api.github.com/repos/${GH_REPO}/actions/runs/${GH_RUN_ID}/artifacts?per_page=100&page=1"
+
+          while [ -n "${NEXT_URL}" ] && [ "${PAGE}" -le "${MAX_PAGES}" ]; do
+            PAGE_FILE="${PAGES_DIR}/page-${PAGE}.json"
+            HEADER_FILE="${PAGES_DIR}/page-${PAGE}.headers"
+
+            API_HTTP=$(curl -sS -o "${PAGE_FILE}" \
+              -D "${HEADER_FILE}" \
+              -w '%{http_code}' \
+              --max-time 30 \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              -H "User-Agent: preflight-fuzz-summary-verifier" \
+              "${NEXT_URL}" || echo "000")
+
+            if [ "${API_HTTP}" != "200" ]; then
+              # Surface the headers + body of the failing page for debug.
+              echo "----- failing page ${PAGE} headers -----"
+              sed 's/^/  /' "${HEADER_FILE}" 2>/dev/null || echo "  (no headers captured)"
+              echo "----- failing page ${PAGE} body (first 40 lines) -----"
+              head -n 40 "${PAGE_FILE}" 2>/dev/null | sed 's/^/  /' || true
+              fail "GitHub artifacts API page ${PAGE} returned HTTP ${API_HTTP} (url=${NEXT_URL})"
+            fi
+
+            if [ -z "${TOTAL_COUNT}" ]; then
+              TOTAL_COUNT=$(jq -r '.total_count // 0' "${PAGE_FILE}" 2>/dev/null || echo "0")
+            fi
+
+            PAGE_COUNT=$(jq -r '.artifacts | length' "${PAGE_FILE}" 2>/dev/null || echo "0")
+            echo "  page ${PAGE}: ${PAGE_COUNT} artifacts (total_count=${TOTAL_COUNT})" \
+              | tee -a /tmp/artifacts_pages_summary.txt
+
+            # Parse Link header for rel="next". Strip CRs, lowercase the
+            # header name match, and extract the URL inside <…>.
+            LINK=$(grep -i '^link:' "${HEADER_FILE}" | tr -d '\r' || true)
+            NEXT_URL=$(printf '%s\n' "${LINK}" \
+              | sed -n 's/.*<\([^>]*\)>;[[:space:]]*rel="next".*/\1/p' \
+              | head -n 1)
+
+            PAGE=$((PAGE + 1))
+          done
+
+          if [ "${PAGE}" -gt "${MAX_PAGES}" ] && [ -n "${NEXT_URL}" ]; then
+            fail "Pagination runaway guard tripped: walked ${MAX_PAGES} pages and Link: rel=\"next\" still present (last next=${NEXT_URL})"
           fi
 
-          if ! command -v jq >/dev/null 2>&1; then
-            fail "jq is not available on the runner — cannot parse artifacts API response"
+          # Merge .artifacts arrays from all pages into a single document
+          # shaped like the original single-page response so the existing
+          # jq match below is unchanged.
+          jq -s '{ total_count: (.[0].total_count // 0),
+                   artifacts:   ([.[].artifacts[]]) }' \
+            "${PAGES_DIR}"/page-*.json > "${MERGED}"
+
+          MERGED_COUNT=$(jq -r '.artifacts | length' "${MERGED}")
+          echo "Merged artifacts: ${MERGED_COUNT} across $((PAGE - 1)) page(s); total_count=${TOTAL_COUNT}"
+
+          if [ -n "${TOTAL_COUNT}" ] && [ "${TOTAL_COUNT}" != "0" ] \
+             && [ "${MERGED_COUNT}" != "${TOTAL_COUNT}" ]; then
+            fail "Pagination accounting mismatch: merged ${MERGED_COUNT} artifacts but API total_count=${TOTAL_COUNT} — at least one page was lost"
           fi
 
           # Extract the artifact id embedded in SUMMARY_URL (last path segment
@@ -723,11 +785,12 @@ jobs:
             .artifacts[]
             | select(.name == $name and (.id|tostring) == $id and (.expired|not))
             | "\(.name)|\(.id)|\(.archive_download_url)"
-          ' /tmp/artifacts.json | head -n 1)
+          ' "${MERGED}" | head -n 1)
 
           if [ -z "${MATCH}" ]; then
-            fail "No artifact in run ${GH_RUN_ID} matches BOTH name='${EXPECTED_ARTIFACT_NAME}' AND id=${ARTIFACT_ID_FROM_URL} (and is not expired)"
+            fail "No artifact in run ${GH_RUN_ID} matches BOTH name='${EXPECTED_ARTIFACT_NAME}' AND id=${ARTIFACT_ID_FROM_URL} (and is not expired) — searched ${MERGED_COUNT} artifacts across $((PAGE - 1)) page(s)"
           fi
+
 
           # Sanity: the matched artifact's archive_download_url should also
           # resolve when used as an alternative download path. We just assert
