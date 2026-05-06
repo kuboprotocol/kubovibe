@@ -1969,3 +1969,81 @@ Deno.test('HTTP integration: OPTIONS preflight cross-origin — no Allow-Credent
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: minimal cross-origin OPTIONS (Origin only, no Access-Control-Request-*) — no Allow-Credentials, Allow-Origin "*"', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    // Por que essa variante MINIMALISTA é dedicada (e não redundante com o
+    // teste consolidado anterior):
+    //   * O teste consolidado envia preflight COMPLETO com
+    //     `Access-Control-Request-Method` e `Access-Control-Request-Headers`
+    //     — cenário típico de browser fazendo preflight para POST custom.
+    //   * Esse teste cobre o caminho ALTERNATIVO: OPTIONS cross-origin com
+    //     APENAS `Origin`, sem `Access-Control-Request-*`. Isso simula:
+    //       - Clientes não-browser (curl, monitores, scanners) que não
+    //         distinguem preflight de probe.
+    //       - Browsers fazendo OPTIONS direto (raro, mas possível via
+    //         fetch({ method: 'OPTIONS' }) explícito).
+    //       - Reverse-proxies que stripam headers `Access-Control-Request-*`
+    //         antes do upstream.
+    //     O handler NÃO faz branching por presença desses headers — devolve
+    //     sempre o mesmo `corsHeaders`. Esse teste BLINDA contra regressão
+    //     que adicione branching condicional acidentalmente.
+    //   * Foco LASER: só o par (Allow-Credentials ausente + Allow-Origin "*").
+    //     Sem assertions sobre Max-Age, Vary, cookies — esses já estão no
+    //     teste consolidado. Aqui validamos APENAS o contrato que o usuário
+    //     pediu, no caminho mais minimalista possível.
+
+    const HOSTILE_ORIGIN = 'https://attacker.example.com'
+
+    const res = await fetch(`${ctx.url}/`, {
+      method: 'OPTIONS',
+      headers: {
+        // Apenas Origin — nenhum Access-Control-Request-* header.
+        'origin': HOSTILE_ORIGIN,
+      },
+    })
+
+    assertEquals(res.status, 200, 'OPTIONS minimalista cross-origin deve retornar 200')
+
+    // Allow-Credentials ausente — checagem dupla (.get + varredura case-insensitive).
+    assertEquals(
+      res.headers.get('access-control-allow-credentials'),
+      null,
+      'OPTIONS minimalista: Access-Control-Allow-Credentials NÃO pode estar presente',
+    )
+    const credLeak: string[] = []
+    for (const [name, value] of res.headers) {
+      if (name.toLowerCase() === 'access-control-allow-credentials') {
+        credLeak.push(`${name}=${value}`)
+      }
+    }
+    assertEquals(
+      credLeak,
+      [],
+      `OPTIONS minimalista: nenhum Allow-Credentials permitido (qualquer capitalização) — vazamentos: ${JSON.stringify(credLeak)}`,
+    )
+
+    // Allow-Origin literal "*" — não ecoa o Origin hostil mesmo sem
+    // Access-Control-Request-* (cenário onde alguns handlers mal-escritos
+    // fazem fallback para "echo Origin").
+    const allowOrigin = res.headers.get('access-control-allow-origin')
+    assertEquals(
+      allowOrigin,
+      '*',
+      `OPTIONS minimalista: Allow-Origin deve ser exatamente "*" literal, recebido: ${JSON.stringify(allowOrigin)}`,
+    )
+    if (allowOrigin === HOSTILE_ORIGIN) {
+      throw new Error(
+        `OPTIONS minimalista: Allow-Origin ECOOU o Origin hostil "${HOSTILE_ORIGIN}" — falha crítica de CORS`,
+      )
+    }
+
+    // Sanidade: createClient nunca é invocado em OPTIONS.
+    assertEquals(ctx._calls, 0, 'OPTIONS minimalista nunca deve chamar createClient')
+
+    await res.text()
+  } finally {
+    await ctx.stop()
+  }
+})
