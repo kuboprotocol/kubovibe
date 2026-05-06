@@ -66,10 +66,53 @@ runs:
           case "${PREV}" in ''|*[!0-9]*) PREV=0 ;; esac
         fi
 
+        # ------------------------------------------------------------------
+        # Helper: append a one-row markdown table to $GITHUB_STEP_SUMMARY so
+        # the Actions run page surfaces npm-cache health per job WITHOUT
+        # forcing the user to dig through raw logs. Idempotent header: each
+        # job appends its own table block under the same H2 — GitHub renders
+        # them stacked in job execution order on the run summary page.
+        # ------------------------------------------------------------------
+        write_summary() {
+          local status="$1"        # HIT | MISS
+          local streak="$2"        # numeric streak after this run
+          local outcome="$3"       # ok | warn | error | enforced
+          local note="$4"          # short human-readable note
+
+          # Visual status badge using emoji (renders identically on GH UI).
+          local badge
+          case "${status}" in
+            HIT)  badge="🟢 HIT"  ;;
+            MISS) badge="🟡 MISS" ;;
+            *)    badge="⚪ ${status}" ;;
+          esac
+          # Outcome cell color cue.
+          local outcome_cell
+          case "${outcome}" in
+            ok)       outcome_cell="✅ ok" ;;
+            warn)     outcome_cell="⚠️ warn" ;;
+            error)    outcome_cell="❌ error" ;;
+            enforced) outcome_cell="🛑 enforced" ;;
+            *)        outcome_cell="${outcome}" ;;
+          esac
+
+          # Render. Backticks around key/hash to keep them monospaced and
+          # prevent markdown from interpreting hyphens/underscores.
+          {
+            echo "## 📦 npm cache report — \`${JOB_LABEL}\`"
+            echo ""
+            echo "| Job | Status | Streak | Cache key | Lockfile hash | Node | Strict | Max misses | Outcome | Note |"
+            echo "|---|---|---|---|---|---|---|---|---|---|"
+            echo "| \`${JOB_LABEL}\` | ${badge} | \`${streak}/${NPM_CACHE_MAX_MISSES}\` | \`${CACHE_KEY}\` | \`${LOCK_HASH}\` | ${NODE_VERSION} | \`${NPM_CACHE_STRICT}\` | \`${NPM_CACHE_MAX_MISSES}\` | ${outcome_cell} | ${note} |"
+            echo ""
+          } >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+        }
+
         if [ "${CACHE_HIT}" = "true" ]; then
           echo "[${JOB_LABEL}] npm cache: HIT (resetting miss streak from ${PREV} to 0)"
           echo "::notice title=[${JOB_LABEL}] npm cache::HIT — streak reset (was ${PREV})"
           echo 0 > "${STREAK_FILE}"
+          write_summary "HIT" "0" "ok" "Cache restored — previous streak was ${PREV}."
           echo "::endgroup::"
           exit 0
         fi
@@ -80,6 +123,7 @@ runs:
 
         if [ "${NEW}" -gt "${NPM_CACHE_MAX_MISSES}" ]; then
           echo "::error title=[${JOB_LABEL}] npm cache MISS streak::Consecutive MISS streak ${NEW} exceeds limit ${NPM_CACHE_MAX_MISSES}. Failing."
+          write_summary "MISS" "${NEW}" "enforced" "Streak exceeds limit — job failed."
           echo "::endgroup::"
           exit 1
         fi
@@ -87,14 +131,17 @@ runs:
         case "${NPM_CACHE_STRICT}" in
           error)
             echo "::error title=[${JOB_LABEL}] npm cache MISS::Cache regression detected — failing job (NPM_CACHE_STRICT=error). Streak=${NEW}/${NPM_CACHE_MAX_MISSES}."
+            write_summary "MISS" "${NEW}" "error" "Strict=error — job failed on first MISS."
             echo "::endgroup::"
             exit 1
             ;;
           off)
             echo "::notice title=[${JOB_LABEL}] npm cache::MISS (streak=${NEW}/${NPM_CACHE_MAX_MISSES})"
+            write_summary "MISS" "${NEW}" "ok" "Strict=off — MISS tolerated silently."
             ;;
           *)
             echo "::warning title=[${JOB_LABEL}] npm cache MISS::No cache restored. Streak=${NEW}/${NPM_CACHE_MAX_MISSES}. Set NPM_CACHE_STRICT=error to enforce immediately."
+            write_summary "MISS" "${NEW}" "warn" "No cache restored — set NPM_CACHE_STRICT=error to enforce."
             ;;
         esac
         echo "::endgroup::"
