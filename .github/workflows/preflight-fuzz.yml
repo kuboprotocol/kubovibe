@@ -308,7 +308,11 @@ jobs:
             cp "reports/fuzz-${CATEGORY_ID}.log" "reports/log/fuzz-${CATEGORY_ID}.log"
             STAGED_LOG=1
           fi
-          if [ "${CATEGORY_ID}" = "request-method" ]; then
+          # fast-check seeds/failures are produced by the shared fast-check
+          # SHRINKING suite. That suite now runs in BOTH request-method and
+          # request-headers jobs (see matrix.filters), so we stage these files
+          # for either category whenever the test actually wrote them.
+          if [ "${CATEGORY_ID}" = "request-method" ] || [ "${CATEGORY_ID}" = "request-headers" ]; then
             if [ -f "$FUZZ_STATE_DIR/fc-seeds.json" ]; then
               cp "$FUZZ_STATE_DIR/fc-seeds.json" reports/fc-seeds/fc-seeds.json
               STAGED_FC_SEEDS=1
