@@ -688,3 +688,49 @@ Deno.test('HTTP integration: OPTIONS with VALID x-test-secret returns Max-Age 86
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: OPTIONS with Origin + WRONG Access-Control-Request-Method + WRONG x-test-secret still returns expected Allow-Headers', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    // Cenário: navegador envia preflight para um método NÃO suportado pelo
+    // handler (ex.: DELETE) e ainda manda x-test-secret inválido. Mesmo assim,
+    // o handler responde 200 com os defaults de CORS — incluindo Allow-Headers
+    // completo — porque OPTIONS nunca valida secret nem método solicitado.
+    const res = await fetch(`${ctx.url}/`, {
+      method: 'OPTIONS',
+      headers: {
+        'origin': 'https://app.kubovibe.dev',
+        'access-control-request-method': 'DELETE',
+        'access-control-request-headers': 'content-type, x-test-secret',
+        'x-test-secret': 'definitely-wrong-secret',
+      },
+    })
+
+    assertEquals(res.status, 200, 'preflight com método errado deve responder 200')
+
+    // Allow-Headers default: deve listar todos os headers aceitos pelo handler.
+    const allowed = res.headers.get('access-control-allow-headers') ?? ''
+    assert(allowed.length > 0, 'allow-headers default deve estar presente')
+    assert(allowed.includes('x-test-secret'), 'allow-headers deve listar x-test-secret')
+    assert(allowed.includes('content-type'), 'allow-headers deve listar content-type')
+    assert(allowed.includes('authorization'), 'allow-headers deve listar authorization')
+    assert(allowed.includes('apikey'), 'allow-headers deve listar apikey')
+    assert(allowed.includes('x-client-info'), 'allow-headers deve listar x-client-info')
+
+    // Sanidade: outros headers CORS continuam corretos.
+    assertEquals(res.headers.get('access-control-allow-origin'), '*')
+    const methods = res.headers.get('access-control-allow-methods') ?? ''
+    const upper = methods.toUpperCase()
+    assert(upper.includes('POST'), `allow-methods deve listar POST (got: "${methods}")`)
+    assert(upper.includes('OPTIONS'), `allow-methods deve listar OPTIONS (got: "${methods}")`)
+    // Allow-Methods reflete o que o servidor suporta, NÃO o método solicitado.
+    assert(!upper.includes('DELETE'), 'allow-methods não deve ecoar DELETE solicitado')
+
+    await res.text()
+
+    // Preflight nunca pode validar secret nem instanciar Supabase client.
+    assertEquals(ctx._calls, 0, 'OPTIONS jamais deve chamar createClient')
+  } finally {
+    await ctx.stop()
+  }
+})
