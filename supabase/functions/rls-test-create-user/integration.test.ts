@@ -3592,3 +3592,166 @@ Deno.test('HTTP integration: OPTIONS without Origin header — full CORS contrac
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: 405 method_not_allowed — CORS contract preserved across Origins and methods (Allow-Origin "*", Allow-Methods "POST, OPTIONS", NO Allow-Credentials)', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    // Contrato esperado (literais do handler index.ts).
+    const EXPECTED_ALLOW_ORIGIN = '*'
+    const EXPECTED_ALLOW_METHODS = 'POST, OPTIONS'
+    const EXPECTED_ALLOW_HEADERS = 'authorization, x-client-info, apikey, content-type, x-test-secret'
+    const EXPECTED_MAX_AGE = '86400'
+
+    // Métodos que devem disparar 405 (handler aceita apenas POST/OPTIONS).
+    const METHODS_405 = ['GET', 'PUT', 'PATCH', 'DELETE', 'HEAD'] as const
+
+    // Diferentes Origens — todas devem receber o MESMO Allow-Origin: '*' literal,
+    // sem eco do Origin recebido (handler não ramifica por Origin).
+    const ORIGINS: Array<{ label: string; value: string | null }> = [
+      { label: 'sem Origin', value: null },
+      { label: 'same-origin produção', value: 'https://app.kubovibe.dev' },
+      { label: 'same-origin lovable', value: 'https://kubovibe.lovable.app' },
+      { label: 'cross-origin hostil', value: 'https://evil.example.com' },
+      { label: 'cross-origin localhost dev', value: 'http://localhost:5173' },
+      { label: 'Origin "null" (sandbox iframe / file://)', value: 'null' },
+      { label: 'Origin com porta exótica', value: 'https://attacker.example.com:31337' },
+    ]
+
+    const parseList = (v: string | null): string[] =>
+      (v ?? '').split(',').map((s) => s.trim()).filter(Boolean)
+
+    for (const method of METHODS_405) {
+      for (const origin of ORIGINS) {
+        const headers: Record<string, string> = {
+          'content-type': 'application/json',
+          'x-test-secret': SECRET, // secret correto + método inválido = 405
+        }
+        if (origin.value !== null) headers['origin'] = origin.value
+
+        const init: RequestInit = { method, headers }
+        if (method !== 'GET' && method !== 'HEAD') {
+          (init as RequestInit & { body: string }).body = '{}'
+        }
+
+        const res = await fetch(`${ctx.url}/`, init)
+        await res.text()
+
+        const ctxLabel = `[${method} | Origin: ${origin.label}]`
+
+        // (1) Status 405.
+        assertEquals(res.status, 405, `${ctxLabel}: status deve ser 405`)
+
+        // (2) Allow-Origin — sempre '*' literal, NUNCA eco do Origin recebido.
+        const allowOrigin = res.headers.get('access-control-allow-origin')
+        assertEquals(
+          allowOrigin,
+          EXPECTED_ALLOW_ORIGIN,
+          `${ctxLabel}: Allow-Origin deve ser '*' literal (sem eco do Origin)`,
+        )
+        // Defesa explícita: nunca pode igualar o Origin recebido (exceto no caso degenerado '*').
+        if (origin.value !== null && origin.value !== '*') {
+          assert(
+            allowOrigin !== origin.value,
+            `${ctxLabel}: Allow-Origin NÃO PODE ecoar o Origin recebido "${origin.value}"`,
+          )
+        }
+        // Nunca retornar a string literal 'null' como Allow-Origin (vulnerabilidade conhecida).
+        assert(
+          allowOrigin !== 'null',
+          `${ctxLabel}: Allow-Origin NÃO PODE ser literal 'null'`,
+        )
+
+        // (3) Allow-Methods — contrato literal exato.
+        const allowMethods = res.headers.get('access-control-allow-methods')
+        assertEquals(
+          allowMethods,
+          EXPECTED_ALLOW_METHODS,
+          `${ctxLabel}: Allow-Methods deve ser "${EXPECTED_ALLOW_METHODS}"`,
+        )
+        // Parse + invariantes: exatamente 2 métodos, sem duplicatas, apenas POST e OPTIONS.
+        const methods = parseList(allowMethods).map((m) => m.toUpperCase())
+        assertEquals(methods.length, 2, `${ctxLabel}: Allow-Methods deve listar 2 métodos`)
+        assertEquals(
+          new Set(methods).size,
+          2,
+          `${ctxLabel}: Allow-Methods não pode conter duplicatas`,
+        )
+        assert(methods.includes('POST'), `${ctxLabel}: Allow-Methods deve incluir POST`)
+        assert(methods.includes('OPTIONS'), `${ctxLabel}: Allow-Methods deve incluir OPTIONS`)
+        // CRÍTICO: o método solicitado (que gerou 405) NÃO deve aparecer em Allow-Methods.
+        assert(
+          !methods.includes(method),
+          `${ctxLabel}: Allow-Methods NÃO PODE listar o método rejeitado "${method}"`,
+        )
+        // Métodos perigosos NUNCA podem aparecer.
+        for (const dangerous of ['GET', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'CONNECT', 'TRACE', '*']) {
+          if (dangerous === 'POST' || dangerous === 'OPTIONS') continue
+          assert(
+            !methods.includes(dangerous),
+            `${ctxLabel}: Allow-Methods NÃO PODE incluir "${dangerous}"`,
+          )
+        }
+
+        // (4) Allow-Credentials — NUNCA presente (incompatível com Allow-Origin: '*').
+        assertEquals(
+          res.headers.get('access-control-allow-credentials'),
+          null,
+          `${ctxLabel}: Allow-Credentials NUNCA pode aparecer em 405`,
+        )
+
+        // (5) Allow-Headers + Max-Age — handler emite uniformemente (corsHeaders constante).
+        assertEquals(
+          res.headers.get('access-control-allow-headers'),
+          EXPECTED_ALLOW_HEADERS,
+          `${ctxLabel}: Allow-Headers deve ser literal exato`,
+        )
+        assertEquals(
+          res.headers.get('access-control-max-age'),
+          EXPECTED_MAX_AGE,
+          `${ctxLabel}: Max-Age deve ser "${EXPECTED_MAX_AGE}"`,
+        )
+
+        // (6) Vary — sem Origin/Cookie/Authorization (incompatível com Allow-Origin: '*').
+        const vary = res.headers.get('vary')
+        if (vary !== null) {
+          const tokens = vary.split(',').map((s) => s.trim().toLowerCase())
+          for (const forbidden of ['origin', 'cookie', 'authorization', '*']) {
+            assert(
+              !tokens.includes(forbidden),
+              `${ctxLabel}: Vary NÃO PODE conter "${forbidden}", recebeu "${vary}"`,
+            )
+          }
+        }
+
+        // (7) Expose-Headers + Set-Cookie — defesa adicional.
+        assertEquals(
+          res.headers.get('access-control-expose-headers'),
+          null,
+          `${ctxLabel}: Expose-Headers NUNCA pode aparecer em 405`,
+        )
+        assertEquals(
+          res.headers.get('set-cookie'),
+          null,
+          `${ctxLabel}: Set-Cookie NUNCA pode aparecer em 405`,
+        )
+
+        // (8) Body JSON canônico do handler para 405.
+        // (já consumido acima como text — recheck via headers de content-type)
+        assertEquals(
+          res.headers.get('content-type'),
+          'application/json',
+          `${ctxLabel}: Content-Type deve ser application/json`,
+        )
+      }
+    }
+
+    // (9) Garantia: nenhum createClient instanciado em qualquer 405 (Origin × method).
+    assertEquals(
+      ctx._calls,
+      0,
+      'createClient NUNCA pode ser invocado em respostas 405',
+    )
+  } finally {
+    await ctx.stop()
+  }
+})
