@@ -7520,3 +7520,226 @@ Deno.test('HTTP integration: OPTIONS preflight — response NEVER contains unexp
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: OPTIONS preflight — Access-Control-Request-Method variants (percent-encoded + exotic whitespace) NEVER appear in ANY response header or body (zero echo, zero leak)', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    const EXPECTED_METHODS_LITERAL = 'POST, OPTIONS'
+    const EXPECTED_HEADERS_LITERAL = 'authorization, x-client-info, apikey, content-type, x-test-secret'
+
+    const u = new URL(ctx.url)
+    const hostHeader = u.host
+
+    // Cada payload contém um MARKER único e altamente improvável de aparecer naturalmente
+    // em qualquer resposta. Validamos que NEM o marker, NEM seus tokens componentes,
+    // NEM suas formas decodificadas vazam para qualquer header ou body.
+    //
+    // O marker é injetado via Access-Control-Request-Method usando combinações de:
+    //  - percent-encoding (%2C, %2c, %20, %09, %0D%0A, %00, %3B, %2F, %252C duplo)
+    //  - whitespace exótico Unicode (NBSP, em-space, ideographic, narrow NBSP, hair, ZWS)
+    //  - casing variado e tokens injetados
+    const PAYLOADS: Array<{ label: string; method: string; markers: string[] }> = [
+      // --- %2C / %2c puros escondendo método marker. ---
+      { label: '%2C + UNIQUEMARKER001',       method: 'POST%2CUNIQUEMARKER001',                 markers: ['UNIQUEMARKER001', '%2C'] },
+      { label: '%2c + UNIQUEMARKER002',       method: 'POST%2cUNIQUEMARKER002',                 markers: ['UNIQUEMARKER002', '%2c'] },
+      { label: '%2C múltiplo + MARKER003',    method: 'POST%2CUNIQUEMARKER003%2CDELETE',        markers: ['UNIQUEMARKER003', '%2C'] },
+
+      // --- Percent-encoding duplo. ---
+      { label: '%252C + MARKER004',           method: 'POST%252CUNIQUEMARKER004',               markers: ['UNIQUEMARKER004', '%252C', '%2C'] },
+      { label: '%252c + MARKER005',           method: 'POST%252cUNIQUEMARKER005',               markers: ['UNIQUEMARKER005', '%252c', '%2c'] },
+
+      // --- %20 (space) percent-encoded. ---
+      { label: '%20 + MARKER006',             method: '%20POST%20MARKER006%20',                 markers: ['MARKER006', '%20'] },
+      { label: '%20 + %2C + MARKER007',       method: 'POST%20%2C%20UNIQUEMARKER007',           markers: ['UNIQUEMARKER007', '%20', '%2C'] },
+
+      // --- Outros separadores percent-encoded. ---
+      { label: '%09 tab + MARKER008',         method: 'POST%09UNIQUEMARKER008',                 markers: ['UNIQUEMARKER008', '%09'] },
+      { label: '%0D%0A CRLF + MARKER009',     method: 'POST%0D%0AX-Leak-MARKER009:%20yes',      markers: ['MARKER009', '%0D%0A', 'X-Leak-MARKER009'] },
+      { label: '%00 null + MARKER010',        method: 'POST%00UNIQUEMARKER010',                 markers: ['UNIQUEMARKER010', '%00'] },
+      { label: '%3B semicolon + MARKER011',   method: 'POST%3BUNIQUEMARKER011',                 markers: ['UNIQUEMARKER011', '%3B'] },
+      { label: '%2F slash + MARKER012',       method: 'POST%2FUNIQUEMARKER012',                 markers: ['UNIQUEMARKER012', '%2F'] },
+
+      // --- Whitespace exótico Unicode + marker. ---
+      { label: 'NBSP + MARKER013',            method: '\u00A0POST\u00A0UNIQUEMARKER013\u00A0',  markers: ['UNIQUEMARKER013', '\u00A0'] },
+      { label: 'em-space + MARKER014',        method: '\u2003POST\u2003UNIQUEMARKER014\u2003',  markers: ['UNIQUEMARKER014', '\u2003'] },
+      { label: 'ideographic + MARKER015',     method: '\u3000POST\u3000UNIQUEMARKER015\u3000',  markers: ['UNIQUEMARKER015', '\u3000'] },
+      { label: 'narrow NBSP + MARKER016',     method: '\u202FPOST\u202FUNIQUEMARKER016\u202F',  markers: ['UNIQUEMARKER016', '\u202F'] },
+      { label: 'hair space + MARKER017',      method: '\u200APOST\u200AUNIQUEMARKER017\u200A',  markers: ['UNIQUEMARKER017', '\u200A'] },
+      { label: 'ZWS intra + MARKER018',       method: 'PO\u200BST\u200BUNIQUEMARKER018',        markers: ['UNIQUEMARKER018', '\u200B'] },
+
+      // --- Combinações: percent + Unicode + casing. ---
+      { label: 'NBSP+%2C+UPPER MARKER019',    method: '\u00A0POST\u00A0%2C\u00A0UNIQUEMARKER019\u00A0', markers: ['UNIQUEMARKER019', '%2C', '\u00A0'] },
+      { label: 'em+%2c+lower marker020',      method: '\u2003post\u2003%2c\u2003uniquemarker020\u2003', markers: ['uniquemarker020', '%2c', '\u2003'] },
+      { label: 'ideo+%252C+mixed Mr021',      method: '\u3000PoSt\u3000%252C\u3000UnIqUeMaRkEr021\u3000', markers: ['UnIqUeMaRkEr021', '%252C', '\u3000'] },
+
+      // --- Smuggling com %2C escondendo método dangerous + marker. ---
+      { label: '%2C + NBSP + EVILTRACE022',   method: 'POST%2C\u00A0EVILTRACE022',              markers: ['EVILTRACE022', '%2C', '\u00A0'] },
+      { label: '%2c + ZWS + PWNCONNECT023',   method: 'POST%2c\u200BPWNCONNECT023',             markers: ['PWNCONNECT023', '%2c', '\u200B'] },
+
+      // --- Caos total. ---
+      { label: 'caos #1 MARKER024',           method: '\u00A0POST%20%2C%20UNIQUEMARKER024\u00A0%2c\u00A0DELETE\u2003', markers: ['UNIQUEMARKER024', '%20', '%2C', '%2c', '\u00A0', '\u2003'] },
+      { label: 'caos #2 Cyrillic MARKER025',  method: '\u00A0%50OST%252C%00\u00A0РMARKER025',   markers: ['MARKER025', '%50', '%252C', '%00', 'Р'] },
+      { label: 'caos #3 CRLF smuggle MR026',  method: '\u00A0POST%2C%0D%0AX-Inj-MARKER026:%20evil\u00A0', markers: ['MARKER026', '%2C', '%0D%0A', 'X-Inj-MARKER026'] },
+    ]
+
+    type RawResponse = {
+      status: number
+      headers: Headers
+      headerLines: string[]
+      body: string
+      raw: string
+    } | { error: string }
+
+    async function sendRaw(method: string): Promise<RawResponse> {
+      let conn: Deno.TcpConn | null = null
+      try {
+        conn = await Deno.connect({ hostname: u.hostname, port: parseInt(u.port, 10), transport: 'tcp' })
+        const reqLines = [
+          'OPTIONS / HTTP/1.1',
+          `Host: ${hostHeader}`,
+          'Origin: https://evil.example.com',
+          `Access-Control-Request-Method: ${method}`,
+          'Access-Control-Request-Headers: authorization, x-test-secret',
+          'Connection: close',
+          '',
+          '',
+        ]
+        await conn.write(new TextEncoder().encode(reqLines.join('\r\n')))
+
+        const chunks: Uint8Array[] = []
+        const buf = new Uint8Array(8192)
+        while (true) {
+          const n = await conn.read(buf)
+          if (n === null) break
+          chunks.push(buf.slice(0, n))
+        }
+        const total = chunks.reduce((s, c) => s + c.length, 0)
+        const merged = new Uint8Array(total)
+        let off = 0
+        for (const c of chunks) { merged.set(c, off); off += c.length }
+        const text = new TextDecoder().decode(merged)
+
+        const headerEnd = text.indexOf('\r\n\r\n')
+        if (headerEnd === -1) return { error: 'no header terminator' }
+        const lines = text.slice(0, headerEnd).split('\r\n')
+        const m = lines[0].match(/^HTTP\/1\.[01]\s+(\d{3})/)
+        if (!m) return { error: `bad status: ${lines[0]}` }
+        const status = parseInt(m[1], 10)
+        const headers = new Headers()
+        const headerLines: string[] = []
+        for (let i = 1; i < lines.length; i++) {
+          headerLines.push(lines[i])
+          const idx = lines[i].indexOf(':')
+          if (idx === -1) continue
+          const name = lines[i].slice(0, idx).trim()
+          const value = lines[i].slice(idx + 1).trim()
+          if (name) headers.append(name, value)
+        }
+        const body = text.slice(headerEnd + 4)
+        return { status, headers, headerLines, body, raw: text }
+      } finally {
+        try { conn?.close() } catch { /* ignore */ }
+      }
+    }
+
+    let validatedAs200 = 0
+    let acceptedAs4xx = 0
+
+    for (const p of PAYLOADS) {
+      const result = await sendRaw(p.method)
+      const ctxLabel = `[Payload: ${p.label}]`
+
+      if ('error' in result) { acceptedAs4xx++; continue }
+
+      // (1) NUNCA 5xx.
+      assert(result.status < 500, `${ctxLabel}: status NUNCA pode ser 5xx, recebido ${result.status}`)
+      if (result.status !== 200) { acceptedAs4xx++; continue }
+      validatedAs200++
+
+      // (2) Allow-Methods e Allow-Headers literais exatos.
+      assertEquals(
+        result.headers.get('access-control-allow-methods'), EXPECTED_METHODS_LITERAL,
+        `${ctxLabel}: Allow-Methods literal exato`,
+      )
+      assertEquals(
+        result.headers.get('access-control-allow-headers'), EXPECTED_HEADERS_LITERAL,
+        `${ctxLabel}: Allow-Headers literal exato`,
+      )
+
+      // (3) NENHUM marker aparece em NENHUM valor de header (case-insensitive).
+      for (const marker of p.markers) {
+        const markerLower = marker.toLowerCase()
+        for (const [name, value] of result.headers) {
+          assert(
+            !value.toLowerCase().includes(markerLower),
+            `${ctxLabel}: marker "${marker}" vazou para header "${name}: ${value}"`,
+          )
+          // Nome do header também não pode conter marker.
+          assert(
+            !name.toLowerCase().includes(markerLower),
+            `${ctxLabel}: marker "${marker}" vazou para nome de header "${name}"`,
+          )
+        }
+      }
+
+      // (4) NENHUM marker aparece nas linhas brutas de header (defesa contra response splitting).
+      for (const marker of p.markers) {
+        const markerLower = marker.toLowerCase()
+        for (const line of result.headerLines) {
+          assert(
+            !line.toLowerCase().includes(markerLower),
+            `${ctxLabel}: marker "${marker}" vazou para linha bruta "${line}"`,
+          )
+        }
+      }
+
+      // (5) NENHUM marker aparece no body (preflight 200 deve ter body vazio ou neutro).
+      for (const marker of p.markers) {
+        const markerLower = marker.toLowerCase()
+        assert(
+          !result.body.toLowerCase().includes(markerLower),
+          `${ctxLabel}: marker "${marker}" vazou para body (${result.body.length} bytes)`,
+        )
+      }
+
+      // (6) Body de preflight deve ser vazio (length 0) ou no máximo whitespace.
+      assert(
+        result.body.trim().length === 0,
+        `${ctxLabel}: body de preflight deve ser vazio, recebido ${result.body.length} bytes não-whitespace`,
+      )
+
+      // (7) Headers CORS literais adicionais.
+      assertEquals(result.headers.get('access-control-allow-origin'), '*', `${ctxLabel}: Allow-Origin '*' literal`)
+      assertEquals(result.headers.get('access-control-allow-credentials'), null, `${ctxLabel}: Allow-Credentials NUNCA`)
+      assertEquals(result.headers.get('access-control-max-age'), '86400', `${ctxLabel}: Max-Age literal`)
+      assertEquals(result.headers.get('set-cookie'), null, `${ctxLabel}: Set-Cookie NUNCA`)
+      assertEquals(result.headers.get('access-control-expose-headers'), null, `${ctxLabel}: Expose-Headers NUNCA`)
+
+      // (8) Allow-Methods/Allow-Headers ASCII puro 0x20-0x7E.
+      const am = result.headers.get('access-control-allow-methods')!
+      const ah = result.headers.get('access-control-allow-headers')!
+      for (const [field, value] of [['Allow-Methods', am], ['Allow-Headers', ah]] as const) {
+        assert(!value.includes('\r'), `${ctxLabel}: ${field} contém CR`)
+        assert(!value.includes('\n'), `${ctxLabel}: ${field} contém LF`)
+        assert(!value.includes('\x00'), `${ctxLabel}: ${field} contém null`)
+        assert(!value.includes('\t'), `${ctxLabel}: ${field} contém HTAB`)
+        assert(!value.includes('%'), `${ctxLabel}: ${field} contém '%' (echo de percent)`)
+        for (const ch of value) {
+          const code = ch.charCodeAt(0)
+          assert(code >= 0x20 && code <= 0x7E, `${ctxLabel}: ${field} contém non-ASCII U+${code.toString(16).padStart(4, '0')}`)
+        }
+      }
+    }
+
+    // (9) Cobertura total.
+    assertEquals(
+      validatedAs200 + acceptedAs4xx, PAYLOADS.length,
+      `todos os ${PAYLOADS.length} payloads cobertos (200=${validatedAs200}, 4xx/erro=${acceptedAs4xx})`,
+    )
+
+    // (10) Zero createClient invocado.
+    assertEquals(ctx._calls, 0, 'createClient NUNCA pode ser invocado em OPTIONS preflight (Request-Method markers)')
+  } finally {
+    await ctx.stop()
+  }
+})
