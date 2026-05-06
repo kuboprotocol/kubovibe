@@ -585,3 +585,55 @@ Deno.test('HTTP integration: bare OPTIONS (no CORS request headers) + WRONG x-te
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: OPTIONS with CORS headers (Origin + Request-Method) + WRONG x-test-secret returns Allow-Methods and Max-Age', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    // Cenário "preflight real do navegador": Origin + Access-Control-Request-Method
+    // presentes (como qualquer browser envia), mas com x-test-secret inválido.
+    // Contrato: handler ignora secret em OPTIONS e responde 200 com Allow-Methods
+    // (POST, OPTIONS) e Max-Age para cache do preflight.
+    const res = await fetch(`${ctx.url}/`, {
+      method: 'OPTIONS',
+      headers: {
+        'origin': 'https://app.kubovibe.dev',
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'content-type, x-test-secret',
+        'x-test-secret': 'definitely-wrong-secret',
+      },
+    })
+
+    assertEquals(res.status, 200, 'preflight com secret errado deve responder 200')
+
+    // Allow-Methods: POST + OPTIONS, sem métodos não suportados.
+    const methods = res.headers.get('access-control-allow-methods') ?? ''
+    assert(methods.length > 0, 'allow-methods deve estar presente')
+    const upper = methods.toUpperCase()
+    assert(upper.includes('POST'), `allow-methods deve listar POST (got: "${methods}")`)
+    assert(upper.includes('OPTIONS'), `allow-methods deve listar OPTIONS (got: "${methods}")`)
+    assert(!upper.includes('DELETE'), 'allow-methods não deve listar DELETE')
+    assert(!upper.includes('PUT'), 'allow-methods não deve listar PUT')
+    assert(!upper.includes('PATCH'), 'allow-methods não deve listar PATCH')
+
+    // Max-Age: inteiro positivo.
+    const maxAge = res.headers.get('access-control-max-age') ?? ''
+    assert(maxAge.length > 0, 'access-control-max-age deve estar presente')
+    const maxAgeNum = Number(maxAge)
+    assert(Number.isInteger(maxAgeNum), `max-age deve ser inteiro (got: "${maxAge}")`)
+    assert(maxAgeNum > 0, `max-age deve ser positivo (got: ${maxAgeNum})`)
+
+    // Sanidade: outros headers CORS continuam corretos.
+    assertEquals(res.headers.get('access-control-allow-origin'), '*')
+    const allowed = res.headers.get('access-control-allow-headers') ?? ''
+    assert(allowed.includes('x-test-secret'), 'allow-headers deve listar x-test-secret')
+    assert(allowed.includes('content-type'), 'allow-headers deve listar content-type')
+    assert(allowed.includes('authorization'), 'allow-headers deve listar authorization')
+
+    await res.text()
+
+    // Preflight nunca pode validar secret nem instanciar Supabase client.
+    assertEquals(ctx._calls, 0, 'OPTIONS jamais deve chamar createClient')
+  } finally {
+    await ctx.stop()
+  }
+})
