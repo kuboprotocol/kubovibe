@@ -4911,3 +4911,169 @@ Deno.test('HTTP integration: OPTIONS WITH Origin — Allow-Headers stays LITERAL
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: OPTIONS preflight — Request-Method × Request-Headers combined matrix — Allow-Methods/Allow-Headers stay LITERAL (no echo, no leak)', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    const EXPECTED_METHODS_LITERAL = 'POST, OPTIONS'
+    const EXPECTED_METHODS_SET = new Set(['post', 'options'])
+    const EXPECTED_HEADERS_LITERAL = 'authorization, x-client-info, apikey, content-type, x-test-secret'
+    const EXPECTED_HEADERS_SET = new Set([
+      'authorization', 'x-client-info', 'apikey', 'content-type', 'x-test-secret',
+    ])
+    const DANGEROUS_METHODS = ['get', 'put', 'patch', 'delete', 'head', 'connect', 'trace', 'propfind', 'custom-method', '*']
+    const DANGEROUS_HEADERS = [
+      'set-cookie', 'set-cookie2', 'cookie', 'cookie2',
+      'host', 'origin', 'authorization-bearer',
+      'x-evil-cookie', 'x-fake-header', 'x-csrf-token',
+      'x-forwarded-for', 'x-real-ip', 'proxy-authorization',
+      '*',
+    ]
+
+    // Origens diversas — Allow-Methods e Allow-Headers devem ser idênticos para todas.
+    const ORIGINS: Array<{ label: string; value: string | null }> = [
+      { label: 'sem Origin',                value: null },
+      { label: 'same-origin produção',      value: 'https://app.kubovibe.dev' },
+      { label: 'same-origin lovable',       value: 'https://kubovibe.lovable.app' },
+      { label: 'cross-origin hostil',       value: 'https://evil.example.com' },
+      { label: 'localhost dev',             value: 'http://localhost:5173' },
+      { label: 'Origin literal "null"',     value: 'null' },
+    ]
+
+    // Variantes de Access-Control-Request-Method — casing/spacing/exóticos.
+    const METHOD_VARIANTS: Array<{ label: string; value: string }> = [
+      { label: 'POST canônico',             value: 'POST' },
+      { label: 'post lowercase',            value: 'post' },
+      { label: 'PoSt mIxEd',                value: 'PoSt' },
+      { label: 'POST espaços',              value: '  POST  ' },
+      { label: 'OPTIONS canônico',          value: 'OPTIONS' },
+      { label: 'GET (rejeitado)',           value: 'GET' },
+      { label: 'DELETE (rejeitado)',        value: 'DELETE' },
+      { label: 'PATCH (rejeitado)',         value: 'PATCH' },
+      { label: 'PROPFIND exótico',          value: 'PROPFIND' },
+      { label: 'CUSTOM-METHOD absurdo',     value: 'CUSTOM-METHOD' },
+      { label: 'wildcard *',                value: '*' },
+    ]
+
+    // Variantes de Access-Control-Request-Headers — casing/spacing/dangerous/repetições.
+    const HEADER_VARIANTS: Array<{ label: string; value: string }> = [
+      { label: 'lowercase canônico',        value: 'content-type, x-test-secret' },
+      { label: 'Title-Case',                value: 'Content-Type, X-Test-Secret' },
+      { label: 'UPPERCASE',                 value: 'CONTENT-TYPE, X-TEST-SECRET' },
+      { label: 'mIxEd CaSiNg',              value: 'CoNtEnT-TyPe, X-tEsT-sEcReT' },
+      { label: 'sem espaço pós-vírgula',    value: 'content-type,x-test-secret' },
+      { label: 'tab separador',             value: 'content-type,\tx-test-secret' },
+      { label: 'trailing comma',            value: 'content-type, x-test-secret,' },
+      { label: 'vírgulas consecutivas',     value: 'content-type,,, x-test-secret' },
+      { label: 'tentar set-cookie',         value: 'content-type, set-cookie' },
+      { label: 'tentar cookie+host',        value: 'cookie, host, content-type' },
+      { label: 'wildcard *',                value: '*' },
+      { label: 'só dangerous',              value: 'set-cookie, cookie, host, x-evil' },
+      { label: 'allowlist duplicada',       value: 'authorization, AUTHORIZATION, content-type, content-type' },
+      { label: 'ordem reversa',             value: 'x-test-secret, content-type, apikey, x-client-info, authorization' },
+      { label: 'string vazia',              value: '' },
+      { label: 'caos misto',                value: ' , X-TEST-SECRET ,, set-cookie,,  CONTENT-type ,, cookie ,, authorization ,,, ' },
+    ]
+
+    const parseList = (v: string | null): string[] =>
+      (v ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
+
+    let totalRequests = 0
+
+    for (const origin of ORIGINS) {
+      for (const methodVariant of METHOD_VARIANTS) {
+        for (const headerVariant of HEADER_VARIANTS) {
+          const reqHeaders: Record<string, string> = {
+            'access-control-request-method': methodVariant.value,
+            'access-control-request-headers': headerVariant.value,
+          }
+          if (origin.value !== null) reqHeaders['origin'] = origin.value
+
+          const res = await fetch(`${ctx.url}/`, { method: 'OPTIONS', headers: reqHeaders })
+          await res.text()
+          totalRequests++
+
+          const ctxLabel = `[Origin: ${origin.label} | Req-Method: ${methodVariant.label} | Req-Headers: ${headerVariant.label}]`
+
+          // (1) Status 200.
+          assertEquals(res.status, 200, `${ctxLabel}: preflight deve retornar 200`)
+
+          // (2) Allow-Methods LITERAL EXATO — nunca ecoa Request-Method.
+          const am = res.headers.get('access-control-allow-methods')
+          assertExists(am, `${ctxLabel}: Allow-Methods deve estar presente`)
+          assertEquals(am, EXPECTED_METHODS_LITERAL, `${ctxLabel}: Allow-Methods deve ser literal "${EXPECTED_METHODS_LITERAL}"`)
+          const parsedMethods = new Set(parseList(am))
+          assertEquals(parsedMethods.size, EXPECTED_METHODS_SET.size, `${ctxLabel}: Allow-Methods deve listar exatamente 2 métodos`)
+          for (const m of EXPECTED_METHODS_SET) {
+            assert(parsedMethods.has(m), `${ctxLabel}: Allow-Methods deve incluir "${m}"`)
+          }
+          // Métodos perigosos NUNCA presentes (exceto o degenerado '*' que coincide com wildcard).
+          for (const dangerous of DANGEROUS_METHODS) {
+            assert(!parsedMethods.has(dangerous), `${ctxLabel}: Allow-Methods NÃO PODE conter método perigoso "${dangerous}"`)
+          }
+
+          // (3) Allow-Headers LITERAL EXATO — nunca ecoa Request-Headers.
+          const ah = res.headers.get('access-control-allow-headers')
+          assertExists(ah, `${ctxLabel}: Allow-Headers deve estar presente`)
+          assertEquals(ah, EXPECTED_HEADERS_LITERAL, `${ctxLabel}: Allow-Headers deve ser literal "${EXPECTED_HEADERS_LITERAL}"`)
+          const parsedHeaders = new Set(parseList(ah))
+          assertEquals(parsedHeaders.size, EXPECTED_HEADERS_SET.size, `${ctxLabel}: Allow-Headers deve listar exatamente 5 headers`)
+          for (const h of EXPECTED_HEADERS_SET) {
+            assert(parsedHeaders.has(h), `${ctxLabel}: Allow-Headers deve incluir "${h}"`)
+          }
+          for (const dangerous of DANGEROUS_HEADERS) {
+            assert(!parsedHeaders.has(dangerous), `${ctxLabel}: Allow-Headers NÃO PODE conter header perigoso "${dangerous}"`)
+          }
+
+          // (4) Nunca ecoar tokens não-allowlisted enviados em Request-Headers.
+          for (const sent of parseList(headerVariant.value)) {
+            if (!EXPECTED_HEADERS_SET.has(sent)) {
+              assert(!parsedHeaders.has(sent), `${ctxLabel}: Allow-Headers NÃO PODE ecoar token "${sent}"`)
+            }
+          }
+          // Nunca ecoar o método enviado se não for POST/OPTIONS.
+          const sentMethod = methodVariant.value.trim().toLowerCase()
+          if (!EXPECTED_METHODS_SET.has(sentMethod)) {
+            assert(!parsedMethods.has(sentMethod), `${ctxLabel}: Allow-Methods NÃO PODE ecoar método "${sentMethod}"`)
+          }
+
+          // (5) Allow-Origin permanece '*' literal — sem eco.
+          const allowOrigin = res.headers.get('access-control-allow-origin')
+          assertEquals(allowOrigin, '*', `${ctxLabel}: Allow-Origin deve ser '*' literal`)
+          if (origin.value && origin.value !== '*') {
+            assert(allowOrigin !== origin.value, `${ctxLabel}: Allow-Origin NÃO PODE ecoar Origin`)
+          }
+          assert(allowOrigin !== 'null', `${ctxLabel}: Allow-Origin NUNCA pode ser 'null'`)
+
+          // (6) Allow-Credentials NUNCA presente.
+          assertEquals(res.headers.get('access-control-allow-credentials'), null, `${ctxLabel}: Allow-Credentials NUNCA pode aparecer`)
+
+          // (7) Max-Age literal.
+          assertEquals(res.headers.get('access-control-max-age'), '86400', `${ctxLabel}: Max-Age deve ser '86400'`)
+
+          // (8) Set-Cookie/Expose-Headers ausentes.
+          assertEquals(res.headers.get('set-cookie'), null, `${ctxLabel}: Set-Cookie NUNCA pode aparecer`)
+          assertEquals(res.headers.get('access-control-expose-headers'), null, `${ctxLabel}: Expose-Headers NUNCA pode aparecer`)
+
+          // (9) Allow-Methods e Allow-Headers aparecem exatamente 1x cada.
+          let methodsCount = 0, headersCount = 0
+          for (const [name] of res.headers) {
+            const lower = name.toLowerCase()
+            if (lower === 'access-control-allow-methods') methodsCount++
+            if (lower === 'access-control-allow-headers') headersCount++
+          }
+          assertEquals(methodsCount, 1, `${ctxLabel}: Allow-Methods deve aparecer exatamente 1x`)
+          assertEquals(headersCount, 1, `${ctxLabel}: Allow-Headers deve aparecer exatamente 1x`)
+        }
+      }
+    }
+
+    // Sanidade da matriz: 6 × 11 × 16 = 1056 requests.
+    assertEquals(totalRequests, ORIGINS.length * METHOD_VARIANTS.length * HEADER_VARIANTS.length, 'matriz combinada deve cobrir todas as combinações')
+
+    // (10) Zero createClient em qualquer preflight da matriz.
+    assertEquals(ctx._calls, 0, 'createClient NUNCA pode ser invocado em OPTIONS preflight')
+  } finally {
+    await ctx.stop()
+  }
+})
