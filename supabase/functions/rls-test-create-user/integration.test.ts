@@ -3395,3 +3395,200 @@ Deno.test('HTTP integration: 405 method_not_allowed with hostile Cookie — NEVE
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: OPTIONS without Origin header — full CORS contract preserved (Allow-Headers + Max-Age + Allow-Methods + Allow-Origin)', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    // Contrato esperado (literais do handler index.ts).
+    const EXPECTED_ALLOW_HEADERS = 'authorization, x-client-info, apikey, content-type, x-test-secret'
+    const EXPECTED_ALLOW_HEADERS_SET = new Set([
+      'authorization', 'x-client-info', 'apikey', 'content-type', 'x-test-secret',
+    ])
+    const EXPECTED_MAX_AGE = '86400'
+    const EXPECTED_ALLOW_METHODS = 'POST, OPTIONS'
+    const EXPECTED_ALLOW_ORIGIN = '*'
+
+    // Cenários SEM Origin — simulam: same-origin browser, curl, healthcheck, server-to-server.
+    // O handler NÃO deve ramificar comportamento por presença de Origin: contrato é uniforme.
+    const scenarios: Array<{ name: string; init: RequestInit }> = [
+      {
+        name: 'OPTIONS puro sem Origin nem qualquer header',
+        init: { method: 'OPTIONS' },
+      },
+      {
+        name: 'OPTIONS sem Origin mas com Access-Control-Request-Method',
+        init: {
+          method: 'OPTIONS',
+          headers: { 'access-control-request-method': 'POST' },
+        },
+      },
+      {
+        name: 'OPTIONS sem Origin mas com Access-Control-Request-Headers',
+        init: {
+          method: 'OPTIONS',
+          headers: {
+            'access-control-request-method': 'POST',
+            'access-control-request-headers': 'content-type, x-test-secret, authorization',
+          },
+        },
+      },
+      {
+        name: 'OPTIONS sem Origin mas com Cookie hostil (server-to-server espião)',
+        init: {
+          method: 'OPTIONS',
+          headers: {
+            'cookie': 'sid=stolen; auth=fake-jwt; admin=true',
+          },
+        },
+      },
+      {
+        name: 'OPTIONS sem Origin mas com Authorization Bearer',
+        init: {
+          method: 'OPTIONS',
+          headers: { 'authorization': 'Bearer some-token' },
+        },
+      },
+      {
+        name: 'OPTIONS sem Origin com User-Agent custom (curl-like)',
+        init: {
+          method: 'OPTIONS',
+          headers: { 'user-agent': 'curl/8.4.0' },
+        },
+      },
+    ]
+
+    const parseList = (v: string | null): string[] =>
+      (v ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
+
+    for (const sc of scenarios) {
+      // Sanidade: garantir que NÃO estamos enviando Origin acidentalmente.
+      const sentHeaders = new Headers((sc.init.headers ?? {}) as HeadersInit)
+      assert(
+        !sentHeaders.has('origin'),
+        `[${sc.name}] cenário inválido: Origin não pode estar presente`,
+      )
+
+      // 2 tentativas idempotentes — contrato deve ser determinístico.
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        const res = await fetch(`${ctx.url}/`, sc.init)
+        const body = await res.text()
+
+        // (1) Status + body literal.
+        assertEquals(res.status, 200, `[${sc.name}] tentativa ${attempt}: status deve ser 200`)
+        assertEquals(body, 'ok', `[${sc.name}] tentativa ${attempt}: body deve ser literal "ok"`)
+
+        // (2) Allow-Headers — contrato literal exato.
+        const ah = res.headers.get('access-control-allow-headers')
+        assertExists(ah, `[${sc.name}] tentativa ${attempt}: Allow-Headers deve estar presente`)
+        assertEquals(
+          ah,
+          EXPECTED_ALLOW_HEADERS,
+          `[${sc.name}] tentativa ${attempt}: Allow-Headers deve ser literal exato`,
+        )
+        const ahSet = new Set(parseList(ah))
+        assertEquals(
+          ahSet.size,
+          EXPECTED_ALLOW_HEADERS_SET.size,
+          `[${sc.name}] tentativa ${attempt}: Allow-Headers deve listar exatamente ${EXPECTED_ALLOW_HEADERS_SET.size} headers`,
+        )
+        for (const h of EXPECTED_ALLOW_HEADERS_SET) {
+          assert(
+            ahSet.has(h),
+            `[${sc.name}] tentativa ${attempt}: Allow-Headers deve incluir "${h}"`,
+          )
+        }
+        assert(
+          !ahSet.has('*'),
+          `[${sc.name}] tentativa ${attempt}: Allow-Headers NÃO PODE conter wildcard '*'`,
+        )
+
+        // (3) Max-Age — contrato literal + numérico válido + bounds sanos.
+        const ma = res.headers.get('access-control-max-age')
+        assertExists(ma, `[${sc.name}] tentativa ${attempt}: Max-Age deve estar presente`)
+        assertEquals(
+          ma,
+          EXPECTED_MAX_AGE,
+          `[${sc.name}] tentativa ${attempt}: Max-Age deve ser literal "${EXPECTED_MAX_AGE}"`,
+        )
+        assert(/^\d+$/.test(ma), `[${sc.name}] tentativa ${attempt}: Max-Age deve ser dígitos puros`)
+        const n = Number(ma)
+        assert(Number.isInteger(n) && n > 0 && n <= 86400,
+          `[${sc.name}] tentativa ${attempt}: Max-Age deve ser inteiro em (0, 86400]`)
+
+        // (4) Allow-Methods — contrato preservado mesmo sem Origin.
+        assertEquals(
+          res.headers.get('access-control-allow-methods'),
+          EXPECTED_ALLOW_METHODS,
+          `[${sc.name}] tentativa ${attempt}: Allow-Methods deve ser "${EXPECTED_ALLOW_METHODS}"`,
+        )
+
+        // (5) Allow-Origin — wildcard literal '*' (handler NÃO ecoa Origin, e aqui não há Origin para ecoar).
+        assertEquals(
+          res.headers.get('access-control-allow-origin'),
+          EXPECTED_ALLOW_ORIGIN,
+          `[${sc.name}] tentativa ${attempt}: Allow-Origin deve ser '*' literal`,
+        )
+
+        // (6) Headers proibidos — NUNCA presentes em preflight, mesmo sem Origin.
+        assertEquals(
+          res.headers.get('access-control-allow-credentials'),
+          null,
+          `[${sc.name}] tentativa ${attempt}: Allow-Credentials NUNCA pode aparecer`,
+        )
+        assertEquals(
+          res.headers.get('access-control-expose-headers'),
+          null,
+          `[${sc.name}] tentativa ${attempt}: Expose-Headers NUNCA pode aparecer em preflight`,
+        )
+        assertEquals(
+          res.headers.get('set-cookie'),
+          null,
+          `[${sc.name}] tentativa ${attempt}: Set-Cookie NUNCA pode aparecer`,
+        )
+        assertEquals(
+          res.headers.get('set-cookie2'),
+          null,
+          `[${sc.name}] tentativa ${attempt}: Set-Cookie2 NUNCA pode aparecer`,
+        )
+
+        // (7) Vary — sem Origin/Cookie/Authorization (incompatível com Allow-Origin: '*').
+        const vary = res.headers.get('vary')
+        if (vary !== null) {
+          const tokens = parseList(vary)
+          for (const forbidden of ['origin', 'cookie', 'authorization', '*']) {
+            assert(
+              !tokens.includes(forbidden),
+              `[${sc.name}] tentativa ${attempt}: Vary NÃO PODE conter "${forbidden}", recebeu "${vary}"`,
+            )
+          }
+        }
+
+        // (8) Leitura case-insensitive dos 4 headers CORS — funciona em qualquer casing.
+        const caseVariants: Array<[string, string]> = [
+          ['ACCESS-CONTROL-ALLOW-HEADERS', EXPECTED_ALLOW_HEADERS],
+          ['Access-Control-Allow-Headers', EXPECTED_ALLOW_HEADERS],
+          ['ACCESS-CONTROL-MAX-AGE', EXPECTED_MAX_AGE],
+          ['Access-Control-Max-Age', EXPECTED_MAX_AGE],
+          ['ACCESS-CONTROL-ALLOW-METHODS', EXPECTED_ALLOW_METHODS],
+          ['ACCESS-CONTROL-ALLOW-ORIGIN', EXPECTED_ALLOW_ORIGIN],
+        ]
+        for (const [name, expected] of caseVariants) {
+          assertEquals(
+            res.headers.get(name),
+            expected,
+            `[${sc.name}] tentativa ${attempt}: header "${name}" deve retornar "${expected}"`,
+          )
+        }
+      }
+    }
+
+    // (9) Garantia: nenhum createClient instanciado — preflight nunca toca Supabase.
+    assertEquals(
+      ctx._calls,
+      0,
+      'createClient NUNCA pode ser invocado em OPTIONS sem Origin',
+    )
+  } finally {
+    await ctx.stop()
+  }
+})
