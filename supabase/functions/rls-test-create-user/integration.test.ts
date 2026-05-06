@@ -4776,6 +4776,29 @@ Deno.test('HTTP integration: OPTIONS WITH Origin — Allow-Headers stays LITERAL
       { label: 'string vazia',                 value: '' },
       { label: 'só whitespace',                value: '   ' },
       { label: 'só vírgulas',                  value: ',,,' },
+      // Headers repetidos múltiplas vezes (mesmo token N vezes).
+      { label: 'content-type repetido 2x',     value: 'content-type, content-type' },
+      { label: 'content-type repetido 5x',     value: 'content-type, content-type, content-type, content-type, content-type' },
+      { label: 'authorization repetido casing variado', value: 'authorization, Authorization, AUTHORIZATION, AuThOrIzAtIoN' },
+      { label: 'allowlist inteira duplicada',  value: 'authorization, x-client-info, apikey, content-type, x-test-secret, authorization, x-client-info, apikey, content-type, x-test-secret' },
+      { label: 'apikey repetido + dangerous',  value: 'apikey, apikey, apikey, set-cookie, apikey' },
+      // Ordens diferentes da allowlist canônica.
+      { label: 'ordem reversa',                value: 'x-test-secret, content-type, apikey, x-client-info, authorization' },
+      { label: 'ordem alfabética',             value: 'apikey, authorization, content-type, x-client-info, x-test-secret' },
+      { label: 'ordem aleatória 1',            value: 'apikey, x-test-secret, authorization, content-type, x-client-info' },
+      { label: 'ordem aleatória 2',            value: 'content-type, authorization, x-test-secret, apikey, x-client-info' },
+      { label: 'ordem reversa Title-Case',     value: 'X-Test-Secret, Content-Type, Apikey, X-Client-Info, Authorization' },
+      // Vírgulas consecutivas em diferentes posições.
+      { label: 'vírgulas consecutivas (3x)',   value: 'content-type,,, x-test-secret' },
+      { label: 'vírgulas consecutivas (10x)',  value: 'content-type,,,,,,,,,,x-test-secret' },
+      { label: 'leading múltiplas vírgulas',   value: ',,,, content-type, x-test-secret' },
+      { label: 'trailing múltiplas vírgulas',  value: 'content-type, x-test-secret,,,,' },
+      { label: 'vírgulas no meio + repetido',  value: 'content-type,,,content-type,,,x-test-secret' },
+      { label: 'vírgulas + whitespace misto',  value: ' , , content-type , , , x-test-secret , , ' },
+      // Combinações: repetidos + ordem trocada + vírgulas múltiplas + casing + dangerous.
+      { label: 'caos total',                   value: ' , X-TEST-SECRET ,, Authorization,, set-cookie,,  CONTENT-type ,, apikey ,, X-Client-Info ,, cookie,, authorization ,,, ' },
+      { label: 'allowlist embaralhada + dangerous intercalado', value: 'apikey, set-cookie, content-type, cookie, x-test-secret, host, authorization, x-evil, x-client-info' },
+      { label: 'duplicação massiva + casing',  value: 'AUTHORIZATION, authorization, Authorization, APIKEY, apikey, Apikey, CONTENT-TYPE, content-type, Content-Type' },
     ]
 
     const parseList = (v: string | null): string[] =>
