@@ -589,6 +589,83 @@ run_case "TOL-NEG: CRLF everywhere but wrong seeds URL" \
   "${TOL_CRLF_WRONG_URL}"     1 1 1 "https://example.com/seeds" "https://example.com/failures"
 
 
+# ─── mixed LF/CRLF across sections (must PASS) ───────────────────────────────
+# Real-world summaries are sometimes assembled by concatenating fragments
+# authored on different platforms (Windows fragment + Linux fragment, or a
+# CRLF template with an LF-appended bullet from a shell script). The parser
+# MUST treat each line on its own EOL terms — never assume the whole file
+# uses a single convention.
+
+# 14) Header block CRLF, bullets LF, footer CRLF — staged canonical bullets.
+TOL_MIX_HEADER_CRLF_BULLETS_LF="${WORKDIR}/tol_mix_header_crlf_bullets_lf.md"
+{
+  printf '# Preflight CORS Fuzz — request-headers\r\n\r\n'
+  printf '### 🎯 fast-check direct downloads (Access-Control-Request-Headers)\r\n\r\n'
+  printf -- '- 🌱 **Seeds executed (last 50 runs):** [`fc-seeds.json`](https://example.com/seeds)\n'
+  printf -- '- 💥 **Minimized counterexamples (last 100):** [`fc-failures.json`](https://example.com/failures)\n'
+  printf '\r\n_The two files above are uploaded as standalone GitHub artifacts so you can curl or download them without unpacking the full bundle._\r\n'
+} > "${TOL_MIX_HEADER_CRLF_BULLETS_LF}"
+
+# 15) Header block LF, bullets CRLF, footer LF — staged canonical bullets.
+TOL_MIX_HEADER_LF_BULLETS_CRLF="${WORKDIR}/tol_mix_header_lf_bullets_crlf.md"
+{
+  printf '# Preflight CORS Fuzz — request-headers\n\n'
+  printf '### 🎯 fast-check direct downloads (Access-Control-Request-Headers)\n\n'
+  printf -- '- 🌱 **Seeds executed (last 50 runs):** [`fc-seeds.json`](https://example.com/seeds)\r\n'
+  printf -- '- 💥 **Minimized counterexamples (last 100):** [`fc-failures.json`](https://example.com/failures)\r\n'
+  printf '\n_The two files above are uploaded as standalone GitHub artifacts so you can curl or download them without unpacking the full bundle._\n'
+} > "${TOL_MIX_HEADER_LF_BULLETS_CRLF}"
+
+# 16) Per-bullet split: seeds bullet CRLF, failures bullet LF (different
+# section authors / appenders). Both staged.
+TOL_MIX_PER_BULLET="${WORKDIR}/tol_mix_per_bullet.md"
+{
+  printf '# Preflight CORS Fuzz — request-headers\n\n'
+  printf '### 🎯 fast-check direct downloads (Access-Control-Request-Headers)\n\n'
+  printf -- '- 🌱 **Seeds executed (last 50 runs):** [`fc-seeds.json`](https://example.com/seeds)\r\n'
+  printf -- '- 💥 **Minimized counterexamples (last 100):** [`fc-failures.json`](https://example.com/failures)\n'
+  printf '\n_The two files above are uploaded as standalone GitHub artifacts so you can curl or download them without unpacking the full bundle._\n'
+} > "${TOL_MIX_PER_BULLET}"
+
+# 17) Per-bullet split with FALLBACK markers (not staged): seeds fallback LF,
+# failures fallback CRLF.
+TOL_MIX_FALLBACK_PER_BULLET="${WORKDIR}/tol_mix_fallback_per_bullet.md"
+{
+  printf '# Preflight CORS Fuzz — request-headers\r\n\r\n'
+  printf '### 🎯 fast-check direct downloads (Access-Control-Request-Headers)\n\n'
+  printf -- '- 🌱 `fc-seeds.json` — _(not produced in this run)_\n'
+  printf -- '- 💥 `fc-failures.json` — _(no failures persisted in this run — invariants held)_\r\n'
+  printf '\r\n_The two files above are uploaded as standalone GitHub artifacts so you can curl or download them without unpacking the full bundle._\n'
+} > "${TOL_MIX_FALLBACK_PER_BULLET}"
+
+# 18) NEGATIVE: mixed EOLs but failures bullet has wrong URL — drift must still
+# be detected regardless of EOL convention per section.
+TOL_MIX_WRONG_FAILURES_URL="${WORKDIR}/tol_mix_wrong_failures_url.md"
+{
+  printf '# Preflight CORS Fuzz — request-headers\r\n\r\n'
+  printf '### 🎯 fast-check direct downloads (Access-Control-Request-Headers)\n\n'
+  printf -- '- 🌱 **Seeds executed (last 50 runs):** [`fc-seeds.json`](https://example.com/seeds)\r\n'
+  printf -- '- 💥 **Minimized counterexamples (last 100):** [`fc-failures.json`](https://wrong.example.com/failures)\n'
+  printf '\r\n_The two files above are uploaded as standalone GitHub artifacts so you can curl or download them without unpacking the full bundle._\r\n'
+} > "${TOL_MIX_WRONG_FAILURES_URL}"
+
+echo ""
+echo "── mixed LF/CRLF across sections (must PASS) ──"
+run_case "TOL: header CRLF + bullets LF + footer CRLF" \
+  "${TOL_MIX_HEADER_CRLF_BULLETS_LF}"  0 1 1 "https://example.com/seeds" "https://example.com/failures"
+run_case "TOL: header LF + bullets CRLF + footer LF" \
+  "${TOL_MIX_HEADER_LF_BULLETS_CRLF}"  0 1 1 "https://example.com/seeds" "https://example.com/failures"
+run_case "TOL: seeds bullet CRLF, failures bullet LF" \
+  "${TOL_MIX_PER_BULLET}"              0 1 1 "https://example.com/seeds" "https://example.com/failures"
+run_case "TOL: fallback markers with per-bullet EOL split (not staged)" \
+  "${TOL_MIX_FALLBACK_PER_BULLET}"     0 0 0 "" ""
+
+echo ""
+echo "── mixed LF/CRLF NEGATIVE: drift must surface (must FAIL) ──"
+run_case "TOL-NEG: mixed EOLs but failures bullet has wrong URL" \
+  "${TOL_MIX_WRONG_FAILURES_URL}"      1 1 1 "https://example.com/seeds" "https://example.com/failures"
+
+
 # ─── summary ─────────────────────────────────────────────────────────────────
 
 echo ""
