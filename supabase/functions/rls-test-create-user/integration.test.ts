@@ -9338,3 +9338,43 @@ Deno.test('HTTP integration: OPTIONS preflight — fast-check property-based SHR
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: OPTIONS with ONLY Origin (no Access-Control-Request-Headers) returns full Allow-Headers and Allow-Origin "*"', async () => {
+  // Cenário: alguns clientes/proxies emitem preflight apenas com Origin,
+  // sem Access-Control-Request-Headers. O handler DEVE devolver o conjunto
+  // completo e estático de allow-headers (sem ecoar request-headers) e
+  // Allow-Origin '*' — caso contrário o browser bloqueia a request real.
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    const res = await fetch(`${ctx.url}/`, {
+      method: 'OPTIONS',
+      headers: {
+        'origin': 'https://app.kubovibe.dev',
+        // Intencionalmente SEM access-control-request-headers
+        // e SEM access-control-request-method.
+      },
+    })
+
+    assertEquals(res.status, 200, 'OPTIONS sem ACRH deve responder 200')
+    assertEquals(
+      res.headers.get('access-control-allow-origin'), '*',
+      'allow-origin deve ser "*" mesmo sem ACRH',
+    )
+
+    const allowed = (res.headers.get('access-control-allow-headers') ?? '').toLowerCase()
+    // Conjunto canônico completo — não pode degradar para subset por falta de ACRH.
+    for (const h of ['authorization', 'x-client-info', 'apikey', 'content-type', 'x-test-secret']) {
+      assert(allowed.includes(h), `allow-headers deve listar "${h}" (got: "${allowed}")`)
+    }
+
+    // Allow-Methods estático também presente.
+    const methods = (res.headers.get('access-control-allow-methods') ?? '').toUpperCase()
+    assert(methods.includes('POST'), `allow-methods deve listar POST (got: "${methods}")`)
+    assert(methods.includes('OPTIONS'), `allow-methods deve listar OPTIONS (got: "${methods}")`)
+
+    await res.text()
+    assertEquals(ctx._calls, 0, 'OPTIONS jamais deve chamar createClient')
+  } finally {
+    await ctx.stop()
+  }
+})
