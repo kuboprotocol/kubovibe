@@ -9378,3 +9378,50 @@ Deno.test('HTTP integration: OPTIONS with ONLY Origin (no Access-Control-Request
     await ctx.stop()
   }
 })
+
+Deno.test('HTTP integration: OPTIONS without Origin header (no secret, no ACR-*) still returns full Allow-Headers + Allow-Origin "*"', async () => {
+  // Cenário: probes/healthchecks server-to-server (curl, monitors) emitem
+  // OPTIONS sem Origin e sem nenhum dos Access-Control-Request-* headers.
+  // Contrato: handler responde 200 com o conjunto CANÔNICO COMPLETO de
+  // allow-headers (estático, não derivado de ACRH) e Allow-Origin '*'.
+  // Não pode degradar para subset por ausência de Origin.
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    const res = await fetch(`${ctx.url}/`, {
+      method: 'OPTIONS',
+      // Intencionalmente SEM 'origin', SEM 'access-control-request-*',
+      // SEM 'x-test-secret'. Apenas OPTIONS puro.
+    })
+
+    assertEquals(res.status, 200, 'OPTIONS sem Origin deve responder 200')
+    assertEquals(
+      res.headers.get('access-control-allow-origin'), '*',
+      'Allow-Origin deve ser "*" mesmo sem Origin na request',
+    )
+
+    // Conjunto canônico completo — espelha corsHeaders em index.ts.
+    const allowed = (res.headers.get('access-control-allow-headers') ?? '').toLowerCase()
+    for (const h of ['authorization', 'x-client-info', 'apikey', 'content-type', 'x-test-secret']) {
+      assert(
+        allowed.includes(h),
+        `Allow-Headers deve listar "${h}" mesmo sem Origin (got: "${allowed}")`,
+      )
+    }
+
+    // Allow-Methods estático também deve estar presente.
+    const methods = (res.headers.get('access-control-allow-methods') ?? '').toUpperCase()
+    assert(methods.includes('POST'), `Allow-Methods deve listar POST (got: "${methods}")`)
+    assert(methods.includes('OPTIONS'), `Allow-Methods deve listar OPTIONS (got: "${methods}")`)
+
+    // Max-Age é parte do contrato de preflight — cache do browser depende dele.
+    assertEquals(
+      res.headers.get('access-control-max-age'), '86400',
+      'Max-Age deve estar presente mesmo sem Origin',
+    )
+
+    await res.text()
+    assertEquals(ctx._calls, 0, 'OPTIONS jamais deve chamar createClient')
+  } finally {
+    await ctx.stop()
+  }
+})
