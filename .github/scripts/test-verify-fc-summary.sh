@@ -524,6 +524,71 @@ run_case "TOL-NEG: tabs everywhere but wrong emoji" \
 run_case "TOL-NEG: stray spaced inline link while not staged" \
   "${TOL_STRAY_SPACED}"          1 0 0 "" ""
 
+
+# ─── CRLF / trailing carriage return fixtures ────────────────────────────────
+# Files authored on Windows (or piped through tools that normalize EOLs) can
+# arrive with CRLF line endings. The validator must accept them since the
+# rendered Markdown meaning is identical — only the byte-level EOL differs.
+# Each canonical bullet line still gets a trailing \r before \n.
+
+# 10) Full CRLF: every line in the file ends with \r\n (canonical bullets, staged).
+TOL_CRLF_FULL="${WORKDIR}/tol_crlf_full.md"
+{
+  printf '# Preflight CORS Fuzz — request-headers\r\n'
+  printf '\r\n'
+  printf '### 🎯 fast-check direct downloads (Access-Control-Request-Headers)\r\n'
+  printf '\r\n'
+  printf -- '- 🌱 **Seeds executed (last 50 runs):** [`fc-seeds.json`](https://example.com/seeds)\r\n'
+  printf -- '- 💥 **Minimized counterexamples (last 100):** [`fc-failures.json`](https://example.com/failures)\r\n'
+  printf '\r\n'
+  printf '_The two files above are uploaded as standalone GitHub artifacts so you can curl or download them without unpacking the full bundle._\r\n'
+} > "${TOL_CRLF_FULL}"
+
+# 11) Mixed EOLs: only the bullet lines carry a trailing \r (LF elsewhere).
+TOL_CRLF_BULLETS_ONLY="${WORKDIR}/tol_crlf_bullets_only.md"
+{
+  printf '# Preflight CORS Fuzz — request-headers\n\n'
+  printf '### 🎯 fast-check direct downloads (Access-Control-Request-Headers)\n\n'
+  printf -- '- 🌱 **Seeds executed (last 50 runs):** [`fc-seeds.json`](https://example.com/seeds)\r\n'
+  printf -- '- 💥 **Minimized counterexamples (last 100):** [`fc-failures.json`](https://example.com/failures)\r\n'
+  printf '\n_The two files above are uploaded as standalone GitHub artifacts so you can curl or download them without unpacking the full bundle._\n'
+} > "${TOL_CRLF_BULLETS_ONLY}"
+
+# 12) CRLF fallback markers (nothing staged) — must still parse as fallback.
+TOL_CRLF_FALLBACK="${WORKDIR}/tol_crlf_fallback.md"
+{
+  printf '# Preflight CORS Fuzz — request-headers\r\n\r\n'
+  printf '### 🎯 fast-check direct downloads (Access-Control-Request-Headers)\r\n\r\n'
+  printf -- '- 🌱 `fc-seeds.json` — _(not produced in this run)_\r\n'
+  printf -- '- 💥 `fc-failures.json` — _(no failures persisted in this run — invariants held)_\r\n'
+  printf '\r\n_The two files above are uploaded as standalone GitHub artifacts so you can curl or download them without unpacking the full bundle._\r\n'
+} > "${TOL_CRLF_FALLBACK}"
+
+# 13) NEGATIVE: CRLF endings everywhere but the seeds URL is wrong — must still fail.
+TOL_CRLF_WRONG_URL="${WORKDIR}/tol_crlf_wrong_url.md"
+{
+  printf '# Preflight CORS Fuzz — request-headers\r\n\r\n'
+  printf '### 🎯 fast-check direct downloads (Access-Control-Request-Headers)\r\n\r\n'
+  printf -- '- 🌱 **Seeds executed (last 50 runs):** [`fc-seeds.json`](https://wrong.example.com/seeds)\r\n'
+  printf -- '- 💥 **Minimized counterexamples (last 100):** [`fc-failures.json`](https://example.com/failures)\r\n'
+  printf '\r\n_The two files above are uploaded as standalone GitHub artifacts so you can curl or download them without unpacking the full bundle._\r\n'
+} > "${TOL_CRLF_WRONG_URL}"
+
+echo ""
+echo "── CRLF / trailing \\r tolerance (must PASS) ──"
+run_case "TOL: full CRLF line endings (canonical bullets, staged)" \
+  "${TOL_CRLF_FULL}"          0 1 1 "https://example.com/seeds" "https://example.com/failures"
+run_case "TOL: trailing \\r only on bullet lines (mixed EOLs)" \
+  "${TOL_CRLF_BULLETS_ONLY}"  0 1 1 "https://example.com/seeds" "https://example.com/failures"
+run_case "TOL: full CRLF fallback markers (not staged)" \
+  "${TOL_CRLF_FALLBACK}"      0 0 0 "" ""
+
+echo ""
+echo "── CRLF NEGATIVE: trailing \\r must not mask URL drift (must FAIL) ──"
+run_case "TOL-NEG: CRLF everywhere but wrong seeds URL" \
+  "${TOL_CRLF_WRONG_URL}"     1 1 1 "https://example.com/seeds" "https://example.com/failures"
+
+
 # ─── summary ─────────────────────────────────────────────────────────────────
 
 echo ""
