@@ -57,6 +57,18 @@ jobs:
           chmod +x .github/scripts/fixture-eol-fuzzer.sh
           bash .github/scripts/fixture-eol-fuzzer.sh test-parser
 
-      - name: Random EOL fuzz (parser ↔ verifier consistency, 60 iters)
-        run: bash .github/scripts/fixture-eol-fuzzer.sh fuzz --iters 60 --seed 1
+      - name: Random EOL fuzz — deterministic baseline (300 iters, seed=1)
+        run: bash .github/scripts/fixture-eol-fuzzer.sh fuzz --iters 300 --seed 1
+
+      - name: Random EOL fuzz — extended seed sweep (500 iters, seed=10000)
+        run: bash .github/scripts/fixture-eol-fuzzer.sh fuzz --iters 500 --seed 10000
+
+      - name: Random EOL fuzz — non-deterministic seed (250 iters, run-id derived)
+        # Varia a seed por execução do CI usando GITHUB_RUN_ID + RUN_ATTEMPT,
+        # garantindo que PRs distintos exercitem combinações de EOL diferentes
+        # ao longo do tempo (cobertura cumulativa entre runs).
+        run: |
+          SEED=$(( (GITHUB_RUN_ID + GITHUB_RUN_ATTEMPT * 7919) % 2147483647 ))
+          echo "Using non-deterministic seed: ${SEED}"
+          bash .github/scripts/fixture-eol-fuzzer.sh fuzz --iters 250 --seed "${SEED}"
 
