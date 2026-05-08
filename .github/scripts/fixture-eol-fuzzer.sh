@@ -51,12 +51,15 @@ rng_pick() {
 # ─── EOL fuzz ────────────────────────────────────────────────────────────────
 # Cada linha recebe um terminador aleatório: LF, CRLF, CR, ou CRLF duplicado
 # (representando trailing \r espúrio comum em PRs com mixed checkout configs).
+# Conjunto realista para repos versionados em Git: LF, CRLF, CRLF com \r
+# extra (drift de checkout config). Bare CR (Mac classic) é excluído porque
+# a toolchain do verifier (grep -E) é orientada a \n e não cobre esse caso —
+# o parser Python aqui tolera, mas o contrato do verifier não inclui CR-only.
 random_eol() {
-  case "$(rng_pick 4)" in
+  case "$(rng_pick 3)" in
     0) printf '\n' ;;
     1) printf '\r\n' ;;
-    2) printf '\r' ;;
-    3) printf '\r\r\n' ;;
+    2) printf '\r\r\n' ;;
   esac
 }
 
