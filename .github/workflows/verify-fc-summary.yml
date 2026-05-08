@@ -52,3 +52,11 @@ jobs:
           chmod +x .github/scripts/test-artifacts-pagination.sh
           bash .github/scripts/test-artifacts-pagination.sh
 
+      - name: Parser unit tests (EOL fuzzer)
+        run: |
+          chmod +x .github/scripts/fixture-eol-fuzzer.sh
+          bash .github/scripts/fixture-eol-fuzzer.sh test-parser
+
+      - name: Random EOL fuzz (parser ↔ verifier consistency, 60 iters)
+        run: bash .github/scripts/fixture-eol-fuzzer.sh fuzz --iters 60 --seed 1
+
