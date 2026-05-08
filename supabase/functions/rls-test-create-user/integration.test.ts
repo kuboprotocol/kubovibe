@@ -9425,3 +9425,135 @@ Deno.test('HTTP integration: OPTIONS without Origin header (no secret, no ACR-*)
     await ctx.stop()
   }
 })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OPTIONS sem Origin com Access-Control-Request-* PARCIAIS
+// ─────────────────────────────────────────────────────────────────────────────
+// Contrato (espelha corsHeaders em index.ts):
+//   - status 200 sempre
+//   - Access-Control-Allow-Origin: '*'
+//   - Access-Control-Allow-Headers: conjunto canônico ESTÁTICO completo
+//     (authorization, x-client-info, apikey, content-type, x-test-secret),
+//     independente de quais headers vierem em ACRH (ou se ACRH ausente)
+//   - Access-Control-Allow-Methods: 'POST, OPTIONS'
+//   - Access-Control-Max-Age: '86400'
+//   - createClient nunca é invocado em preflight
+
+const CANONICAL_ALLOW_HEADERS = [
+  'authorization', 'x-client-info', 'apikey', 'content-type', 'x-test-secret',
+] as const
+
+function assertCanonicalCors(res: Response) {
+  assertEquals(res.status, 200, 'preflight deve responder 200')
+  assertEquals(res.headers.get('access-control-allow-origin'), '*', 'allow-origin deve ser "*"')
+  const allowed = (res.headers.get('access-control-allow-headers') ?? '').toLowerCase()
+  for (const h of CANONICAL_ALLOW_HEADERS) {
+    assert(allowed.includes(h), `allow-headers deve listar "${h}" (got: "${allowed}")`)
+  }
+  const methods = (res.headers.get('access-control-allow-methods') ?? '').toUpperCase()
+  assert(methods.includes('POST'), `allow-methods deve listar POST (got: "${methods}")`)
+  assert(methods.includes('OPTIONS'), `allow-methods deve listar OPTIONS (got: "${methods}")`)
+  assertEquals(res.headers.get('access-control-max-age'), '86400', 'max-age deve ser 86400')
+}
+
+Deno.test('HTTP integration: OPTIONS no Origin, only Access-Control-Request-Method=POST', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    const res = await fetch(`${ctx.url}/`, {
+      method: 'OPTIONS',
+      headers: { 'access-control-request-method': 'POST' },
+    })
+    assertCanonicalCors(res)
+    await res.text()
+    assertEquals(ctx._calls, 0)
+  } finally { await ctx.stop() }
+})
+
+Deno.test('HTTP integration: OPTIONS no Origin, only ACRH=x-test-secret (single partial header)', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    const res = await fetch(`${ctx.url}/`, {
+      method: 'OPTIONS',
+      headers: { 'access-control-request-headers': 'x-test-secret' },
+    })
+    assertCanonicalCors(res)
+    await res.text()
+    assertEquals(ctx._calls, 0)
+  } finally { await ctx.stop() }
+})
+
+Deno.test('HTTP integration: OPTIONS no Origin, ACRH partial (content-type, authorization) + ACRM=POST', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    const res = await fetch(`${ctx.url}/`, {
+      method: 'OPTIONS',
+      headers: {
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'content-type, authorization',
+      },
+    })
+    assertCanonicalCors(res)
+    await res.text()
+    assertEquals(ctx._calls, 0)
+  } finally { await ctx.stop() }
+})
+
+Deno.test('HTTP integration: OPTIONS no Origin, ACRM=DELETE (unsupported) — handler still returns canonical static CORS', async () => {
+  // O handler retorna o conjunto estático; não negocia o método. Browser
+  // bloqueará por conta própria, mas o servidor não pode emitir 4xx aqui.
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    const res = await fetch(`${ctx.url}/`, {
+      method: 'OPTIONS',
+      headers: { 'access-control-request-method': 'DELETE' },
+    })
+    assertCanonicalCors(res)
+    await res.text()
+    assertEquals(ctx._calls, 0)
+  } finally { await ctx.stop() }
+})
+
+Deno.test('HTTP integration: OPTIONS no Origin, ACRH with unknown header (x-unknown) — allow-headers ainda é canônico estático', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    const res = await fetch(`${ctx.url}/`, {
+      method: 'OPTIONS',
+      headers: { 'access-control-request-headers': 'x-unknown-header, x-test-secret' },
+    })
+    assertCanonicalCors(res)
+    // x-unknown não deve ser injetado; lista permanece a canônica.
+    const allowed = (res.headers.get('access-control-allow-headers') ?? '').toLowerCase()
+    assert(!allowed.includes('x-unknown'), `allow-headers não deve refletir ACRH arbitrário (got: "${allowed}")`)
+    await res.text()
+    assertEquals(ctx._calls, 0)
+  } finally { await ctx.stop() }
+})
+
+Deno.test('HTTP integration: OPTIONS no Origin, ACRH empty string — canonical static CORS', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    const res = await fetch(`${ctx.url}/`, {
+      method: 'OPTIONS',
+      headers: { 'access-control-request-headers': '' },
+    })
+    assertCanonicalCors(res)
+    await res.text()
+    assertEquals(ctx._calls, 0)
+  } finally { await ctx.stop() }
+})
+
+Deno.test('HTTP integration: OPTIONS no Origin, ACRM empty + ACRH=apikey — canonical static CORS', async () => {
+  const ctx = await startServer(fullEnv) as ServerCtx & { _calls: number }
+  try {
+    const res = await fetch(`${ctx.url}/`, {
+      method: 'OPTIONS',
+      headers: {
+        'access-control-request-method': '',
+        'access-control-request-headers': 'apikey',
+      },
+    })
+    assertCanonicalCors(res)
+    await res.text()
+    assertEquals(ctx._calls, 0)
+  } finally { await ctx.stop() }
+})
