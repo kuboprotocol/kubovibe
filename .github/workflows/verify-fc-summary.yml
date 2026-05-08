@@ -13,12 +13,14 @@ on:
       - '.github/scripts/verify-fc-summary.sh'
       - '.github/scripts/test-verify-fc-summary.sh'
       - '.github/scripts/test-artifacts-pagination.sh'
+      - '.github/scripts/fixture-eol-fuzzer.sh'
       - '.github/workflows/verify-fc-summary.yml'
   pull_request:
     paths:
       - '.github/scripts/verify-fc-summary.sh'
       - '.github/scripts/test-verify-fc-summary.sh'
       - '.github/scripts/test-artifacts-pagination.sh'
+      - '.github/scripts/fixture-eol-fuzzer.sh'
       - '.github/workflows/verify-fc-summary.yml'
       - '.github/workflows/preflight-fuzz.yml'  # writer side — keep in sync
   workflow_dispatch:
