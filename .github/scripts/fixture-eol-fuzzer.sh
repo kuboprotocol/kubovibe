@@ -420,12 +420,19 @@ cmd_test_parser() {
 }
 
 # ─── fuzz harness ────────────────────────────────────────────────────────────
+# Quando rodando no CI, qualquer falha precisa ser reproduzível localmente
+# com UM comando. Para isso, persistimos:
+#   - failures.jsonl (uma linha por falha: iter/seed/mode/stage/rc + repro_cmd)
+#   - fixtures/<seed>_<mode>.md  (bytes exatos com EOLs preservados)
+#   - verify_<i>.log (saída do verifier para falhas no stage 'verify')
+# em um diretório passado via --failures-out (default: $tmp, descartado).
 cmd_fuzz() {
-  local iters=30 seed_base=1
+  local iters=30 seed_base=1 failures_out=""
   while [ $# -gt 0 ]; do
     case "$1" in
-      --iters) iters="$2"; shift 2 ;;
-      --seed)  seed_base="$2"; shift 2 ;;
+      --iters)         iters="$2"; shift 2 ;;
+      --seed)          seed_base="$2"; shift 2 ;;
+      --failures-out)  failures_out="$2"; shift 2 ;;
       *) echo "unknown arg: $1" >&2; return 1 ;;
     esac
   done
@@ -433,8 +440,32 @@ cmd_fuzz() {
   [ -x "${VERIFY}" ] || chmod +x "${VERIFY}"
   local tmp; tmp="$(mktemp -d)"; trap "rm -rf '${tmp}'" RETURN
 
+  local fail_dir="${failures_out:-${tmp}/failures}"
+  local fail_log="${fail_dir}/failures.jsonl"
+  local fail_fixtures="${fail_dir}/fixtures"
+  local persisted=0
+  __persist_failure() {
+    local iter="$1" seed="$2" mode="$3" stage="$4" rc="$5" detail="$6" fixture_src="$7" verify_log="$8"
+    if [ "${persisted}" = "0" ]; then
+      mkdir -p "${fail_fixtures}"
+      : > "${fail_log}"
+      persisted=1
+    fi
+    cp "${fixture_src}" "${fail_fixtures}/seed${seed}_${mode}.md"
+    local repro="bash .github/scripts/fixture-eol-fuzzer.sh repro --seed ${seed} --mode ${mode}"
+    local detail_json
+    detail_json=$(printf '%s' "${detail}" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')
+    printf '{"iter":%d,"seed":%d,"mode":"%s","stage":"%s","rc":%d,"fixture":"%s","repro_cmd":"%s","detail":%s}\n' \
+      "${iter}" "${seed}" "${mode}" "${stage}" "${rc}" \
+      "fixtures/seed${seed}_${mode}.md" "${repro}" "${detail_json}" >> "${fail_log}"
+    if [ -n "${verify_log}" ] && [ -f "${verify_log}" ]; then
+      cp "${verify_log}" "${fail_dir}/verify_seed${seed}_${mode}.log"
+    fi
+  }
+
   local pass=0 fail=0 modes=(staged fallback mixed)
   echo "── EOL fuzz: ${iters} iters (parser ↔ verify-fc-summary.sh consistency) ──"
+  [ -n "${failures_out}" ] && echo "   persisting failures to: ${failures_out}"
 
   for ((i=0; i<iters; i++)); do
     local seed=$((seed_base + i))
@@ -442,7 +473,6 @@ cmd_fuzz() {
     local fixture="${tmp}/fuzz_${i}_${mode}.md"
     cmd_gen_fixture "${fixture}" --seed "${seed}" --mode "${mode}"
 
-    # Parser: deve achar exatamente 2 bullets e os tokens corretos.
     local parsed
     parsed=$(parse_file "${fixture}" || true)
     local toks
@@ -452,12 +482,14 @@ cmd_fuzz() {
       fail=$((fail + 1))
       printf "  ❌ iter=%d seed=%d mode=%s — parser tokens=[%s], expected=[%s]\n" \
         "${i}" "${seed}" "${mode}" "${toks}" "${expect_toks}"
+      printf "     repro: bash .github/scripts/fixture-eol-fuzzer.sh repro --seed %d --mode %s\n" "${seed}" "${mode}"
       echo "     fixture (od -c trecho):"
       od -c "${fixture}" | head -10 | sed 's/^/       /'
+      __persist_failure "${i}" "${seed}" "${mode}" "parser" 2 \
+        "parser tokens=[${toks}], expected=[${expect_toks}]" "${fixture}" ""
       continue
     fi
 
-    # Verifier: configura STAGED conforme o modo do fixture.
     local staged_seeds=1 staged_failures=1 seeds_url="${SEEDS_URL_DEFAULT}" failures_url="${FAILURES_URL_DEFAULT}"
     case "${mode}" in
       staged)   staged_seeds=1; staged_failures=1 ;;
@@ -484,15 +516,76 @@ cmd_fuzz() {
     else
       fail=$((fail + 1))
       printf "  ❌ iter=%d seed=%d mode=%s — verify exited %d (parser ok)\n" "${i}" "${seed}" "${mode}" "${rc}"
+      printf "     repro: bash .github/scripts/fixture-eol-fuzzer.sh repro --seed %d --mode %s\n" "${seed}" "${mode}"
       sed 's/^/       /' "${tmp}/verify_${i}.log" | head -25
       echo "     fixture od -c (8 linhas):"
       od -c "${fixture}" | head -8 | sed 's/^/       /'
+      local detail
+      detail=$(head -25 "${tmp}/verify_${i}.log")
+      __persist_failure "${i}" "${seed}" "${mode}" "verify" "${rc}" \
+        "${detail}" "${fixture}" "${tmp}/verify_${i}.log"
     fi
   done
 
   echo ""
   echo "EOL fuzz: ${pass} passed, ${fail} failed (${iters} total)"
+  if [ "${fail}" != "0" ] && [ "${persisted}" = "1" ]; then
+    echo ""
+    echo "── failures persisted to ${fail_dir} ──"
+    echo "   • failures.jsonl  (uma linha JSON por falha, com repro_cmd)"
+    echo "   • fixtures/       (bytes exatos do fixture, EOLs preservados)"
+    echo ""
+    echo "   Reproduza QUALQUER falha localmente com o repro_cmd; primeira falha:"
+    head -1 "${fail_log}" | python3 -c 'import sys,json; print("     " + json.loads(sys.stdin.read())["repro_cmd"])' 2>/dev/null || true
+  fi
   [ "${fail}" = "0" ]
+}
+
+# ─── repro: regenera UM fixture e roda parser + verifier verbose ─────────────
+# Comando único para reproduzir localmente uma falha do CI:
+#   bash .github/scripts/fixture-eol-fuzzer.sh repro --seed N --mode M
+cmd_repro() {
+  local seed="" mode="staged"
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --seed) seed="$2"; shift 2 ;;
+      --mode) mode="$2"; shift 2 ;;
+      *) echo "unknown arg: $1" >&2; return 1 ;;
+    esac
+  done
+  [ -n "${seed}" ] || { echo "usage: repro --seed N [--mode staged|fallback|mixed]" >&2; return 1; }
+
+  [ -x "${VERIFY}" ] || chmod +x "${VERIFY}"
+  local tmp; tmp="$(mktemp -d)"; trap "rm -rf '${tmp}'" RETURN
+  local fixture="${tmp}/repro_seed${seed}_${mode}.md"
+  cmd_gen_fixture "${fixture}" --seed "${seed}" --mode "${mode}"
+
+  echo "── repro: seed=${seed} mode=${mode} ──"
+  echo ""
+  echo "── fixture bytes (od -c, primeiras 30 linhas) ──"
+  od -c "${fixture}" | head -30
+  echo ""
+  echo "── parser output ──"
+  parse_file "${fixture}" || echo "(parser exit code: $?)"
+  echo ""
+  echo "── verify-fc-summary.sh ──"
+  local staged_seeds=1 staged_failures=1 seeds_url="${SEEDS_URL_DEFAULT}" failures_url="${FAILURES_URL_DEFAULT}"
+  case "${mode}" in
+    staged)   ;;
+    fallback) staged_seeds=0; staged_failures=0; seeds_url=""; failures_url="" ;;
+    mixed)    staged_failures=0; failures_url="" ;;
+    *) echo "unknown mode: ${mode}" >&2; return 1 ;;
+  esac
+  SUMMARY_FILE="${fixture}" \
+  CONTEXT_LABEL="repro:seed${seed}:${mode}" \
+  STAGED_FC_SEEDS="${staged_seeds}" \
+  STAGED_FC_FAILURES="${staged_failures}" \
+  FC_SEEDS_URL="${seeds_url}" \
+  FC_FAILURES_URL="${failures_url}" \
+  FC_HEADER_LABEL="Access-Control-Request-Headers" \
+  REQUIRE_CONTEXT_PARAGRAPH="1" \
+  GITHUB_OUTPUT="" \
+    "${VERIFY}"
 }
 
 # ─── entry point ─────────────────────────────────────────────────────────────
@@ -503,13 +596,15 @@ case "${sub}" in
   parse-bullet) cmd_parse_bullet "$@" ;;
   test-parser)  cmd_test_parser ;;
   fuzz)         cmd_fuzz "$@" ;;
+  repro)        cmd_repro "$@" ;;
   *)
     cat >&2 <<USAGE
 usage: $0 <subcommand> [args]
   gen-fixture <out> [--seed N] [--mode staged|fallback|mixed]
   parse-bullet <file>
   test-parser
-  fuzz [--iters N] [--seed BASE]
+  fuzz [--iters N] [--seed BASE] [--failures-out DIR]
+  repro --seed N [--mode staged|fallback|mixed]
 USAGE
     exit 1
     ;;

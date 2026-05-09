@@ -58,10 +58,18 @@ jobs:
           bash .github/scripts/fixture-eol-fuzzer.sh test-parser
 
       - name: Random EOL fuzz — deterministic baseline (300 iters, seed=1)
-        run: bash .github/scripts/fixture-eol-fuzzer.sh fuzz --iters 300 --seed 1
+        run: |
+          mkdir -p fuzz-failures/baseline
+          bash .github/scripts/fixture-eol-fuzzer.sh fuzz \
+            --iters 300 --seed 1 \
+            --failures-out "$GITHUB_WORKSPACE/fuzz-failures/baseline"
 
       - name: Random EOL fuzz — extended seed sweep (500 iters, seed=10000)
-        run: bash .github/scripts/fixture-eol-fuzzer.sh fuzz --iters 500 --seed 10000
+        run: |
+          mkdir -p fuzz-failures/extended
+          bash .github/scripts/fixture-eol-fuzzer.sh fuzz \
+            --iters 500 --seed 10000 \
+            --failures-out "$GITHUB_WORKSPACE/fuzz-failures/extended"
 
       - name: Random EOL fuzz — non-deterministic seed (250 iters, run-id derived)
         # Varia a seed por execução do CI usando GITHUB_RUN_ID + RUN_ATTEMPT,
@@ -70,5 +78,49 @@ jobs:
         run: |
           SEED=$(( (GITHUB_RUN_ID + GITHUB_RUN_ATTEMPT * 7919) % 2147483647 ))
           echo "Using non-deterministic seed: ${SEED}"
-          bash .github/scripts/fixture-eol-fuzzer.sh fuzz --iters 250 --seed "${SEED}"
+          mkdir -p fuzz-failures/runid
+          bash .github/scripts/fixture-eol-fuzzer.sh fuzz \
+            --iters 250 --seed "${SEED}" \
+            --failures-out "$GITHUB_WORKSPACE/fuzz-failures/runid"
+
+      - name: Summarize fuzz failures (single repro command per failure)
+        if: failure()
+        run: |
+          echo "## EOL fuzz — failing seeds" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          shopt -s nullglob
+          any=0
+          for f in fuzz-failures/*/failures.jsonl; do
+            sweep=$(basename "$(dirname "$f")")
+            count=$(wc -l < "$f")
+            [ "$count" = "0" ] && continue
+            any=1
+            {
+              echo "### sweep: \`${sweep}\` (${count} failure(s))"
+              echo ""
+              echo "| seed | mode | stage | rc | repro |"
+              echo "|------|------|-------|----|-------|"
+              python3 -c "
+          import json, sys
+          for line in open('$f'):
+              r = json.loads(line)
+              print(f\"| {r['seed']} | {r['mode']} | {r['stage']} | {r['rc']} | \`{r['repro_cmd']}\` |\")
+          "
+              echo ""
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "── ${sweep} ──"
+            cat "$f"
+          done
+          if [ "${any}" = "0" ]; then
+            echo "_No fuzz failures persisted (failure may be in another step)._" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload fuzz failures artifact
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eol-fuzz-failures
+          path: fuzz-failures/
+          if-no-files-found: ignore
+          retention-days: 14
 
