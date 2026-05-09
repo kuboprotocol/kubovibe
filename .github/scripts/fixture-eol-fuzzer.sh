@@ -299,6 +299,121 @@ cmd_test_parser() {
   set -e
   parser_assert_eq "Arquivo sem bullets reconhecidos -> exit 2" "2" "${rc}"
 
+  # ─── Negativos: bullets corrompidos / labels quase corretos ─────────────
+  # Cada caso contém SOMENTE bullets corrompidos. O parser deve reconhecer
+  # zero bullets válidos e sair com código 2 de forma determinística — sem
+  # casar parcialmente ou capturar tokens errados.
+  __neg_assert() {
+    local name="$1" file="$2"
+    set +e
+    local out; out=$(parse_file "${file}" 2>/dev/null)
+    local rc=$?
+    set -e
+    parser_assert_eq "${name} (exit code)" "2" "${rc}"
+    parser_assert_eq "${name} (stdout vazio)" "" "${out}"
+  }
+
+  # N1) Token typo: fc-seed.json (sem 's') / fc-failures.txt
+  printf '%s\n' \
+    '- 🌱 **Seeds executed (last 50 runs):** [`fc-seed.json`](https://x/seeds)' \
+    '- 💥 **Minimized counterexamples (last 100):** [`fc-failures.txt`](https://x/failures)' \
+    > "${tmp}/neg_token.md"
+  __neg_assert "Negativo: tokens com extensões/typos errados" "${tmp}/neg_token.md"
+
+  # N2) Emoji errado (🔥 / ⚠️ no lugar de 🌱 / 💥)
+  printf '%s\n' \
+    '- 🔥 **Seeds executed (last 50 runs):** [`fc-seeds.json`](https://x/seeds)' \
+    '- ⚠️ **Minimized counterexamples (last 100):** [`fc-failures.json`](https://x/failures)' \
+    > "${tmp}/neg_emoji.md"
+  __neg_assert "Negativo: emojis trocados" "${tmp}/neg_emoji.md"
+
+  # N3) Emoji ausente
+  printf '%s\n' \
+    '- **Seeds executed (last 50 runs):** [`fc-seeds.json`](https://x/seeds)' \
+    '- **Minimized counterexamples (last 100):** [`fc-failures.json`](https://x/failures)' \
+    > "${tmp}/neg_no_emoji.md"
+  __neg_assert "Negativo: bullets sem emoji" "${tmp}/neg_no_emoji.md"
+
+  # N4) Label quase certo: 'Seed executed' (singular) / 'Counterexample' (singular)
+  printf '%s\n' \
+    '- 🌱 **Seed executed (last 50 runs):** [`fc-seeds.json`](https://x/seeds)' \
+    '- 💥 **Minimized counterexample (last 100):** [`fc-failures.json`](https://x/failures)' \
+    > "${tmp}/neg_label.md"
+  __neg_assert "Negativo: labels singulares (quase corretos)" "${tmp}/neg_label.md"
+
+  # N5) Sem backticks no token: `[fc-seeds.json](url)` — não casa code fence
+  printf '%s\n' \
+    '- 🌱 **Seeds executed (last 50 runs):** [fc-seeds.json](https://x/seeds)' \
+    '- 💥 **Minimized counterexamples (last 100):** [fc-failures.json](https://x/failures)' \
+    > "${tmp}/neg_no_code.md"
+  __neg_assert "Negativo: token sem code fences" "${tmp}/neg_no_code.md"
+
+  # N6) Markdown link malformado (parêntese não fechado)
+  printf '%s\n' \
+    '- 🌱 **Seeds executed (last 50 runs):** [`fc-seeds.json`](https://x/seeds' \
+    '- 💥 **Minimized counterexamples (last 100):** [`fc-failures.json`(https://x/failures)' \
+    > "${tmp}/neg_link.md"
+  __neg_assert "Negativo: links markdown malformados" "${tmp}/neg_link.md"
+
+  # N7) Negrito quebrado (asterisco solto / sem fechamento)
+  printf '%s\n' \
+    '- 🌱 *Seeds executed (last 50 runs):* [`fc-seeds.json`](https://x/seeds)' \
+    '- 💥 ***Minimized counterexamples (last 100):* [`fc-failures.json`](https://x/failures)' \
+    > "${tmp}/neg_bold.md"
+  __neg_assert "Negativo: negrito quebrado/itálico simples" "${tmp}/neg_bold.md"
+
+  # N8) Fallback sem itálico (em-dash sem _( ... )_)
+  printf '%s\n' \
+    '- 🌱 `fc-seeds.json` — (not produced in this run)' \
+    '- 💥 `fc-failures.json` — no failures persisted' \
+    > "${tmp}/neg_fb_italic.md"
+  __neg_assert "Negativo: fallback sem itálico _( )_" "${tmp}/neg_fb_italic.md"
+
+  # N9) Fallback sem em-dash (usa hífen ASCII '-')
+  printf '%s\n' \
+    '- 🌱 `fc-seeds.json` - _(not produced in this run)_' \
+    '- 💥 `fc-failures.json` - _(no failures persisted in this run — invariants held)_' \
+    > "${tmp}/neg_fb_dash.md"
+  __neg_assert "Negativo: fallback com hífen ASCII no lugar de em-dash" "${tmp}/neg_fb_dash.md"
+
+  # N10) Linha sem o bullet '-' (apenas emoji)
+  printf '%s\n' \
+    '🌱 **Seeds executed (last 50 runs):** [`fc-seeds.json`](https://x/seeds)' \
+    '💥 **Minimized counterexamples (last 100):** [`fc-failures.json`](https://x/failures)' \
+    > "${tmp}/neg_no_dash.md"
+  __neg_assert "Negativo: linhas sem dash de bullet" "${tmp}/neg_no_dash.md"
+
+  # N11) Token correto, mas dentro de bloco de código (não é bullet markdown)
+  printf '%s\n' \
+    '```' \
+    '- 🌱 **Seeds executed (last 50 runs):** [`fc-seeds.json`](https://x/seeds)' \
+    '- 💥 **Minimized counterexamples (last 100):** [`fc-failures.json`](https://x/failures)' \
+    '```' \
+    > "${tmp}/neg_codeblock.md"
+  # NOTA: o parser atual NÃO sabe distinguir bloco de código — então neste
+  # caso ele DEVE casar canônico (comportamento documentado). Verificamos
+  # esse contrato explicitamente para que qualquer mudança futura no parser
+  # quebre o teste de forma visível.
+  parser_assert_eq "Contrato: bullets dentro de code-block ainda casam (parser não interpreta fences)" \
+    "$(printf 'failures_canonical\tfc-failures.json\thttps://x/failures\nseeds_canonical\tfc-seeds.json\thttps://x/seeds')" \
+    "$(parse_file "${tmp}/neg_codeblock.md")"
+
+  # N12) Trailing chars depois da URL ')' invalidam o match
+  printf '%s\n' \
+    '- 🌱 **Seeds executed (last 50 runs):** [`fc-seeds.json`](https://x/seeds) extra-text' \
+    '- 💥 **Minimized counterexamples (last 100):** [`fc-failures.json`](https://x/failures) trailing' \
+    > "${tmp}/neg_trailing.md"
+  __neg_assert "Negativo: conteúdo extra após URL invalida bullet canônico" "${tmp}/neg_trailing.md"
+
+  # N13) Mistura: bullet válido + bullet corrompido — parser captura SÓ o válido
+  printf '%s\n' \
+    '- 🌱 **Seeds executed (last 50 runs):** [`fc-seeds.json`](https://x/seeds)' \
+    '- 💥 **Minimized counterexample (last 100):** [`fc-failures.json`](https://x/failures)' \
+    > "${tmp}/neg_partial.md"
+  parser_assert_eq "Contrato: bullet corrompido é descartado, válido é preservado" \
+    "$(printf 'seeds_canonical\tfc-seeds.json\thttps://x/seeds')" \
+    "$(parse_file "${tmp}/neg_partial.md")"
+
   echo ""
   echo "parser unit tests: ${PARSER_PASS} passed, ${PARSER_FAIL} failed"
   [ "${PARSER_FAIL}" = "0" ]
