@@ -596,13 +596,15 @@ case "${sub}" in
   parse-bullet) cmd_parse_bullet "$@" ;;
   test-parser)  cmd_test_parser ;;
   fuzz)         cmd_fuzz "$@" ;;
+  repro)        cmd_repro "$@" ;;
   *)
     cat >&2 <<USAGE
 usage: $0 <subcommand> [args]
   gen-fixture <out> [--seed N] [--mode staged|fallback|mixed]
   parse-bullet <file>
   test-parser
-  fuzz [--iters N] [--seed BASE]
+  fuzz [--iters N] [--seed BASE] [--failures-out DIR]
+  repro --seed N [--mode staged|fallback|mixed]
 USAGE
     exit 1
     ;;
