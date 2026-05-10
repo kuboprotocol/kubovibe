@@ -477,6 +477,43 @@ cmd_test_parser() {
     > "${tmp}/neg_fb_quotes.md"
   __neg_assert "Negativo: token entre aspas simples no fallback" "${tmp}/neg_fb_quotes.md"
 
+  # N21) Token com capitalização errada: 'Fc-Seeds.Json'. Regex casa
+  #      literalmente o token em minúsculas.
+  printf '%s\n' \
+    '- 🌱 **Seeds executed (last 50 runs):** [`Fc-Seeds.Json`](https://x/seeds)' \
+    '- 💥 **Minimized counterexamples (last 100):** [`Fc-Failures.Json`](https://x/failures)' \
+    > "${tmp}/neg_caps.md"
+  __neg_assert "Negativo: token com capitalização errada" "${tmp}/neg_caps.md"
+
+  # N22) Token com ponto duplo: 'fc-seeds..json'. Regex casa apenas '.json'.
+  printf '%s\n' \
+    '- 🌱 **Seeds executed (last 50 runs):** [`fc-seeds..json`](https://x/seeds)' \
+    '- 💥 **Minimized counterexamples (last 100):** [`fc-failures..json`](https://x/failures)' \
+    > "${tmp}/neg_dotdot.md"
+  __neg_assert "Negativo: token com ponto duplo" "${tmp}/neg_dotdot.md"
+
+  # N23) Whitespace embutido no meio da URL invalida o grupo (\S+?).
+  printf '%s\n' \
+    '- 🌱 **Seeds executed (last 50 runs):** [`fc-seeds.json`](https://x/ seeds)' \
+    '- 💥 **Minimized counterexamples (last 100):** [`fc-failures.json`](https://x/ failures)' \
+    > "${tmp}/neg_url_ws.md"
+  __neg_assert "Negativo: whitespace embutido na URL" "${tmp}/neg_url_ws.md"
+
+  # N24) Fallback com itálico não-fechado: '_(text)' sem '_' final.
+  printf '%s\n' \
+    '- 🌱 `fc-seeds.json` — _(not produced in this run)' \
+    '- 💥 `fc-failures.json` — _(no failures persisted in this run)' \
+    > "${tmp}/neg_fb_unclosed.md"
+  __neg_assert "Negativo: itálico de fallback não-fechado" "${tmp}/neg_fb_unclosed.md"
+
+  # N25) Dois bullets concatenados em uma única linha (via '; - '). Como o
+  #      parser processa por linha, o conjunto inteiro vira o corpo do
+  #      primeiro bullet e não casa nenhuma regex canônica.
+  printf '%s\n' \
+    '- 🌱 **Seeds executed (last 50 runs):** [`fc-seeds.json`](https://x/seeds); - 💥 **Minimized counterexamples (last 100):** [`fc-failures.json`](https://x/failures)' \
+    > "${tmp}/neg_inline_join.md"
+  __neg_assert "Negativo: dois bullets concatenados na mesma linha" "${tmp}/neg_inline_join.md"
+
   echo ""
   echo "parser unit tests: ${PARSER_PASS} passed, ${PARSER_FAIL} failed"
   [ "${PARSER_FAIL}" = "0" ]
@@ -651,15 +688,214 @@ cmd_repro() {
     "${VERIFY}"
 }
 
+# Adiciona validação explícita de êxito ao final do repro: o cmd_repro acima
+# delega ao verifier (set -e propaga). Wrapper que captura rc, valida stdout
+# do parser, e emite verdict legível.
+cmd_repro_validated() {
+  local seed="" mode="staged" expect="auto"
+  local args=()
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --seed)   seed="$2";   args+=(--seed "$2");   shift 2 ;;
+      --mode)   mode="$2";   args+=(--mode "$2");   shift 2 ;;
+      --expect) expect="$2"; shift 2 ;;
+      *) echo "unknown arg: $1" >&2; return 1 ;;
+    esac
+  done
+  [ -n "${seed}" ] || { echo "usage: repro --seed N [--mode M] [--expect pass|fail|auto]" >&2; return 1; }
+
+  local tmp; tmp="$(mktemp -d)"; trap "rm -rf '${tmp}'" RETURN
+  set +e
+  cmd_repro "${args[@]}" >"${tmp}/repro.out" 2>&1
+  local rc=$?
+  set -e
+  cat "${tmp}/repro.out"
+
+  echo ""
+  echo "── repro verdict ──"
+  echo "   exit code:   ${rc}"
+  echo "   parser line: $(grep -c $'\t' "${tmp}/repro.out" || true) bullets parseados"
+  case "${expect}" in
+    pass) [ "${rc}" = "0" ] || { echo "❌ esperado pass, obtido rc=${rc}"; return 1; } ;;
+    fail) [ "${rc}" != "0" ] || { echo "❌ esperado fail, obtido rc=0"; return 1; } ;;
+    auto) : ;;
+  esac
+  if [ "${rc}" = "0" ]; then
+    echo "✅ repro reproduziu o cenário com sucesso (verifier passou)"
+  else
+    echo "💥 repro reproduziu falha do CI localmente (verifier rc=${rc})"
+  fi
+  return 0
+}
+
+# ─── list-failures: lista entradas de failures.jsonl ─────────────────────────
+# Default: ./fuzz-failures/failures.jsonl (artifact baixado do CI).
+cmd_list_failures() {
+  local file="./fuzz-failures/failures.jsonl"
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --file) file="$2"; shift 2 ;;
+      *) echo "unknown arg: $1" >&2; return 1 ;;
+    esac
+  done
+  [ -f "${file}" ] || { echo "failures file not found: ${file}" >&2; return 1; }
+  python3 - "${file}" <<'PY'
+import json, sys
+path = sys.argv[1]
+rows = [json.loads(l) for l in open(path) if l.strip()]
+if not rows:
+    print("(no failures persisted)")
+    sys.exit(0)
+print(f"── {len(rows)} failure(s) in {path} ──")
+print(f"{'idx':>3}  {'seed':>8}  {'mode':<10}  {'stage':<8}  {'rc':>3}  detail")
+for i, r in enumerate(rows):
+    detail = (r.get('detail') or '').replace('\n', ' ⏎ ')
+    if len(detail) > 80: detail = detail[:77] + '...'
+    print(f"{i:>3}  {r['seed']:>8}  {r['mode']:<10}  {r['stage']:<8}  {r['rc']:>3}  {detail}")
+print("")
+print("Reproduza:")
+print("  bash .github/scripts/fixture-eol-fuzzer.sh repro-from --index <idx>")
+print("  bash .github/scripts/fixture-eol-fuzzer.sh repro-from --seed <seed> [--mode <mode>]")
+PY
+}
+
+# ─── repro-from: seleciona falha por índice ou seed/mode e roda repro ───────
+cmd_repro_from() {
+  local file="./fuzz-failures/failures.jsonl"
+  local idx="" seed="" mode=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --file)  file="$2"; shift 2 ;;
+      --index) idx="$2";  shift 2 ;;
+      --seed)  seed="$2"; shift 2 ;;
+      --mode)  mode="$2"; shift 2 ;;
+      *) echo "unknown arg: $1" >&2; return 1 ;;
+    esac
+  done
+  [ -f "${file}" ] || { echo "failures file not found: ${file}" >&2; return 1; }
+  [ -n "${idx}" ] || [ -n "${seed}" ] || {
+    echo "usage: repro-from [--file F] (--index N | --seed S [--mode M])" >&2
+    return 1
+  }
+
+  local picked
+  picked=$(IDX="${idx}" SEED="${seed}" MODE="${mode}" python3 - "${file}" <<'PY'
+import json, os, sys
+rows = [json.loads(l) for l in open(sys.argv[1]) if l.strip()]
+idx  = os.environ.get('IDX','')
+seed = os.environ.get('SEED','')
+mode = os.environ.get('MODE','')
+if idx != '':
+    i = int(idx)
+    if i < 0 or i >= len(rows):
+        print(f"index out of range: {i} (have {len(rows)})", file=sys.stderr); sys.exit(1)
+    r = rows[i]
+else:
+    cands = [r for r in rows if str(r['seed']) == seed and (not mode or r['mode'] == mode)]
+    if not cands:
+        print(f"no failure matches seed={seed} mode={mode}", file=sys.stderr); sys.exit(1)
+    if len(cands) > 1 and not mode:
+        print(f"ambiguous: {len(cands)} matches for seed={seed}; pass --mode", file=sys.stderr); sys.exit(1)
+    r = cands[0]
+print(f"{r['seed']}\t{r['mode']}")
+PY
+  ) || return 1
+
+  local s m
+  s=$(printf '%s' "${picked}" | cut -f1)
+  m=$(printf '%s' "${picked}" | cut -f2)
+  echo "── repro-from: selected seed=${s} mode=${m} ──"
+  cmd_repro_validated --seed "${s}" --mode "${m}" --expect fail
+}
+
+# ─── fetch-artifact: baixa fuzz-failures do último run via gh CLI ───────────
+cmd_fetch_artifact() {
+  local run_id="" name="fuzz-failures" out="./fuzz-failures"
+  local workflow="verify-fc-summary.yml"
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --run-id)   run_id="$2";   shift 2 ;;
+      --name)     name="$2";     shift 2 ;;
+      --out)      out="$2";      shift 2 ;;
+      --workflow) workflow="$2"; shift 2 ;;
+      *) echo "unknown arg: $1" >&2; return 1 ;;
+    esac
+  done
+  command -v gh >/dev/null 2>&1 || {
+    echo "gh CLI não encontrado. Instale: https://cli.github.com/" >&2
+    return 1
+  }
+  if [ -z "${run_id}" ]; then
+    echo "── procurando último run com falhas em ${workflow} ──"
+    run_id=$(gh run list --workflow "${workflow}" --limit 20 --json databaseId,conclusion \
+      --jq '[.[] | select(.conclusion=="failure")][0].databaseId')
+    [ -n "${run_id}" ] && [ "${run_id}" != "null" ] || {
+      echo "nenhum run com conclusion=failure encontrado em ${workflow}" >&2
+      return 1
+    }
+    echo "   run_id=${run_id}"
+  fi
+  rm -rf "${out}"
+  mkdir -p "${out}"
+  gh run download "${run_id}" --name "${name}" --dir "${out}"
+  echo ""
+  echo "✅ artifact baixado em ${out}"
+  ls -la "${out}" | head -20
+  echo ""
+  cmd_list_failures --file "${out}/failures.jsonl"
+}
+
+# ─── matrix: gera matriz completa de fixtures (seeds × modes) ───────────────
+cmd_matrix() {
+  local out="./fixture-matrix"
+  local seeds="1,2,3,42,100,1000"
+  local modes="staged,fallback,mixed"
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --out)   out="$2";   shift 2 ;;
+      --seeds) seeds="$2"; shift 2 ;;
+      --modes) modes="$2"; shift 2 ;;
+      *) echo "unknown arg: $1" >&2; return 1 ;;
+    esac
+  done
+  rm -rf "${out}"; mkdir -p "${out}"
+  local manifest="${out}/manifest.tsv"
+  printf 'seed\tmode\tpath\tparser_rc\tparser_tokens\n' > "${manifest}"
+  local count=0 ok=0
+  IFS=',' read -ra SEED_ARR <<< "${seeds}"
+  IFS=',' read -ra MODE_ARR <<< "${modes}"
+  for s in "${SEED_ARR[@]}"; do
+    for m in "${MODE_ARR[@]}"; do
+      local f="${out}/seed${s}_${m}.md"
+      cmd_gen_fixture "${f}" --seed "${s}" --mode "${m}"
+      set +e
+      local toks; toks=$(parse_file "${f}" | awk -F'\t' '{print $2}' | sort -u | tr '\n' ',' | sed 's/,$//')
+      local rc=$?
+      set -e
+      printf '%s\t%s\t%s\t%d\t%s\n' "${s}" "${m}" "${f}" "${rc}" "${toks}" >> "${manifest}"
+      count=$((count + 1))
+      [ "${rc}" = "0" ] && ok=$((ok + 1))
+    done
+  done
+  echo "── fixture matrix gerada em ${out} ──"
+  echo "   ${count} fixtures (${ok} parseáveis)"
+  echo "   manifest: ${manifest}"
+  column -t -s $'\t' "${manifest}" | head -50
+}
+
 # ─── entry point ─────────────────────────────────────────────────────────────
 sub="${1:-}"
 shift || true
 case "${sub}" in
-  gen-fixture)  cmd_gen_fixture  "$@" ;;
-  parse-bullet) cmd_parse_bullet "$@" ;;
-  test-parser)  cmd_test_parser ;;
-  fuzz)         cmd_fuzz "$@" ;;
-  repro)        cmd_repro "$@" ;;
+  gen-fixture)    cmd_gen_fixture    "$@" ;;
+  parse-bullet)   cmd_parse_bullet   "$@" ;;
+  test-parser)    cmd_test_parser ;;
+  fuzz)           cmd_fuzz           "$@" ;;
+  repro)          cmd_repro_validated "$@" ;;
+  list-failures)  cmd_list_failures  "$@" ;;
+  repro-from)     cmd_repro_from     "$@" ;;
+  fetch-artifact) cmd_fetch_artifact "$@" ;;
+  matrix)         cmd_matrix         "$@" ;;
   *)
     cat >&2 <<USAGE
 usage: $0 <subcommand> [args]
@@ -667,7 +903,11 @@ usage: $0 <subcommand> [args]
   parse-bullet <file>
   test-parser
   fuzz [--iters N] [--seed BASE] [--failures-out DIR]
-  repro --seed N [--mode staged|fallback|mixed]
+  repro --seed N [--mode staged|fallback|mixed] [--expect pass|fail|auto]
+  list-failures [--file ./fuzz-failures/failures.jsonl]
+  repro-from [--file F] (--index N | --seed S [--mode M])
+  fetch-artifact [--run-id ID] [--workflow verify-fc-summary.yml] [--name fuzz-failures] [--out DIR]
+  matrix [--out DIR] [--seeds 1,2,3] [--modes staged,fallback,mixed]
 USAGE
     exit 1
     ;;
