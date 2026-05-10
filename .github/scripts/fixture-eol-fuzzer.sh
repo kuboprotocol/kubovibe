@@ -477,6 +477,43 @@ cmd_test_parser() {
     > "${tmp}/neg_fb_quotes.md"
   __neg_assert "Negativo: token entre aspas simples no fallback" "${tmp}/neg_fb_quotes.md"
 
+  # N21) Token com capitalização errada: 'Fc-Seeds.Json'. Regex casa
+  #      literalmente o token em minúsculas.
+  printf '%s\n' \
+    '- 🌱 **Seeds executed (last 50 runs):** [`Fc-Seeds.Json`](https://x/seeds)' \
+    '- 💥 **Minimized counterexamples (last 100):** [`Fc-Failures.Json`](https://x/failures)' \
+    > "${tmp}/neg_caps.md"
+  __neg_assert "Negativo: token com capitalização errada" "${tmp}/neg_caps.md"
+
+  # N22) Token com ponto duplo: 'fc-seeds..json'. Regex casa apenas '.json'.
+  printf '%s\n' \
+    '- 🌱 **Seeds executed (last 50 runs):** [`fc-seeds..json`](https://x/seeds)' \
+    '- 💥 **Minimized counterexamples (last 100):** [`fc-failures..json`](https://x/failures)' \
+    > "${tmp}/neg_dotdot.md"
+  __neg_assert "Negativo: token com ponto duplo" "${tmp}/neg_dotdot.md"
+
+  # N23) Whitespace embutido no meio da URL invalida o grupo (\S+?).
+  printf '%s\n' \
+    '- 🌱 **Seeds executed (last 50 runs):** [`fc-seeds.json`](https://x/ seeds)' \
+    '- 💥 **Minimized counterexamples (last 100):** [`fc-failures.json`](https://x/ failures)' \
+    > "${tmp}/neg_url_ws.md"
+  __neg_assert "Negativo: whitespace embutido na URL" "${tmp}/neg_url_ws.md"
+
+  # N24) Fallback com itálico não-fechado: '_(text)' sem '_' final.
+  printf '%s\n' \
+    '- 🌱 `fc-seeds.json` — _(not produced in this run)' \
+    '- 💥 `fc-failures.json` — _(no failures persisted in this run)' \
+    > "${tmp}/neg_fb_unclosed.md"
+  __neg_assert "Negativo: itálico de fallback não-fechado" "${tmp}/neg_fb_unclosed.md"
+
+  # N25) Dois bullets concatenados em uma única linha (via '; - '). Como o
+  #      parser processa por linha, o conjunto inteiro vira o corpo do
+  #      primeiro bullet e não casa nenhuma regex canônica.
+  printf '%s\n' \
+    '- 🌱 **Seeds executed (last 50 runs):** [`fc-seeds.json`](https://x/seeds); - 💥 **Minimized counterexamples (last 100):** [`fc-failures.json`](https://x/failures)' \
+    > "${tmp}/neg_inline_join.md"
+  __neg_assert "Negativo: dois bullets concatenados na mesma linha" "${tmp}/neg_inline_join.md"
+
   echo ""
   echo "parser unit tests: ${PARSER_PASS} passed, ${PARSER_FAIL} failed"
   [ "${PARSER_FAIL}" = "0" ]
