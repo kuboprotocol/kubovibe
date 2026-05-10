@@ -414,6 +414,69 @@ cmd_test_parser() {
     "$(printf 'seeds_canonical\tfc-seeds.json\thttps://x/seeds')" \
     "$(parse_file "${tmp}/neg_partial.md")"
 
+  # ─── Near-miss negatives (N14-N20): formatação quase válida ──────────────
+  # Pequenas variações tipográficas (espaçamento, pontuação extra, tokens
+  # trocados entre seções) NÃO podem casar nenhum bullet — o parser deve
+  # falhar de forma determinística (exit 2, stdout vazio).
+
+  # N14) Tokens trocados entre seções: emoji seeds com token failures e
+  #      vice-versa. Cada regex canônica fixa o token literalmente, então
+  #      essas linhas não casam nem como seeds nem como failures.
+  printf '%s\n' \
+    '- 🌱 **Seeds executed (last 50 runs):** [`fc-failures.json`](https://x/seeds)' \
+    '- 💥 **Minimized counterexamples (last 100):** [`fc-seeds.json`](https://x/failures)' \
+    > "${tmp}/neg_swap_token.md"
+  __neg_assert "Negativo: tokens trocados entre seções (cross-section swap)" "${tmp}/neg_swap_token.md"
+
+  # N15) Bullet com dois dashes ('-- ') — bullet regex exige '-\s+', dois
+  #      dashes consecutivos invalidam a marca de lista.
+  printf '%s\n' \
+    '-- 🌱 **Seeds executed (last 50 runs):** [`fc-seeds.json`](https://x/seeds)' \
+    '-- 💥 **Minimized counterexamples (last 100):** [`fc-failures.json`](https://x/failures)' \
+    > "${tmp}/neg_double_dash.md"
+  __neg_assert "Negativo: prefixo de bullet com dois dashes ('-- ')" "${tmp}/neg_double_dash.md"
+
+  # N16) URL vazia entre parênteses: ']()'. O grupo de URL exige \S+ (>=1
+  #      caractere não-whitespace), portanto não casa.
+  printf '%s\n' \
+    '- 🌱 **Seeds executed (last 50 runs):** [`fc-seeds.json`]()' \
+    '- 💥 **Minimized counterexamples (last 100):** [`fc-failures.json`]()' \
+    > "${tmp}/neg_empty_url.md"
+  __neg_assert "Negativo: URL vazia entre parênteses" "${tmp}/neg_empty_url.md"
+
+  # N17) Triplo asterisco antes do label ('***Seeds executed...:***'): a
+  #      alternância (\*\*|__) consome '**', restando '*Seeds...' que não
+  #      casa o início literal do label.
+  printf '%s\n' \
+    '- 🌱 ***Seeds executed (last 50 runs):*** [`fc-seeds.json`](https://x/seeds)' \
+    '- 💥 ***Minimized counterexamples (last 100):*** [`fc-failures.json`](https://x/failures)' \
+    > "${tmp}/neg_triple_star.md"
+  __neg_assert "Negativo: triplo asterisco no negrito" "${tmp}/neg_triple_star.md"
+
+  # N18) Espaços extras dentro das crases do token: `` ` fc-seeds.json ` ``.
+  #      A regex casa literalmente '`fc-seeds.json`' sem espaços internos.
+  printf '%s\n' \
+    '- 🌱 **Seeds executed (last 50 runs):** [` fc-seeds.json `](https://x/seeds)' \
+    '- 💥 **Minimized counterexamples (last 100):** [` fc-failures.json `](https://x/failures)' \
+    > "${tmp}/neg_token_pad.md"
+  __neg_assert "Negativo: espaços extras dentro das crases do token" "${tmp}/neg_token_pad.md"
+
+  # N19) Fallback com ':' no lugar do em-dash ' — '. Regex de fallback exige
+  #      U+2014 cercado por whitespace; ':' invalida.
+  printf '%s\n' \
+    '- 🌱 `fc-seeds.json` : _(not produced in this run)_' \
+    '- 💥 `fc-failures.json` : _(no failures persisted in this run)_' \
+    > "${tmp}/neg_fb_colon.md"
+  __neg_assert "Negativo: fallback com ':' no lugar do em-dash" "${tmp}/neg_fb_colon.md"
+
+  # N20) Token entre aspas simples no fallback ('fc-seeds.json' em vez de
+  #      `fc-seeds.json`). Regex exige crases literais.
+  printf '%s\n' \
+    "- 🌱 'fc-seeds.json' — _(not produced in this run)_" \
+    "- 💥 'fc-failures.json' — _(no failures persisted in this run)_" \
+    > "${tmp}/neg_fb_quotes.md"
+  __neg_assert "Negativo: token entre aspas simples no fallback" "${tmp}/neg_fb_quotes.md"
+
   echo ""
   echo "parser unit tests: ${PARSER_PASS} passed, ${PARSER_FAIL} failed"
   [ "${PARSER_FAIL}" = "0" ]
