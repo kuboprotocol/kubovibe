@@ -596,11 +596,28 @@ export default function BuilderPage() {
                   >
                     <iframe
                       key={previewKey}
-                      srcDoc={generatedCode}
-                      className="w-full h-full border-0 bg-background"
-                      sandbox="allow-scripts"
+                      srcDoc={(() => {
+                        const code = generatedCode || ''
+                        const hasDoctype = /<!doctype\s+html/i.test(code)
+                        const hasHtmlTag = /<html[\s>]/i.test(code)
+                        // Wrap fragments in a minimal HTML scaffold so the
+                        // iframe always has a viewport, default white bg,
+                        // and a sane font — preventing the "black screen"
+                        // when the model returns body-only HTML.
+                        if (hasDoctype || hasHtmlTag) return code
+                        return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;padding:0;background:#ffffff;color:#111;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;min-height:100%}</style></head><body>${code}</body></html>`
+                      })()}
+                      className="w-full h-full border-0"
+                      // allow-same-origin is required for Tailwind CDN,
+                      // Google Fonts and any external <script src> the
+                      // generated app may load — without it, srcDoc apps
+                      // commonly render as a blank/black page.
+                      sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
                       title="App Preview"
-                      style={deviceFrame !== 'desktop' ? { borderRadius: '12px' } : {}}
+                      style={{
+                        backgroundColor: '#ffffff',
+                        ...(deviceFrame !== 'desktop' ? { borderRadius: '12px' } : {}),
+                      }}
                     />
                   </div>
                 ) : !showLoading ? (
