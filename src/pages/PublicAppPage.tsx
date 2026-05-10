@@ -54,13 +54,25 @@ export default function PublicAppPage() {
     )
   }
 
+  // Wrap fragments in a minimal HTML scaffold so apps without an explicit
+  // <html><body> still render full-screen with a sane white background
+  // (otherwise the iframe inherits the dark host theme → black screen).
+  const wrappedHtml = (() => {
+    const code = html || ''
+    const hasDoctype = /<!doctype\s+html/i.test(code)
+    const hasHtmlTag = /<html[\s>]/i.test(code)
+    if (hasDoctype || hasHtmlTag) return code
+    return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;padding:0;background:#ffffff;color:#111;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;min-height:100vh}</style></head><body>${code}</body></html>`
+  })()
+
   return (
     <div className="relative w-full h-screen">
       <iframe
-        srcDoc={html!}
+        srcDoc={wrappedHtml}
         title="Published App"
         className="w-full h-full border-0"
-        sandbox="allow-scripts allow-forms allow-popups allow-same-origin"
+        sandbox="allow-scripts allow-forms allow-popups allow-same-origin allow-modals"
+        style={{ backgroundColor: '#ffffff' }}
       />
       {/* Badge */}
       <a
