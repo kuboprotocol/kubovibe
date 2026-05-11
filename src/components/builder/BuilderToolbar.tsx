@@ -181,6 +181,15 @@ export default function BuilderToolbar({
               <Icon className="h-3.5 w-3.5" />
             </button>
           ))}
+          {deviceFrame !== 'desktop' && onToggleLandscape && (
+            <button
+              onClick={onToggleLandscape}
+              title={landscape ? 'Retrato' : 'Paisagem'}
+              className="p-1.5 rounded-md text-muted-foreground hover:text-foreground transition-all duration-200"
+            >
+              <RotateCcw className={`h-3.5 w-3.5 transition-transform ${landscape ? 'rotate-90' : ''}`} />
+            </button>
+          )}
         </div>
 
         <div className="flex items-center gap-1 text-xs text-muted-foreground font-mono">
