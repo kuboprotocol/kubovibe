@@ -625,13 +625,7 @@ export default function BuilderPage() {
                     )}
                     <iframe
                       key={previewKey}
-                      srcDoc={(() => {
-                        const code = generatedCode || ''
-                        const hasDoctype = /<!doctype\s+html/i.test(code)
-                        const hasHtmlTag = /<html[\s>]/i.test(code)
-                        if (hasDoctype || hasHtmlTag) return code
-                        return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;padding:0;background:#ffffff;color:#111;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;min-height:100%}</style></head><body>${code}</body></html>`
-                      })()}
+                      srcDoc={wrapPreviewHtml(generatedCode || '')}
                       className="w-full h-full border-0 block"
                       sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
                       title="App Preview"
