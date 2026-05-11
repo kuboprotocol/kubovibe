@@ -1,13 +1,18 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/integrations/supabase/client'
 import { Loader2 } from 'lucide-react'
+import { wrapPreviewHtml, subscribePreviewLogs, type PreviewLogEntry } from '@/lib/iframePreview'
+import PreviewAuditPanel from '@/components/builder/PreviewAuditPanel'
 
 export default function PublicAppPage() {
   const { projectId } = useParams<{ projectId: string }>()
+  const [searchParams] = useSearchParams()
+  const debug = searchParams.get('debug') === '1'
   const [html, setHtml] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [logs, setLogs] = useState<PreviewLogEntry[]>([])
 
   useEffect(() => {
     if (!projectId) { setError('Projeto não encontrado'); setLoading(false); return }
@@ -35,6 +40,17 @@ export default function PublicAppPage() {
     load()
   }, [projectId])
 
+  // Capture iframe console/error events (always on — used by ?debug=1 overlay
+  // and useful for diagnosing black-screen reports).
+  useEffect(() => {
+    return subscribePreviewLogs((entry) => {
+      setLogs((prev) => {
+        const next = [...prev, entry]
+        return next.length > 500 ? next.slice(-500) : next
+      })
+    })
+  }, [])
+
   if (loading) {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-background">
@@ -54,26 +70,22 @@ export default function PublicAppPage() {
     )
   }
 
-  // Wrap fragments in a minimal HTML scaffold so apps without an explicit
-  // <html><body> still render full-screen with a sane white background
-  // (otherwise the iframe inherits the dark host theme → black screen).
-  const wrappedHtml = (() => {
-    const code = html || ''
-    const hasDoctype = /<!doctype\s+html/i.test(code)
-    const hasHtmlTag = /<html[\s>]/i.test(code)
-    if (hasDoctype || hasHtmlTag) return code
-    return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;padding:0;background:#ffffff;color:#111;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;min-height:100vh}</style></head><body>${code}</body></html>`
-  })()
-
   return (
     <div className="relative w-full h-screen">
       <iframe
-        srcDoc={wrappedHtml}
+        srcDoc={wrapPreviewHtml(html || '')}
         title="Published App"
         className="w-full h-full border-0"
         sandbox="allow-scripts allow-forms allow-popups allow-same-origin allow-modals"
         style={{ backgroundColor: '#ffffff' }}
       />
+      {debug && (
+        <PreviewAuditPanel
+          logs={logs}
+          onClear={() => setLogs([])}
+          defaultOpen
+        />
+      )}
       {/* Badge */}
       <a
         href="https://kubovibe.lovable.app"
