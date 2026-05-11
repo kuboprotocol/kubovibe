@@ -406,7 +406,9 @@ export default function BuilderPage() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         deviceFrame={deviceFrame}
-        onDeviceFrameChange={setDeviceFrame}
+        onDeviceFrameChange={(f) => { setDeviceFrame(f); if (f === 'desktop') setLandscape(false) }}
+        landscape={landscape}
+        onToggleLandscape={() => setLandscape(l => !l)}
         onRefreshPreview={() => setPreviewKey(k => k + 1)}
         onSave={() => saveProject(generatedCode, messages)}
         onDownload={handleDownload}
