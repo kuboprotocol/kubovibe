@@ -20,10 +20,10 @@ import { uploadFile, validateFile, getAllAllowedTypes, type UploadedFile } from 
 import { Progress } from '@/components/ui/progress'
 import logoImg from '@/assets/logo-kubovibe.png'
 
-const DEVICE_WIDTHS: Record<DeviceFrame, string> = {
-  desktop: '100%',
-  tablet: '768px',
-  mobile: '375px',
+const DEVICE_SIZES: Record<DeviceFrame, { w: number; h: number; label: string }> = {
+  desktop: { w: 1440, h: 900, label: 'Desktop 1440×900' },
+  tablet: { w: 768, h: 1024, label: 'Tablet 768×1024' },
+  mobile: { w: 390, h: 844, label: 'Mobile 390×844' },
 }
 
 export default function BuilderPage() {
