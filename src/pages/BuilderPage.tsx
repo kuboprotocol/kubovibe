@@ -19,6 +19,8 @@ import KuboFlowSelector, { autoDetectMode, type KuboFlowMode } from '@/component
 import { uploadFile, validateFile, getAllAllowedTypes, type UploadedFile } from '@/lib/fileUpload'
 import { Progress } from '@/components/ui/progress'
 import logoImg from '@/assets/logo-kubovibe.png'
+import { wrapPreviewHtml, subscribePreviewLogs, type PreviewLogEntry } from '@/lib/iframePreview'
+import PreviewAuditPanel from '@/components/builder/PreviewAuditPanel'
 
 const DEVICE_SIZES: Record<DeviceFrame, { w: number; h: number; label: string }> = {
   desktop: { w: 1440, h: 900, label: 'Desktop 1440×900' },
