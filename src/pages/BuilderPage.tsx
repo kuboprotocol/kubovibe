@@ -52,6 +52,17 @@ export default function BuilderPage() {
   const [landscape, setLandscape] = useState(false)
   const [previewLogs, setPreviewLogs] = useState<PreviewLogEntry[]>([])
   const [previewKey, setPreviewKey] = useState(0)
+  // Subscribe to runtime errors / console messages from the iframe
+  useEffect(() => {
+    return subscribePreviewLogs((entry) => {
+      setPreviewLogs((prev) => {
+        const next = [...prev, entry]
+        return next.length > 500 ? next.slice(-500) : next
+      })
+    })
+  }, [])
+  // Reset logs whenever the preview is reloaded or the code changes
+  useEffect(() => { setPreviewLogs([]) }, [previewKey, generatedCode])
   const [attachedFiles, setAttachedFiles] = useState<UploadedFile[]>([])
   const [uploadProgress, setUploadProgress] = useState<number | null>(null)
   const [isPublished, setIsPublished] = useState(false)
