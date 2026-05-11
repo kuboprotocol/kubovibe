@@ -43,6 +43,7 @@ interface BuilderToolbarProps {
 
 export default function BuilderToolbar({
   projectTitle, activeTab, onTabChange, deviceFrame, onDeviceFrameChange,
+  landscape = false, onToggleLandscape,
   onRefreshPreview, onSave, onDownload, onShowTemplates, onCloneSite, onPublish,
   saving, hasCode, editsRemaining, isSubscribed, generatedCode,
   isPublished, publishedUrl,
