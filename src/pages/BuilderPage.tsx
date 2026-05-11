@@ -669,6 +669,13 @@ export default function BuilderPage() {
               </motion.div>
             )}
           </AnimatePresence>
+          {activeTab === 'preview' && generatedCode && (
+            <PreviewAuditPanel
+              logs={previewLogs}
+              onClear={() => setPreviewLogs([])}
+              defaultOpen={previewLogs.some(l => ['error','exception','rejection'].includes(l.kind))}
+            />
+          )}
         </div>
       </div>
 
