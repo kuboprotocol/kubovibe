@@ -24,6 +24,8 @@ interface BuilderToolbarProps {
   onTabChange: (tab: 'preview' | 'code') => void
   deviceFrame: DeviceFrame
   onDeviceFrameChange: (frame: DeviceFrame) => void
+  landscape?: boolean
+  onToggleLandscape?: () => void
   onRefreshPreview: () => void
   onSave: () => void
   onDownload: () => void
