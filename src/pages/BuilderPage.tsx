@@ -19,6 +19,8 @@ import KuboFlowSelector, { autoDetectMode, type KuboFlowMode } from '@/component
 import { uploadFile, validateFile, getAllAllowedTypes, type UploadedFile } from '@/lib/fileUpload'
 import { Progress } from '@/components/ui/progress'
 import logoImg from '@/assets/logo-kubovibe.png'
+import { wrapPreviewHtml, subscribePreviewLogs, type PreviewLogEntry } from '@/lib/iframePreview'
+import PreviewAuditPanel from '@/components/builder/PreviewAuditPanel'
 
 const DEVICE_SIZES: Record<DeviceFrame, { w: number; h: number; label: string }> = {
   desktop: { w: 1440, h: 900, label: 'Desktop 1440×900' },
@@ -48,7 +50,19 @@ export default function BuilderPage() {
   const [isCloning, setIsCloning] = useState(false)
   const [deviceFrame, setDeviceFrame] = useState<DeviceFrame>('desktop')
   const [landscape, setLandscape] = useState(false)
+  const [previewLogs, setPreviewLogs] = useState<PreviewLogEntry[]>([])
   const [previewKey, setPreviewKey] = useState(0)
+  // Subscribe to runtime errors / console messages from the iframe
+  useEffect(() => {
+    return subscribePreviewLogs((entry) => {
+      setPreviewLogs((prev) => {
+        const next = [...prev, entry]
+        return next.length > 500 ? next.slice(-500) : next
+      })
+    })
+  }, [])
+  // Reset logs whenever the preview is reloaded or the code changes
+  useEffect(() => { setPreviewLogs([]) }, [previewKey, generatedCode])
   const [attachedFiles, setAttachedFiles] = useState<UploadedFile[]>([])
   const [uploadProgress, setUploadProgress] = useState<number | null>(null)
   const [isPublished, setIsPublished] = useState(false)
@@ -611,13 +625,7 @@ export default function BuilderPage() {
                     )}
                     <iframe
                       key={previewKey}
-                      srcDoc={(() => {
-                        const code = generatedCode || ''
-                        const hasDoctype = /<!doctype\s+html/i.test(code)
-                        const hasHtmlTag = /<html[\s>]/i.test(code)
-                        if (hasDoctype || hasHtmlTag) return code
-                        return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;padding:0;background:#ffffff;color:#111;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;min-height:100%}</style></head><body>${code}</body></html>`
-                      })()}
+                      srcDoc={wrapPreviewHtml(generatedCode || '')}
                       className="w-full h-full border-0 block"
                       sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
                       title="App Preview"
@@ -661,6 +669,13 @@ export default function BuilderPage() {
               </motion.div>
             )}
           </AnimatePresence>
+          {activeTab === 'preview' && generatedCode && (
+            <PreviewAuditPanel
+              logs={previewLogs}
+              onClear={() => setPreviewLogs([])}
+              defaultOpen={previewLogs.some(l => ['error','exception','rejection'].includes(l.kind))}
+            />
+          )}
         </div>
       </div>
 
