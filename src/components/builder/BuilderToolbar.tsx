@@ -5,7 +5,7 @@ import {
   ArrowLeft, Eye, Code, Monitor, Smartphone, Tablet,
   RotateCw, ExternalLink, Share2, Save, Loader2, Download,
   LayoutTemplate, Zap, MoreHorizontal, Copy, Check, Globe, Layers,
-  CircleDot,
+  CircleDot, RotateCcw,
 } from 'lucide-react'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
@@ -24,6 +24,8 @@ interface BuilderToolbarProps {
   onTabChange: (tab: 'preview' | 'code') => void
   deviceFrame: DeviceFrame
   onDeviceFrameChange: (frame: DeviceFrame) => void
+  landscape?: boolean
+  onToggleLandscape?: () => void
   onRefreshPreview: () => void
   onSave: () => void
   onDownload: () => void
@@ -41,6 +43,7 @@ interface BuilderToolbarProps {
 
 export default function BuilderToolbar({
   projectTitle, activeTab, onTabChange, deviceFrame, onDeviceFrameChange,
+  landscape = false, onToggleLandscape,
   onRefreshPreview, onSave, onDownload, onShowTemplates, onCloneSite, onPublish,
   saving, hasCode, editsRemaining, isSubscribed, generatedCode,
   isPublished, publishedUrl,
@@ -178,6 +181,15 @@ export default function BuilderToolbar({
               <Icon className="h-3.5 w-3.5" />
             </button>
           ))}
+          {deviceFrame !== 'desktop' && onToggleLandscape && (
+            <button
+              onClick={onToggleLandscape}
+              title={landscape ? 'Retrato' : 'Paisagem'}
+              className="p-1.5 rounded-md text-muted-foreground hover:text-foreground transition-all duration-200"
+            >
+              <RotateCcw className={`h-3.5 w-3.5 transition-transform ${landscape ? 'rotate-90' : ''}`} />
+            </button>
+          )}
         </div>
 
         <div className="flex items-center gap-1 text-xs text-muted-foreground font-mono">

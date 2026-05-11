@@ -20,10 +20,10 @@ import { uploadFile, validateFile, getAllAllowedTypes, type UploadedFile } from 
 import { Progress } from '@/components/ui/progress'
 import logoImg from '@/assets/logo-kubovibe.png'
 
-const DEVICE_WIDTHS: Record<DeviceFrame, string> = {
-  desktop: '100%',
-  tablet: '768px',
-  mobile: '375px',
+const DEVICE_SIZES: Record<DeviceFrame, { w: number; h: number; label: string }> = {
+  desktop: { w: 1440, h: 900, label: 'Desktop 1440×900' },
+  tablet: { w: 768, h: 1024, label: 'Tablet 768×1024' },
+  mobile: { w: 390, h: 844, label: 'Mobile 390×844' },
 }
 
 export default function BuilderPage() {
@@ -47,6 +47,7 @@ export default function BuilderPage() {
   const [showCloneDialog, setShowCloneDialog] = useState(false)
   const [isCloning, setIsCloning] = useState(false)
   const [deviceFrame, setDeviceFrame] = useState<DeviceFrame>('desktop')
+  const [landscape, setLandscape] = useState(false)
   const [previewKey, setPreviewKey] = useState(0)
   const [attachedFiles, setAttachedFiles] = useState<UploadedFile[]>([])
   const [uploadProgress, setUploadProgress] = useState<number | null>(null)
@@ -405,7 +406,9 @@ export default function BuilderPage() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         deviceFrame={deviceFrame}
-        onDeviceFrameChange={setDeviceFrame}
+        onDeviceFrameChange={(f) => { setDeviceFrame(f); if (f === 'desktop') setLandscape(false) }}
+        landscape={landscape}
+        onToggleLandscape={() => setLandscape(l => !l)}
         onRefreshPreview={() => setPreviewKey(k => k + 1)}
         onSave={() => saveProject(generatedCode, messages)}
         onDownload={handleDownload}
@@ -580,46 +583,52 @@ export default function BuilderPage() {
                   </div>
                 )}
               {generatedCode && !showLoading ? (
+                  (() => {
+                    const size = DEVICE_SIZES[deviceFrame]
+                    const isDesktop = deviceFrame === 'desktop'
+                    const w = landscape && !isDesktop ? size.h : size.w
+                    const h = landscape && !isDesktop ? size.w : size.h
+                    return (
                   <div
-                    className="w-full h-full"
+                    className="relative"
                     style={{
-                      ...(deviceFrame !== 'desktop' ? {
-                        maxWidth: deviceFrame === 'tablet' ? 768 : 390,
-                        maxHeight: deviceFrame === 'tablet' ? 1024 : 844,
-                        margin: '0 auto',
+                      width: isDesktop ? '100%' : `${w}px`,
+                      height: isDesktop ? '100%' : `${h}px`,
+                      maxWidth: '100%',
+                      margin: isDesktop ? 0 : '24px auto',
+                      ...(isDesktop ? {} : {
                         border: '8px solid hsl(var(--border))',
                         borderRadius: '24px',
                         overflow: 'hidden',
                         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-                      } : {}),
+                      }),
                     }}
                   >
+                    {!isDesktop && (
+                      <div className="absolute -top-7 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-md bg-background/80 backdrop-blur border border-border text-[10px] font-mono text-muted-foreground z-10">
+                        {w}×{h}
+                      </div>
+                    )}
                     <iframe
                       key={previewKey}
                       srcDoc={(() => {
                         const code = generatedCode || ''
                         const hasDoctype = /<!doctype\s+html/i.test(code)
                         const hasHtmlTag = /<html[\s>]/i.test(code)
-                        // Wrap fragments in a minimal HTML scaffold so the
-                        // iframe always has a viewport, default white bg,
-                        // and a sane font — preventing the "black screen"
-                        // when the model returns body-only HTML.
                         if (hasDoctype || hasHtmlTag) return code
                         return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;padding:0;background:#ffffff;color:#111;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;min-height:100%}</style></head><body>${code}</body></html>`
                       })()}
-                      className="w-full h-full border-0"
-                      // allow-same-origin is required for Tailwind CDN,
-                      // Google Fonts and any external <script src> the
-                      // generated app may load — without it, srcDoc apps
-                      // commonly render as a blank/black page.
+                      className="w-full h-full border-0 block"
                       sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
                       title="App Preview"
                       style={{
                         backgroundColor: '#ffffff',
-                        ...(deviceFrame !== 'desktop' ? { borderRadius: '12px' } : {}),
+                        ...(isDesktop ? {} : { borderRadius: '12px' }),
                       }}
                     />
                   </div>
+                  )
+                  })()
                 ) : !showLoading ? (
                   <div className="flex items-center justify-center h-full w-full relative">
                     <motion.div
