@@ -99,7 +99,7 @@ export default function PreviewFrame({
     }
   }, [])
 
-  const takeScreenshot = useCallback(async () => {
+  const takeScreenshot = useCallback(async (opts: { silent?: boolean; suffix?: string } = {}) => {
     const iframe = iframeRef.current
     if (!iframe) return
     setShooting(true)
@@ -115,14 +115,28 @@ export default function PreviewFrame({
       })
       const a = document.createElement('a')
       const slug = (projectTitle || 'preview').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'preview'
-      a.download = `${slug}-${deviceFrame}-${w}x${h}.png`
+      const suffix = opts.suffix ? `-${opts.suffix}` : ''
+      a.download = `${slug}-${deviceFrame}-${w}x${h}${suffix}.png`
       a.href = dataUrl
       a.click()
-      toast.success('Screenshot salva')
+      if (!opts.silent) toast.success('Screenshot salva')
+      else toast('Auto-screenshot capturada', { description: opts.suffix })
     } catch (e: any) {
-      toast.error('Falha ao capturar: ' + (e?.message || 'erro'))
+      if (!opts.silent) toast.error('Falha ao capturar: ' + (e?.message || 'erro'))
     } finally {
       setShooting(false)
+    }
+  }, [w, h, deviceFrame, projectTitle])
+
+  // Listen for auto-screenshot requests from the audit panel
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail || {}
+      takeScreenshot({ silent: true, suffix: 'auto-error' + (detail.reason ? '-' + String(detail.reason).slice(0,30).replace(/[^a-z0-9]+/gi,'-') : '') })
+    }
+    window.addEventListener('kubo:preview:auto-screenshot', handler as EventListener)
+    return () => window.removeEventListener('kubo:preview:auto-screenshot', handler as EventListener)
+  }, [takeScreenshot])
     }
   }, [w, h, deviceFrame, projectTitle])
 
