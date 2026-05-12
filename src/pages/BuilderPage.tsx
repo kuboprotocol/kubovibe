@@ -19,13 +19,20 @@ import KuboFlowSelector, { autoDetectMode, type KuboFlowMode } from '@/component
 import { uploadFile, validateFile, getAllAllowedTypes, type UploadedFile } from '@/lib/fileUpload'
 import { Progress } from '@/components/ui/progress'
 import logoImg from '@/assets/logo-kubovibe.png'
-import { wrapPreviewHtml, subscribePreviewLogs, type PreviewLogEntry } from '@/lib/iframePreview'
+import { subscribePreviewLogs, type PreviewLogEntry } from '@/lib/iframePreview'
 import PreviewAuditPanel from '@/components/builder/PreviewAuditPanel'
+import PreviewFrame from '@/components/builder/PreviewFrame'
 
-const DEVICE_SIZES: Record<DeviceFrame, { w: number; h: number; label: string }> = {
-  desktop: { w: 1440, h: 900, label: 'Desktop 1440×900' },
-  tablet: { w: 768, h: 1024, label: 'Tablet 768×1024' },
-  mobile: { w: 390, h: 844, label: 'Mobile 390×844' },
+const DEVICE_LS_KEY = 'kubo:previewDevice:v1'
+function loadDevicePref(): { frame: DeviceFrame; landscape: boolean } {
+  try {
+    const raw = localStorage.getItem(DEVICE_LS_KEY)
+    if (raw) {
+      const p = JSON.parse(raw)
+      if (p && typeof p === 'object') return { frame: p.frame || 'desktop', landscape: !!p.landscape }
+    }
+  } catch {}
+  return { frame: 'desktop', landscape: false }
 }
 
 export default function BuilderPage() {
@@ -48,8 +55,12 @@ export default function BuilderPage() {
   const [showTemplates, setShowTemplates] = useState(false)
   const [showCloneDialog, setShowCloneDialog] = useState(false)
   const [isCloning, setIsCloning] = useState(false)
-  const [deviceFrame, setDeviceFrame] = useState<DeviceFrame>('desktop')
-  const [landscape, setLandscape] = useState(false)
+  const _devicePref = loadDevicePref()
+  const [deviceFrame, setDeviceFrame] = useState<DeviceFrame>(_devicePref.frame)
+  const [landscape, setLandscape] = useState(_devicePref.landscape)
+  useEffect(() => {
+    try { localStorage.setItem(DEVICE_LS_KEY, JSON.stringify({ frame: deviceFrame, landscape })) } catch {}
+  }, [deviceFrame, landscape])
   const [previewLogs, setPreviewLogs] = useState<PreviewLogEntry[]>([])
   const [previewKey, setPreviewKey] = useState(0)
   // Subscribe to runtime errors / console messages from the iframe
@@ -597,46 +608,15 @@ export default function BuilderPage() {
                   </div>
                 )}
               {generatedCode && !showLoading ? (
-                  (() => {
-                    const size = DEVICE_SIZES[deviceFrame]
-                    const isDesktop = deviceFrame === 'desktop'
-                    const w = landscape && !isDesktop ? size.h : size.w
-                    const h = landscape && !isDesktop ? size.w : size.h
-                    return (
-                  <div
-                    className="relative"
-                    style={{
-                      width: isDesktop ? '100%' : `${w}px`,
-                      height: isDesktop ? '100%' : `${h}px`,
-                      maxWidth: '100%',
-                      margin: isDesktop ? 0 : '24px auto',
-                      ...(isDesktop ? {} : {
-                        border: '8px solid hsl(var(--border))',
-                        borderRadius: '24px',
-                        overflow: 'hidden',
-                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-                      }),
-                    }}
-                  >
-                    {!isDesktop && (
-                      <div className="absolute -top-7 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-md bg-background/80 backdrop-blur border border-border text-[10px] font-mono text-muted-foreground z-10">
-                        {w}×{h}
-                      </div>
-                    )}
-                    <iframe
-                      key={previewKey}
-                      srcDoc={wrapPreviewHtml(generatedCode || '')}
-                      className="w-full h-full border-0 block"
-                      sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
-                      title="App Preview"
-                      style={{
-                        backgroundColor: '#ffffff',
-                        ...(isDesktop ? {} : { borderRadius: '12px' }),
-                      }}
-                    />
-                  </div>
-                  )
-                  })()
+                  <PreviewFrame
+                    generatedCode={generatedCode}
+                    deviceFrame={deviceFrame}
+                    landscape={landscape}
+                    previewKey={previewKey}
+                    onRefresh={() => setPreviewKey(k => k + 1)}
+                    publishedUrl={publishedUrl}
+                    projectTitle={projectTitle}
+                  />
                 ) : !showLoading ? (
                   <div className="flex items-center justify-center h-full w-full relative">
                     <motion.div
