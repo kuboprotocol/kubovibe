@@ -137,8 +137,6 @@ export default function PreviewFrame({
     window.addEventListener('kubo:preview:auto-screenshot', handler as EventListener)
     return () => window.removeEventListener('kubo:preview:auto-screenshot', handler as EventListener)
   }, [takeScreenshot])
-    }
-  }, [w, h, deviceFrame, projectTitle])
 
   const displayUrl = publishedUrl || (typeof window !== 'undefined' ? `${window.location.origin}/preview` : '/preview')
 
