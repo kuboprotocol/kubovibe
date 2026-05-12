@@ -55,8 +55,12 @@ export default function BuilderPage() {
   const [showTemplates, setShowTemplates] = useState(false)
   const [showCloneDialog, setShowCloneDialog] = useState(false)
   const [isCloning, setIsCloning] = useState(false)
-  const [deviceFrame, setDeviceFrame] = useState<DeviceFrame>('desktop')
-  const [landscape, setLandscape] = useState(false)
+  const _devicePref = loadDevicePref()
+  const [deviceFrame, setDeviceFrame] = useState<DeviceFrame>(_devicePref.frame)
+  const [landscape, setLandscape] = useState(_devicePref.landscape)
+  useEffect(() => {
+    try { localStorage.setItem(DEVICE_LS_KEY, JSON.stringify({ frame: deviceFrame, landscape })) } catch {}
+  }, [deviceFrame, landscape])
   const [previewLogs, setPreviewLogs] = useState<PreviewLogEntry[]>([])
   const [previewKey, setPreviewKey] = useState(0)
   // Subscribe to runtime errors / console messages from the iframe
