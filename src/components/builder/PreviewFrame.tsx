@@ -190,7 +190,7 @@ export default function PreviewFrame({
           </button>
         </div>
 
-        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={takeScreenshot} disabled={shooting || !generatedCode} title="Capturar screenshot">
+        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => takeScreenshot()} disabled={shooting || !generatedCode} title="Capturar screenshot">
           <Camera className={`h-3 w-3 ${shooting ? 'animate-pulse' : ''}`} />
         </Button>
         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={toggleFullscreen} title={isFullscreen ? 'Sair de tela cheia' : 'Tela cheia'}>
