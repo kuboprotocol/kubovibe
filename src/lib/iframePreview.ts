@@ -148,6 +148,10 @@ export function subscribePreviewLogs(handler: (entry: PreviewLogEntry) => void):
       source: data.source,
       line: data.line,
       col: data.col,
+      url: data.url,
+      method: data.method,
+      status: data.status,
+      duration: data.duration,
     })
   }
   window.addEventListener('message', listener)
