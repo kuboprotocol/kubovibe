@@ -654,6 +654,7 @@ export default function BuilderPage() {
               logs={previewLogs}
               onClear={() => setPreviewLogs([])}
               defaultOpen={previewLogs.some(l => ['error','exception','rejection'].includes(l.kind))}
+              onAutoScreenshot={(reason) => window.dispatchEvent(new CustomEvent('kubo:preview:auto-screenshot', { detail: { reason } }))}
             />
           )}
         </div>
