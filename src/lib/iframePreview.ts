@@ -60,6 +60,50 @@ const INSTRUMENTATION = `
       var r = ev && ev.reason;
       send({kind:'rejection', message: (r && (r.message || String(r))) || 'Unhandled rejection', stack: r && r.stack});
     });
+
+    // ---- Network instrumentation: fetch ----
+    try {
+      var origFetch = window.fetch;
+      if (typeof origFetch === 'function') {
+        window.fetch = function(input, init){
+          var start = Date.now();
+          var url = typeof input === 'string' ? input : (input && input.url) || '';
+          var method = (init && init.method) || (input && input.method) || 'GET';
+          return origFetch.apply(this, arguments).then(function(res){
+            var dur = Date.now() - start;
+            if (!res.ok) send({kind:'network', message:('HTTP '+res.status+' '+method+' '+url), url:url, method:method, status:res.status, duration:dur});
+            return res;
+          }).catch(function(err){
+            send({kind:'network', message:('FETCH FAIL '+method+' '+url+' — '+(err && err.message || err)), url:url, method:method, duration: Date.now()-start, stack: err && err.stack});
+            throw err;
+          });
+        };
+      }
+    } catch(e){}
+
+    // ---- Network instrumentation: XHR ----
+    try {
+      var XHR = window.XMLHttpRequest && window.XMLHttpRequest.prototype;
+      if (XHR) {
+        var origOpen = XHR.open, origSend = XHR.send;
+        XHR.open = function(method, url){
+          this.__kubo = { method: method, url: url, start: 0 };
+          return origOpen.apply(this, arguments);
+        };
+        XHR.send = function(){
+          var self = this;
+          if (self.__kubo) self.__kubo.start = Date.now();
+          self.addEventListener('loadend', function(){
+            var info = self.__kubo || {};
+            var dur = Date.now() - (info.start || Date.now());
+            if (self.status === 0) send({kind:'network', message:('XHR FAIL '+info.method+' '+info.url), url:info.url, method:info.method, duration:dur});
+            else if (self.status >= 400) send({kind:'network', message:('HTTP '+self.status+' '+info.method+' '+info.url), url:info.url, method:info.method, status:self.status, duration:dur});
+          });
+          return origSend.apply(this, arguments);
+        };
+      }
+    } catch(e){}
+
     send({kind:'ready', message: location.href});
   } catch(e){}
 })();
