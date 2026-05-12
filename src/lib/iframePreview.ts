@@ -9,7 +9,7 @@
 
 export type PreviewLogKind =
   | 'log' | 'info' | 'warn' | 'error' | 'debug'
-  | 'exception' | 'rejection' | 'resource' | 'ready'
+  | 'exception' | 'rejection' | 'resource' | 'ready' | 'network'
 
 export interface PreviewLogEntry {
   id: string
@@ -20,6 +20,10 @@ export interface PreviewLogEntry {
   source?: string
   line?: number
   col?: number
+  url?: string
+  method?: string
+  status?: number
+  duration?: number
 }
 
 const INSTRUMENTATION = `
