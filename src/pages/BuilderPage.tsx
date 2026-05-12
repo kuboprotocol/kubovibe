@@ -19,13 +19,20 @@ import KuboFlowSelector, { autoDetectMode, type KuboFlowMode } from '@/component
 import { uploadFile, validateFile, getAllAllowedTypes, type UploadedFile } from '@/lib/fileUpload'
 import { Progress } from '@/components/ui/progress'
 import logoImg from '@/assets/logo-kubovibe.png'
-import { wrapPreviewHtml, subscribePreviewLogs, type PreviewLogEntry } from '@/lib/iframePreview'
+import { subscribePreviewLogs, type PreviewLogEntry } from '@/lib/iframePreview'
 import PreviewAuditPanel from '@/components/builder/PreviewAuditPanel'
+import PreviewFrame from '@/components/builder/PreviewFrame'
 
-const DEVICE_SIZES: Record<DeviceFrame, { w: number; h: number; label: string }> = {
-  desktop: { w: 1440, h: 900, label: 'Desktop 1440×900' },
-  tablet: { w: 768, h: 1024, label: 'Tablet 768×1024' },
-  mobile: { w: 390, h: 844, label: 'Mobile 390×844' },
+const DEVICE_LS_KEY = 'kubo:previewDevice:v1'
+function loadDevicePref(): { frame: DeviceFrame; landscape: boolean } {
+  try {
+    const raw = localStorage.getItem(DEVICE_LS_KEY)
+    if (raw) {
+      const p = JSON.parse(raw)
+      if (p && typeof p === 'object') return { frame: p.frame || 'desktop', landscape: !!p.landscape }
+    }
+  } catch {}
+  return { frame: 'desktop', landscape: false }
 }
 
 export default function BuilderPage() {
