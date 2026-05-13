@@ -165,10 +165,24 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
   })
   const [copied, setCopied] = useState(false)
   const [bundling, setBundling] = useState(false)
+  const [sharing, setSharing] = useState(false)
+  const [selectMode, setSelectMode] = useState(false)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [bundleOpts, setBundleOpts] = useState<{ logs: boolean; report: boolean; har: boolean; correlations: boolean; network: boolean; screenshots: boolean }>(() => {
+    try {
+      const raw = localStorage.getItem('kubo:audit:bundleOpts')
+      if (raw) return { logs: true, report: true, har: true, correlations: true, network: true, screenshots: true, ...JSON.parse(raw) }
+    } catch {}
+    return { logs: true, report: true, har: true, correlations: true, network: true, screenshots: true }
+  })
   const scrollRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const lastShotErrorIdRef = useRef<string | null>(null)
   const shotsRef = useRef<{ name: string; dataUrl: string; ts: number; reason?: string }[]>([])
+
+  useEffect(() => {
+    try { localStorage.setItem('kubo:audit:bundleOpts', JSON.stringify(bundleOpts)) } catch {}
+  }, [bundleOpts])
 
   // Persist filters
   useEffect(() => {
