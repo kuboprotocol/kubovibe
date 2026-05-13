@@ -2,16 +2,19 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertCircle, AlertTriangle, Bug, Camera, ChevronDown, ChevronUp, Copy,
   Download, Info, Network, Search, Trash2, X, Check, Package, BarChart3, Clock,
+  CheckSquare, Square, Share2, Link2, Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel, DropdownMenuCheckboxItem,
 } from '@/components/ui/dropdown-menu'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import JSZip from 'jszip'
 import type { PreviewLogEntry, PreviewLogKind } from '@/lib/iframePreview'
+import { entriesToHAR, correlateErrors, correlationsToMarkdown, shareReport } from '@/lib/auditBundle'
 
 interface Props {
   logs: PreviewLogEntry[]
@@ -162,10 +165,24 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
   })
   const [copied, setCopied] = useState(false)
   const [bundling, setBundling] = useState(false)
+  const [sharing, setSharing] = useState(false)
+  const [selectMode, setSelectMode] = useState(false)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [bundleOpts, setBundleOpts] = useState<{ logs: boolean; report: boolean; har: boolean; correlations: boolean; network: boolean; screenshots: boolean }>(() => {
+    try {
+      const raw = localStorage.getItem('kubo:audit:bundleOpts')
+      if (raw) return { logs: true, report: true, har: true, correlations: true, network: true, screenshots: true, ...JSON.parse(raw) }
+    } catch {}
+    return { logs: true, report: true, har: true, correlations: true, network: true, screenshots: true }
+  })
   const scrollRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const lastShotErrorIdRef = useRef<string | null>(null)
   const shotsRef = useRef<{ name: string; dataUrl: string; ts: number; reason?: string }[]>([])
+
+  useEffect(() => {
+    try { localStorage.setItem('kubo:audit:bundleOpts', JSON.stringify(bundleOpts)) } catch {}
+  }, [bundleOpts])
 
   // Persist filters
   useEffect(() => {
@@ -259,29 +276,44 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
     } catch { toast.error('Falha ao copiar') }
   }
 
-  const handleBundleZip = async () => {
-    setBundling(true)
-    try {
-      const zip = new JSZip()
-      const ts = new Date().toISOString().replace(/[:.]/g, '-')
-      zip.file('logs.json', JSON.stringify({ exportedAt: new Date().toISOString(), count: logs.length, entries: logs }, null, 2))
-      zip.file('logs.csv', entriesToCSV(logs))
-      zip.file('report.md', buildErrorReport(logs))
-      zip.file('network-summary.json', JSON.stringify(summarizeNetwork(logs), null, 2))
-      zip.file('meta.json', JSON.stringify({
-        exportedAt: new Date().toISOString(),
-        userAgent: navigator.userAgent,
-        url: location.href,
-        counts: { total: logs.length, errors: errorCount, warnings: warnCount, network: netCount },
-        filters: { query, filter, range },
-      }, null, 2))
+  const buildBundle = async (): Promise<{ blob: Blob; ts: string }> => {
+    const zip = new JSZip()
+    const ts = new Date().toISOString().replace(/[:.]/g, '-')
+    // Pick source set: selected items if any, else all logs
+    const source = selectMode && selected.size > 0 ? logs.filter(l => selected.has(l.id)) : logs
+    const correlations = correlateErrors(source)
 
-      // Add stashed auto-shots
+    if (bundleOpts.logs) {
+      zip.file('logs.json', JSON.stringify({ exportedAt: new Date().toISOString(), count: source.length, entries: source }, null, 2))
+      zip.file('logs.csv', entriesToCSV(source))
+    }
+    if (bundleOpts.report) {
+      const base = buildErrorReport(source)
+      const corr = bundleOpts.correlations ? `\n\n## Correlações erro × rede (±2s)\n${correlationsToMarkdown(correlations)}` : ''
+      zip.file('report.md', base + corr)
+    }
+    if (bundleOpts.network) {
+      zip.file('network-summary.json', JSON.stringify(summarizeNetwork(source), null, 2))
+    }
+    if (bundleOpts.har) {
+      zip.file('network.har', JSON.stringify(entriesToHAR(source), null, 2))
+    }
+    if (bundleOpts.correlations) {
+      zip.file('correlations.json', JSON.stringify(correlations, null, 2))
+    }
+    zip.file('meta.json', JSON.stringify({
+      exportedAt: new Date().toISOString(),
+      userAgent: navigator.userAgent,
+      url: location.href,
+      counts: { total: source.length, errors: errorCount, warnings: warnCount, network: netCount },
+      selection: { mode: selectMode, count: selected.size },
+      filters: { query, filter, range },
+      includes: bundleOpts,
+    }, null, 2))
+
+    if (bundleOpts.screenshots) {
       const shotsFolder = zip.folder('screenshots')
-      for (const s of shotsRef.current) {
-        shotsFolder?.file(s.name, dataUrlToBlob(s.dataUrl))
-      }
-      // Also try a fresh manual capture
+      for (const s of shotsRef.current) shotsFolder?.file(s.name, dataUrlToBlob(s.dataUrl))
       const cap = (window as any).__kuboCapturePreview
       if (typeof cap === 'function') {
         try {
@@ -289,8 +321,15 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
           if (res?.dataUrl) shotsFolder?.file(`current-${ts}.png`, dataUrlToBlob(res.dataUrl))
         } catch {}
       }
+    }
+    const blob = await zip.generateAsync({ type: 'blob' })
+    return { blob, ts }
+  }
 
-      const blob = await zip.generateAsync({ type: 'blob' })
+  const handleBundleZip = async () => {
+    setBundling(true)
+    try {
+      const { blob, ts } = await buildBundle()
       downloadBlob(blob, `preview-bundle-${ts}.zip`, 'application/zip')
       toast.success('Bundle ZIP gerado')
     } catch (e: any) {
@@ -299,6 +338,30 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
       setBundling(false)
     }
   }
+
+  const handleShareReport = async () => {
+    setSharing(true)
+    try {
+      const { blob } = await buildBundle()
+      const url = await shareReport(blob)
+      try { await navigator.clipboard.writeText(url) } catch {}
+      toast.success('Link de compartilhamento copiado', { description: url })
+    } catch (e: any) {
+      toast.error('Falha ao compartilhar: ' + (e?.message || 'erro'))
+    } finally {
+      setSharing(false)
+    }
+  }
+
+  const toggleSelected = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+  const selectAllVisible = () => setSelected(new Set(filtered.map(l => l.id)))
+  const clearSelection = () => setSelected(new Set())
 
   // Keyboard shortcuts (Ctrl/Cmd + Shift + …)
   useEffect(() => {
@@ -309,6 +372,7 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
       if (key === 'l') { e.preventDefault(); setOpen(o => !o) }
       else if (key === 'e') { e.preventDefault(); setOpen(true); handleExportJSON() }
       else if (key === 'b') { e.preventDefault(); setOpen(true); handleBundleZip() }
+      else if (key === 's') { e.preventDefault(); setOpen(true); handleShareReport() }
       else if (key === 'c') { e.preventDefault(); setOpen(true); handleCopyReport() }
       else if (key === 'k') { e.preventDefault(); onClear() }
       else if (key === 'f') { e.preventDefault(); setOpen(true); setTimeout(() => searchRef.current?.focus(), 50) }
@@ -420,21 +484,67 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
               </DropdownMenuContent>
             </DropdownMenu>
 
+            <Button
+              variant="ghost" size="icon"
+              className={cn('h-6 w-6', selectMode && 'text-primary')}
+              onClick={() => { setSelectMode(s => !s); if (selectMode) clearSelection() }}
+              title={selectMode ? `Selecionados: ${selected.size}` : 'Selecionar itens para o ZIP'}
+            >
+              {selectMode ? <CheckSquare className="h-3 w-3" /> : <Square className="h-3 w-3" />}
+            </Button>
+            {selectMode && (
+              <span className="text-[10px] font-mono text-muted-foreground whitespace-nowrap">
+                {selected.size}/{filtered.length}
+                <button onClick={selectAllVisible} className="ml-1 underline">todos</button>
+                {selected.size > 0 && <button onClick={clearSelection} className="ml-1 underline">limpar</button>}
+              </span>
+            )}
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-6 w-6" title="Exportar">
                   <Download className="h-3 w-3" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" className="w-60">
                 <DropdownMenuItem onClick={handleExportJSON}>JSON (⌘⇧E)</DropdownMenuItem>
                 <DropdownMenuItem onClick={handleExportCSV}>CSV</DropdownMenuItem>
                 <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-[10px]">Conteúdo do bundle</DropdownMenuLabel>
+                {([
+                  ['logs', 'Logs (JSON + CSV)'],
+                  ['report', 'Relatório (Markdown)'],
+                  ['network', 'Resumo de endpoints'],
+                  ['har', 'HAR de rede'],
+                  ['correlations', 'Correlações erro × rede'],
+                  ['screenshots', 'Screenshots'],
+                ] as const).map(([k, label]) => (
+                  <DropdownMenuCheckboxItem
+                    key={k}
+                    checked={bundleOpts[k]}
+                    onCheckedChange={(v) => setBundleOpts(o => ({ ...o, [k]: !!v }))}
+                    onSelect={(e) => e.preventDefault()}
+                  >{label}</DropdownMenuCheckboxItem>
+                ))}
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleBundleZip} disabled={bundling}>
-                  <Package className="h-3 w-3 mr-2" /> Bundle ZIP (⌘⇧B)
+                  {bundling ? <Loader2 className="h-3 w-3 mr-2 animate-spin" /> : <Package className="h-3 w-3 mr-2" />}
+                  Bundle ZIP (⌘⇧B)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleShareReport} disabled={sharing}>
+                  {sharing ? <Loader2 className="h-3 w-3 mr-2 animate-spin" /> : <Share2 className="h-3 w-3 mr-2" />}
+                  Compartilhar por link (⌘⇧S)
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+
+            <Button
+              variant="ghost" size="icon" className="h-6 w-6"
+              onClick={handleShareReport} disabled={sharing}
+              title="Compartilhar relatório por link (⌘⇧S)"
+            >
+              {sharing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Link2 className="h-3 w-3" />}
+            </Button>
 
             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onClear} title="Limpar (⌘⇧K)">
               <Trash2 className="h-3 w-3" />
@@ -496,8 +606,15 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
                 const meta = KIND_META[l.kind] || KIND_META.log
                 const Icon = meta.icon
                 return (
-                  <li key={l.id} className="px-3 py-1.5 hover:bg-secondary/40">
+                  <li key={l.id} className={cn('px-3 py-1.5 hover:bg-secondary/40', selectMode && selected.has(l.id) && 'bg-primary/10')}>
                     <div className="flex items-start gap-2">
+                      {selectMode && (
+                        <Checkbox
+                          checked={selected.has(l.id)}
+                          onCheckedChange={() => toggleSelected(l.id)}
+                          className="mt-0.5 shrink-0 h-3.5 w-3.5"
+                        />
+                      )}
                       <Icon className={cn('h-3 w-3 mt-0.5 shrink-0', meta.color)} />
                       <span className={cn('uppercase text-[9px] font-semibold tracking-wide w-14 shrink-0 mt-0.5', meta.color)}>{meta.label}</span>
                       <div className="flex-1 min-w-0">
