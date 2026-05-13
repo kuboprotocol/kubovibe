@@ -606,8 +606,15 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
                 const meta = KIND_META[l.kind] || KIND_META.log
                 const Icon = meta.icon
                 return (
-                  <li key={l.id} className="px-3 py-1.5 hover:bg-secondary/40">
+                  <li key={l.id} className={cn('px-3 py-1.5 hover:bg-secondary/40', selectMode && selected.has(l.id) && 'bg-primary/10')}>
                     <div className="flex items-start gap-2">
+                      {selectMode && (
+                        <Checkbox
+                          checked={selected.has(l.id)}
+                          onCheckedChange={() => toggleSelected(l.id)}
+                          className="mt-0.5 shrink-0 h-3.5 w-3.5"
+                        />
+                      )}
                       <Icon className={cn('h-3 w-3 mt-0.5 shrink-0', meta.color)} />
                       <span className={cn('uppercase text-[9px] font-semibold tracking-wide w-14 shrink-0 mt-0.5', meta.color)}>{meta.label}</span>
                       <div className="flex-1 min-w-0">
