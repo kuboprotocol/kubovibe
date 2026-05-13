@@ -99,34 +99,40 @@ export default function PreviewFrame({
     }
   }, [])
 
-  const takeScreenshot = useCallback(async (opts: { silent?: boolean; suffix?: string } = {}) => {
+  const captureDataUrl = useCallback(async (): Promise<string | null> => {
     const iframe = iframeRef.current
-    if (!iframe) return
+    if (!iframe) return null
+    const doc = iframe.contentDocument
+    const body = doc?.documentElement
+    if (!doc || !body) return null
+    return await htmlToImage.toPng(body as unknown as HTMLElement, {
+      width: w, height: h, pixelRatio: 2, backgroundColor: '#ffffff',
+    })
+  }, [w, h])
+
+  const takeScreenshot = useCallback(async (opts: { silent?: boolean; suffix?: string; download?: boolean } = {}) => {
     setShooting(true)
     try {
-      const doc = iframe.contentDocument
-      const body = doc?.documentElement
-      if (!doc || !body) throw new Error('Sem acesso ao iframe')
-      const dataUrl = await htmlToImage.toPng(body as unknown as HTMLElement, {
-        width: w,
-        height: h,
-        pixelRatio: 2,
-        backgroundColor: '#ffffff',
-      })
-      const a = document.createElement('a')
-      const slug = (projectTitle || 'preview').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'preview'
-      const suffix = opts.suffix ? `-${opts.suffix}` : ''
-      a.download = `${slug}-${deviceFrame}-${w}x${h}${suffix}.png`
-      a.href = dataUrl
-      a.click()
+      const dataUrl = await captureDataUrl()
+      if (!dataUrl) throw new Error('Sem acesso ao iframe')
+      if (opts.download !== false) {
+        const a = document.createElement('a')
+        const slug = (projectTitle || 'preview').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'preview'
+        const suffix = opts.suffix ? `-${opts.suffix}` : ''
+        a.download = `${slug}-${deviceFrame}-${w}x${h}${suffix}.png`
+        a.href = dataUrl
+        a.click()
+      }
       if (!opts.silent) toast.success('Screenshot salva')
-      else toast('Auto-screenshot capturada', { description: opts.suffix })
+      else if (opts.download !== false) toast('Auto-screenshot capturada', { description: opts.suffix })
+      return dataUrl
     } catch (e: any) {
       if (!opts.silent) toast.error('Falha ao capturar: ' + (e?.message || 'erro'))
+      return null
     } finally {
       setShooting(false)
     }
-  }, [w, h, deviceFrame, projectTitle])
+  }, [captureDataUrl, deviceFrame, projectTitle, w, h])
 
   // Listen for auto-screenshot requests from the audit panel
   useEffect(() => {
@@ -137,6 +143,15 @@ export default function PreviewFrame({
     window.addEventListener('kubo:preview:auto-screenshot', handler as EventListener)
     return () => window.removeEventListener('kubo:preview:auto-screenshot', handler as EventListener)
   }, [takeScreenshot])
+
+  // Expose capture API for bundle export
+  useEffect(() => {
+    ;(window as any).__kuboCapturePreview = async () => {
+      const url = await captureDataUrl()
+      return url ? { dataUrl: url, width: w, height: h, device: deviceFrame } : null
+    }
+    return () => { try { delete (window as any).__kuboCapturePreview } catch {} }
+  }, [captureDataUrl, w, h, deviceFrame])
 
   const displayUrl = publishedUrl || (typeof window !== 'undefined' ? `${window.location.origin}/preview` : '/preview')
 

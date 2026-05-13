@@ -61,6 +61,7 @@
     "framer-motion": "^12.34.4",
     "html-to-image": "^1.11.13",
     "input-otp": "^1.4.2",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.462.0",
     "next-themes": "^0.3.0",
     "qrcode.react": "^4.2.0",
