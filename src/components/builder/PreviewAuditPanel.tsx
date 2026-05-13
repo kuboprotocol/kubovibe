@@ -372,6 +372,7 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
       if (key === 'l') { e.preventDefault(); setOpen(o => !o) }
       else if (key === 'e') { e.preventDefault(); setOpen(true); handleExportJSON() }
       else if (key === 'b') { e.preventDefault(); setOpen(true); handleBundleZip() }
+      else if (key === 's') { e.preventDefault(); setOpen(true); handleShareReport() }
       else if (key === 'c') { e.preventDefault(); setOpen(true); handleCopyReport() }
       else if (key === 'k') { e.preventDefault(); onClear() }
       else if (key === 'f') { e.preventDefault(); setOpen(true); setTimeout(() => searchRef.current?.focus(), 50) }
