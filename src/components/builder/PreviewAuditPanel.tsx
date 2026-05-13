@@ -483,21 +483,67 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
               </DropdownMenuContent>
             </DropdownMenu>
 
+            <Button
+              variant="ghost" size="icon"
+              className={cn('h-6 w-6', selectMode && 'text-primary')}
+              onClick={() => { setSelectMode(s => !s); if (selectMode) clearSelection() }}
+              title={selectMode ? `Selecionados: ${selected.size}` : 'Selecionar itens para o ZIP'}
+            >
+              {selectMode ? <CheckSquare className="h-3 w-3" /> : <Square className="h-3 w-3" />}
+            </Button>
+            {selectMode && (
+              <span className="text-[10px] font-mono text-muted-foreground whitespace-nowrap">
+                {selected.size}/{filtered.length}
+                <button onClick={selectAllVisible} className="ml-1 underline">todos</button>
+                {selected.size > 0 && <button onClick={clearSelection} className="ml-1 underline">limpar</button>}
+              </span>
+            )}
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-6 w-6" title="Exportar">
                   <Download className="h-3 w-3" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" className="w-60">
                 <DropdownMenuItem onClick={handleExportJSON}>JSON (⌘⇧E)</DropdownMenuItem>
                 <DropdownMenuItem onClick={handleExportCSV}>CSV</DropdownMenuItem>
                 <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-[10px]">Conteúdo do bundle</DropdownMenuLabel>
+                {([
+                  ['logs', 'Logs (JSON + CSV)'],
+                  ['report', 'Relatório (Markdown)'],
+                  ['network', 'Resumo de endpoints'],
+                  ['har', 'HAR de rede'],
+                  ['correlations', 'Correlações erro × rede'],
+                  ['screenshots', 'Screenshots'],
+                ] as const).map(([k, label]) => (
+                  <DropdownMenuCheckboxItem
+                    key={k}
+                    checked={bundleOpts[k]}
+                    onCheckedChange={(v) => setBundleOpts(o => ({ ...o, [k]: !!v }))}
+                    onSelect={(e) => e.preventDefault()}
+                  >{label}</DropdownMenuCheckboxItem>
+                ))}
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleBundleZip} disabled={bundling}>
-                  <Package className="h-3 w-3 mr-2" /> Bundle ZIP (⌘⇧B)
+                  {bundling ? <Loader2 className="h-3 w-3 mr-2 animate-spin" /> : <Package className="h-3 w-3 mr-2" />}
+                  Bundle ZIP (⌘⇧B)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleShareReport} disabled={sharing}>
+                  {sharing ? <Loader2 className="h-3 w-3 mr-2 animate-spin" /> : <Share2 className="h-3 w-3 mr-2" />}
+                  Compartilhar por link (⌘⇧S)
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+
+            <Button
+              variant="ghost" size="icon" className="h-6 w-6"
+              onClick={handleShareReport} disabled={sharing}
+              title="Compartilhar relatório por link (⌘⇧S)"
+            >
+              {sharing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Link2 className="h-3 w-3" />}
+            </Button>
 
             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onClear} title="Limpar (⌘⇧K)">
               <Trash2 className="h-3 w-3" />
