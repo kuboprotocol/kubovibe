@@ -2,16 +2,19 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertCircle, AlertTriangle, Bug, Camera, ChevronDown, ChevronUp, Copy,
   Download, Info, Network, Search, Trash2, X, Check, Package, BarChart3, Clock,
+  CheckSquare, Square, Share2, Link2, Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel, DropdownMenuCheckboxItem,
 } from '@/components/ui/dropdown-menu'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import JSZip from 'jszip'
 import type { PreviewLogEntry, PreviewLogKind } from '@/lib/iframePreview'
+import { entriesToHAR, correlateErrors, correlationsToMarkdown, shareReport } from '@/lib/auditBundle'
 
 interface Props {
   logs: PreviewLogEntry[]
