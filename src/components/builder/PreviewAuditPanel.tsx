@@ -276,29 +276,44 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
     } catch { toast.error('Falha ao copiar') }
   }
 
-  const handleBundleZip = async () => {
-    setBundling(true)
-    try {
-      const zip = new JSZip()
-      const ts = new Date().toISOString().replace(/[:.]/g, '-')
-      zip.file('logs.json', JSON.stringify({ exportedAt: new Date().toISOString(), count: logs.length, entries: logs }, null, 2))
-      zip.file('logs.csv', entriesToCSV(logs))
-      zip.file('report.md', buildErrorReport(logs))
-      zip.file('network-summary.json', JSON.stringify(summarizeNetwork(logs), null, 2))
-      zip.file('meta.json', JSON.stringify({
-        exportedAt: new Date().toISOString(),
-        userAgent: navigator.userAgent,
-        url: location.href,
-        counts: { total: logs.length, errors: errorCount, warnings: warnCount, network: netCount },
-        filters: { query, filter, range },
-      }, null, 2))
+  const buildBundle = async (): Promise<{ blob: Blob; ts: string }> => {
+    const zip = new JSZip()
+    const ts = new Date().toISOString().replace(/[:.]/g, '-')
+    // Pick source set: selected items if any, else all logs
+    const source = selectMode && selected.size > 0 ? logs.filter(l => selected.has(l.id)) : logs
+    const correlations = correlateErrors(source)
 
-      // Add stashed auto-shots
+    if (bundleOpts.logs) {
+      zip.file('logs.json', JSON.stringify({ exportedAt: new Date().toISOString(), count: source.length, entries: source }, null, 2))
+      zip.file('logs.csv', entriesToCSV(source))
+    }
+    if (bundleOpts.report) {
+      const base = buildErrorReport(source)
+      const corr = bundleOpts.correlations ? `\n\n## Correlações erro × rede (±2s)\n${correlationsToMarkdown(correlations)}` : ''
+      zip.file('report.md', base + corr)
+    }
+    if (bundleOpts.network) {
+      zip.file('network-summary.json', JSON.stringify(summarizeNetwork(source), null, 2))
+    }
+    if (bundleOpts.har) {
+      zip.file('network.har', JSON.stringify(entriesToHAR(source), null, 2))
+    }
+    if (bundleOpts.correlations) {
+      zip.file('correlations.json', JSON.stringify(correlations, null, 2))
+    }
+    zip.file('meta.json', JSON.stringify({
+      exportedAt: new Date().toISOString(),
+      userAgent: navigator.userAgent,
+      url: location.href,
+      counts: { total: source.length, errors: errorCount, warnings: warnCount, network: netCount },
+      selection: { mode: selectMode, count: selected.size },
+      filters: { query, filter, range },
+      includes: bundleOpts,
+    }, null, 2))
+
+    if (bundleOpts.screenshots) {
       const shotsFolder = zip.folder('screenshots')
-      for (const s of shotsRef.current) {
-        shotsFolder?.file(s.name, dataUrlToBlob(s.dataUrl))
-      }
-      // Also try a fresh manual capture
+      for (const s of shotsRef.current) shotsFolder?.file(s.name, dataUrlToBlob(s.dataUrl))
       const cap = (window as any).__kuboCapturePreview
       if (typeof cap === 'function') {
         try {
@@ -306,8 +321,15 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
           if (res?.dataUrl) shotsFolder?.file(`current-${ts}.png`, dataUrlToBlob(res.dataUrl))
         } catch {}
       }
+    }
+    const blob = await zip.generateAsync({ type: 'blob' })
+    return { blob, ts }
+  }
 
-      const blob = await zip.generateAsync({ type: 'blob' })
+  const handleBundleZip = async () => {
+    setBundling(true)
+    try {
+      const { blob, ts } = await buildBundle()
       downloadBlob(blob, `preview-bundle-${ts}.zip`, 'application/zip')
       toast.success('Bundle ZIP gerado')
     } catch (e: any) {
@@ -316,6 +338,30 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
       setBundling(false)
     }
   }
+
+  const handleShareReport = async () => {
+    setSharing(true)
+    try {
+      const { blob } = await buildBundle()
+      const url = await shareReport(blob)
+      try { await navigator.clipboard.writeText(url) } catch {}
+      toast.success('Link de compartilhamento copiado', { description: url })
+    } catch (e: any) {
+      toast.error('Falha ao compartilhar: ' + (e?.message || 'erro'))
+    } finally {
+      setSharing(false)
+    }
+  }
+
+  const toggleSelected = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+  const selectAllVisible = () => setSelected(new Set(filtered.map(l => l.id)))
+  const clearSelection = () => setSelected(new Set())
 
   // Keyboard shortcuts (Ctrl/Cmd + Shift + …)
   useEffect(() => {
