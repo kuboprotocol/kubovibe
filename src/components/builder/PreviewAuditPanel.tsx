@@ -14,7 +14,7 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import JSZip from 'jszip'
 import type { PreviewLogEntry, PreviewLogKind } from '@/lib/iframePreview'
-import { entriesToHAR, correlateErrors, correlationsToMarkdown, shareReport } from '@/lib/auditBundle'
+import { entriesToHAR, correlateErrors, correlationsToMarkdown, shareReport, type SharedReport } from '@/lib/auditBundle'
 
 interface Props {
   logs: PreviewLogEntry[]
@@ -159,7 +159,7 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
   const [filter, setFilter] = useState<FilterKind>(persisted.filter)
   const [query, setQuery] = useState(persisted.query)
   const [range, setRange] = useState<TimeRange>(persisted.range)
-  const [showSummary, setShowSummary] = useState(false)
+  const [view, setView] = useState<'logs' | 'summary' | 'timeline'>('logs')
   const [autoShot, setAutoShot] = useState<boolean>(() => {
     try { return localStorage.getItem('kubo:audit:autoShot') === '1' } catch { return false }
   })
@@ -168,6 +168,18 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
   const [sharing, setSharing] = useState(false)
   const [selectMode, setSelectMode] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [corrWindowMs, setCorrWindowMs] = useState<number>(() => {
+    try { return Number(localStorage.getItem('kubo:audit:corrWindowMs')) || 2000 } catch { return 2000 }
+  })
+  const [protectShare, setProtectShare] = useState<boolean>(() => {
+    try { return localStorage.getItem('kubo:audit:protectShare') !== '0' } catch { return true }
+  })
+  const [shareTtlSec, setShareTtlSec] = useState<number>(() => {
+    try { return Number(localStorage.getItem('kubo:audit:shareTtlSec')) || 7 * 24 * 60 * 60 } catch { return 7 * 24 * 60 * 60 }
+  })
+  const [shareHistory, setShareHistory] = useState<SharedReport[]>(() => {
+    try { return JSON.parse(localStorage.getItem('kubo:audit:shareHistory') || '[]') } catch { return [] }
+  })
   const [bundleOpts, setBundleOpts] = useState<{ logs: boolean; report: boolean; har: boolean; correlations: boolean; network: boolean; screenshots: boolean }>(() => {
     try {
       const raw = localStorage.getItem('kubo:audit:bundleOpts')
@@ -183,6 +195,10 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
   useEffect(() => {
     try { localStorage.setItem('kubo:audit:bundleOpts', JSON.stringify(bundleOpts)) } catch {}
   }, [bundleOpts])
+  useEffect(() => { try { localStorage.setItem('kubo:audit:corrWindowMs', String(corrWindowMs)) } catch {} }, [corrWindowMs])
+  useEffect(() => { try { localStorage.setItem('kubo:audit:protectShare', protectShare ? '1' : '0') } catch {} }, [protectShare])
+  useEffect(() => { try { localStorage.setItem('kubo:audit:shareTtlSec', String(shareTtlSec)) } catch {} }, [shareTtlSec])
+  useEffect(() => { try { localStorage.setItem('kubo:audit:shareHistory', JSON.stringify(shareHistory.slice(0, 20))) } catch {} }, [shareHistory])
 
   // Persist filters
   useEffect(() => {
@@ -281,7 +297,7 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
     const ts = new Date().toISOString().replace(/[:.]/g, '-')
     // Pick source set: selected items if any, else all logs
     const source = selectMode && selected.size > 0 ? logs.filter(l => selected.has(l.id)) : logs
-    const correlations = correlateErrors(source)
+    const correlations = correlateErrors(source, corrWindowMs)
 
     if (bundleOpts.logs) {
       zip.file('logs.json', JSON.stringify({ exportedAt: new Date().toISOString(), count: source.length, entries: source }, null, 2))
@@ -289,7 +305,7 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
     }
     if (bundleOpts.report) {
       const base = buildErrorReport(source)
-      const corr = bundleOpts.correlations ? `\n\n## Correlações erro × rede (±2s)\n${correlationsToMarkdown(correlations)}` : ''
+      const corr = bundleOpts.correlations ? `\n\n## Correlações erro × rede (±${corrWindowMs}ms)\n${correlationsToMarkdown(correlations)}` : ''
       zip.file('report.md', base + corr)
     }
     if (bundleOpts.network) {
@@ -343,15 +359,25 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
     setSharing(true)
     try {
       const { blob } = await buildBundle()
-      const url = await shareReport(blob)
-      try { await navigator.clipboard.writeText(url) } catch {}
-      toast.success('Link de compartilhamento copiado', { description: url })
+      const shared = await shareReport(blob, { protect: protectShare, expiresInSec: shareTtlSec })
+      try { await navigator.clipboard.writeText(shared.url) } catch {}
+      setShareHistory(h => [shared, ...h].slice(0, 20))
+      toast.success(
+        protectShare ? 'Link protegido copiado' : 'Link público copiado',
+        { description: shared.expiresAt ? `Expira em ${new Date(shared.expiresAt).toLocaleString()}` : shared.url },
+      )
     } catch (e: any) {
       toast.error('Falha ao compartilhar: ' + (e?.message || 'erro'))
     } finally {
       setSharing(false)
     }
   }
+
+  const copyShared = async (s: SharedReport) => {
+    try { await navigator.clipboard.writeText(s.url); toast.success('Link copiado') }
+    catch { toast.error('Falha ao copiar') }
+  }
+  const clearShareHistory = () => { setShareHistory([]); toast.success('Histórico limpo') }
 
   const toggleSelected = (id: string) => {
     setSelected(prev => {
@@ -450,14 +476,39 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <Button
-              variant="ghost" size="icon"
-              className={cn('h-6 w-6', showSummary && 'text-primary')}
-              onClick={() => setShowSummary(s => !s)}
-              title="Resumo de endpoints"
-            >
-              <BarChart3 className="h-3 w-3" />
-            </Button>
+            <div className="flex items-center gap-0.5 bg-secondary/60 rounded-md p-0.5">
+              {([
+                ['logs', 'Logs'],
+                ['summary', 'Rede'],
+                ['timeline', 'Timeline'],
+              ] as const).map(([v, label]) => (
+                <button
+                  key={v}
+                  onClick={() => setView(v)}
+                  className={cn('px-2 py-0.5 text-[10px] rounded',
+                    view === v ? 'bg-background text-foreground' : 'text-muted-foreground')}
+                  title={`Ver ${label}`}
+                >{v === 'summary' ? <BarChart3 className="h-3 w-3 inline" /> : v === 'timeline' ? <Clock className="h-3 w-3 inline" /> : label}</button>
+              ))}
+            </div>
+
+            {/* Correlation window */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px] font-mono gap-1" title="Janela de correlação erro × rede">
+                  ±{corrWindowMs >= 1000 ? `${corrWindowMs / 1000}s` : `${corrWindowMs}ms`}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel className="text-[10px]">Janela de correlação</DropdownMenuLabel>
+                {[500, 1000, 2000, 5000, 10000, 30000].map(ms => (
+                  <DropdownMenuItem key={ms} onClick={() => setCorrWindowMs(ms)}>
+                    ±{ms >= 1000 ? `${ms / 1000}s` : `${ms}ms`}
+                    {corrWindowMs === ms && <Check className="h-3 w-3 ml-auto" />}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             {onAutoScreenshot && (
               <Button
@@ -538,13 +589,56 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <Button
-              variant="ghost" size="icon" className="h-6 w-6"
-              onClick={handleShareReport} disabled={sharing}
-              title="Compartilhar relatório por link (⌘⇧S)"
-            >
-              {sharing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Link2 className="h-3 w-3" />}
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-6 w-6" title="Compartilhar / histórico" disabled={sharing}>
+                  {sharing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Link2 className="h-3 w-3" />}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-72">
+                <DropdownMenuLabel className="text-[10px]">Compartilhamento</DropdownMenuLabel>
+                <DropdownMenuCheckboxItem
+                  checked={protectShare}
+                  onCheckedChange={(v) => setProtectShare(!!v)}
+                  onSelect={(e) => e.preventDefault()}
+                >Link protegido (URL assinada)</DropdownMenuCheckboxItem>
+                <DropdownMenuLabel className="text-[10px] text-muted-foreground">Validade do link</DropdownMenuLabel>
+                {[
+                  ['1h', 60 * 60],
+                  ['24h', 24 * 60 * 60],
+                  ['7d', 7 * 24 * 60 * 60],
+                  ['30d', 30 * 24 * 60 * 60],
+                ].map(([label, sec]) => (
+                  <DropdownMenuItem key={label as string} disabled={!protectShare} onClick={() => setShareTtlSec(sec as number)}>
+                    {label}{shareTtlSec === sec && <Check className="h-3 w-3 ml-auto" />}
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleShareReport} disabled={sharing}>
+                  {sharing ? <Loader2 className="h-3 w-3 mr-2 animate-spin" /> : <Share2 className="h-3 w-3 mr-2" />}
+                  Gerar e copiar link (⌘⇧S)
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-[10px]">Histórico ({shareHistory.length})</DropdownMenuLabel>
+                {shareHistory.length === 0 ? (
+                  <div className="px-2 py-1.5 text-[11px] text-muted-foreground">Nenhum compartilhamento ainda.</div>
+                ) : (
+                  <>
+                    {shareHistory.slice(0, 10).map(s => (
+                      <DropdownMenuItem key={s.path} onClick={() => copyShared(s)} className="flex-col items-start gap-0.5">
+                        <span className="text-[11px] font-mono truncate w-full">{s.path}</span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {new Date(s.createdAt).toLocaleString()} · {(s.size / 1024).toFixed(1)}KB · {s.protected ? 'protegido' : 'público'}
+                          {s.expiresAt ? ` · expira ${new Date(s.expiresAt).toLocaleDateString()}` : ''}
+                        </span>
+                      </DropdownMenuItem>
+                    ))}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={clearShareHistory}>Limpar histórico</DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onClear} title="Limpar (⌘⇧K)">
               <Trash2 className="h-3 w-3" />
@@ -561,7 +655,7 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
       {/* Body */}
       {open && (
         <div ref={scrollRef} className="overflow-auto h-[calc(100%-2.25rem)] font-mono text-[11px]">
-          {showSummary ? (
+          {view === 'summary' ? (
             networkStats.length === 0 ? (
               <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
                 Nenhuma requisição de rede capturada.
@@ -596,6 +690,53 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
                 </tbody>
               </table>
             )
+          ) : view === 'timeline' ? (
+            filtered.length === 0 ? (
+              <div className="flex items-center justify-center h-full text-muted-foreground text-xs">Nenhum evento para o intervalo.</div>
+            ) : (() => {
+              const t0 = filtered[0].ts
+              const t1 = filtered[filtered.length - 1].ts
+              const span = Math.max(1, t1 - t0)
+              return (
+                <div className="p-3 space-y-1">
+                  <div className="text-[10px] text-muted-foreground mb-2 flex justify-between">
+                    <span>{new Date(t0).toLocaleTimeString()}</span>
+                    <span>{filtered.length} eventos · {(span / 1000).toFixed(1)}s</span>
+                    <span>{new Date(t1).toLocaleTimeString()}</span>
+                  </div>
+                  <div className="relative h-8 bg-secondary/40 rounded border border-border/40">
+                    {filtered.map(l => {
+                      const meta = KIND_META[l.kind] || KIND_META.log
+                      const left = ((l.ts - t0) / span) * 100
+                      return (
+                        <div
+                          key={l.id}
+                          className={cn('absolute top-0 bottom-0 w-[2px]', meta.color.replace('text-', 'bg-'))}
+                          style={{ left: `${left}%` }}
+                          title={`${new Date(l.ts).toLocaleTimeString()} · ${l.kind} · ${l.message.slice(0, 80)}`}
+                        />
+                      )
+                    })}
+                  </div>
+                  <ul className="mt-3 divide-y divide-border/40">
+                    {filtered.map(l => {
+                      const meta = KIND_META[l.kind] || KIND_META.log
+                      const offset = ((l.ts - t0) / span) * 100
+                      return (
+                        <li key={l.id} className="py-1 flex items-center gap-2 text-[11px]">
+                          <span className="w-12 text-[10px] text-muted-foreground tabular-nums">+{((l.ts - t0) / 1000).toFixed(2)}s</span>
+                          <div className="flex-1 h-1 bg-secondary/40 rounded relative">
+                            <div className={cn('absolute top-0 bottom-0 w-1 rounded', meta.color.replace('text-', 'bg-'))} style={{ left: `${offset}%` }} />
+                          </div>
+                          <span className={cn('uppercase text-[9px] font-semibold w-14 shrink-0', meta.color)}>{meta.label}</span>
+                          <span className="flex-[3] truncate text-foreground">{l.message}</span>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </div>
+              )
+            })()
           ) : filtered.length === 0 ? (
             <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
               {query || range !== 'all' || filter !== 'all' ? 'Nenhum log corresponde aos filtros.' : 'Nenhum evento capturado ainda.'}
