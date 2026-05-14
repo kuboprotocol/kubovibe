@@ -655,7 +655,7 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
       {/* Body */}
       {open && (
         <div ref={scrollRef} className="overflow-auto h-[calc(100%-2.25rem)] font-mono text-[11px]">
-          {showSummary ? (
+          {view === 'summary' ? (
             networkStats.length === 0 ? (
               <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
                 Nenhuma requisição de rede capturada.
@@ -690,6 +690,53 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
                 </tbody>
               </table>
             )
+          ) : view === 'timeline' ? (
+            filtered.length === 0 ? (
+              <div className="flex items-center justify-center h-full text-muted-foreground text-xs">Nenhum evento para o intervalo.</div>
+            ) : (() => {
+              const t0 = filtered[0].ts
+              const t1 = filtered[filtered.length - 1].ts
+              const span = Math.max(1, t1 - t0)
+              return (
+                <div className="p-3 space-y-1">
+                  <div className="text-[10px] text-muted-foreground mb-2 flex justify-between">
+                    <span>{new Date(t0).toLocaleTimeString()}</span>
+                    <span>{filtered.length} eventos · {(span / 1000).toFixed(1)}s</span>
+                    <span>{new Date(t1).toLocaleTimeString()}</span>
+                  </div>
+                  <div className="relative h-8 bg-secondary/40 rounded border border-border/40">
+                    {filtered.map(l => {
+                      const meta = KIND_META[l.kind] || KIND_META.log
+                      const left = ((l.ts - t0) / span) * 100
+                      return (
+                        <div
+                          key={l.id}
+                          className={cn('absolute top-0 bottom-0 w-[2px]', meta.color.replace('text-', 'bg-'))}
+                          style={{ left: `${left}%` }}
+                          title={`${new Date(l.ts).toLocaleTimeString()} · ${l.kind} · ${l.message.slice(0, 80)}`}
+                        />
+                      )
+                    })}
+                  </div>
+                  <ul className="mt-3 divide-y divide-border/40">
+                    {filtered.map(l => {
+                      const meta = KIND_META[l.kind] || KIND_META.log
+                      const offset = ((l.ts - t0) / span) * 100
+                      return (
+                        <li key={l.id} className="py-1 flex items-center gap-2 text-[11px]">
+                          <span className="w-12 text-[10px] text-muted-foreground tabular-nums">+{((l.ts - t0) / 1000).toFixed(2)}s</span>
+                          <div className="flex-1 h-1 bg-secondary/40 rounded relative">
+                            <div className={cn('absolute top-0 bottom-0 w-1 rounded', meta.color.replace('text-', 'bg-'))} style={{ left: `${offset}%` }} />
+                          </div>
+                          <span className={cn('uppercase text-[9px] font-semibold w-14 shrink-0', meta.color)}>{meta.label}</span>
+                          <span className="flex-[3] truncate text-foreground">{l.message}</span>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </div>
+              )
+            })()
           ) : filtered.length === 0 ? (
             <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
               {query || range !== 'all' || filter !== 'all' ? 'Nenhum log corresponde aos filtros.' : 'Nenhum evento capturado ainda.'}
