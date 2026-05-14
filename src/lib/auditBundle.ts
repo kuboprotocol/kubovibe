@@ -79,14 +79,45 @@ export function correlationsToMarkdown(c: Correlation[]): string {
   }).join('\n\n')
 }
 
-/** Upload a ZIP blob to Supabase storage and return the public URL. */
-export async function shareReport(blob: Blob): Promise<string> {
+export interface SharedReport {
+  url: string
+  path: string
+  protected: boolean
+  expiresAt: number | null
+  createdAt: number
+  size: number
+}
+
+/**
+ * Upload a ZIP blob to Supabase storage and return a (optionally protected) link.
+ * When `protect` is true, returns a time-limited signed URL instead of a public URL.
+ */
+export async function shareReport(
+  blob: Blob,
+  opts: { protect?: boolean; expiresInSec?: number } = {},
+): Promise<SharedReport> {
   const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
   const path = `${id}.zip`
   const { error } = await supabase.storage
     .from('audit-reports')
     .upload(path, blob, { contentType: 'application/zip', upsert: false })
   if (error) throw error
-  const { data } = supabase.storage.from('audit-reports').getPublicUrl(path)
-  return data.publicUrl
+
+  const protect = !!opts.protect
+  const expiresInSec = opts.expiresInSec ?? 7 * 24 * 60 * 60 // 7 days
+  let url: string
+  let expiresAt: number | null = null
+
+  if (protect) {
+    const { data, error: signErr } = await supabase.storage
+      .from('audit-reports')
+      .createSignedUrl(path, expiresInSec)
+    if (signErr) throw signErr
+    url = data.signedUrl
+    expiresAt = Date.now() + expiresInSec * 1000
+  } else {
+    url = supabase.storage.from('audit-reports').getPublicUrl(path).data.publicUrl
+  }
+
+  return { url, path, protected: protect, expiresAt, createdAt: Date.now(), size: blob.size }
 }
