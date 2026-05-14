@@ -14,7 +14,7 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import JSZip from 'jszip'
 import type { PreviewLogEntry, PreviewLogKind } from '@/lib/iframePreview'
-import { entriesToHAR, correlateErrors, correlationsToMarkdown, shareReport } from '@/lib/auditBundle'
+import { entriesToHAR, correlateErrors, correlationsToMarkdown, shareReport, type SharedReport } from '@/lib/auditBundle'
 
 interface Props {
   logs: PreviewLogEntry[]
