@@ -297,7 +297,7 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
     const ts = new Date().toISOString().replace(/[:.]/g, '-')
     // Pick source set: selected items if any, else all logs
     const source = selectMode && selected.size > 0 ? logs.filter(l => selected.has(l.id)) : logs
-    const correlations = correlateErrors(source)
+    const correlations = correlateErrors(source, corrWindowMs)
 
     if (bundleOpts.logs) {
       zip.file('logs.json', JSON.stringify({ exportedAt: new Date().toISOString(), count: source.length, entries: source }, null, 2))
@@ -305,7 +305,7 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
     }
     if (bundleOpts.report) {
       const base = buildErrorReport(source)
-      const corr = bundleOpts.correlations ? `\n\n## Correlações erro × rede (±2s)\n${correlationsToMarkdown(correlations)}` : ''
+      const corr = bundleOpts.correlations ? `\n\n## Correlações erro × rede (±${corrWindowMs}ms)\n${correlationsToMarkdown(correlations)}` : ''
       zip.file('report.md', base + corr)
     }
     if (bundleOpts.network) {
