@@ -359,15 +359,25 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
     setSharing(true)
     try {
       const { blob } = await buildBundle()
-      const url = await shareReport(blob)
-      try { await navigator.clipboard.writeText(url) } catch {}
-      toast.success('Link de compartilhamento copiado', { description: url })
+      const shared = await shareReport(blob, { protect: protectShare, expiresInSec: shareTtlSec })
+      try { await navigator.clipboard.writeText(shared.url) } catch {}
+      setShareHistory(h => [shared, ...h].slice(0, 20))
+      toast.success(
+        protectShare ? 'Link protegido copiado' : 'Link público copiado',
+        { description: shared.expiresAt ? `Expira em ${new Date(shared.expiresAt).toLocaleString()}` : shared.url },
+      )
     } catch (e: any) {
       toast.error('Falha ao compartilhar: ' + (e?.message || 'erro'))
     } finally {
       setSharing(false)
     }
   }
+
+  const copyShared = async (s: SharedReport) => {
+    try { await navigator.clipboard.writeText(s.url); toast.success('Link copiado') }
+    catch { toast.error('Falha ao copiar') }
+  }
+  const clearShareHistory = () => { setShareHistory([]); toast.success('Histórico limpo') }
 
   const toggleSelected = (id: string) => {
     setSelected(prev => {
