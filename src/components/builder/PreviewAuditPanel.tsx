@@ -476,14 +476,39 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <Button
-              variant="ghost" size="icon"
-              className={cn('h-6 w-6', showSummary && 'text-primary')}
-              onClick={() => setShowSummary(s => !s)}
-              title="Resumo de endpoints"
-            >
-              <BarChart3 className="h-3 w-3" />
-            </Button>
+            <div className="flex items-center gap-0.5 bg-secondary/60 rounded-md p-0.5">
+              {([
+                ['logs', 'Logs'],
+                ['summary', 'Rede'],
+                ['timeline', 'Timeline'],
+              ] as const).map(([v, label]) => (
+                <button
+                  key={v}
+                  onClick={() => setView(v)}
+                  className={cn('px-2 py-0.5 text-[10px] rounded',
+                    view === v ? 'bg-background text-foreground' : 'text-muted-foreground')}
+                  title={`Ver ${label}`}
+                >{v === 'summary' ? <BarChart3 className="h-3 w-3 inline" /> : v === 'timeline' ? <Clock className="h-3 w-3 inline" /> : label}</button>
+              ))}
+            </div>
+
+            {/* Correlation window */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px] font-mono gap-1" title="Janela de correlação erro × rede">
+                  ±{corrWindowMs >= 1000 ? `${corrWindowMs / 1000}s` : `${corrWindowMs}ms`}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel className="text-[10px]">Janela de correlação</DropdownMenuLabel>
+                {[500, 1000, 2000, 5000, 10000, 30000].map(ms => (
+                  <DropdownMenuItem key={ms} onClick={() => setCorrWindowMs(ms)}>
+                    ±{ms >= 1000 ? `${ms / 1000}s` : `${ms}ms`}
+                    {corrWindowMs === ms && <Check className="h-3 w-3 ml-auto" />}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             {onAutoScreenshot && (
               <Button
