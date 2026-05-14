@@ -159,7 +159,7 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
   const [filter, setFilter] = useState<FilterKind>(persisted.filter)
   const [query, setQuery] = useState(persisted.query)
   const [range, setRange] = useState<TimeRange>(persisted.range)
-  const [showSummary, setShowSummary] = useState(false)
+  const [view, setView] = useState<'logs' | 'summary' | 'timeline'>('logs')
   const [autoShot, setAutoShot] = useState<boolean>(() => {
     try { return localStorage.getItem('kubo:audit:autoShot') === '1' } catch { return false }
   })
@@ -168,6 +168,18 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
   const [sharing, setSharing] = useState(false)
   const [selectMode, setSelectMode] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [corrWindowMs, setCorrWindowMs] = useState<number>(() => {
+    try { return Number(localStorage.getItem('kubo:audit:corrWindowMs')) || 2000 } catch { return 2000 }
+  })
+  const [protectShare, setProtectShare] = useState<boolean>(() => {
+    try { return localStorage.getItem('kubo:audit:protectShare') !== '0' } catch { return true }
+  })
+  const [shareTtlSec, setShareTtlSec] = useState<number>(() => {
+    try { return Number(localStorage.getItem('kubo:audit:shareTtlSec')) || 7 * 24 * 60 * 60 } catch { return 7 * 24 * 60 * 60 }
+  })
+  const [shareHistory, setShareHistory] = useState<SharedReport[]>(() => {
+    try { return JSON.parse(localStorage.getItem('kubo:audit:shareHistory') || '[]') } catch { return [] }
+  })
   const [bundleOpts, setBundleOpts] = useState<{ logs: boolean; report: boolean; har: boolean; correlations: boolean; network: boolean; screenshots: boolean }>(() => {
     try {
       const raw = localStorage.getItem('kubo:audit:bundleOpts')
@@ -183,6 +195,10 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
   useEffect(() => {
     try { localStorage.setItem('kubo:audit:bundleOpts', JSON.stringify(bundleOpts)) } catch {}
   }, [bundleOpts])
+  useEffect(() => { try { localStorage.setItem('kubo:audit:corrWindowMs', String(corrWindowMs)) } catch {} }, [corrWindowMs])
+  useEffect(() => { try { localStorage.setItem('kubo:audit:protectShare', protectShare ? '1' : '0') } catch {} }, [protectShare])
+  useEffect(() => { try { localStorage.setItem('kubo:audit:shareTtlSec', String(shareTtlSec)) } catch {} }, [shareTtlSec])
+  useEffect(() => { try { localStorage.setItem('kubo:audit:shareHistory', JSON.stringify(shareHistory.slice(0, 20))) } catch {} }, [shareHistory])
 
   // Persist filters
   useEffect(() => {
