@@ -589,13 +589,56 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <Button
-              variant="ghost" size="icon" className="h-6 w-6"
-              onClick={handleShareReport} disabled={sharing}
-              title="Compartilhar relatório por link (⌘⇧S)"
-            >
-              {sharing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Link2 className="h-3 w-3" />}
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-6 w-6" title="Compartilhar / histórico" disabled={sharing}>
+                  {sharing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Link2 className="h-3 w-3" />}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-72">
+                <DropdownMenuLabel className="text-[10px]">Compartilhamento</DropdownMenuLabel>
+                <DropdownMenuCheckboxItem
+                  checked={protectShare}
+                  onCheckedChange={(v) => setProtectShare(!!v)}
+                  onSelect={(e) => e.preventDefault()}
+                >Link protegido (URL assinada)</DropdownMenuCheckboxItem>
+                <DropdownMenuLabel className="text-[10px] text-muted-foreground">Validade do link</DropdownMenuLabel>
+                {[
+                  ['1h', 60 * 60],
+                  ['24h', 24 * 60 * 60],
+                  ['7d', 7 * 24 * 60 * 60],
+                  ['30d', 30 * 24 * 60 * 60],
+                ].map(([label, sec]) => (
+                  <DropdownMenuItem key={label as string} disabled={!protectShare} onClick={() => setShareTtlSec(sec as number)}>
+                    {label}{shareTtlSec === sec && <Check className="h-3 w-3 ml-auto" />}
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleShareReport} disabled={sharing}>
+                  {sharing ? <Loader2 className="h-3 w-3 mr-2 animate-spin" /> : <Share2 className="h-3 w-3 mr-2" />}
+                  Gerar e copiar link (⌘⇧S)
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-[10px]">Histórico ({shareHistory.length})</DropdownMenuLabel>
+                {shareHistory.length === 0 ? (
+                  <div className="px-2 py-1.5 text-[11px] text-muted-foreground">Nenhum compartilhamento ainda.</div>
+                ) : (
+                  <>
+                    {shareHistory.slice(0, 10).map(s => (
+                      <DropdownMenuItem key={s.path} onClick={() => copyShared(s)} className="flex-col items-start gap-0.5">
+                        <span className="text-[11px] font-mono truncate w-full">{s.path}</span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {new Date(s.createdAt).toLocaleString()} · {(s.size / 1024).toFixed(1)}KB · {s.protected ? 'protegido' : 'público'}
+                          {s.expiresAt ? ` · expira ${new Date(s.expiresAt).toLocaleDateString()}` : ''}
+                        </span>
+                      </DropdownMenuItem>
+                    ))}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={clearShareHistory}>Limpar histórico</DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onClear} title="Limpar (⌘⇧K)">
               <Trash2 className="h-3 w-3" />
