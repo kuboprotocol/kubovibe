@@ -52,15 +52,20 @@ export default function ConnectorAboutPage() {
               </p>
             </div>
           </div>
-          <Button
-            onClick={handleStartSetup}
-            disabled={isComingSoon}
-            className="hidden sm:inline-flex"
-          >
-            <KeyRound className="h-4 w-4" />
-            {isComingSoon ? 'Em breve' : 'Iniciar setup'}
-            {!isComingSoon && <ArrowRight className="h-4 w-4" />}
-          </Button>
+          <div className="hidden sm:flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => navigate(`/connectors/${connector.slug}`)}
+            >
+              <LayoutDashboard className="h-4 w-4" />
+              Abrir painel
+            </Button>
+            <Button onClick={handleStartSetup} disabled={isComingSoon}>
+              <KeyRound className="h-4 w-4" />
+              {isComingSoon ? 'Em breve' : 'Iniciar setup'}
+              {!isComingSoon && <ArrowRight className="h-4 w-4" />}
+            </Button>
+          </div>
         </div>
       </div>
 
