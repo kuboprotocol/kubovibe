@@ -99,6 +99,8 @@ export default function ConnectorSetupPage() {
     }
   }
 
+  const Icon = connector.icon
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Header */}
