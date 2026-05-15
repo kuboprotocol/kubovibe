@@ -386,6 +386,41 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
                 <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-md tracking-wider bg-secondary text-secondary-foreground">CUSTOM</span>
               </button>
 
+              {customConnectors.length > 0 && (
+                <div className="mt-1 pt-2 border-t border-border/30">
+                  <div className="px-3 py-1 text-[10px] uppercase tracking-widest text-muted-foreground/60">Meus conectores</div>
+                  <div className="max-h-40 overflow-y-auto">
+                    {customConnectors.map(c => (
+                      <div key={c.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-accent/40 group/row">
+                        <div className="flex items-center justify-center h-6 w-6 rounded-md bg-secondary/80">
+                          {c.mode === 'api' ? <KeyRound className="h-3.5 w-3.5 text-muted-foreground" /> : <FileJson className="h-3.5 w-3.5 text-muted-foreground" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs text-foreground truncate">{c.name}</div>
+                          {c.url && <div className="text-[10px] text-muted-foreground truncate">{c.url}</div>}
+                        </div>
+                        {c.url && (
+                          <button
+                            onClick={() => openCustomConnector(c)}
+                            className="px-2 py-1 text-[10px] rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-accent transition-colors flex items-center gap-1"
+                            title="Abrir (com confirmação)"
+                          >
+                            Abrir <ShieldAlert className="h-3 w-3 text-destructive/70" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => removeCustomConnector(c.id)}
+                          className="p-1 rounded-md text-muted-foreground/60 hover:text-destructive opacity-0 group-hover/row:opacity-100 transition-opacity"
+                          title="Remover"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="mt-1 pt-2 border-t border-border/30 px-3 py-1.5">
                 <span className="text-[10px] text-muted-foreground/50">Salvo localmente neste navegador</span>
               </div>
