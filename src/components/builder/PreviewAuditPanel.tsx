@@ -629,60 +629,70 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
                   {bundling ? <Loader2 className="h-3 w-3 mr-2 animate-spin" /> : <Package className="h-3 w-3 mr-2" />}
                   Bundle ZIP (⌘⇧B)
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleShareReport} disabled={sharing}>
+                <DropdownMenuItem onClick={openShareDialog} disabled={sharing}>
                   {sharing ? <Loader2 className="h-3 w-3 mr-2 animate-spin" /> : <Share2 className="h-3 w-3 mr-2" />}
-                  Compartilhar por link (⌘⇧S)
+                  Compartilhar com senha (⌘⇧S)
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-6 w-6" title="Compartilhar / histórico" disabled={sharing}>
-                  {sharing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Link2 className="h-3 w-3" />}
+                <Button variant="ghost" size="icon" className="h-6 w-6" title="Compartilhamentos">
+                  <Link2 className="h-3 w-3" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-72">
-                <DropdownMenuLabel className="text-[10px]">Compartilhamento</DropdownMenuLabel>
-                <DropdownMenuCheckboxItem
-                  checked={protectShare}
-                  onCheckedChange={(v) => setProtectShare(!!v)}
-                  onSelect={(e) => e.preventDefault()}
-                >Link protegido (URL assinada)</DropdownMenuCheckboxItem>
-                <DropdownMenuLabel className="text-[10px] text-muted-foreground">Validade do link</DropdownMenuLabel>
+              <DropdownMenuContent align="end" className="w-80">
+                <DropdownMenuLabel className="text-[10px]">Validade do próximo link</DropdownMenuLabel>
                 {[
                   ['1h', 60 * 60],
                   ['24h', 24 * 60 * 60],
                   ['7d', 7 * 24 * 60 * 60],
                   ['30d', 30 * 24 * 60 * 60],
                 ].map(([label, sec]) => (
-                  <DropdownMenuItem key={label as string} disabled={!protectShare} onClick={() => setShareTtlSec(sec as number)}>
+                  <DropdownMenuItem key={label as string} onClick={() => setShareTtlSec(sec as number)}>
                     {label}{shareTtlSec === sec && <Check className="h-3 w-3 ml-auto" />}
                   </DropdownMenuItem>
                 ))}
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleShareReport} disabled={sharing}>
+                <DropdownMenuItem onClick={openShareDialog} disabled={sharing}>
                   {sharing ? <Loader2 className="h-3 w-3 mr-2 animate-spin" /> : <Share2 className="h-3 w-3 mr-2" />}
-                  Gerar e copiar link (⌘⇧S)
+                  Gerar link protegido (⌘⇧S)
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel className="text-[10px]">Histórico ({shareHistory.length})</DropdownMenuLabel>
                 {shareHistory.length === 0 ? (
                   <div className="px-2 py-1.5 text-[11px] text-muted-foreground">Nenhum compartilhamento ainda.</div>
                 ) : (
-                  <>
-                    {shareHistory.slice(0, 10).map(s => (
-                      <DropdownMenuItem key={s.path} onClick={() => copyShared(s)} className="flex-col items-start gap-0.5">
-                        <span className="text-[11px] font-mono truncate w-full">{s.path}</span>
-                        <span className="text-[10px] text-muted-foreground">
-                          {new Date(s.createdAt).toLocaleString()} · {(s.size / 1024).toFixed(1)}KB · {s.protected ? 'protegido' : 'público'}
-                          {s.expiresAt ? ` · expira ${new Date(s.expiresAt).toLocaleDateString()}` : ''}
-                        </span>
-                      </DropdownMenuItem>
-                    ))}
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={clearShareHistory}>Limpar histórico</DropdownMenuItem>
-                  </>
+                  shareHistory.slice(0, 10).map(s => {
+                    const expired = s.expires_at && new Date(s.expires_at).getTime() < Date.now()
+                    const status = s.revoked_at ? 'revogado' : expired ? 'expirado' : 'ativo'
+                    const statusColor = s.revoked_at || expired ? 'text-red-400' : 'text-emerald-400'
+                    return (
+                      <div key={s.id} className="px-2 py-1.5 border-b border-border/30 last:border-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[11px] font-mono truncate flex-1">
+                            {s.label || s.id.slice(0, 8)}
+                          </span>
+                          <span className={cn('text-[9px] uppercase font-semibold', statusColor)}>{status}</span>
+                        </div>
+                        <div className="text-[10px] text-muted-foreground mt-0.5">
+                          {new Date(s.created_at).toLocaleString()} · {(s.size_bytes / 1024).toFixed(1)}KB · {s.download_count} download{s.download_count !== 1 ? 's' : ''}
+                          {s.expires_at && !s.revoked_at ? ` · expira ${new Date(s.expires_at).toLocaleDateString()}` : ''}
+                        </div>
+                        <div className="flex gap-1 mt-1">
+                          <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[10px]" onClick={() => copyShareUrl(s.id)}>
+                            <Copy className="h-2.5 w-2.5 mr-1" />Copiar
+                          </Button>
+                          {!s.revoked_at && (
+                            <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[10px] text-red-400" onClick={() => handleRevokeShare(s.id)}>
+                              <Trash className="h-2.5 w-2.5 mr-1" />Revogar
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
