@@ -492,6 +492,18 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
               </div>
 
               <div className="px-2 pb-1 flex flex-col gap-2">
+                <label className="flex items-start gap-2 px-1 py-1 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={rememberHost}
+                    onChange={(e) => setRememberHost(e.target.checked)}
+                    className="mt-0.5 h-3.5 w-3.5 accent-primary cursor-pointer"
+                  />
+                  <span className="text-[11px] text-muted-foreground leading-snug">
+                    Lembrar e não pedir confirmação para{' '}
+                    <strong className="text-foreground">{hostOf(externalTarget.url) || externalTarget.label}</strong> neste navegador.
+                  </span>
+                </label>
                 <button
                   onClick={confirmExternalNavigation}
                   className="w-full px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
@@ -500,7 +512,7 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
                   <ExternalLink className="h-3.5 w-3.5" />
                 </button>
                 <button
-                  onClick={() => { setView('main'); setExternalTarget(null) }}
+                  onClick={() => { setView('main'); setExternalTarget(null); setRememberHost(false) }}
                   className="w-full px-3 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:bg-accent transition-colors"
                 >
                   Cancelar
