@@ -327,6 +327,52 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
               </div>
             </div>
           )}
+
+          {view === 'confirm-external' && externalTarget && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 px-2 py-1.5">
+                <button
+                  onClick={() => { setView('main'); setExternalTarget(null) }}
+                  className="p-1 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Voltar"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                </button>
+                <externalTarget.icon className="h-3.5 w-3.5 text-primary" />
+                <span className="text-xs font-display font-bold text-primary tracking-wider uppercase">
+                  Sair para {externalTarget.label}
+                </span>
+              </div>
+
+              <div className="mx-2 p-3 rounded-lg border border-destructive/30 bg-destructive/5 flex gap-2">
+                <ShieldAlert className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+                <div className="text-[11px] leading-relaxed text-muted-foreground">
+                  <p className="font-semibold text-destructive/90 mb-1">Você está deixando o KUBO VIBE</p>
+                  <p>
+                    Vamos abrir <strong>{externalTarget.url.replace('https://', '')}</strong> em uma nova aba.
+                    Esse domínio é de terceiros e <strong>não é assegurado</strong> pelo KUBO VIBE — credenciais,
+                    dados e tráfego ficam por conta do provedor externo.
+                  </p>
+                </div>
+              </div>
+
+              <div className="px-2 pb-1 flex flex-col gap-2">
+                <button
+                  onClick={confirmExternalNavigation}
+                  className="w-full px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
+                >
+                  Continuar para {externalTarget.label}
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  onClick={() => { setView('main'); setExternalTarget(null) }}
+                  className="w-full px-3 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:bg-accent transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
         </PopoverContent>
       </Popover>
 
