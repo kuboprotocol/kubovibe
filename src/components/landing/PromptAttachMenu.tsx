@@ -1,13 +1,14 @@
 import { useState, useRef } from 'react'
-import { 
-  Plus, 
-  Settings, 
-  History, 
-  BookOpen, 
-  Github, 
-  Link2, 
-  Camera, 
-  FileText, 
+import { useNavigate } from 'react-router-dom'
+import {
+  Plus,
+  Settings,
+  History,
+  BookOpen,
+  Github,
+  Link2,
+  Camera,
+  FileText,
   Paperclip,
   Pencil,
   X,
@@ -18,8 +19,18 @@ import {
   Globe,
   Sparkles,
   Layers,
-  Rocket
+  Rocket,
+  ChevronRight,
+  ExternalLink,
+  ShieldAlert,
+  KeyRound,
+  FileJson,
+  ArrowLeft,
 } from 'lucide-react'
+import { Textarea } from '@/components/ui/textarea'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { toast } from 'sonner'
 import {
   Popover,
   PopoverContent,
