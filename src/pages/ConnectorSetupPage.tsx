@@ -191,6 +191,38 @@ export default function ConnectorSetupPage() {
           </Card>
         )}
 
+        {slug === 'github' && githubProfile && (
+          <Card className="p-5 border-emerald-500/40 bg-emerald-500/5">
+            <div className="flex items-center gap-4">
+              <Avatar className="h-14 w-14 ring-2 ring-emerald-500/40">
+                <AvatarImage src={githubProfile.avatar_url ?? undefined} alt={githubProfile.login} />
+                <AvatarFallback>
+                  <Github className="h-6 w-6" />
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="font-semibold text-foreground">@{githubProfile.login}</p>
+                  <Badge variant="outline" className="border-emerald-500/40 text-emerald-400 text-[10px]">
+                    <CheckCircle2 className="h-3 w-3 mr-1" /> Vinculado via PAT
+                  </Badge>
+                </div>
+                <a
+                  href={githubProfile.profile_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-muted-foreground hover:text-primary inline-flex items-center gap-1 mt-0.5"
+                >
+                  {githubProfile.profile_url} <ExternalLink className="h-3 w-3" />
+                </a>
+              </div>
+              <Button size="sm" onClick={() => navigate('/connectors/github')}>
+                Abrir painel
+              </Button>
+            </div>
+          </Card>
+        )}
+
         {/* Status atual + Teste de conexão */}
         {!loadingExisting && existing && (
           <Card className="p-4 border-emerald-500/30 bg-emerald-500/5 space-y-3">
