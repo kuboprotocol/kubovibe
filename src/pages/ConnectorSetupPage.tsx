@@ -29,6 +29,8 @@ export default function ConnectorSetupPage() {
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ ok: boolean; status: number; account?: string | null; detail?: string | null } | null>(null)
 
+  const [githubProfile, setGithubProfile] = useState<GithubProfile | null>(null)
+
   useEffect(() => {
     let cancelled = false
     ;(async () => {
@@ -40,6 +42,20 @@ export default function ConnectorSetupPage() {
       if (!cancelled) {
         setExisting(data ?? null)
         setLoadingExisting(false)
+      }
+
+      if (slug === 'github') {
+        const { data: gh } = await supabase
+          .from('github_connections')
+          .select('github_username, github_avatar_url')
+          .maybeSingle()
+        if (!cancelled && gh?.github_username) {
+          setGithubProfile({
+            login: gh.github_username,
+            avatar_url: gh.github_avatar_url,
+            profile_url: `https://github.com/${gh.github_username}`,
+          })
+        }
       }
     })()
     return () => { cancelled = true }
