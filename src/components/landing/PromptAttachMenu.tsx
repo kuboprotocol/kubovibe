@@ -81,7 +81,12 @@ const menuSections = [
   },
 ]
 
-type View = 'main' | 'connectors'
+type View = 'main' | 'connectors' | 'confirm-external'
+type ExternalTarget = { id: 'github' | 'figma'; label: string; url: string; icon: typeof Github }
+const EXTERNAL_TARGETS: Record<'github' | 'figma', ExternalTarget> = {
+  github: { id: 'github', label: 'GitHub', url: 'https://github.com', icon: Github },
+  figma: { id: 'figma', label: 'Figma', url: 'https://figma.com', icon: Figma },
+}
 
 export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddReference }: PromptAttachMenuProps) {
   const navigate = useNavigate()
