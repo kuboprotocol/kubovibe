@@ -72,7 +72,7 @@ export function correlationsToMarkdown(c: Correlation[]): string {
       `### [${i + 1}] ${g.error.kind.toUpperCase()} — ${new Date(g.error.ts).toISOString()}`,
       `> ${g.error.message}`,
       g.related.length === 0
-        ? '_Nenhum evento de rede próximo (±2s)._'
+        ? '_Nenhum evento de rede próximo._'
         : g.related.map(r => `- \`${new Date(r.ts).toISOString()}\` ${r.method ?? ''} ${r.url ?? ''} ${r.status ? `→ ${r.status}` : ''} (${r.duration ?? '–'}ms)`).join('\n'),
     ]
     return lines.join('\n')
@@ -80,44 +80,61 @@ export function correlationsToMarkdown(c: Correlation[]): string {
 }
 
 export interface SharedReport {
+  id: string
   url: string
-  path: string
-  protected: boolean
-  expiresAt: number | null
-  createdAt: number
+  expiresAt: string | null
+  createdAt: string
   size: number
+  label: string | null
 }
 
 /**
- * Upload a ZIP blob to Supabase storage and return a (optionally protected) link.
- * When `protect` is true, returns a time-limited signed URL instead of a public URL.
+ * Upload a ZIP blob via secured edge function. Returns a `/share/audit/:id` URL
+ * that requires the password to download.
  */
 export async function shareReport(
   blob: Blob,
-  opts: { protect?: boolean; expiresInSec?: number } = {},
+  opts: { password: string; expiresInSec?: number; label?: string | null },
 ): Promise<SharedReport> {
-  const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
-  const path = `${id}.zip`
-  const { error } = await supabase.storage
-    .from('audit-reports')
-    .upload(path, blob, { contentType: 'application/zip', upsert: false })
+  const fd = new FormData()
+  fd.append('file', blob, 'preview-bundle.zip')
+  fd.append('password', opts.password)
+  fd.append('expiresInSec', String(opts.expiresInSec ?? 7 * 24 * 60 * 60))
+  if (opts.label) fd.append('label', opts.label)
+
+  const { data, error } = await supabase.functions.invoke('audit-share-create', {
+    body: fd,
+  })
   if (error) throw error
+  // Edge function returns the share URL using its own origin if request came from
+  // another origin (rare). Force absolute on current origin to be safe.
+  const id = (data as { id: string }).id
+  const url = `${window.location.origin}/share/audit/${id}`
+  return { ...(data as SharedReport), url }
+}
 
-  const protect = !!opts.protect
-  const expiresInSec = opts.expiresInSec ?? 7 * 24 * 60 * 60 // 7 days
-  let url: string
-  let expiresAt: number | null = null
+export async function revokeShare(id: string): Promise<void> {
+  const { error } = await supabase.functions.invoke('audit-share-revoke', { body: { id } })
+  if (error) throw error
+}
 
-  if (protect) {
-    const { data, error: signErr } = await supabase.storage
-      .from('audit-reports')
-      .createSignedUrl(path, expiresInSec)
-    if (signErr) throw signErr
-    url = data.signedUrl
-    expiresAt = Date.now() + expiresInSec * 1000
-  } else {
-    url = supabase.storage.from('audit-reports').getPublicUrl(path).data.publicUrl
-  }
+export interface ShareRow {
+  id: string
+  label: string | null
+  size_bytes: number
+  expires_at: string | null
+  revoked_at: string | null
+  download_count: number
+  last_accessed_at: string | null
+  created_at: string
+}
 
-  return { url, path, protected: protect, expiresAt, createdAt: Date.now(), size: blob.size }
+export async function listShares(): Promise<ShareRow[]> {
+  const { data, error } = await supabase
+    .from('audit_shares')
+    .select('id,label,size_bytes,expires_at,revoked_at,download_count,last_accessed_at,created_at')
+    .order('created_at', { ascending: false })
+    .limit(50)
+  if (error) throw error
+  return (data ?? []) as ShareRow[]
 }

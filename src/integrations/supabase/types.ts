@@ -38,6 +38,51 @@ export type Database = {
         }
         Relationships: []
       }
+      audit_shares: {
+        Row: {
+          created_at: string
+          download_count: number
+          expires_at: string | null
+          id: string
+          label: string | null
+          last_accessed_at: string | null
+          password_hash: string
+          revoked_at: string | null
+          size_bytes: number
+          storage_path: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          download_count?: number
+          expires_at?: string | null
+          id?: string
+          label?: string | null
+          last_accessed_at?: string | null
+          password_hash: string
+          revoked_at?: string | null
+          size_bytes?: number
+          storage_path: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          download_count?: number
+          expires_at?: string | null
+          id?: string
+          label?: string | null
+          last_accessed_at?: string | null
+          password_hash?: string
+          revoked_at?: string | null
+          size_bytes?: number
+          storage_path?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       connect_products: {
         Row: {
           connected_account_id: string
@@ -637,6 +682,74 @@ export type Database = {
           wait_seconds?: number
         }
         Relationships: []
+      }
+      slide_decks: {
+        Row: {
+          created_at: string
+          id: string
+          theme: Json
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          theme?: Json
+          title?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          theme?: Json
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      slide_pages: {
+        Row: {
+          content: Json
+          created_at: string
+          deck_id: string
+          id: string
+          layout: string
+          notes: string | null
+          position: number
+          updated_at: string
+        }
+        Insert: {
+          content?: Json
+          created_at?: string
+          deck_id: string
+          id?: string
+          layout?: string
+          notes?: string | null
+          position?: number
+          updated_at?: string
+        }
+        Update: {
+          content?: Json
+          created_at?: string
+          deck_id?: string
+          id?: string
+          layout?: string
+          notes?: string | null
+          position?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "slide_pages_deck_id_fkey"
+            columns: ["deck_id"]
+            isOneToOne: false
+            referencedRelation: "slide_decks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       subscriptions: {
         Row: {

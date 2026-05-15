@@ -2,11 +2,15 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertCircle, AlertTriangle, Bug, Camera, ChevronDown, ChevronUp, Copy,
   Download, Info, Network, Search, Trash2, X, Check, Package, BarChart3, Clock,
-  CheckSquare, Square, Share2, Link2, Loader2,
+  CheckSquare, Square, Share2, Link2, Loader2, Lock, Trash,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from '@/components/ui/dialog'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel, DropdownMenuCheckboxItem,
 } from '@/components/ui/dropdown-menu'
@@ -14,7 +18,11 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import JSZip from 'jszip'
 import type { PreviewLogEntry, PreviewLogKind } from '@/lib/iframePreview'
-import { entriesToHAR, correlateErrors, correlationsToMarkdown, shareReport, type SharedReport } from '@/lib/auditBundle'
+import {
+  entriesToHAR, correlateErrors, correlationsToMarkdown,
+  shareReport, revokeShare, listShares,
+  type SharedReport, type ShareRow,
+} from '@/lib/auditBundle'
 
 interface Props {
   logs: PreviewLogEntry[]
@@ -177,8 +185,17 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
   const [shareTtlSec, setShareTtlSec] = useState<number>(() => {
     try { return Number(localStorage.getItem('kubo:audit:shareTtlSec')) || 7 * 24 * 60 * 60 } catch { return 7 * 24 * 60 * 60 }
   })
-  const [shareHistory, setShareHistory] = useState<SharedReport[]>(() => {
-    try { return JSON.parse(localStorage.getItem('kubo:audit:shareHistory') || '[]') } catch { return [] }
+  const [shareHistory, setShareHistory] = useState<ShareRow[]>([])
+  const [shareDialogOpen, setShareDialogOpen] = useState(false)
+  const [sharePassword, setSharePassword] = useState('')
+  const [shareLabel, setShareLabel] = useState('')
+  const [lastShared, setLastShared] = useState<SharedReport | null>(null)
+  const [timelineKinds, setTimelineKinds] = useState<Set<PreviewLogKind>>(() => {
+    try {
+      const raw = localStorage.getItem('kubo:audit:timelineKinds')
+      if (raw) return new Set(JSON.parse(raw) as PreviewLogKind[])
+    } catch {}
+    return new Set<PreviewLogKind>(['log','info','debug','warn','error','exception','rejection','resource','network','ready'])
   })
   const [bundleOpts, setBundleOpts] = useState<{ logs: boolean; report: boolean; har: boolean; correlations: boolean; network: boolean; screenshots: boolean }>(() => {
     try {
@@ -191,14 +208,19 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
   const searchRef = useRef<HTMLInputElement>(null)
   const lastShotErrorIdRef = useRef<string | null>(null)
   const shotsRef = useRef<{ name: string; dataUrl: string; ts: number; reason?: string }[]>([])
+  const [excludedShots, setExcludedShots] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     try { localStorage.setItem('kubo:audit:bundleOpts', JSON.stringify(bundleOpts)) } catch {}
   }, [bundleOpts])
   useEffect(() => { try { localStorage.setItem('kubo:audit:corrWindowMs', String(corrWindowMs)) } catch {} }, [corrWindowMs])
-  useEffect(() => { try { localStorage.setItem('kubo:audit:protectShare', protectShare ? '1' : '0') } catch {} }, [protectShare])
   useEffect(() => { try { localStorage.setItem('kubo:audit:shareTtlSec', String(shareTtlSec)) } catch {} }, [shareTtlSec])
-  useEffect(() => { try { localStorage.setItem('kubo:audit:shareHistory', JSON.stringify(shareHistory.slice(0, 20))) } catch {} }, [shareHistory])
+  useEffect(() => { try { localStorage.setItem('kubo:audit:timelineKinds', JSON.stringify([...timelineKinds])) } catch {} }, [timelineKinds])
+
+  // Load share history from DB on mount
+  useEffect(() => {
+    listShares().then(setShareHistory).catch(() => {})
+  }, [])
 
   // Persist filters
   useEffect(() => {
@@ -355,17 +377,32 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
     }
   }
 
-  const handleShareReport = async () => {
+  const openShareDialog = () => {
+    // generate a strong default password
+    const rnd = (typeof crypto !== 'undefined'
+      ? Array.from(crypto.getRandomValues(new Uint8Array(9)))
+        .map(b => b.toString(36)).join('').replace(/[^a-z0-9]/g, '').slice(0, 12)
+      : Math.random().toString(36).slice(2, 14))
+    setSharePassword(rnd)
+    setShareLabel('')
+    setLastShared(null)
+    setShareDialogOpen(true)
+  }
+  const confirmShareReport = async () => {
+    if (!sharePassword || sharePassword.length < 4) {
+      toast.error('Senha precisa ter pelo menos 4 caracteres')
+      return
+    }
     setSharing(true)
     try {
       const { blob } = await buildBundle()
-      const shared = await shareReport(blob, { protect: protectShare, expiresInSec: shareTtlSec })
-      try { await navigator.clipboard.writeText(shared.url) } catch {}
-      setShareHistory(h => [shared, ...h].slice(0, 20))
-      toast.success(
-        protectShare ? 'Link protegido copiado' : 'Link público copiado',
-        { description: shared.expiresAt ? `Expira em ${new Date(shared.expiresAt).toLocaleString()}` : shared.url },
-      )
+      const shared = await shareReport(blob, {
+        password: sharePassword, expiresInSec: shareTtlSec, label: shareLabel || null,
+      })
+      try { await navigator.clipboard.writeText(`${shared.url}\nSenha: ${sharePassword}`) } catch {}
+      setLastShared(shared)
+      toast.success('Link protegido copiado (com senha)')
+      listShares().then(setShareHistory).catch(() => {})
     } catch (e: any) {
       toast.error('Falha ao compartilhar: ' + (e?.message || 'erro'))
     } finally {
@@ -373,11 +410,21 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
     }
   }
 
-  const copyShared = async (s: SharedReport) => {
-    try { await navigator.clipboard.writeText(s.url); toast.success('Link copiado') }
+  const handleRevokeShare = async (id: string) => {
+    try {
+      await revokeShare(id)
+      toast.success('Link revogado')
+      listShares().then(setShareHistory).catch(() => {})
+    } catch (e: any) {
+      toast.error('Falha ao revogar: ' + (e?.message || 'erro'))
+    }
+  }
+
+  const copyShareUrl = async (id: string) => {
+    const url = `${window.location.origin}/share/audit/${id}`
+    try { await navigator.clipboard.writeText(url); toast.success('Link copiado') }
     catch { toast.error('Falha ao copiar') }
   }
-  const clearShareHistory = () => { setShareHistory([]); toast.success('Histórico limpo') }
 
   const toggleSelected = (id: string) => {
     setSelected(prev => {
@@ -398,7 +445,7 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
       if (key === 'l') { e.preventDefault(); setOpen(o => !o) }
       else if (key === 'e') { e.preventDefault(); setOpen(true); handleExportJSON() }
       else if (key === 'b') { e.preventDefault(); setOpen(true); handleBundleZip() }
-      else if (key === 's') { e.preventDefault(); setOpen(true); handleShareReport() }
+      else if (key === 's') { e.preventDefault(); setOpen(true); openShareDialog() }
       else if (key === 'c') { e.preventDefault(); setOpen(true); handleCopyReport() }
       else if (key === 'k') { e.preventDefault(); onClear() }
       else if (key === 'f') { e.preventDefault(); setOpen(true); setTimeout(() => searchRef.current?.focus(), 50) }
@@ -582,60 +629,70 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
                   {bundling ? <Loader2 className="h-3 w-3 mr-2 animate-spin" /> : <Package className="h-3 w-3 mr-2" />}
                   Bundle ZIP (⌘⇧B)
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleShareReport} disabled={sharing}>
+                <DropdownMenuItem onClick={openShareDialog} disabled={sharing}>
                   {sharing ? <Loader2 className="h-3 w-3 mr-2 animate-spin" /> : <Share2 className="h-3 w-3 mr-2" />}
-                  Compartilhar por link (⌘⇧S)
+                  Compartilhar com senha (⌘⇧S)
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-6 w-6" title="Compartilhar / histórico" disabled={sharing}>
-                  {sharing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Link2 className="h-3 w-3" />}
+                <Button variant="ghost" size="icon" className="h-6 w-6" title="Compartilhamentos">
+                  <Link2 className="h-3 w-3" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-72">
-                <DropdownMenuLabel className="text-[10px]">Compartilhamento</DropdownMenuLabel>
-                <DropdownMenuCheckboxItem
-                  checked={protectShare}
-                  onCheckedChange={(v) => setProtectShare(!!v)}
-                  onSelect={(e) => e.preventDefault()}
-                >Link protegido (URL assinada)</DropdownMenuCheckboxItem>
-                <DropdownMenuLabel className="text-[10px] text-muted-foreground">Validade do link</DropdownMenuLabel>
+              <DropdownMenuContent align="end" className="w-80">
+                <DropdownMenuLabel className="text-[10px]">Validade do próximo link</DropdownMenuLabel>
                 {[
                   ['1h', 60 * 60],
                   ['24h', 24 * 60 * 60],
                   ['7d', 7 * 24 * 60 * 60],
                   ['30d', 30 * 24 * 60 * 60],
                 ].map(([label, sec]) => (
-                  <DropdownMenuItem key={label as string} disabled={!protectShare} onClick={() => setShareTtlSec(sec as number)}>
+                  <DropdownMenuItem key={label as string} onClick={() => setShareTtlSec(sec as number)}>
                     {label}{shareTtlSec === sec && <Check className="h-3 w-3 ml-auto" />}
                   </DropdownMenuItem>
                 ))}
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleShareReport} disabled={sharing}>
+                <DropdownMenuItem onClick={openShareDialog} disabled={sharing}>
                   {sharing ? <Loader2 className="h-3 w-3 mr-2 animate-spin" /> : <Share2 className="h-3 w-3 mr-2" />}
-                  Gerar e copiar link (⌘⇧S)
+                  Gerar link protegido (⌘⇧S)
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel className="text-[10px]">Histórico ({shareHistory.length})</DropdownMenuLabel>
                 {shareHistory.length === 0 ? (
                   <div className="px-2 py-1.5 text-[11px] text-muted-foreground">Nenhum compartilhamento ainda.</div>
                 ) : (
-                  <>
-                    {shareHistory.slice(0, 10).map(s => (
-                      <DropdownMenuItem key={s.path} onClick={() => copyShared(s)} className="flex-col items-start gap-0.5">
-                        <span className="text-[11px] font-mono truncate w-full">{s.path}</span>
-                        <span className="text-[10px] text-muted-foreground">
-                          {new Date(s.createdAt).toLocaleString()} · {(s.size / 1024).toFixed(1)}KB · {s.protected ? 'protegido' : 'público'}
-                          {s.expiresAt ? ` · expira ${new Date(s.expiresAt).toLocaleDateString()}` : ''}
-                        </span>
-                      </DropdownMenuItem>
-                    ))}
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={clearShareHistory}>Limpar histórico</DropdownMenuItem>
-                  </>
+                  shareHistory.slice(0, 10).map(s => {
+                    const expired = s.expires_at && new Date(s.expires_at).getTime() < Date.now()
+                    const status = s.revoked_at ? 'revogado' : expired ? 'expirado' : 'ativo'
+                    const statusColor = s.revoked_at || expired ? 'text-red-400' : 'text-emerald-400'
+                    return (
+                      <div key={s.id} className="px-2 py-1.5 border-b border-border/30 last:border-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[11px] font-mono truncate flex-1">
+                            {s.label || s.id.slice(0, 8)}
+                          </span>
+                          <span className={cn('text-[9px] uppercase font-semibold', statusColor)}>{status}</span>
+                        </div>
+                        <div className="text-[10px] text-muted-foreground mt-0.5">
+                          {new Date(s.created_at).toLocaleString()} · {(s.size_bytes / 1024).toFixed(1)}KB · {s.download_count} download{s.download_count !== 1 ? 's' : ''}
+                          {s.expires_at && !s.revoked_at ? ` · expira ${new Date(s.expires_at).toLocaleDateString()}` : ''}
+                        </div>
+                        <div className="flex gap-1 mt-1">
+                          <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[10px]" onClick={() => copyShareUrl(s.id)}>
+                            <Copy className="h-2.5 w-2.5 mr-1" />Copiar
+                          </Button>
+                          {!s.revoked_at && (
+                            <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[10px] text-red-400" onClick={() => handleRevokeShare(s.id)}>
+                              <Trash className="h-2.5 w-2.5 mr-1" />Revogar
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
@@ -783,6 +840,59 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
           )}
         </div>
       )}
+
+      <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Lock className="h-4 w-4" /> Compartilhar relatório protegido</DialogTitle>
+            <DialogDescription>
+              O destinatário precisará da senha para baixar. O link expira automaticamente e pode ser revogado a qualquer momento.
+            </DialogDescription>
+          </DialogHeader>
+          {!lastShared ? (
+            <div className="space-y-3">
+              <div>
+                <Label htmlFor="share-pw" className="text-xs">Senha (≥ 4 caracteres)</Label>
+                <Input id="share-pw" value={sharePassword} onChange={(e) => setSharePassword(e.target.value)} className="font-mono" />
+              </div>
+              <div>
+                <Label htmlFor="share-label" className="text-xs">Rótulo (opcional)</Label>
+                <Input id="share-label" value={shareLabel} onChange={(e) => setShareLabel(e.target.value)} placeholder="Ex.: bug tela preta admin" />
+              </div>
+              <div>
+                <Label className="text-xs">Validade</Label>
+                <div className="flex gap-1 mt-1">
+                  {[['1h', 3600], ['24h', 86400], ['7d', 604800], ['30d', 2592000]].map(([l, s]) => (
+                    <button key={l as string} onClick={() => setShareTtlSec(s as number)}
+                      className={cn('px-2 py-1 text-[11px] rounded border', shareTtlSec === s ? 'bg-primary text-primary-foreground border-primary' : 'bg-secondary border-border')}>
+                      {l}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2 text-xs font-mono">
+              <div className="p-2 rounded bg-secondary border border-border break-all">{lastShared.url}</div>
+              <div className="p-2 rounded bg-secondary border border-border">Senha: <span className="text-primary">{sharePassword}</span></div>
+              <p className="text-[10px] text-muted-foreground font-sans">URL e senha já copiadas para a área de transferência.</p>
+            </div>
+          )}
+          <DialogFooter>
+            {!lastShared ? (
+              <>
+                <Button variant="ghost" onClick={() => setShareDialogOpen(false)}>Cancelar</Button>
+                <Button onClick={confirmShareReport} disabled={sharing}>
+                  {sharing ? <Loader2 className="h-3 w-3 mr-2 animate-spin" /> : <Share2 className="h-3 w-3 mr-2" />}
+                  Gerar link
+                </Button>
+              </>
+            ) : (
+              <Button onClick={() => setShareDialogOpen(false)}>Fechar</Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
