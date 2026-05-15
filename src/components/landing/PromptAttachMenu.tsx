@@ -155,12 +155,36 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
     if (file) onAttachFile(file)
   }
 
+  const isExternalUrl = (url: string) => {
+    try {
+      const u = new URL(url, window.location.href)
+      return u.origin !== window.location.origin && (u.protocol === 'http:' || u.protocol === 'https:')
+    } catch { return false }
+  }
+
   const handleReferenceSubmit = () => {
-    if (referenceUrl.trim()) {
-      onAddReference(referenceUrl)
-      setReferenceUrl('')
+    const trimmed = referenceUrl.trim()
+    if (!trimmed) return
+    if (isExternalUrl(trimmed)) {
+      // Reference URLs that point to external domains also pass through confirm.
+      let host = trimmed
+      try { host = new URL(trimmed).hostname } catch {}
       setReferenceDialogOpen(false)
+      requestExternalConfirmation({
+        id: `ref-${Date.now()}`,
+        label: host,
+        url: trimmed,
+        icon: Link2,
+        source: 'custom',
+      })
+      // Still register reference internally so it shows in the prompt.
+      onAddReference(trimmed)
+      setReferenceUrl('')
+      return
     }
+    onAddReference(trimmed)
+    setReferenceUrl('')
+    setReferenceDialogOpen(false)
   }
 
   const handleGoToConnectors = () => {
@@ -168,10 +192,30 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
     navigate('/connectors')
   }
 
+  const openCustomConnector = (c: CustomConnector) => {
+    if (!c.url) {
+      toast.error('Este conector não tem URL para abrir.')
+      return
+    }
+    requestExternalConfirmation({
+      id: c.id,
+      label: c.name,
+      url: c.url,
+      icon: KeyRound,
+      source: 'custom',
+    })
+  }
+
+  const removeCustomConnector = (id: string) => {
+    const next = customConnectors.filter(c => c.id !== id)
+    localStorage.setItem('kubo:custom-connectors', JSON.stringify(next))
+    setCustomConnectors(next)
+  }
+
   const handleSaveCustom = () => {
     try {
       if (customMode === 'json') JSON.parse(customJson)
-      const entry = {
+      const entry: CustomConnector = {
         id: crypto.randomUUID(),
         name: customName.trim() || 'Conector personalizado',
         mode: customMode,
@@ -180,9 +224,9 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
         json: customMode === 'json' ? customJson : null,
         createdAt: new Date().toISOString(),
       }
-      const existing = JSON.parse(localStorage.getItem('kubo:custom-connectors') || '[]')
-      existing.push(entry)
-      localStorage.setItem('kubo:custom-connectors', JSON.stringify(existing))
+      const next = [...customConnectors, entry]
+      localStorage.setItem('kubo:custom-connectors', JSON.stringify(next))
+      setCustomConnectors(next)
       toast.success('Conector personalizado salvo localmente')
       setCustomDialogOpen(false)
       setCustomName(''); setCustomUrl(''); setCustomKey(''); setCustomJson('')
