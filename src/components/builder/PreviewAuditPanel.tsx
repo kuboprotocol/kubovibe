@@ -840,6 +840,59 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
           )}
         </div>
       )}
+
+      <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Lock className="h-4 w-4" /> Compartilhar relatório protegido</DialogTitle>
+            <DialogDescription>
+              O destinatário precisará da senha para baixar. O link expira automaticamente e pode ser revogado a qualquer momento.
+            </DialogDescription>
+          </DialogHeader>
+          {!lastShared ? (
+            <div className="space-y-3">
+              <div>
+                <Label htmlFor="share-pw" className="text-xs">Senha (≥ 4 caracteres)</Label>
+                <Input id="share-pw" value={sharePassword} onChange={(e) => setSharePassword(e.target.value)} className="font-mono" />
+              </div>
+              <div>
+                <Label htmlFor="share-label" className="text-xs">Rótulo (opcional)</Label>
+                <Input id="share-label" value={shareLabel} onChange={(e) => setShareLabel(e.target.value)} placeholder="Ex.: bug tela preta admin" />
+              </div>
+              <div>
+                <Label className="text-xs">Validade</Label>
+                <div className="flex gap-1 mt-1">
+                  {[['1h', 3600], ['24h', 86400], ['7d', 604800], ['30d', 2592000]].map(([l, s]) => (
+                    <button key={l as string} onClick={() => setShareTtlSec(s as number)}
+                      className={cn('px-2 py-1 text-[11px] rounded border', shareTtlSec === s ? 'bg-primary text-primary-foreground border-primary' : 'bg-secondary border-border')}>
+                      {l}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2 text-xs font-mono">
+              <div className="p-2 rounded bg-secondary border border-border break-all">{lastShared.url}</div>
+              <div className="p-2 rounded bg-secondary border border-border">Senha: <span className="text-primary">{sharePassword}</span></div>
+              <p className="text-[10px] text-muted-foreground font-sans">URL e senha já copiadas para a área de transferência.</p>
+            </div>
+          )}
+          <DialogFooter>
+            {!lastShared ? (
+              <>
+                <Button variant="ghost" onClick={() => setShareDialogOpen(false)}>Cancelar</Button>
+                <Button onClick={confirmShareReport} disabled={sharing}>
+                  {sharing ? <Loader2 className="h-3 w-3 mr-2 animate-spin" /> : <Share2 className="h-3 w-3 mr-2" />}
+                  Gerar link
+                </Button>
+              </>
+            ) : (
+              <Button onClick={() => setShareDialogOpen(false)}>Fechar</Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
