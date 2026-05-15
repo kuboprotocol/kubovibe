@@ -26,6 +26,8 @@ import {
   KeyRound,
   FileJson,
   ArrowLeft,
+  ShieldOff,
+  Ban,
 } from 'lucide-react'
 import {
   Popover,
@@ -81,7 +83,7 @@ const menuSections = [
   },
 ]
 
-type View = 'main' | 'connectors' | 'confirm-external'
+type View = 'main' | 'connectors' | 'confirm-external' | 'blocked'
 type ExternalTarget = { id: string; label: string; url: string; icon: typeof Github; source?: 'builtin' | 'custom' }
 const EXTERNAL_TARGETS: Record<'github' | 'figma', ExternalTarget> = {
   github: { id: 'github', label: 'GitHub', url: 'https://github.com', icon: Github, source: 'builtin' },
@@ -103,11 +105,31 @@ function loadCustomConnectors(): CustomConnector[] {
 }
 
 const TRUSTED_HOSTS_KEY = 'kubo:trusted-external-hosts'
+const USER_BLOCKLIST_KEY = 'kubo:blocked-external-hosts'
+
+// Internal blocklist — domains known to be high risk (phishing-prone, malware hosters, anonymizers, etc.).
+// Matches by exact host or any subdomain.
+const INTERNAL_BLOCKLIST: string[] = [
+  'bit.ly', 'tinyurl.com', 'is.gd', 'goo.gl', 't.co', 'shorte.st', 'adf.ly',
+  'grabify.link', 'iplogger.org', 'iplogger.com', 'iplogger.ru',
+  'localhost', '127.0.0.1', '0.0.0.0',
+  'phishing.test', 'malware.test',
+]
+
 function loadTrustedHosts(): string[] {
   try { return JSON.parse(localStorage.getItem(TRUSTED_HOSTS_KEY) || '[]') } catch { return [] }
 }
+function loadBlockedHosts(): string[] {
+  try { return JSON.parse(localStorage.getItem(USER_BLOCKLIST_KEY) || '[]') } catch { return [] }
+}
 function hostOf(url: string): string {
-  try { return new URL(url).hostname } catch { return '' }
+  try { return new URL(url).hostname.toLowerCase() } catch { return '' }
+}
+function hostMatches(host: string, pattern: string): boolean {
+  if (!host || !pattern) return false
+  const h = host.toLowerCase()
+  const p = pattern.toLowerCase()
+  return h === p || h.endsWith('.' + p)
 }
 
 export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddReference }: PromptAttachMenuProps) {
@@ -125,10 +147,23 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
   const [customJson, setCustomJson] = useState('')
   const [customConnectors, setCustomConnectors] = useState<CustomConnector[]>(() => loadCustomConnectors())
   const [trustedHosts, setTrustedHosts] = useState<string[]>(() => loadTrustedHosts())
+  const [blockedHosts, setBlockedHosts] = useState<string[]>(() => loadBlockedHosts())
+  const [autoBlockEnabled, setAutoBlockEnabled] = useState<boolean>(() => {
+    return localStorage.getItem('kubo:auto-block-enabled') !== '0'
+  })
+  const [blockedReason, setBlockedReason] = useState<{ host: string; source: 'internal' | 'user' } | null>(null)
+  const [newBlockHost, setNewBlockHost] = useState('')
   const [rememberHost, setRememberHost] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const closeAll = () => { setOpen(false); setView('main') }
+
+  const isHostBlocked = (host: string): { blocked: boolean; source: 'internal' | 'user' | null } => {
+    if (!host) return { blocked: false, source: null }
+    if (blockedHosts.some(p => hostMatches(host, p))) return { blocked: true, source: 'user' }
+    if (autoBlockEnabled && INTERNAL_BLOCKLIST.some(p => hostMatches(host, p))) return { blocked: true, source: 'internal' }
+    return { blocked: false, source: null }
+  }
 
   const openExternalNow = (target: ExternalTarget) => {
     window.open(target.url, '_blank', 'noopener,noreferrer')
@@ -137,6 +172,15 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
 
   const requestExternalConfirmation = (target: ExternalTarget) => {
     const host = hostOf(target.url)
+    const block = isHostBlocked(host)
+    if (block.blocked) {
+      setBlockedReason({ host, source: block.source! })
+      setExternalTarget(target)
+      setView('blocked')
+      setOpen(true)
+      toast.error(`${host} está bloqueado e não será aberto`)
+      return
+    }
     if (host && trustedHosts.includes(host)) {
       openExternalNow(target)
       closeAll()
@@ -184,6 +228,36 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
     localStorage.setItem(TRUSTED_HOSTS_KEY, JSON.stringify(next))
     setTrustedHosts(next)
     toast.success(`${host} removido — pedirá confirmação novamente`)
+  }
+
+  const addBlockedHost = (raw: string) => {
+    const host = raw.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '')
+    if (!host) return
+    if (blockedHosts.includes(host)) { toast.info(`${host} já está bloqueado`); return }
+    const next = [...blockedHosts, host]
+    localStorage.setItem(USER_BLOCKLIST_KEY, JSON.stringify(next))
+    setBlockedHosts(next)
+    // Also remove from trusted if present
+    if (trustedHosts.some(h => hostMatches(h, host))) {
+      const t = trustedHosts.filter(h => !hostMatches(h, host))
+      localStorage.setItem(TRUSTED_HOSTS_KEY, JSON.stringify(t))
+      setTrustedHosts(t)
+    }
+    toast.success(`${host} bloqueado`)
+    setNewBlockHost('')
+  }
+
+  const removeBlockedHost = (host: string) => {
+    const next = blockedHosts.filter(h => h !== host)
+    localStorage.setItem(USER_BLOCKLIST_KEY, JSON.stringify(next))
+    setBlockedHosts(next)
+    toast.success(`${host} desbloqueado`)
+  }
+
+  const toggleAutoBlock = (enabled: boolean) => {
+    setAutoBlockEnabled(enabled)
+    localStorage.setItem('kubo:auto-block-enabled', enabled ? '1' : '0')
+    toast.success(enabled ? 'Bloqueio automático ativado' : 'Bloqueio automático desativado')
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -480,6 +554,60 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
                 </div>
               )}
 
+              <div className="mt-1 pt-2 border-t border-border/30">
+                <div className="flex items-center justify-between px-3 py-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <ShieldOff className="h-3 w-3 text-destructive" />
+                    <span className="text-[10px] uppercase tracking-widest text-muted-foreground/80">Bloqueio de domínios</span>
+                  </div>
+                  <label className="flex items-center gap-1 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={autoBlockEnabled}
+                      onChange={(e) => toggleAutoBlock(e.target.checked)}
+                      className="h-3 w-3 accent-destructive cursor-pointer"
+                    />
+                    <span className="text-[10px] text-muted-foreground">Auto</span>
+                  </label>
+                </div>
+                <p className="px-3 text-[10px] text-muted-foreground/70 leading-snug pb-1">
+                  Bloqueia abertura mesmo de domínios confiáveis. Lista interna {autoBlockEnabled ? 'ativa' : 'desativada'} ({INTERNAL_BLOCKLIST.length} entradas).
+                </p>
+                <div className="px-2 pb-2 flex gap-1">
+                  <input
+                    type="text"
+                    value={newBlockHost}
+                    onChange={(e) => setNewBlockHost(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') addBlockedHost(newBlockHost) }}
+                    placeholder="ex: exemplo.com"
+                    className="flex-1 px-2 py-1 text-[11px] rounded-md bg-background border border-border focus:outline-none focus:ring-1 focus:ring-destructive/50"
+                  />
+                  <button
+                    onClick={() => addBlockedHost(newBlockHost)}
+                    className="px-2 py-1 text-[10px] rounded-md bg-destructive/15 text-destructive hover:bg-destructive/25 transition-colors flex items-center gap-1"
+                  >
+                    <Ban className="h-3 w-3" /> Bloquear
+                  </button>
+                </div>
+                {blockedHosts.length > 0 && (
+                  <div className="max-h-32 overflow-y-auto">
+                    {blockedHosts.map(h => (
+                      <div key={h} className="flex items-center gap-2 px-3 py-1 hover:bg-accent/40">
+                        <Ban className="h-3 w-3 text-destructive flex-shrink-0" />
+                        <span className="flex-1 text-[11px] text-foreground truncate">{h}</span>
+                        <button
+                          onClick={() => removeBlockedHost(h)}
+                          className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                          title="Desbloquear"
+                        >
+                          Remover
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <div className="mt-1 pt-2 border-t border-border/30 px-3 py-1.5">
                 <span className="text-[10px] text-muted-foreground/50">Salvo localmente neste navegador</span></div>
             </div>
@@ -538,6 +666,65 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
                   className="w-full px-3 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:bg-accent transition-colors"
                 >
                   Cancelar
+                </button>
+              </div>
+            </div>
+          )}
+
+          {view === 'blocked' && externalTarget && blockedReason && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 px-2 py-1.5">
+                <button
+                  onClick={() => { setView('main'); setExternalTarget(null); setBlockedReason(null) }}
+                  className="p-1 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Voltar"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                </button>
+                <ShieldOff className="h-3.5 w-3.5 text-destructive" />
+                <span className="text-xs font-display font-bold text-destructive tracking-wider uppercase">
+                  Domínio bloqueado
+                </span>
+              </div>
+
+              <div className="mx-2 p-3 rounded-lg border border-destructive/40 bg-destructive/10 flex gap-2">
+                <Ban className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+                <div className="text-[11px] leading-relaxed text-muted-foreground">
+                  <p className="font-semibold text-destructive mb-1">
+                    {blockedReason.source === 'internal' ? 'Bloqueado pela lista interna' : 'Bloqueado pela sua lista'}
+                  </p>
+                  <p>
+                    <strong className="text-foreground">{blockedReason.host}</strong> não pode ser aberto.
+                    {blockedReason.source === 'internal'
+                      ? ' Domínios na lista interna são considerados de risco (encurtadores, anonimizadores, hosts conhecidos por phishing).'
+                      : ' Você adicionou este domínio à sua lista de bloqueio.'}
+                  </p>
+                  <p className="mt-1">A configuração de <strong>domínios confiáveis</strong> é ignorada quando há bloqueio.</p>
+                </div>
+              </div>
+
+              <div className="px-2 pb-1 flex flex-col gap-2">
+                {blockedReason.source === 'user' && (
+                  <button
+                    onClick={() => { removeBlockedHost(blockedReason.host); setView('main'); setExternalTarget(null); setBlockedReason(null) }}
+                    className="w-full px-3 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:bg-accent transition-colors"
+                  >
+                    Desbloquear {blockedReason.host}
+                  </button>
+                )}
+                {blockedReason.source === 'internal' && (
+                  <button
+                    onClick={() => { toggleAutoBlock(false); setView('main'); setExternalTarget(null); setBlockedReason(null) }}
+                    className="w-full px-3 py-2 rounded-lg border border-destructive/40 text-xs text-destructive hover:bg-destructive/10 transition-colors"
+                  >
+                    Desativar bloqueio automático (não recomendado)
+                  </button>
+                )}
+                <button
+                  onClick={() => { setView('main'); setExternalTarget(null); setBlockedReason(null) }}
+                  className="w-full px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+                >
+                  Entendi
                 </button>
               </div>
             </div>
