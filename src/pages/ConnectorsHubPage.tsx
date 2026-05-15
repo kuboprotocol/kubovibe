@@ -25,9 +25,9 @@ export default function ConnectorsHubPage() {
     if (connector.internalRoute) {
       navigate(connector.internalRoute)
     } else {
-      // Sempre passa pela subpágina interna de setup (exige API key) antes
-      // de qualquer painel de gerenciamento. Nenhum redirect externo.
-      navigate(`/connectors/${connector.slug}/setup`)
+      // Abre a página de detalhes do conector. A partir dela, o usuário
+      // inicia o setup explicitamente — fluxo igual ao Lovable/Lovebird.
+      navigate(`/connectors/${connector.slug}/about`)
     }
   }
 
