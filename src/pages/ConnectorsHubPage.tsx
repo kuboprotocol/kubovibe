@@ -1,32 +1,75 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useMemo } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { connectors, categories, type ConnectorConfig } from '@/lib/connectorsConfig'
-import { ArrowLeft, Search, Zap, ExternalLink } from 'lucide-react'
+import { ArrowLeft, Search, Zap, ExternalLink, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { GlobalActivityPanel } from '@/components/connectors/GlobalActivityPanel'
 
+type Availability = 'all' | 'available' | 'coming_soon'
+
+const AVAILABILITY_OPTIONS: { id: Availability; label: string }[] = [
+  { id: 'all', label: 'Todos' },
+  { id: 'available', label: 'Disponíveis' },
+  { id: 'coming_soon', label: 'Em breve' },
+]
+
+const STATUS_RANK: Record<ConnectorConfig['status'], number> = {
+  available: 0,
+  coming_soon: 1,
+}
+
 export default function ConnectorsHubPage() {
   const navigate = useNavigate()
-  const [search, setSearch] = useState('')
-  const [activeCategory, setActiveCategory] = useState('all')
+  const [searchParams, setSearchParams] = useSearchParams()
 
-  const filtered = connectors.filter(c => {
-    const matchesSearch = c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.description.toLowerCase().includes(search.toLowerCase())
-    const matchesCategory = activeCategory === 'all' || c.category === activeCategory
-    return matchesSearch && matchesCategory
-  })
+  const search = searchParams.get('q') ?? ''
+  const activeCategory = searchParams.get('cat') ?? 'all'
+  const availability = (searchParams.get('avail') as Availability | null) ?? 'all'
+
+  const updateParam = (key: string, value: string, defaultValue: string) => {
+    setSearchParams(prev => {
+      const sp = new URLSearchParams(prev)
+      if (!value || value === defaultValue) sp.delete(key); else sp.set(key, value)
+      return sp
+    }, { replace: true })
+  }
+
+  const hasActiveFilters = Boolean(search) || activeCategory !== 'all' || availability !== 'all'
+
+  const clearFilters = () => {
+    setSearchParams(prev => {
+      const sp = new URLSearchParams(prev)
+      sp.delete('q'); sp.delete('cat'); sp.delete('avail')
+      return sp
+    }, { replace: true })
+  }
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase()
+    return connectors
+      .filter(c => {
+        const matchesSearch = !q ||
+          c.name.toLowerCase().includes(q) ||
+          c.description.toLowerCase().includes(q)
+        const matchesCategory = activeCategory === 'all' || c.category === activeCategory
+        const matchesAvailability = availability === 'all' || c.status === availability
+        return matchesSearch && matchesCategory && matchesAvailability
+      })
+      .sort((a, b) => {
+        const byStatus = STATUS_RANK[a.status] - STATUS_RANK[b.status]
+        if (byStatus !== 0) return byStatus
+        return a.name.localeCompare(b.name)
+      })
+  }, [search, activeCategory, availability])
 
   const handleConnectorClick = (connector: ConnectorConfig) => {
     if (connector.internalRoute) {
       navigate(connector.internalRoute)
     } else {
-      // Abre a página de detalhes do conector. A partir dela, o usuário
-      // inicia o setup explicitamente — fluxo igual ao Lovable/Lovebird.
       navigate(`/connectors/${connector.slug}/about`)
     }
   }
@@ -52,25 +95,52 @@ export default function ConnectorsHubPage() {
       </div>
 
       <div className="max-w-6xl mx-auto px-4 py-8 space-y-6">
-        {/* Global Activity */}
         <GlobalActivityPanel />
 
         {/* Search + Filters */}
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar conectores..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="pl-10"
-            />
+        <div className="space-y-3">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar conectores..."
+                value={search}
+                onChange={e => updateParam('q', e.target.value, '')}
+                className="pl-10 pr-9"
+              />
+              {search && (
+                <button
+                  onClick={() => updateParam('q', '', '')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                  aria-label="Limpar busca"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              {AVAILABILITY_OPTIONS.map(opt => (
+                <button
+                  key={opt.id}
+                  onClick={() => updateParam('avail', opt.id, 'all')}
+                  className={cn(
+                    'px-3 py-1.5 rounded-lg text-xs font-medium transition-all',
+                    availability === opt.id
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-secondary text-secondary-foreground hover:bg-accent'
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="flex gap-2 flex-wrap">
+
+          <div className="flex gap-2 flex-wrap items-center">
             {categories.map(cat => (
               <button
                 key={cat.id}
-                onClick={() => setActiveCategory(cat.id)}
+                onClick={() => updateParam('cat', cat.id, 'all')}
                 className={cn(
                   'px-3 py-1.5 rounded-lg text-xs font-medium transition-all',
                   activeCategory === cat.id
@@ -81,7 +151,21 @@ export default function ConnectorsHubPage() {
                 {cat.label}
               </button>
             ))}
+            {hasActiveFilters && (
+              <button
+                onClick={clearFilters}
+                className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              >
+                <X className="h-3.5 w-3.5" />
+                Limpar filtros
+              </button>
+            )}
           </div>
+
+          <p className="text-xs text-muted-foreground">
+            {filtered.length} de {connectors.length} conectores
+            {hasActiveFilters && ' · filtros ativos compartilháveis via URL'}
+          </p>
         </div>
 
         {/* Connectors Grid */}
@@ -133,7 +217,6 @@ export default function ConnectorsHubPage() {
                 </div>
               </div>
 
-              {/* Category tag */}
               <div className="mt-3 flex items-center justify-between">
                 <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
                   {connector.category}
@@ -145,9 +228,15 @@ export default function ConnectorsHubPage() {
         </motion.div>
 
         {filtered.length === 0 && (
-          <div className="text-center py-16 text-muted-foreground">
+          <div className="text-center py-16 text-muted-foreground space-y-3">
             <p className="text-lg">Nenhum conector encontrado</p>
-            <p className="text-sm mt-1">Tente ajustar seus filtros de busca</p>
+            <p className="text-sm">Tente ajustar seus filtros de busca</p>
+            {hasActiveFilters && (
+              <Button variant="outline" size="sm" onClick={clearFilters}>
+                <X className="h-4 w-4" />
+                Limpar filtros
+              </Button>
+            )}
           </div>
         )}
       </div>
