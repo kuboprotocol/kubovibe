@@ -82,10 +82,24 @@ const menuSections = [
 ]
 
 type View = 'main' | 'connectors' | 'confirm-external'
-type ExternalTarget = { id: 'github' | 'figma'; label: string; url: string; icon: typeof Github }
+type ExternalTarget = { id: string; label: string; url: string; icon: typeof Github; source?: 'builtin' | 'custom' }
 const EXTERNAL_TARGETS: Record<'github' | 'figma', ExternalTarget> = {
-  github: { id: 'github', label: 'GitHub', url: 'https://github.com', icon: Github },
-  figma: { id: 'figma', label: 'Figma', url: 'https://figma.com', icon: Figma },
+  github: { id: 'github', label: 'GitHub', url: 'https://github.com', icon: Github, source: 'builtin' },
+  figma: { id: 'figma', label: 'Figma', url: 'https://figma.com', icon: Figma, source: 'builtin' },
+}
+
+interface CustomConnector {
+  id: string
+  name: string
+  mode: 'api' | 'json'
+  url: string | null
+  apiKey: string | null
+  json: string | null
+  createdAt: string
+}
+
+function loadCustomConnectors(): CustomConnector[] {
+  try { return JSON.parse(localStorage.getItem('kubo:custom-connectors') || '[]') } catch { return [] }
 }
 
 export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddReference }: PromptAttachMenuProps) {
