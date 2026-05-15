@@ -245,6 +245,10 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
     return list
   }, [logs, filter, query, range])
 
+  const timelineFiltered = useMemo(() => {
+    return filtered.filter(l => timelineKinds.has(l.kind))
+  }, [filtered, timelineKinds])
+
   const errorCount = logs.filter(l => ['error', 'exception', 'rejection'].includes(l.kind)).length
   const warnCount = logs.filter(l => ['warn', 'resource'].includes(l.kind)).length
   const netCount = logs.filter(l => l.kind === 'network').length
