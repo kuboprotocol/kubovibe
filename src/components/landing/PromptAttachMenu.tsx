@@ -554,6 +554,60 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
                 </div>
               )}
 
+              <div className="mt-1 pt-2 border-t border-border/30">
+                <div className="flex items-center justify-between px-3 py-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <ShieldOff className="h-3 w-3 text-destructive" />
+                    <span className="text-[10px] uppercase tracking-widest text-muted-foreground/80">Bloqueio de domínios</span>
+                  </div>
+                  <label className="flex items-center gap-1 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={autoBlockEnabled}
+                      onChange={(e) => toggleAutoBlock(e.target.checked)}
+                      className="h-3 w-3 accent-destructive cursor-pointer"
+                    />
+                    <span className="text-[10px] text-muted-foreground">Auto</span>
+                  </label>
+                </div>
+                <p className="px-3 text-[10px] text-muted-foreground/70 leading-snug pb-1">
+                  Bloqueia abertura mesmo de domínios confiáveis. Lista interna {autoBlockEnabled ? 'ativa' : 'desativada'} ({INTERNAL_BLOCKLIST.length} entradas).
+                </p>
+                <div className="px-2 pb-2 flex gap-1">
+                  <input
+                    type="text"
+                    value={newBlockHost}
+                    onChange={(e) => setNewBlockHost(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') addBlockedHost(newBlockHost) }}
+                    placeholder="ex: exemplo.com"
+                    className="flex-1 px-2 py-1 text-[11px] rounded-md bg-background border border-border focus:outline-none focus:ring-1 focus:ring-destructive/50"
+                  />
+                  <button
+                    onClick={() => addBlockedHost(newBlockHost)}
+                    className="px-2 py-1 text-[10px] rounded-md bg-destructive/15 text-destructive hover:bg-destructive/25 transition-colors flex items-center gap-1"
+                  >
+                    <Ban className="h-3 w-3" /> Bloquear
+                  </button>
+                </div>
+                {blockedHosts.length > 0 && (
+                  <div className="max-h-32 overflow-y-auto">
+                    {blockedHosts.map(h => (
+                      <div key={h} className="flex items-center gap-2 px-3 py-1 hover:bg-accent/40">
+                        <Ban className="h-3 w-3 text-destructive flex-shrink-0" />
+                        <span className="flex-1 text-[11px] text-foreground truncate">{h}</span>
+                        <button
+                          onClick={() => removeBlockedHost(h)}
+                          className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                          title="Desbloquear"
+                        >
+                          Remover
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <div className="mt-1 pt-2 border-t border-border/30 px-3 py-1.5">
                 <span className="text-[10px] text-muted-foreground/50">Salvo localmente neste navegador</span></div>
             </div>
