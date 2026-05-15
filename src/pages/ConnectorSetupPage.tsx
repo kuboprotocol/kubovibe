@@ -1,17 +1,20 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowLeft, ExternalLink, Loader2, ShieldCheck, KeyRound, CheckCircle2, AlertTriangle, Plug, XCircle } from 'lucide-react'
+import { ArrowLeft, ExternalLink, Loader2, ShieldCheck, KeyRound, CheckCircle2, AlertTriangle, Plug, XCircle, Github } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { toast } from 'sonner'
 import { getConnectorBySlug } from '@/lib/connectorsConfig'
 import { supabase } from '@/integrations/supabase/client'
 import { cn } from '@/lib/utils'
+
+type GithubProfile = { login: string; avatar_url: string | null; profile_url: string }
 
 export default function ConnectorSetupPage() {
   const { slug = '' } = useParams<{ slug: string }>()
