@@ -543,6 +543,41 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
               ))}
             </div>
 
+            {view === 'timeline' && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px] font-mono gap-1">
+                    <Filter className="h-3 w-3" />
+                    Tipos
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44">
+                  <DropdownMenuLabel className="text-[10px]">Filtrar eventos</DropdownMenuLabel>
+                  {Object.entries(KIND_META).map(([kind, meta]) => {
+                    const k = kind as PreviewLogKind
+                    const Icon = meta.icon
+                    return (
+                      <DropdownMenuCheckboxItem
+                        key={kind}
+                        checked={timelineKinds.has(k)}
+                        onCheckedChange={(v) => {
+                          setTimelineKinds(prev => {
+                            const next = new Set(prev)
+                            if (v) next.add(k); else next.delete(k)
+                            return next
+                          })
+                        }}
+                        onSelect={(e) => e.preventDefault()}
+                      >
+                        <Icon className={cn('h-3 w-3 mr-1.5 inline', meta.color)} />
+                        <span className="capitalize">{meta.label}</span>
+                      </DropdownMenuCheckboxItem>
+                    )
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
             {/* Correlation window */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
