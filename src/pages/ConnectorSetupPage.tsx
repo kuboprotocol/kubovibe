@@ -88,8 +88,22 @@ export default function ConnectorSetupPage() {
       })
       if (error) throw error
       if ((data as any)?.error) throw new Error(JSON.stringify((data as any).error))
-      toast.success(`${connector.name} conectado com sucesso!`)
-      navigate(`/connectors/${slug}`)
+      const gh = (data as any)?.github as GithubProfile | null
+      if (slug === 'github' && gh?.login) {
+        setGithubProfile(gh)
+        setApiKey('')
+        // refresh existing badge
+        const { data: cred } = await supabase
+          .from('api_credentials')
+          .select('masked_hint, updated_at')
+          .eq('connector_slug', slug)
+          .maybeSingle()
+        setExisting(cred ?? null)
+        toast.success(`GitHub vinculado: @${gh.login}`)
+      } else {
+        toast.success(`${connector.name} conectado com sucesso!`)
+        navigate(`/connectors/${slug}`)
+      }
     } catch (e: any) {
       toast.error(`Falha ao salvar: ${e.message ?? 'erro desconhecido'}`)
     } finally {
