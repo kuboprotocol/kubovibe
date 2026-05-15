@@ -230,6 +230,36 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
     toast.success(`${host} removido — pedirá confirmação novamente`)
   }
 
+  const addBlockedHost = (raw: string) => {
+    const host = raw.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '')
+    if (!host) return
+    if (blockedHosts.includes(host)) { toast.info(`${host} já está bloqueado`); return }
+    const next = [...blockedHosts, host]
+    localStorage.setItem(USER_BLOCKLIST_KEY, JSON.stringify(next))
+    setBlockedHosts(next)
+    // Also remove from trusted if present
+    if (trustedHosts.some(h => hostMatches(h, host))) {
+      const t = trustedHosts.filter(h => !hostMatches(h, host))
+      localStorage.setItem(TRUSTED_HOSTS_KEY, JSON.stringify(t))
+      setTrustedHosts(t)
+    }
+    toast.success(`${host} bloqueado`)
+    setNewBlockHost('')
+  }
+
+  const removeBlockedHost = (host: string) => {
+    const next = blockedHosts.filter(h => h !== host)
+    localStorage.setItem(USER_BLOCKLIST_KEY, JSON.stringify(next))
+    setBlockedHosts(next)
+    toast.success(`${host} desbloqueado`)
+  }
+
+  const toggleAutoBlock = (enabled: boolean) => {
+    setAutoBlockEnabled(enabled)
+    localStorage.setItem('kubo:auto-block-enabled', enabled ? '1' : '0')
+    toast.success(enabled ? 'Bloqueio automático ativado' : 'Bloqueio automático desativado')
+  }
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) onAttachFile(file)
