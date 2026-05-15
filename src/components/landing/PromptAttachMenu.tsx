@@ -81,12 +81,18 @@ const menuSections = [
   },
 ]
 
-type View = 'main' | 'connectors'
+type View = 'main' | 'connectors' | 'confirm-external'
+type ExternalTarget = { id: 'github' | 'figma'; label: string; url: string; icon: typeof Github }
+const EXTERNAL_TARGETS: Record<'github' | 'figma', ExternalTarget> = {
+  github: { id: 'github', label: 'GitHub', url: 'https://github.com', icon: Github },
+  figma: { id: 'figma', label: 'Figma', url: 'https://figma.com', icon: Figma },
+}
 
 export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddReference }: PromptAttachMenuProps) {
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const [view, setView] = useState<View>('main')
+  const [externalTarget, setExternalTarget] = useState<ExternalTarget | null>(null)
   const [referenceDialogOpen, setReferenceDialogOpen] = useState(false)
   const [referenceUrl, setReferenceUrl] = useState('')
   const [customDialogOpen, setCustomDialogOpen] = useState(false)
@@ -101,14 +107,26 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
 
   const handleAction = (action: string) => {
     switch (action) {
-      case 'github': window.open('https://github.com', '_blank'); break
-      case 'figma': window.open('https://figma.com', '_blank'); break
+      case 'github':
+      case 'figma':
+        setExternalTarget(EXTERNAL_TARGETS[action])
+        setView('confirm-external')
+        return
       case 'connectors': setView('connectors'); return
       case 'screenshot': onScreenshot(); break
       case 'reference': setReferenceDialogOpen(true); closeAll(); return
       case 'attach': fileInputRef.current?.click(); break
       default: console.log(`Action: ${action}`)
     }
+    closeAll()
+  }
+
+  const confirmExternalNavigation = () => {
+    if (externalTarget) {
+      window.open(externalTarget.url, '_blank', 'noopener,noreferrer')
+      toast.warning(`Redirecionado para ${externalTarget.label} — fora do KUBO VIBE`)
+    }
+    setExternalTarget(null)
     closeAll()
   }
 
@@ -206,6 +224,7 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
                     {section.items.map((item) => {
                       const isConnectorsRoot = item.action === 'connectors'
                       const isExternal = item.action === 'github' || item.action === 'figma'
+                      const showChevron = isConnectorsRoot || isExternal
                       return (
                         <button
                           key={item.action}
@@ -221,7 +240,7 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
                           </div>
                           <span className="flex-1 text-left flex items-center gap-1.5">
                             {item.label}
-                            {isExternal && <ExternalLink className="h-3 w-3 text-muted-foreground/50" />}
+                            {isExternal && <ShieldAlert className="h-3 w-3 text-destructive/70" />}
                           </span>
                           {item.badge && (
                             <span className={cn(
@@ -231,7 +250,7 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
                               {item.badge}
                             </span>
                           )}
-                          {isConnectorsRoot && <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/60" />}
+                          {showChevron && <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/60" />}
                         </button>
                       )
                     })}
@@ -305,6 +324,52 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
 
               <div className="mt-1 pt-2 border-t border-border/30 px-3 py-1.5">
                 <span className="text-[10px] text-muted-foreground/50">Salvo localmente neste navegador</span>
+              </div>
+            </div>
+          )}
+
+          {view === 'confirm-external' && externalTarget && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 px-2 py-1.5">
+                <button
+                  onClick={() => { setView('main'); setExternalTarget(null) }}
+                  className="p-1 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Voltar"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                </button>
+                <externalTarget.icon className="h-3.5 w-3.5 text-primary" />
+                <span className="text-xs font-display font-bold text-primary tracking-wider uppercase">
+                  Sair para {externalTarget.label}
+                </span>
+              </div>
+
+              <div className="mx-2 p-3 rounded-lg border border-destructive/30 bg-destructive/5 flex gap-2">
+                <ShieldAlert className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+                <div className="text-[11px] leading-relaxed text-muted-foreground">
+                  <p className="font-semibold text-destructive/90 mb-1">Você está deixando o KUBO VIBE</p>
+                  <p>
+                    Vamos abrir <strong>{externalTarget.url.replace('https://', '')}</strong> em uma nova aba.
+                    Esse domínio é de terceiros e <strong>não é assegurado</strong> pelo KUBO VIBE — credenciais,
+                    dados e tráfego ficam por conta do provedor externo.
+                  </p>
+                </div>
+              </div>
+
+              <div className="px-2 pb-1 flex flex-col gap-2">
+                <button
+                  onClick={confirmExternalNavigation}
+                  className="w-full px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
+                >
+                  Continuar para {externalTarget.label}
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  onClick={() => { setView('main'); setExternalTarget(null) }}
+                  className="w-full px-3 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:bg-accent transition-colors"
+                >
+                  Cancelar
+                </button>
               </div>
             </div>
           )}
