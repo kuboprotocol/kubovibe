@@ -83,7 +83,7 @@ const menuSections = [
   },
 ]
 
-type View = 'main' | 'connectors' | 'confirm-external'
+type View = 'main' | 'connectors' | 'confirm-external' | 'blocked'
 type ExternalTarget = { id: string; label: string; url: string; icon: typeof Github; source?: 'builtin' | 'custom' }
 const EXTERNAL_TARGETS: Record<'github' | 'figma', ExternalTarget> = {
   github: { id: 'github', label: 'GitHub', url: 'https://github.com', icon: Github, source: 'builtin' },
@@ -105,11 +105,31 @@ function loadCustomConnectors(): CustomConnector[] {
 }
 
 const TRUSTED_HOSTS_KEY = 'kubo:trusted-external-hosts'
+const USER_BLOCKLIST_KEY = 'kubo:blocked-external-hosts'
+
+// Internal blocklist — domains known to be high risk (phishing-prone, malware hosters, anonymizers, etc.).
+// Matches by exact host or any subdomain.
+const INTERNAL_BLOCKLIST: string[] = [
+  'bit.ly', 'tinyurl.com', 'is.gd', 'goo.gl', 't.co', 'shorte.st', 'adf.ly',
+  'grabify.link', 'iplogger.org', 'iplogger.com', 'iplogger.ru',
+  'localhost', '127.0.0.1', '0.0.0.0',
+  'phishing.test', 'malware.test',
+]
+
 function loadTrustedHosts(): string[] {
   try { return JSON.parse(localStorage.getItem(TRUSTED_HOSTS_KEY) || '[]') } catch { return [] }
 }
+function loadBlockedHosts(): string[] {
+  try { return JSON.parse(localStorage.getItem(USER_BLOCKLIST_KEY) || '[]') } catch { return [] }
+}
 function hostOf(url: string): string {
-  try { return new URL(url).hostname } catch { return '' }
+  try { return new URL(url).hostname.toLowerCase() } catch { return '' }
+}
+function hostMatches(host: string, pattern: string): boolean {
+  if (!host || !pattern) return false
+  const h = host.toLowerCase()
+  const p = pattern.toLowerCase()
+  return h === p || h.endsWith('.' + p)
 }
 
 export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddReference }: PromptAttachMenuProps) {
