@@ -78,7 +78,26 @@ export default function ConnectorSetupPage() {
     }
   }
 
-  const Icon = connector.icon
+  const handleTest = async () => {
+    setTesting(true)
+    setTestResult(null)
+    try {
+      const { data, error } = await supabase.functions.invoke('connector-credentials-test', {
+        body: { connector_slug: slug },
+      })
+      if (error) throw error
+      const r = data as any
+      setTestResult({ ok: !!r?.ok, status: r?.status ?? 0, account: r?.account, detail: r?.detail })
+      if (r?.ok) toast.success(`Conexão validada${r.account ? ` · ${r.account}` : ''}`)
+      else toast.error(`Falha no teste: ${r?.detail ?? `HTTP ${r?.status}`}`)
+    } catch (e: any) {
+      const msg = e?.message ?? 'erro desconhecido'
+      setTestResult({ ok: false, status: 0, detail: msg })
+      toast.error(`Erro ao testar: ${msg}`)
+    } finally {
+      setTesting(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground">
