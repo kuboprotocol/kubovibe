@@ -82,10 +82,24 @@ const menuSections = [
 ]
 
 type View = 'main' | 'connectors' | 'confirm-external'
-type ExternalTarget = { id: 'github' | 'figma'; label: string; url: string; icon: typeof Github }
+type ExternalTarget = { id: string; label: string; url: string; icon: typeof Github; source?: 'builtin' | 'custom' }
 const EXTERNAL_TARGETS: Record<'github' | 'figma', ExternalTarget> = {
-  github: { id: 'github', label: 'GitHub', url: 'https://github.com', icon: Github },
-  figma: { id: 'figma', label: 'Figma', url: 'https://figma.com', icon: Figma },
+  github: { id: 'github', label: 'GitHub', url: 'https://github.com', icon: Github, source: 'builtin' },
+  figma: { id: 'figma', label: 'Figma', url: 'https://figma.com', icon: Figma, source: 'builtin' },
+}
+
+interface CustomConnector {
+  id: string
+  name: string
+  mode: 'api' | 'json'
+  url: string | null
+  apiKey: string | null
+  json: string | null
+  createdAt: string
+}
+
+function loadCustomConnectors(): CustomConnector[] {
+  try { return JSON.parse(localStorage.getItem('kubo:custom-connectors') || '[]') } catch { return [] }
 }
 
 export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddReference }: PromptAttachMenuProps) {
@@ -101,16 +115,22 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
   const [customUrl, setCustomUrl] = useState('')
   const [customKey, setCustomKey] = useState('')
   const [customJson, setCustomJson] = useState('')
+  const [customConnectors, setCustomConnectors] = useState<CustomConnector[]>(() => loadCustomConnectors())
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const closeAll = () => { setOpen(false); setView('main') }
+
+  const requestExternalConfirmation = (target: ExternalTarget) => {
+    setExternalTarget(target)
+    setView('confirm-external')
+    setOpen(true)
+  }
 
   const handleAction = (action: string) => {
     switch (action) {
       case 'github':
       case 'figma':
-        setExternalTarget(EXTERNAL_TARGETS[action])
-        setView('confirm-external')
+        requestExternalConfirmation(EXTERNAL_TARGETS[action])
         return
       case 'connectors': setView('connectors'); return
       case 'screenshot': onScreenshot(); break
@@ -135,12 +155,36 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
     if (file) onAttachFile(file)
   }
 
+  const isExternalUrl = (url: string) => {
+    try {
+      const u = new URL(url, window.location.href)
+      return u.origin !== window.location.origin && (u.protocol === 'http:' || u.protocol === 'https:')
+    } catch { return false }
+  }
+
   const handleReferenceSubmit = () => {
-    if (referenceUrl.trim()) {
-      onAddReference(referenceUrl)
-      setReferenceUrl('')
+    const trimmed = referenceUrl.trim()
+    if (!trimmed) return
+    if (isExternalUrl(trimmed)) {
+      // Reference URLs that point to external domains also pass through confirm.
+      let host = trimmed
+      try { host = new URL(trimmed).hostname } catch {}
       setReferenceDialogOpen(false)
+      requestExternalConfirmation({
+        id: `ref-${Date.now()}`,
+        label: host,
+        url: trimmed,
+        icon: Link2,
+        source: 'custom',
+      })
+      // Still register reference internally so it shows in the prompt.
+      onAddReference(trimmed)
+      setReferenceUrl('')
+      return
     }
+    onAddReference(trimmed)
+    setReferenceUrl('')
+    setReferenceDialogOpen(false)
   }
 
   const handleGoToConnectors = () => {
@@ -148,10 +192,30 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
     navigate('/connectors')
   }
 
+  const openCustomConnector = (c: CustomConnector) => {
+    if (!c.url) {
+      toast.error('Este conector não tem URL para abrir.')
+      return
+    }
+    requestExternalConfirmation({
+      id: c.id,
+      label: c.name,
+      url: c.url,
+      icon: KeyRound,
+      source: 'custom',
+    })
+  }
+
+  const removeCustomConnector = (id: string) => {
+    const next = customConnectors.filter(c => c.id !== id)
+    localStorage.setItem('kubo:custom-connectors', JSON.stringify(next))
+    setCustomConnectors(next)
+  }
+
   const handleSaveCustom = () => {
     try {
       if (customMode === 'json') JSON.parse(customJson)
-      const entry = {
+      const entry: CustomConnector = {
         id: crypto.randomUUID(),
         name: customName.trim() || 'Conector personalizado',
         mode: customMode,
@@ -160,9 +224,9 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
         json: customMode === 'json' ? customJson : null,
         createdAt: new Date().toISOString(),
       }
-      const existing = JSON.parse(localStorage.getItem('kubo:custom-connectors') || '[]')
-      existing.push(entry)
-      localStorage.setItem('kubo:custom-connectors', JSON.stringify(existing))
+      const next = [...customConnectors, entry]
+      localStorage.setItem('kubo:custom-connectors', JSON.stringify(next))
+      setCustomConnectors(next)
       toast.success('Conector personalizado salvo localmente')
       setCustomDialogOpen(false)
       setCustomName(''); setCustomUrl(''); setCustomKey(''); setCustomJson('')
@@ -321,6 +385,41 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
                 <span className="flex-1 text-left">Importar JSON</span>
                 <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-md tracking-wider bg-secondary text-secondary-foreground">CUSTOM</span>
               </button>
+
+              {customConnectors.length > 0 && (
+                <div className="mt-1 pt-2 border-t border-border/30">
+                  <div className="px-3 py-1 text-[10px] uppercase tracking-widest text-muted-foreground/60">Meus conectores</div>
+                  <div className="max-h-40 overflow-y-auto">
+                    {customConnectors.map(c => (
+                      <div key={c.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-accent/40 group/row">
+                        <div className="flex items-center justify-center h-6 w-6 rounded-md bg-secondary/80">
+                          {c.mode === 'api' ? <KeyRound className="h-3.5 w-3.5 text-muted-foreground" /> : <FileJson className="h-3.5 w-3.5 text-muted-foreground" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs text-foreground truncate">{c.name}</div>
+                          {c.url && <div className="text-[10px] text-muted-foreground truncate">{c.url}</div>}
+                        </div>
+                        {c.url && (
+                          <button
+                            onClick={() => openCustomConnector(c)}
+                            className="px-2 py-1 text-[10px] rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-accent transition-colors flex items-center gap-1"
+                            title="Abrir (com confirmação)"
+                          >
+                            Abrir <ShieldAlert className="h-3 w-3 text-destructive/70" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => removeCustomConnector(c.id)}
+                          className="p-1 rounded-md text-muted-foreground/60 hover:text-destructive opacity-0 group-hover/row:opacity-100 transition-opacity"
+                          title="Remover"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="mt-1 pt-2 border-t border-border/30 px-3 py-1.5">
                 <span className="text-[10px] text-muted-foreground/50">Salvo localmente neste navegador</span>
