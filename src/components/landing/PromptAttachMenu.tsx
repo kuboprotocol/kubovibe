@@ -92,6 +92,7 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const [view, setView] = useState<View>('main')
+  const [externalTarget, setExternalTarget] = useState<ExternalTarget | null>(null)
   const [referenceDialogOpen, setReferenceDialogOpen] = useState(false)
   const [referenceUrl, setReferenceUrl] = useState('')
   const [customDialogOpen, setCustomDialogOpen] = useState(false)
