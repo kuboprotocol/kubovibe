@@ -58,9 +58,7 @@ const menuSections = [
   },
   {
     title: 'Connectors',
-    items: [
-      { icon: Github, label: 'GitHub', action: 'github', badge: null },
-      { icon: Figma, label: 'Figma', action: 'figma', badge: null },
+     items: [
       { icon: Link2, label: 'More connectors', action: 'connectors', badge: null },
     ],
   },
