@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertCircle, AlertTriangle, Bug, Camera, ChevronDown, ChevronUp, Copy,
   Download, Info, Network, Search, Trash2, X, Check, Package, BarChart3, Clock,
-  CheckSquare, Square, Share2, Link2, Loader2, Lock, Trash,
+  CheckSquare, Square, Share2, Link2, Loader2, Lock, Trash, Filter,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -244,6 +244,10 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
     }
     return list
   }, [logs, filter, query, range])
+
+  const timelineFiltered = useMemo(() => {
+    return filtered.filter(l => timelineKinds.has(l.kind))
+  }, [filtered, timelineKinds])
 
   const errorCount = logs.filter(l => ['error', 'exception', 'rejection'].includes(l.kind)).length
   const warnCount = logs.filter(l => ['warn', 'resource'].includes(l.kind)).length
@@ -539,6 +543,41 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
               ))}
             </div>
 
+            {view === 'timeline' && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px] font-mono gap-1">
+                    <Filter className="h-3 w-3" />
+                    Tipos
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44">
+                  <DropdownMenuLabel className="text-[10px]">Filtrar eventos</DropdownMenuLabel>
+                  {Object.entries(KIND_META).map(([kind, meta]) => {
+                    const k = kind as PreviewLogKind
+                    const Icon = meta.icon
+                    return (
+                      <DropdownMenuCheckboxItem
+                        key={kind}
+                        checked={timelineKinds.has(k)}
+                        onCheckedChange={(v) => {
+                          setTimelineKinds(prev => {
+                            const next = new Set(prev)
+                            if (v) next.add(k); else next.delete(k)
+                            return next
+                          })
+                        }}
+                        onSelect={(e) => e.preventDefault()}
+                      >
+                        <Icon className={cn('h-3 w-3 mr-1.5 inline', meta.color)} />
+                        <span className="capitalize">{meta.label}</span>
+                      </DropdownMenuCheckboxItem>
+                    )
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
             {/* Correlation window */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -748,21 +787,23 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
               </table>
             )
           ) : view === 'timeline' ? (
-            filtered.length === 0 ? (
-              <div className="flex items-center justify-center h-full text-muted-foreground text-xs">Nenhum evento para o intervalo.</div>
+            timelineFiltered.length === 0 ? (
+              <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
+                {timelineKinds.size === 0 ? 'Nenhum tipo selecionado.' : 'Nenhum evento para o intervalo.'}
+              </div>
             ) : (() => {
-              const t0 = filtered[0].ts
-              const t1 = filtered[filtered.length - 1].ts
+              const t0 = timelineFiltered[0].ts
+              const t1 = timelineFiltered[timelineFiltered.length - 1].ts
               const span = Math.max(1, t1 - t0)
               return (
                 <div className="p-3 space-y-1">
                   <div className="text-[10px] text-muted-foreground mb-2 flex justify-between">
                     <span>{new Date(t0).toLocaleTimeString()}</span>
-                    <span>{filtered.length} eventos · {(span / 1000).toFixed(1)}s</span>
+                    <span>{timelineFiltered.length} eventos · {(span / 1000).toFixed(1)}s</span>
                     <span>{new Date(t1).toLocaleTimeString()}</span>
                   </div>
                   <div className="relative h-8 bg-secondary/40 rounded border border-border/40">
-                    {filtered.map(l => {
+                    {timelineFiltered.map(l => {
                       const meta = KIND_META[l.kind] || KIND_META.log
                       const left = ((l.ts - t0) / span) * 100
                       return (
@@ -776,7 +817,7 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
                     })}
                   </div>
                   <ul className="mt-3 divide-y divide-border/40">
-                    {filtered.map(l => {
+                    {timelineFiltered.map(l => {
                       const meta = KIND_META[l.kind] || KIND_META.log
                       const offset = ((l.ts - t0) / span) * 100
                       return (
