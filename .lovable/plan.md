@@ -1,108 +1,69 @@
-## Objetivo
+## Problema
 
-Eliminar qualquer redirecionamento direto para sites de terceiros ao clicar num conector. Todo o fluxo passa a acontecer dentro da KUBO, em duas subpáginas internas, com persistência segura das credenciais por projeto e exposição automática das capacidades para a IA.
+Hoje o GitHub no /connectors ainda depende do OAuth real (`useGitHubConnection` → `/github-auth`). Mesmo passando pela `/connectors/github/setup`, a página de detalhe (`/connectors/github`) só mostra avatar/username/repos se o usuário tiver feito o **OAuth do GitHub**, não bastando ter cadastrado o PAT.
 
-## Fluxo novo
+Você quer o oposto: **a conta GitHub deve ser vinculada à KUBO usando apenas o Personal Access Token (PAT)** salvo na setup. Sem redirecionamento externo. O detalhe só aparece depois que o PAT é validado contra a API do GitHub.
+
+## Plano
+
+### 1. Edge function `connector-credentials-save` — vincular GitHub ao salvar
+Quando `connector_slug === "github"`, após cifrar o PAT:
+- Chamar `GET https://api.github.com/user` com o token.
+- Se 200, gravar/atualizar `github_connections` com `user_id`, `access_token` (mesmo PAT), `github_username`, `github_avatar_url`, `scope = "pat"`.
+- Se 401/403, retornar erro 400 com mensagem clara — **não salva** a credencial inválida.
+
+### 2. Página `ConnectorSetupPage` (GitHub)
+- Antes de redirecionar para `/connectors/github`, exibir resultado da validação (já temos UI de teste).
+- Só navegar para `/connectors/github` quando o PAT for aceito pelo GitHub.
+- Texto explicativo: *"Vamos vincular sua conta GitHub à KUBO usando seu PAT — sem login OAuth externo."*
+
+### 3. Hook `useGitHubConnection`
+- Remover/desativar o `connect()` que dispara OAuth (`/github-auth`).
+- `connect()` agora apenas redireciona para `/connectors/github/setup`.
+- `disconnect()` continua deletando linha em `github_connections` **e** em `api_credentials` (slug `github`).
+
+### 4. Página `ConnectorDetailPage` (GitHub)
+- Botão "Conectar" passa a navegar para `/connectors/github/setup` (não dispara OAuth).
+- `isConnected` continua lendo de `github_connections` — agora populada pelo PAT.
+- Bloco de avatar/username/repos funciona inalterado.
+
+### 5. Hub `ConnectorsHubPage`
+- Remover `internalRoute` do GitHub em `connectorsConfig.ts` (se houver) para forçar `/connectors/github/setup` como entrada única.
+- Comportamento já correto para os demais conectores.
+
+### 6. Rota `/github-auth` e edge function `github-auth`/`github-callback`
+- Manter funcionando (não remover) para não quebrar quem já está conectado via OAuth, mas **não chamar mais** a partir do app.
+- Opcional: marcar como deprecated em comentário.
+
+## Detalhes técnicos
 
 ```text
-/connectors  →  /connectors/:slug          (Etapa 1 — Aviso/TC)
-              →  /connectors/:slug/setup    (Etapa 2 — Docs + API)
-              →  salva credencial por projeto + log
+Fluxo novo:
+
+[Hub /connectors]
+       │ click GitHub
+       ▼
+[/connectors/github/setup]
+       │ usuário cola PAT + aceita termos
+       │ → connector-credentials-save
+       │     ├─ valida PAT em api.github.com/user
+       │     ├─ cifra e grava api_credentials
+       │     └─ upsert github_connections (username, avatar)
+       │ ← sucesso
+       ▼
+[/connectors/github]  ← já mostra avatar/repos vindos do PAT
 ```
 
-Nenhum botão da listagem ou da página de detalhe abre nova aba para o site do terceiro sem passar antes pela Etapa 1. Links externos (docs oficiais, painel do provedor) só aparecem dentro da Etapa 2 e sempre rotulados como "site externo de terceiro".
+- Tabela `github_connections` já aceita `access_token TEXT` — guardamos o PAT em claro lá (RLS já restringe a service_role + dono). Alternativa: guardar só metadados em `github_connections` e ler o token sempre cifrado de `api_credentials` (mais seguro). **Recomendo a alternativa** para não duplicar segredo em claro.
+- O componente `GitHubReposList` que hoje usa `github_connections.access_token` precisa passar a chamar uma edge function (`github-repos`) que descriptografa o PAT de `api_credentials` e lista os repos — assim o token nunca vai para o frontend.
 
-## Etapa 1 — Página de Aviso (`/connectors/:slug`)
+## Arquivos afetados
+- `supabase/functions/connector-credentials-save/index.ts` (validação + upsert github)
+- `supabase/functions/github-repos/index.ts` (ler PAT cifrado)
+- `src/hooks/useGitHubConnection.ts` (sem OAuth)
+- `src/pages/ConnectorSetupPage.tsx` (redirect condicional pós-validação)
+- `src/pages/ConnectorDetailPage.tsx` (botão conectar → /setup)
+- `src/lib/connectorsConfig.ts` (remover internalRoute do github, se houver)
 
-Refatorar a `ConnectorDetailPage` atual para virar a tela de aviso/TC. Conteúdo:
-
-- Branding KUBO + ícone/cor do conector.
-- Bloco "Serviço de terceiros": nome do provedor, link para o site oficial **só** como referência textual.
-- Bullets de responsabilidade:
-  - O serviço **não pertence** à KUBO.
-  - A KUBO apenas integra/automatiza.
-  - Cobranças, limites, política de API e segurança são responsabilidade do provedor.
-  - Riscos de uso indevido das chaves recaem sobre o usuário.
-- Checkbox obrigatório "Li e aceito os termos deste serviço de terceiros".
-- Botão **Continuar configuração** → habilitado só com o checkbox marcado, navega para `/connectors/:slug/setup`.
-- Botão secundário **Voltar para conectores**.
-
-A tela de gerenciamento avançada de logs/runs/share que hoje está nessa rota é movida para `/connectors/:slug/manage` (mesmo componente, sem alterações funcionais), preservando os testes E2E existentes via redirect transparente quando há `?run=...` ou usuário já tem credencial salva.
-
-## Etapa 2 — Setup (`/connectors/:slug/setup`)
-
-Novo arquivo `src/pages/ConnectorSetupPage.tsx`. Layout estilo docs (sidebar + steps numerados + cards):
-
-1. **O que é o serviço** — descrição longa do `connectorsConfig`.
-2. **Como criar a API Key** — instruções específicas por conector (`setupSteps` no config, com fallback genérico + link para docs oficiais marcado como externo).
-3. **Permissões necessárias** — lista de scopes/escopos por conector.
-4. **Conectar ao projeto**:
-   - Select de projeto (lista os `projects` do usuário).
-   - Campo `API Key` (password).
-   - Campo `Secret` (password, opcional por conector).
-   - Campo `Webhook/Callback URL` (opcional).
-   - Botão **Salvar e ativar**.
-5. **Como a IA vai usar** — cards listando capacidades derivadas do conector (ex.: GitHub → "criar commits", "ler repos", "CI/CD"; Supabase → "ler schema", "auth", "storage", "realtime").
-
-Submit chama edge function `connector-credentials-save` que criptografa e grava em `api_credentials`, cria linha em `project_integrations` e registra evento em `connector_activity_logs`. Em sucesso, navega para `/connectors/:slug/manage?project=<id>`.
-
-GitHub mantém o fluxo OAuth existente, mas o botão "Conectar com GitHub" aparece dentro da Etapa 2 (depois do aviso), não mais direto da listagem.
-
-## Banco de dados
-
-Migration nova:
-
-- `connectors` — catálogo persistido (slug, nome, categoria, auth_type, capabilities[], required_scopes[], docs_url). Seed a partir do `connectorsConfig`.
-- `project_integrations` — `(project_id, connector_slug, credential_id, status, scopes, created_at)`. RLS: dono do projeto.
-- `api_credentials` — `(id, user_id, connector_slug, ciphertext, iv, tag, created_at, rotated_at)`. RLS: dono. **Nunca lida no client** — apenas edge functions com service role + chave AES de `Deno.env`.
-- Função `has_project_access(_project uuid)` SECURITY DEFINER reutilizada nas policies.
-
-Adicionar segredo `CONNECTOR_ENC_KEY` (32 bytes base64) via `add_secret` antes da migração ser usada.
-
-## Edge functions
-
-- `connector-credentials-save` — valida JWT, criptografa AES-256-GCM, insere em `api_credentials` + `project_integrations`, loga.
-- `connector-credentials-reveal` — só retorna metadados (mascarado: `ghp_••••1234`), nunca o segredo bruto.
-- `connector-capabilities` — devolve, para um `project_id`, a lista de conectores ativos + capabilities + scopes; consumida pela IA do builder via `orchestrator`.
-
-`verify_jwt = false` + validação manual com `auth.getUser()` (padrão do projeto).
-
-## Integração com a IA
-
-`supabase/functions/orchestrator/index.ts` passa a chamar `connector-capabilities` no início da execução e injeta um bloco `available_connectors` no system prompt. Sem expor segredos — só nomes, scopes e capabilities. Quando a IA precisar executar uma ação que dependa do segredo, ela invoca uma função intermediária que carrega a credencial server-side.
-
-## Segurança
-
-- AES-256-GCM com `CONNECTOR_ENC_KEY` server-only.
-- Frontend nunca recebe `ciphertext`, `iv`, `tag` ou segredo em claro.
-- Inputs validados com Zod nas edge functions (length, formato).
-- RLS estrita em `api_credentials` e `project_integrations`.
-- Confirmação de domínio externo já existente no `PromptAttachMenu` continua aplicando para qualquer link "abrir docs/painel".
-
-## UI/UX
-
-- Dark + glassmorphism + ouro (#C9941A) — alinhado ao design system existente.
-- Stepper animado (framer-motion) na Etapa 2.
-- Cards com ícone do conector.
-- Toasts (sonner) para erros de validação e sucesso.
-
-## Arquivos
-
-- **Editar**: `src/pages/ConnectorDetailPage.tsx` (vira tela de aviso; conteúdo atual movido), `src/App.tsx` (novas rotas), `src/lib/connectorsConfig.ts` (adicionar `setupSteps`, `permissions`, `aiCapabilities`), `src/pages/ConnectorsHubPage.tsx` (rota continua `/connectors/:slug`), `supabase/functions/orchestrator/index.ts`.
-- **Criar**: `src/pages/ConnectorSetupPage.tsx`, `src/pages/ConnectorManagePage.tsx` (re-export do componente atual), `supabase/functions/connector-credentials-save/index.ts`, `supabase/functions/connector-credentials-reveal/index.ts`, `supabase/functions/connector-capabilities/index.ts`, migração SQL.
-
-## Ordem de execução
-
-1. `add_secret CONNECTOR_ENC_KEY`.
-2. Migração (tabelas + RLS + seed).
-3. Edge functions.
-4. Refactor `ConnectorDetailPage` → tela de aviso + nova `ConnectorManagePage`.
-5. `ConnectorSetupPage` + rotas em `App.tsx`.
-6. Atualizar `connectorsConfig` com docs/permissions/capabilities.
-7. Hook `orchestrator` para ler capabilities.
-
-## Pontos de confirmação antes de codar
-
-- Confirma o nome do segredo `CONNECTOR_ENC_KEY`?
-- O fluxo OAuth do GitHub passa a iniciar **só** após o aviso ser aceito (mesmo para usuários já conectados a primeira vez)?
-- Mantemos `/connectors/:slug/manage` como página avançada (logs/share/runs) ou esse painel deveria virar uma aba dentro do setup?
+## Confirma?
+Quer que eu também aplique o mesmo padrão "validar antes de redirecionar para o detalhe" para os outros conectores (Stripe, Vercel, etc.), ou só para o GitHub agora?

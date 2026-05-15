@@ -145,6 +145,19 @@ export default function ConnectorSetupPage() {
           </div>
         </Card>
 
+        {slug === 'github' && (
+          <Card className="p-4 border-primary/40 bg-primary/5 flex gap-3 items-start">
+            <KeyRound className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+            <div className="text-sm space-y-1">
+              <p className="font-semibold text-foreground">Login GitHub via PAT</p>
+              <p className="text-muted-foreground text-xs">
+                Sem OAuth externo. A KUBO valida seu Personal Access Token na API do GitHub e
+                vincula sua conta automaticamente — só então você é levado ao painel do conector.
+              </p>
+            </div>
+          </Card>
+        )}
+
         {/* Status atual + Teste de conexão */}
         {!loadingExisting && existing && (
           <Card className="p-4 border-emerald-500/30 bg-emerald-500/5 space-y-3">

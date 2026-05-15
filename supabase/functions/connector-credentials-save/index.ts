@@ -78,6 +78,30 @@ Deno.serve(async (req) => {
     const tag = cipherBytes.slice(cipherBytes.length - 16)
     const ct = cipherBytes.slice(0, cipherBytes.length - 16)
 
+    // ====== Validação obrigatória para GitHub ANTES de salvar ======
+    let githubProfile: { login: string; avatar_url: string | null } | null = null
+    if (connector_slug === 'github') {
+      const ghRes = await fetch('https://api.github.com/user', {
+        headers: {
+          Authorization: `Bearer ${api_key}`,
+          Accept: 'application/vnd.github+json',
+          'User-Agent': 'KuboVibe',
+        },
+      })
+      if (!ghRes.ok) {
+        const body = await ghRes.text()
+        let detail = body.slice(0, 240)
+        try { detail = JSON.parse(body)?.message ?? detail } catch { /* noop */ }
+        return new Response(JSON.stringify({
+          error: `PAT inválido (HTTP ${ghRes.status}): ${detail}`,
+        }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      const profile = await ghRes.json()
+      githubProfile = { login: profile?.login, avatar_url: profile?.avatar_url ?? null }
+    }
+
     const admin = createClient(supabaseUrl, serviceKey)
     const { error: upsertErr } = await admin
       .from('api_credentials')
@@ -95,6 +119,22 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: upsertErr.message }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
+    }
+
+    // Vincula a conta GitHub usando o PAT (sem OAuth)
+    if (connector_slug === 'github' && githubProfile?.login) {
+      const { error: ghErr } = await admin
+        .from('github_connections')
+        .upsert({
+          user_id: userId,
+          access_token: api_key,
+          github_username: githubProfile.login,
+          github_avatar_url: githubProfile.avatar_url,
+          scope: 'pat',
+          connected_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' })
+      if (ghErr) console.error('[github_connections upsert]', ghErr.message)
     }
 
     // Log activity (best-effort)

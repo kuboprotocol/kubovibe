@@ -48,74 +48,18 @@ export function useGitHubConnection() {
   }, [user])
 
   const connect = async () => {
+    // GitHub agora conecta via PAT na própria KUBO (sem OAuth externo).
+    // Direciona o usuário para a subpágina de setup interno.
     setConnecting(true)
-    const maxAttempts = 3
-    let attempt = 0
-    let lastErr: unknown = null
-
-    try {
-      while (attempt < maxAttempts) {
-        attempt++
-        const { data, error } = await supabase.functions.invoke('github-auth', {
-          body: { returnUrl: window.location.href },
-        })
-
-        // Detecta 429: edge function retorna { error: 'rate_limited', retry_after_seconds }
-        // O FunctionsHttpError vem em `error.context.response`
-        const ctxResp = (error as { context?: { response?: Response } } | null)
-          ?.context?.response
-        const status = ctxResp?.status
-        let retryAfter = 0
-        let payload: { error?: string; retry_after_seconds?: number } | null = null
-        if (ctxResp) {
-          try { payload = await ctxResp.clone().json() } catch { /* noop */ }
-          const headerRA = ctxResp.headers.get('Retry-After')
-          const rawHint = payload?.retry_after_seconds ?? headerRA
-          const parsed =
-            rawHint === null || rawHint === undefined || rawHint === ''
-              ? 0
-              : Number(rawHint)
-          retryAfter = Number.isFinite(parsed) && parsed > 0 ? parsed : 0
-        }
-
-        if (status === 429 || payload?.error === 'rate_limited') {
-          if (attempt < maxAttempts) {
-            const waitMs = Math.min(
-              Math.max(retryAfter * 1000, 1000 * 2 ** (attempt - 1)),
-              15_000,
-            )
-            console.warn(`[github-auth] 429 — retry ${attempt}/${maxAttempts} em ${waitMs}ms`, payload)
-            toast.warning(`Muitas tentativas. Tentando novamente em ${Math.ceil(waitMs / 1000)}s…`)
-            await new Promise((r) => setTimeout(r, waitMs))
-            continue
-          }
-          toast.error(
-            `Limite de conexões atingido. Tente novamente em ${retryAfter || 60}s.`,
-          )
-          setConnecting(false)
-          return
-        }
-
-        if (error) { lastErr = error; throw error }
-        if (data?.url) {
-          window.location.href = data.url
-          return
-        }
-        throw new Error('Resposta sem URL de autorização')
-      }
-    } catch (err) {
-      console.error('[github-auth] falha após retries', { attempt, err: lastErr ?? err })
-      toast.error('Erro ao iniciar conexão GitHub')
-      setConnecting(false)
-    }
+    window.location.href = '/connectors/github/setup'
   }
 
   const disconnect = async () => {
     if (!user) return
-    const { error } = await supabase
-      .from('github_connections')
-      .delete()
-      .eq('user_id', user.id)
+    const [{ error }, _] = await Promise.all([
+      supabase.from('github_connections').delete().eq('user_id', user.id),
+      supabase.from('api_credentials').delete().eq('user_id', user.id).eq('connector_slug', 'github'),
+    ])
     if (error) {
       toast.error('Erro ao desconectar')
     } else {
