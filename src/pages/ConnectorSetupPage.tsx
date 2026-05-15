@@ -23,6 +23,8 @@ export default function ConnectorSetupPage() {
   const [saving, setSaving] = useState(false)
   const [existing, setExisting] = useState<{ masked_hint: string | null; updated_at: string } | null>(null)
   const [loadingExisting, setLoadingExisting] = useState(true)
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<{ ok: boolean; status: number; account?: string | null; detail?: string | null } | null>(null)
 
   useEffect(() => {
     let cancelled = false
