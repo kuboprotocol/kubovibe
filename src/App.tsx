@@ -25,6 +25,7 @@ import PublicAppPage from "./pages/PublicAppPage";
 import UnsubscribePage from "./pages/UnsubscribePage";
 import EmailDashboardPage from "./pages/EmailDashboardPage";
 import PlanPage from "./pages/PlanPage";
+import SharedAuditPage from "./pages/SharedAuditPage";
 
 const queryClient = new QueryClient();
 
