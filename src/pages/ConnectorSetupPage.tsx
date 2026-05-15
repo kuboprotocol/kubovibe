@@ -1,17 +1,20 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowLeft, ExternalLink, Loader2, ShieldCheck, KeyRound, CheckCircle2, AlertTriangle, Plug, XCircle } from 'lucide-react'
+import { ArrowLeft, ExternalLink, Loader2, ShieldCheck, KeyRound, CheckCircle2, AlertTriangle, Plug, XCircle, Github } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { toast } from 'sonner'
 import { getConnectorBySlug } from '@/lib/connectorsConfig'
 import { supabase } from '@/integrations/supabase/client'
 import { cn } from '@/lib/utils'
+
+type GithubProfile = { login: string; avatar_url: string | null; profile_url: string }
 
 export default function ConnectorSetupPage() {
   const { slug = '' } = useParams<{ slug: string }>()
@@ -26,6 +29,8 @@ export default function ConnectorSetupPage() {
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ ok: boolean; status: number; account?: string | null; detail?: string | null } | null>(null)
 
+  const [githubProfile, setGithubProfile] = useState<GithubProfile | null>(null)
+
   useEffect(() => {
     let cancelled = false
     ;(async () => {
@@ -37,6 +42,20 @@ export default function ConnectorSetupPage() {
       if (!cancelled) {
         setExisting(data ?? null)
         setLoadingExisting(false)
+      }
+
+      if (slug === 'github') {
+        const { data: gh } = await supabase
+          .from('github_connections')
+          .select('github_username, github_avatar_url')
+          .maybeSingle()
+        if (!cancelled && gh?.github_username) {
+          setGithubProfile({
+            login: gh.github_username,
+            avatar_url: gh.github_avatar_url,
+            profile_url: `https://github.com/${gh.github_username}`,
+          })
+        }
       }
     })()
     return () => { cancelled = true }
@@ -69,8 +88,22 @@ export default function ConnectorSetupPage() {
       })
       if (error) throw error
       if ((data as any)?.error) throw new Error(JSON.stringify((data as any).error))
-      toast.success(`${connector.name} conectado com sucesso!`)
-      navigate(`/connectors/${slug}`)
+      const gh = (data as any)?.github as GithubProfile | null
+      if (slug === 'github' && gh?.login) {
+        setGithubProfile(gh)
+        setApiKey('')
+        // refresh existing badge
+        const { data: cred } = await supabase
+          .from('api_credentials')
+          .select('masked_hint, updated_at')
+          .eq('connector_slug', slug)
+          .maybeSingle()
+        setExisting(cred ?? null)
+        toast.success(`GitHub vinculado: @${gh.login}`)
+      } else {
+        toast.success(`${connector.name} conectado com sucesso!`)
+        navigate(`/connectors/${slug}`)
+      }
     } catch (e: any) {
       toast.error(`Falha ao salvar: ${e.message ?? 'erro desconhecido'}`)
     } finally {
@@ -154,6 +187,38 @@ export default function ConnectorSetupPage() {
                 Sem OAuth externo. A KUBO valida seu Personal Access Token na API do GitHub e
                 vincula sua conta automaticamente — só então você é levado ao painel do conector.
               </p>
+            </div>
+          </Card>
+        )}
+
+        {slug === 'github' && githubProfile && (
+          <Card className="p-5 border-emerald-500/40 bg-emerald-500/5">
+            <div className="flex items-center gap-4">
+              <Avatar className="h-14 w-14 ring-2 ring-emerald-500/40">
+                <AvatarImage src={githubProfile.avatar_url ?? undefined} alt={githubProfile.login} />
+                <AvatarFallback>
+                  <Github className="h-6 w-6" />
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="font-semibold text-foreground">@{githubProfile.login}</p>
+                  <Badge variant="outline" className="border-emerald-500/40 text-emerald-400 text-[10px]">
+                    <CheckCircle2 className="h-3 w-3 mr-1" /> Vinculado via PAT
+                  </Badge>
+                </div>
+                <a
+                  href={githubProfile.profile_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-muted-foreground hover:text-primary inline-flex items-center gap-1 mt-0.5"
+                >
+                  {githubProfile.profile_url} <ExternalLink className="h-3 w-3" />
+                </a>
+              </div>
+              <Button size="sm" onClick={() => navigate('/connectors/github')}>
+                Abrir painel
+              </Button>
             </div>
           </Card>
         )}

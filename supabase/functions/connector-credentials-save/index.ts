@@ -147,7 +147,15 @@ Deno.serve(async (req) => {
       metadata: { masked: maskHint(api_key) },
     })
 
-    return new Response(JSON.stringify({ success: true, masked: maskHint(api_key) }), {
+    return new Response(JSON.stringify({
+      success: true,
+      masked: maskHint(api_key),
+      github: githubProfile ? {
+        login: githubProfile.login,
+        avatar_url: githubProfile.avatar_url,
+        profile_url: `https://github.com/${githubProfile.login}`,
+      } : null,
+    }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (e) {
