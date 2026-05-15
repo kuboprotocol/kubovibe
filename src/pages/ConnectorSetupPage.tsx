@@ -145,17 +145,50 @@ export default function ConnectorSetupPage() {
           </div>
         </Card>
 
-        {/* Status atual */}
+        {/* Status atual + Teste de conexão */}
         {!loadingExisting && existing && (
-          <Card className="p-4 border-emerald-500/30 bg-emerald-500/5 flex items-center gap-3">
-            <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-            <div className="flex-1 text-sm">
-              <p className="font-medium">Já existe uma chave configurada</p>
-              <p className="text-muted-foreground text-xs">
-                {existing.masked_hint ?? '••••'} · atualizada {new Date(existing.updated_at).toLocaleDateString()}
-              </p>
+          <Card className="p-4 border-emerald-500/30 bg-emerald-500/5 space-y-3">
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="h-5 w-5 text-emerald-500 flex-shrink-0" />
+              <div className="flex-1 text-sm">
+                <p className="font-medium">Chave configurada</p>
+                <p className="text-muted-foreground text-xs">
+                  {existing.masked_hint ?? '••••'} · atualizada {new Date(existing.updated_at).toLocaleDateString()}
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleTest}
+                disabled={testing}
+              >
+                {testing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plug className="h-4 w-4 mr-2" />}
+                Testar conexão
+              </Button>
             </div>
-            <Badge variant="secondary">Substituir abaixo</Badge>
+
+            {testResult && (
+              <div
+                className={cn(
+                  'rounded-lg border p-3 text-sm flex items-start gap-2',
+                  testResult.ok
+                    ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
+                    : 'border-red-500/40 bg-red-500/10 text-red-200'
+                )}
+              >
+                {testResult.ok
+                  ? <CheckCircle2 className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                  : <XCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />}
+                <div className="flex-1 space-y-0.5">
+                  <p className="font-medium">
+                    {testResult.ok ? 'Conexão OK' : 'Falha na conexão'}
+                    {testResult.status ? ` · HTTP ${testResult.status}` : ''}
+                  </p>
+                  {testResult.account && <p className="text-xs opacity-90">Conta: {testResult.account}</p>}
+                  {testResult.detail && <p className="text-xs opacity-80 break-words">{testResult.detail}</p>}
+                </div>
+              </div>
+            )}
           </Card>
         )}
 
