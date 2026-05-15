@@ -1,6 +1,6 @@
 import { useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowLeft, ArrowRight, CheckCircle2, ExternalLink, KeyRound, ShieldCheck, Sparkles, Zap } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CheckCircle2, ExternalLink, KeyRound, LayoutDashboard, ShieldCheck, Sparkles, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
@@ -52,15 +52,20 @@ export default function ConnectorAboutPage() {
               </p>
             </div>
           </div>
-          <Button
-            onClick={handleStartSetup}
-            disabled={isComingSoon}
-            className="hidden sm:inline-flex"
-          >
-            <KeyRound className="h-4 w-4" />
-            {isComingSoon ? 'Em breve' : 'Iniciar setup'}
-            {!isComingSoon && <ArrowRight className="h-4 w-4" />}
-          </Button>
+          <div className="hidden sm:flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => navigate(`/connectors/${connector.slug}`)}
+            >
+              <LayoutDashboard className="h-4 w-4" />
+              Abrir painel
+            </Button>
+            <Button onClick={handleStartSetup} disabled={isComingSoon}>
+              <KeyRound className="h-4 w-4" />
+              {isComingSoon ? 'Em breve' : 'Iniciar setup'}
+              {!isComingSoon && <ArrowRight className="h-4 w-4" />}
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -101,6 +106,14 @@ export default function ConnectorAboutPage() {
                 <KeyRound className="h-4 w-4" />
                 {isComingSoon ? 'Em breve' : 'Iniciar setup'}
                 {!isComingSoon && <ArrowRight className="h-4 w-4" />}
+              </Button>
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={() => navigate(`/connectors/${connector.slug}`)}
+              >
+                <LayoutDashboard className="h-4 w-4" />
+                Voltar ao painel
               </Button>
               {connector.docsUrl && (
                 <Button asChild variant="outline" size="lg">
