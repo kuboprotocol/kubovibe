@@ -107,6 +107,14 @@ export default function ConnectorAboutPage() {
                 {isComingSoon ? 'Em breve' : 'Iniciar setup'}
                 {!isComingSoon && <ArrowRight className="h-4 w-4" />}
               </Button>
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={() => navigate(`/connectors/${connector.slug}`)}
+              >
+                <LayoutDashboard className="h-4 w-4" />
+                Voltar ao painel
+              </Button>
               {connector.docsUrl && (
                 <Button asChild variant="outline" size="lg">
                   <a href={connector.docsUrl} target="_blank" rel="noopener noreferrer">
