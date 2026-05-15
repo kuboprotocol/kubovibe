@@ -26,6 +26,8 @@ import {
   KeyRound,
   FileJson,
   ArrowLeft,
+  ShieldOff,
+  Ban,
 } from 'lucide-react'
 import {
   Popover,
