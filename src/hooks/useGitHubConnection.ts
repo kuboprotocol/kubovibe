@@ -56,10 +56,10 @@ export function useGitHubConnection() {
 
   const disconnect = async () => {
     if (!user) return
-    const { error } = await supabase
-      .from('github_connections')
-      .delete()
-      .eq('user_id', user.id)
+    const [{ error }, _] = await Promise.all([
+      supabase.from('github_connections').delete().eq('user_id', user.id),
+      supabase.from('api_credentials').delete().eq('user_id', user.id).eq('connector_slug', 'github'),
+    ])
     if (error) {
       toast.error('Erro ao desconectar')
     } else {
