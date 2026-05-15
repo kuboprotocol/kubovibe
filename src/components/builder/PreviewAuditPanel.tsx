@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertCircle, AlertTriangle, Bug, Camera, ChevronDown, ChevronUp, Copy,
   Download, Info, Network, Search, Trash2, X, Check, Package, BarChart3, Clock,
-  CheckSquare, Square, Share2, Link2, Loader2, Lock, Trash,
+  CheckSquare, Square, Share2, Link2, Loader2, Lock, Trash, Filter,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
