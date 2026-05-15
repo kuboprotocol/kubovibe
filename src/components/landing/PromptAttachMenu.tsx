@@ -102,6 +102,14 @@ function loadCustomConnectors(): CustomConnector[] {
   try { return JSON.parse(localStorage.getItem('kubo:custom-connectors') || '[]') } catch { return [] }
 }
 
+const TRUSTED_HOSTS_KEY = 'kubo:trusted-external-hosts'
+function loadTrustedHosts(): string[] {
+  try { return JSON.parse(localStorage.getItem(TRUSTED_HOSTS_KEY) || '[]') } catch { return [] }
+}
+function hostOf(url: string): string {
+  try { return new URL(url).hostname } catch { return '' }
+}
+
 export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddReference }: PromptAttachMenuProps) {
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
@@ -116,11 +124,25 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
   const [customKey, setCustomKey] = useState('')
   const [customJson, setCustomJson] = useState('')
   const [customConnectors, setCustomConnectors] = useState<CustomConnector[]>(() => loadCustomConnectors())
+  const [trustedHosts, setTrustedHosts] = useState<string[]>(() => loadTrustedHosts())
+  const [rememberHost, setRememberHost] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const closeAll = () => { setOpen(false); setView('main') }
 
+  const openExternalNow = (target: ExternalTarget) => {
+    window.open(target.url, '_blank', 'noopener,noreferrer')
+    toast.warning(`Redirecionado para ${target.label} — fora do KUBO VIBE`)
+  }
+
   const requestExternalConfirmation = (target: ExternalTarget) => {
+    const host = hostOf(target.url)
+    if (host && trustedHosts.includes(host)) {
+      openExternalNow(target)
+      closeAll()
+      return
+    }
+    setRememberHost(false)
     setExternalTarget(target)
     setView('confirm-external')
     setOpen(true)
@@ -143,11 +165,25 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
 
   const confirmExternalNavigation = () => {
     if (externalTarget) {
-      window.open(externalTarget.url, '_blank', 'noopener,noreferrer')
-      toast.warning(`Redirecionado para ${externalTarget.label} — fora do KUBO VIBE`)
+      const host = hostOf(externalTarget.url)
+      if (rememberHost && host && !trustedHosts.includes(host)) {
+        const next = [...trustedHosts, host]
+        localStorage.setItem(TRUSTED_HOSTS_KEY, JSON.stringify(next))
+        setTrustedHosts(next)
+        toast.success(`${host} adicionado a domínios confiáveis`)
+      }
+      openExternalNow(externalTarget)
     }
     setExternalTarget(null)
+    setRememberHost(false)
     closeAll()
+  }
+
+  const forgetTrustedHost = (host: string) => {
+    const next = trustedHosts.filter(h => h !== host)
+    localStorage.setItem(TRUSTED_HOSTS_KEY, JSON.stringify(next))
+    setTrustedHosts(next)
+    toast.success(`${host} removido — pedirá confirmação novamente`)
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -421,9 +457,31 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
                 </div>
               )}
 
+              {trustedHosts.length > 0 && (
+                <div className="mt-1 pt-2 border-t border-border/30">
+                  <div className="px-3 py-1 text-[10px] uppercase tracking-widest text-muted-foreground/60">
+                    Domínios confiáveis ({trustedHosts.length})
+                  </div>
+                  <div className="max-h-32 overflow-y-auto">
+                    {trustedHosts.map(h => (
+                      <div key={h} className="flex items-center gap-2 px-3 py-1 hover:bg-accent/40">
+                        <Globe className="h-3 w-3 text-emerald-500 flex-shrink-0" />
+                        <span className="flex-1 text-[11px] text-foreground truncate">{h}</span>
+                        <button
+                          onClick={() => forgetTrustedHost(h)}
+                          className="text-[10px] text-muted-foreground hover:text-destructive transition-colors"
+                          title="Esquecer — pedir confirmação novamente"
+                        >
+                          Esquecer
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="mt-1 pt-2 border-t border-border/30 px-3 py-1.5">
-                <span className="text-[10px] text-muted-foreground/50">Salvo localmente neste navegador</span>
-              </div>
+                <span className="text-[10px] text-muted-foreground/50">Salvo localmente neste navegador</span></div>
             </div>
           )}
 
@@ -456,6 +514,18 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
               </div>
 
               <div className="px-2 pb-1 flex flex-col gap-2">
+                <label className="flex items-start gap-2 px-1 py-1 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={rememberHost}
+                    onChange={(e) => setRememberHost(e.target.checked)}
+                    className="mt-0.5 h-3.5 w-3.5 accent-primary cursor-pointer"
+                  />
+                  <span className="text-[11px] text-muted-foreground leading-snug">
+                    Lembrar e não pedir confirmação para{' '}
+                    <strong className="text-foreground">{hostOf(externalTarget.url) || externalTarget.label}</strong> neste navegador.
+                  </span>
+                </label>
                 <button
                   onClick={confirmExternalNavigation}
                   className="w-full px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
@@ -464,7 +534,7 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
                   <ExternalLink className="h-3.5 w-3.5" />
                 </button>
                 <button
-                  onClick={() => { setView('main'); setExternalTarget(null) }}
+                  onClick={() => { setView('main'); setExternalTarget(null); setRememberHost(false) }}
                   className="w-full px-3 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:bg-accent transition-colors"
                 >
                   Cancelar
