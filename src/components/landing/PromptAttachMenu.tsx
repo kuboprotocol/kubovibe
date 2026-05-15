@@ -224,6 +224,7 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
                     {section.items.map((item) => {
                       const isConnectorsRoot = item.action === 'connectors'
                       const isExternal = item.action === 'github' || item.action === 'figma'
+                      const showChevron = isConnectorsRoot || isExternal
                       return (
                         <button
                           key={item.action}
@@ -239,7 +240,7 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
                           </div>
                           <span className="flex-1 text-left flex items-center gap-1.5">
                             {item.label}
-                            {isExternal && <ExternalLink className="h-3 w-3 text-muted-foreground/50" />}
+                            {isExternal && <ShieldAlert className="h-3 w-3 text-destructive/70" />}
                           </span>
                           {item.badge && (
                             <span className={cn(
@@ -249,7 +250,7 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
                               {item.badge}
                             </span>
                           )}
-                          {isConnectorsRoot && <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/60" />}
+                          {showChevron && <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/60" />}
                         </button>
                       )
                     })}
