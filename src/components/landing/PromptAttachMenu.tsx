@@ -115,16 +115,22 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
   const [customUrl, setCustomUrl] = useState('')
   const [customKey, setCustomKey] = useState('')
   const [customJson, setCustomJson] = useState('')
+  const [customConnectors, setCustomConnectors] = useState<CustomConnector[]>(() => loadCustomConnectors())
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const closeAll = () => { setOpen(false); setView('main') }
+
+  const requestExternalConfirmation = (target: ExternalTarget) => {
+    setExternalTarget(target)
+    setView('confirm-external')
+    setOpen(true)
+  }
 
   const handleAction = (action: string) => {
     switch (action) {
       case 'github':
       case 'figma':
-        setExternalTarget(EXTERNAL_TARGETS[action])
-        setView('confirm-external')
+        requestExternalConfirmation(EXTERNAL_TARGETS[action])
         return
       case 'connectors': setView('connectors'); return
       case 'screenshot': onScreenshot(); break
