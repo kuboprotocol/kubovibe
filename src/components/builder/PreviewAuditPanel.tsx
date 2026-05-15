@@ -377,17 +377,32 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
     }
   }
 
-  const handleShareReport = async () => {
+  const openShareDialog = () => {
+    // generate a strong default password
+    const rnd = (typeof crypto !== 'undefined'
+      ? Array.from(crypto.getRandomValues(new Uint8Array(9)))
+        .map(b => b.toString(36)).join('').replace(/[^a-z0-9]/g, '').slice(0, 12)
+      : Math.random().toString(36).slice(2, 14))
+    setSharePassword(rnd)
+    setShareLabel('')
+    setLastShared(null)
+    setShareDialogOpen(true)
+  }
+  const confirmShareReport = async () => {
+    if (!sharePassword || sharePassword.length < 4) {
+      toast.error('Senha precisa ter pelo menos 4 caracteres')
+      return
+    }
     setSharing(true)
     try {
       const { blob } = await buildBundle()
-      const shared = await shareReport(blob, { protect: protectShare, expiresInSec: shareTtlSec })
-      try { await navigator.clipboard.writeText(shared.url) } catch {}
-      setShareHistory(h => [shared, ...h].slice(0, 20))
-      toast.success(
-        protectShare ? 'Link protegido copiado' : 'Link público copiado',
-        { description: shared.expiresAt ? `Expira em ${new Date(shared.expiresAt).toLocaleString()}` : shared.url },
-      )
+      const shared = await shareReport(blob, {
+        password: sharePassword, expiresInSec: shareTtlSec, label: shareLabel || null,
+      })
+      try { await navigator.clipboard.writeText(`${shared.url}\nSenha: ${sharePassword}`) } catch {}
+      setLastShared(shared)
+      toast.success('Link protegido copiado (com senha)')
+      listShares().then(setShareHistory).catch(() => {})
     } catch (e: any) {
       toast.error('Falha ao compartilhar: ' + (e?.message || 'erro'))
     } finally {
@@ -395,11 +410,21 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
     }
   }
 
-  const copyShared = async (s: SharedReport) => {
-    try { await navigator.clipboard.writeText(s.url); toast.success('Link copiado') }
+  const handleRevokeShare = async (id: string) => {
+    try {
+      await revokeShare(id)
+      toast.success('Link revogado')
+      listShares().then(setShareHistory).catch(() => {})
+    } catch (e: any) {
+      toast.error('Falha ao revogar: ' + (e?.message || 'erro'))
+    }
+  }
+
+  const copyShareUrl = async (id: string) => {
+    const url = `${window.location.origin}/share/audit/${id}`
+    try { await navigator.clipboard.writeText(url); toast.success('Link copiado') }
     catch { toast.error('Falha ao copiar') }
   }
-  const clearShareHistory = () => { setShareHistory([]); toast.success('Histórico limpo') }
 
   const toggleSelected = (id: string) => {
     setSelected(prev => {
