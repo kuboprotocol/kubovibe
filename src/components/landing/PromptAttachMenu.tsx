@@ -147,10 +147,23 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
   const [customJson, setCustomJson] = useState('')
   const [customConnectors, setCustomConnectors] = useState<CustomConnector[]>(() => loadCustomConnectors())
   const [trustedHosts, setTrustedHosts] = useState<string[]>(() => loadTrustedHosts())
+  const [blockedHosts, setBlockedHosts] = useState<string[]>(() => loadBlockedHosts())
+  const [autoBlockEnabled, setAutoBlockEnabled] = useState<boolean>(() => {
+    return localStorage.getItem('kubo:auto-block-enabled') !== '0'
+  })
+  const [blockedReason, setBlockedReason] = useState<{ host: string; source: 'internal' | 'user' } | null>(null)
+  const [newBlockHost, setNewBlockHost] = useState('')
   const [rememberHost, setRememberHost] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const closeAll = () => { setOpen(false); setView('main') }
+
+  const isHostBlocked = (host: string): { blocked: boolean; source: 'internal' | 'user' | null } => {
+    if (!host) return { blocked: false, source: null }
+    if (blockedHosts.some(p => hostMatches(host, p))) return { blocked: true, source: 'user' }
+    if (autoBlockEnabled && INTERNAL_BLOCKLIST.some(p => hostMatches(host, p))) return { blocked: true, source: 'internal' }
+    return { blocked: false, source: null }
+  }
 
   const openExternalNow = (target: ExternalTarget) => {
     window.open(target.url, '_blank', 'noopener,noreferrer')
@@ -159,6 +172,15 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
 
   const requestExternalConfirmation = (target: ExternalTarget) => {
     const host = hostOf(target.url)
+    const block = isHostBlocked(host)
+    if (block.blocked) {
+      setBlockedReason({ host, source: block.source! })
+      setExternalTarget(target)
+      setView('blocked')
+      setOpen(true)
+      toast.error(`${host} está bloqueado e não será aberto`)
+      return
+    }
     if (host && trustedHosts.includes(host)) {
       openExternalNow(target)
       closeAll()
