@@ -457,9 +457,31 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
                 </div>
               )}
 
+              {trustedHosts.length > 0 && (
+                <div className="mt-1 pt-2 border-t border-border/30">
+                  <div className="px-3 py-1 text-[10px] uppercase tracking-widest text-muted-foreground/60">
+                    Domínios confiáveis ({trustedHosts.length})
+                  </div>
+                  <div className="max-h-32 overflow-y-auto">
+                    {trustedHosts.map(h => (
+                      <div key={h} className="flex items-center gap-2 px-3 py-1 hover:bg-accent/40">
+                        <Globe className="h-3 w-3 text-emerald-500 flex-shrink-0" />
+                        <span className="flex-1 text-[11px] text-foreground truncate">{h}</span>
+                        <button
+                          onClick={() => forgetTrustedHost(h)}
+                          className="text-[10px] text-muted-foreground hover:text-destructive transition-colors"
+                          title="Esquecer — pedir confirmação novamente"
+                        >
+                          Esquecer
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="mt-1 pt-2 border-t border-border/30 px-3 py-1.5">
-                <span className="text-[10px] text-muted-foreground/50">Salvo localmente neste navegador</span>
-              </div>
+                <span className="text-[10px] text-muted-foreground/50">Salvo localmente neste navegador</span></div>
             </div>
           )}
 
