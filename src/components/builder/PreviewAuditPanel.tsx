@@ -185,8 +185,17 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
   const [shareTtlSec, setShareTtlSec] = useState<number>(() => {
     try { return Number(localStorage.getItem('kubo:audit:shareTtlSec')) || 7 * 24 * 60 * 60 } catch { return 7 * 24 * 60 * 60 }
   })
-  const [shareHistory, setShareHistory] = useState<SharedReport[]>(() => {
-    try { return JSON.parse(localStorage.getItem('kubo:audit:shareHistory') || '[]') } catch { return [] }
+  const [shareHistory, setShareHistory] = useState<ShareRow[]>([])
+  const [shareDialogOpen, setShareDialogOpen] = useState(false)
+  const [sharePassword, setSharePassword] = useState('')
+  const [shareLabel, setShareLabel] = useState('')
+  const [lastShared, setLastShared] = useState<SharedReport | null>(null)
+  const [timelineKinds, setTimelineKinds] = useState<Set<PreviewLogKind>>(() => {
+    try {
+      const raw = localStorage.getItem('kubo:audit:timelineKinds')
+      if (raw) return new Set(JSON.parse(raw) as PreviewLogKind[])
+    } catch {}
+    return new Set<PreviewLogKind>(['log','info','debug','warn','error','exception','rejection','resource','network','ready'])
   })
   const [bundleOpts, setBundleOpts] = useState<{ logs: boolean; report: boolean; har: boolean; correlations: boolean; network: boolean; screenshots: boolean }>(() => {
     try {
@@ -199,14 +208,19 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
   const searchRef = useRef<HTMLInputElement>(null)
   const lastShotErrorIdRef = useRef<string | null>(null)
   const shotsRef = useRef<{ name: string; dataUrl: string; ts: number; reason?: string }[]>([])
+  const [excludedShots, setExcludedShots] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     try { localStorage.setItem('kubo:audit:bundleOpts', JSON.stringify(bundleOpts)) } catch {}
   }, [bundleOpts])
   useEffect(() => { try { localStorage.setItem('kubo:audit:corrWindowMs', String(corrWindowMs)) } catch {} }, [corrWindowMs])
-  useEffect(() => { try { localStorage.setItem('kubo:audit:protectShare', protectShare ? '1' : '0') } catch {} }, [protectShare])
   useEffect(() => { try { localStorage.setItem('kubo:audit:shareTtlSec', String(shareTtlSec)) } catch {} }, [shareTtlSec])
-  useEffect(() => { try { localStorage.setItem('kubo:audit:shareHistory', JSON.stringify(shareHistory.slice(0, 20))) } catch {} }, [shareHistory])
+  useEffect(() => { try { localStorage.setItem('kubo:audit:timelineKinds', JSON.stringify([...timelineKinds])) } catch {} }, [timelineKinds])
+
+  // Load share history from DB on mount
+  useEffect(() => {
+    listShares().then(setShareHistory).catch(() => {})
+  }, [])
 
   // Persist filters
   useEffect(() => {
