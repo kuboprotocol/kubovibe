@@ -124,11 +124,25 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
   const [customKey, setCustomKey] = useState('')
   const [customJson, setCustomJson] = useState('')
   const [customConnectors, setCustomConnectors] = useState<CustomConnector[]>(() => loadCustomConnectors())
+  const [trustedHosts, setTrustedHosts] = useState<string[]>(() => loadTrustedHosts())
+  const [rememberHost, setRememberHost] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const closeAll = () => { setOpen(false); setView('main') }
 
+  const openExternalNow = (target: ExternalTarget) => {
+    window.open(target.url, '_blank', 'noopener,noreferrer')
+    toast.warning(`Redirecionado para ${target.label} — fora do KUBO VIBE`)
+  }
+
   const requestExternalConfirmation = (target: ExternalTarget) => {
+    const host = hostOf(target.url)
+    if (host && trustedHosts.includes(host)) {
+      openExternalNow(target)
+      closeAll()
+      return
+    }
+    setRememberHost(false)
     setExternalTarget(target)
     setView('confirm-external')
     setOpen(true)
@@ -151,11 +165,25 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
 
   const confirmExternalNavigation = () => {
     if (externalTarget) {
-      window.open(externalTarget.url, '_blank', 'noopener,noreferrer')
-      toast.warning(`Redirecionado para ${externalTarget.label} — fora do KUBO VIBE`)
+      const host = hostOf(externalTarget.url)
+      if (rememberHost && host && !trustedHosts.includes(host)) {
+        const next = [...trustedHosts, host]
+        localStorage.setItem(TRUSTED_HOSTS_KEY, JSON.stringify(next))
+        setTrustedHosts(next)
+        toast.success(`${host} adicionado a domínios confiáveis`)
+      }
+      openExternalNow(externalTarget)
     }
     setExternalTarget(null)
+    setRememberHost(false)
     closeAll()
+  }
+
+  const forgetTrustedHost = (host: string) => {
+    const next = trustedHosts.filter(h => h !== host)
+    localStorage.setItem(TRUSTED_HOSTS_KEY, JSON.stringify(next))
+    setTrustedHosts(next)
+    toast.success(`${host} removido — pedirá confirmação novamente`)
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
