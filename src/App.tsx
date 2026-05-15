@@ -19,6 +19,7 @@ import SupportPage from "./pages/SupportPage";
 import ConnectPage from "./pages/ConnectPage";
 import ConnectorsHubPage from "./pages/ConnectorsHubPage";
 import ConnectorDetailPage from "./pages/ConnectorDetailPage";
+import ConnectorSetupPage from "./pages/ConnectorSetupPage";
 import ShortlinksPage from "./pages/ShortlinksPage";
 import LeaderboardPage from "./pages/LeaderboardPage";
 import PublicAppPage from "./pages/PublicAppPage";
@@ -61,6 +62,7 @@ const App = () => (
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
             <Route path="/connect" element={<ProtectedRoute><ConnectPage /></ProtectedRoute>} />
             <Route path="/connectors" element={<ProtectedRoute><ConnectorsHubPage /></ProtectedRoute>} />
+            <Route path="/connectors/:slug/setup" element={<ProtectedRoute><ConnectorSetupPage /></ProtectedRoute>} />
             <Route path="/connectors/:slug" element={<ProtectedRoute><ConnectorDetailPage /></ProtectedRoute>} />
             <Route path="/shortlinks" element={<ProtectedRoute><ShortlinksPage /></ProtectedRoute>} />
             <Route path="/leaderboard" element={<ProtectedRoute><LeaderboardPage /></ProtectedRoute>} />

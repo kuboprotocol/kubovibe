@@ -25,7 +25,9 @@ export default function ConnectorsHubPage() {
     if (connector.internalRoute) {
       navigate(connector.internalRoute)
     } else {
-      navigate(`/connectors/${connector.slug}`)
+      // Sempre passa pela subpágina interna de setup (exige API key) antes
+      // de qualquer painel de gerenciamento. Nenhum redirect externo.
+      navigate(`/connectors/${connector.slug}/setup`)
     }
   }
 

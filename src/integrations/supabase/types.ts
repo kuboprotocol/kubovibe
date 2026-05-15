@@ -38,6 +38,42 @@ export type Database = {
         }
         Relationships: []
       }
+      api_credentials: {
+        Row: {
+          ciphertext: string
+          connector_slug: string
+          created_at: string
+          id: string
+          iv: string
+          masked_hint: string | null
+          tag: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ciphertext: string
+          connector_slug: string
+          created_at?: string
+          id?: string
+          iv: string
+          masked_hint?: string | null
+          tag: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ciphertext?: string
+          connector_slug?: string
+          created_at?: string
+          id?: string
+          iv?: string
+          masked_hint?: string | null
+          tag?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       audit_shares: {
         Row: {
           created_at: string
