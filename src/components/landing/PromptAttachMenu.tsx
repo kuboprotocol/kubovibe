@@ -192,11 +192,7 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
 
   const handleAction = (action: string) => {
     switch (action) {
-      case 'github':
-      case 'figma':
-        requestExternalConfirmation(EXTERNAL_TARGETS[action])
-        return
-      case 'connectors': setView('connectors'); return
+      case 'connectors': handleGoToConnectors(); return
       case 'screenshot': onScreenshot(); break
       case 'reference': setReferenceDialogOpen(true); closeAll(); return
       case 'attach': fileInputRef.current?.click(); break
