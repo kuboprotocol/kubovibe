@@ -102,6 +102,14 @@ function loadCustomConnectors(): CustomConnector[] {
   try { return JSON.parse(localStorage.getItem('kubo:custom-connectors') || '[]') } catch { return [] }
 }
 
+const TRUSTED_HOSTS_KEY = 'kubo:trusted-external-hosts'
+function loadTrustedHosts(): string[] {
+  try { return JSON.parse(localStorage.getItem(TRUSTED_HOSTS_KEY) || '[]') } catch { return [] }
+}
+function hostOf(url: string): string {
+  try { return new URL(url).hostname } catch { return '' }
+}
+
 export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddReference }: PromptAttachMenuProps) {
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
