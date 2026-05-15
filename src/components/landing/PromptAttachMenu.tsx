@@ -107,14 +107,26 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
 
   const handleAction = (action: string) => {
     switch (action) {
-      case 'github': window.open('https://github.com', '_blank'); break
-      case 'figma': window.open('https://figma.com', '_blank'); break
+      case 'github':
+      case 'figma':
+        setExternalTarget(EXTERNAL_TARGETS[action])
+        setView('confirm-external')
+        return
       case 'connectors': setView('connectors'); return
       case 'screenshot': onScreenshot(); break
       case 'reference': setReferenceDialogOpen(true); closeAll(); return
       case 'attach': fileInputRef.current?.click(); break
       default: console.log(`Action: ${action}`)
     }
+    closeAll()
+  }
+
+  const confirmExternalNavigation = () => {
+    if (externalTarget) {
+      window.open(externalTarget.url, '_blank', 'noopener,noreferrer')
+      toast.warning(`Redirecionado para ${externalTarget.label} — fora do KUBO VIBE`)
+    }
+    setExternalTarget(null)
     closeAll()
   }
 
