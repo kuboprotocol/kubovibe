@@ -184,18 +184,19 @@ export default function ConnectorAboutPage() {
               {connector.longDescription}
             </p>
             <div className="flex gap-3 flex-wrap pt-2">
-              <Button onClick={handleStartSetup} disabled={isComingSoon} size="lg">
-                <KeyRound className="h-4 w-4" />
-                {isComingSoon ? 'Em breve' : 'Iniciar setup'}
-                {!isComingSoon && <ArrowRight className="h-4 w-4" />}
+              <Button onClick={handleStartSetup} disabled={isComingSoon || isNavigating} size="lg">
+                {navTarget === 'setup' ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
+                {isComingSoon ? 'Em breve' : navTarget === 'setup' ? 'Abrindo…' : 'Iniciar setup'}
+                {!isComingSoon && navTarget !== 'setup' && <ArrowRight className="h-4 w-4" />}
               </Button>
               <Button
                 variant="outline"
                 size="lg"
                 onClick={goToPanel}
+                disabled={isNavigating}
               >
-                <LayoutDashboard className="h-4 w-4" />
-                Painel do conector
+                {navTarget === 'panel' ? <Loader2 className="h-4 w-4 animate-spin" /> : <LayoutDashboard className="h-4 w-4" />}
+                {navTarget === 'panel' ? 'Abrindo…' : 'Painel do conector'}
               </Button>
               {connector.docsUrl && (
                 <Button asChild variant="outline" size="lg">
