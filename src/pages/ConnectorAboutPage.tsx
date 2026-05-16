@@ -193,15 +193,24 @@ export default function ConnectorAboutPage() {
         </Card>
 
         {/* Sticky bottom CTA on mobile */}
-        <div className="sticky bottom-4 sm:hidden">
+        <div className="sticky bottom-4 sm:hidden flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="lg"
+            className="flex-1"
+            onClick={() => navigate(`/connectors/${connector.slug}`)}
+          >
+            <LayoutDashboard className="h-4 w-4" />
+            Painel
+          </Button>
           <Button
             onClick={handleStartSetup}
             disabled={isComingSoon}
             size="lg"
-            className="w-full shadow-glow"
+            className="flex-1 shadow-glow"
           >
             <KeyRound className="h-4 w-4" />
-            {isComingSoon ? 'Em breve' : 'Iniciar setup'}
+            {isComingSoon ? 'Em breve' : 'Setup'}
             {!isComingSoon && <ArrowRight className="h-4 w-4" />}
           </Button>
         </div>
