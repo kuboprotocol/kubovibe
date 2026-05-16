@@ -81,8 +81,8 @@ export default function ConnectorAboutPage() {
       {/* Header */}
       <div className="border-b border-border bg-card/50 backdrop-blur-xl sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={goToHub} aria-label="Voltar para conectores" className="min-h-11 min-w-11">
-            <ArrowLeft className="h-5 w-5" />
+          <Button variant="ghost" size="icon" onClick={goToHub} aria-label="Voltar para conectores" disabled={isNavigating} className="min-h-11 min-w-11">
+            {navTarget === 'hub' ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowLeft className="h-5 w-5" />}
           </Button>
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <div
