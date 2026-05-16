@@ -281,19 +281,23 @@ export default function ConnectorAboutPage() {
             <button
               type="button"
               onClick={goToHub}
-              className="text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1.5 min-h-11"
+              disabled={isNavigating}
+              aria-busy={navTarget === 'hub'}
+              className="text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1.5 min-h-11 disabled:opacity-60"
             >
-              <ArrowLeft className="h-4 w-4" />
-              Todos os conectores
+              {navTarget === 'hub' ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowLeft className="h-4 w-4" />}
+              {navTarget === 'hub' ? 'Abrindo…' : 'Todos os conectores'}
             </button>
             <button
               type="button"
               onClick={goToPanel}
-              className="text-primary hover:underline inline-flex items-center gap-1.5 font-medium min-h-11"
+              disabled={isNavigating}
+              aria-busy={navTarget === 'panel'}
+              className="text-primary hover:underline inline-flex items-center gap-1.5 font-medium min-h-11 disabled:opacity-60"
             >
-              <LayoutDashboard className="h-4 w-4" />
-              Ir para o painel do conector
-              <ArrowRight className="h-4 w-4" />
+              {navTarget === 'panel' ? <Loader2 className="h-4 w-4 animate-spin" /> : <LayoutDashboard className="h-4 w-4" />}
+              {navTarget === 'panel' ? 'Abrindo painel…' : 'Ir para o painel do conector'}
+              {navTarget !== 'panel' && <ArrowRight className="h-4 w-4" />}
             </button>
           </div>
         </nav>
@@ -305,21 +309,24 @@ export default function ConnectorAboutPage() {
             size="lg"
             className="flex-1 min-h-11"
             onClick={goToPanel}
+            disabled={isNavigating}
             aria-label="Abrir painel do conector"
+            aria-busy={navTarget === 'panel'}
           >
-            <LayoutDashboard className="h-4 w-4" />
-            Painel
+            {navTarget === 'panel' ? <Loader2 className="h-4 w-4 animate-spin" /> : <LayoutDashboard className="h-4 w-4" />}
+            {navTarget === 'panel' ? 'Abrindo…' : 'Painel'}
           </Button>
           <Button
             onClick={handleStartSetup}
-            disabled={isComingSoon}
+            disabled={isComingSoon || isNavigating}
             size="lg"
             className="flex-1 shadow-glow min-h-11"
             aria-label={isComingSoon ? 'Em breve' : 'Iniciar setup do conector'}
+            aria-busy={navTarget === 'setup'}
           >
-            <KeyRound className="h-4 w-4" />
-            {isComingSoon ? 'Em breve' : 'Setup'}
-            {!isComingSoon && <ArrowRight className="h-4 w-4" />}
+            {navTarget === 'setup' ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
+            {isComingSoon ? 'Em breve' : navTarget === 'setup' ? 'Abrindo…' : 'Setup'}
+            {!isComingSoon && navTarget !== 'setup' && <ArrowRight className="h-4 w-4" />}
           </Button>
         </div>
       </motion.div>
