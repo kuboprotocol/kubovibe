@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowLeft, ArrowRight, CheckCircle2, ExternalLink, KeyRound, LayoutDashboard, ShieldCheck, Sparkles, Zap } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CheckCircle2, ExternalLink, KeyRound, LayoutDashboard, Loader2, ShieldCheck, Sparkles, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
@@ -49,19 +49,31 @@ export default function ConnectorAboutPage() {
   }, [scrollKey])
 
   const navLockRef = useRef(false)
-  const safeNav = (fn: () => void) => {
+  const [navTarget, setNavTarget] = useState<null | 'hub' | 'panel' | 'setup'>(null)
+  const isNavigating = navTarget !== null
+
+  const safeNav = (target: 'hub' | 'panel' | 'setup', fn: () => void) => {
     if (navLockRef.current) return
     navLockRef.current = true
+    setNavTarget(target)
     sessionStorage.setItem(scrollKey, String(window.scrollY))
     fn()
-    setTimeout(() => { navLockRef.current = false }, 600)
+    setTimeout(() => {
+      navLockRef.current = false
+      setNavTarget(null)
+    }, 600)
   }
 
-  const goToPanel = () => safeNav(() => navigate(`/connectors/${connector.slug}`))
-  const goToHub = () => safeNav(() => navigate('/connectors'))
+  const goToPanel = () => safeNav('panel', () => navigate(`/connectors/${connector.slug}`))
+  const goToHub = () => safeNav('hub', () => navigate('/connectors'))
   const handleStartSetup = () => {
     if (isComingSoon) return
-    safeNav(() => navigate(`/connectors/${connector.slug}/setup`))
+    safeNav('setup', () => navigate(`/connectors/${connector.slug}/setup`))
+  }
+
+  const onBreadcrumbClick = (target: 'hub' | 'panel') => () => {
+    sessionStorage.setItem(scrollKey, String(window.scrollY))
+    setNavTarget(target)
   }
 
   return (
@@ -69,8 +81,8 @@ export default function ConnectorAboutPage() {
       {/* Header */}
       <div className="border-b border-border bg-card/50 backdrop-blur-xl sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={goToHub} aria-label="Voltar para conectores" className="min-h-11 min-w-11">
-            <ArrowLeft className="h-5 w-5" />
+          <Button variant="ghost" size="icon" onClick={goToHub} aria-label="Voltar para conectores" disabled={isNavigating} className="min-h-11 min-w-11">
+            {navTarget === 'hub' ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowLeft className="h-5 w-5" />}
           </Button>
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <div
@@ -87,14 +99,14 @@ export default function ConnectorAboutPage() {
             </div>
           </div>
           <div className="hidden sm:flex items-center gap-2">
-            <Button variant="outline" onClick={goToPanel}>
-              <LayoutDashboard className="h-4 w-4" />
-              Painel do conector
+            <Button variant="outline" onClick={goToPanel} disabled={isNavigating}>
+              {navTarget === 'panel' ? <Loader2 className="h-4 w-4 animate-spin" /> : <LayoutDashboard className="h-4 w-4" />}
+              {navTarget === 'panel' ? 'Abrindo…' : 'Painel do conector'}
             </Button>
-            <Button onClick={handleStartSetup} disabled={isComingSoon}>
-              <KeyRound className="h-4 w-4" />
-              {isComingSoon ? 'Em breve' : 'Iniciar setup'}
-              {!isComingSoon && <ArrowRight className="h-4 w-4" />}
+            <Button onClick={handleStartSetup} disabled={isComingSoon || isNavigating}>
+              {navTarget === 'setup' ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
+              {isComingSoon ? 'Em breve' : navTarget === 'setup' ? 'Abrindo…' : 'Iniciar setup'}
+              {!isComingSoon && navTarget !== 'setup' && <ArrowRight className="h-4 w-4" />}
             </Button>
           </div>
         </div>
@@ -108,8 +120,11 @@ export default function ConnectorAboutPage() {
               <BreadcrumbLink asChild>
                 <Link
                   to="/connectors"
-                  onClick={() => sessionStorage.setItem(scrollKey, String(window.scrollY))}
+                  onClick={onBreadcrumbClick('hub')}
+                  aria-busy={navTarget === 'hub'}
+                  className="inline-flex items-center gap-1.5"
                 >
+                  {navTarget === 'hub' && <Loader2 className="h-3 w-3 animate-spin" />}
                   Conectores
                 </Link>
               </BreadcrumbLink>
@@ -119,8 +134,11 @@ export default function ConnectorAboutPage() {
               <BreadcrumbLink asChild>
                 <Link
                   to={`/connectors/${connector.slug}`}
-                  onClick={() => sessionStorage.setItem(scrollKey, String(window.scrollY))}
+                  onClick={onBreadcrumbClick('panel')}
+                  aria-busy={navTarget === 'panel'}
+                  className="inline-flex items-center gap-1.5"
                 >
+                  {navTarget === 'panel' && <Loader2 className="h-3 w-3 animate-spin" />}
                   Painel do conector
                 </Link>
               </BreadcrumbLink>
@@ -166,18 +184,19 @@ export default function ConnectorAboutPage() {
               {connector.longDescription}
             </p>
             <div className="flex gap-3 flex-wrap pt-2">
-              <Button onClick={handleStartSetup} disabled={isComingSoon} size="lg">
-                <KeyRound className="h-4 w-4" />
-                {isComingSoon ? 'Em breve' : 'Iniciar setup'}
-                {!isComingSoon && <ArrowRight className="h-4 w-4" />}
+              <Button onClick={handleStartSetup} disabled={isComingSoon || isNavigating} size="lg">
+                {navTarget === 'setup' ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
+                {isComingSoon ? 'Em breve' : navTarget === 'setup' ? 'Abrindo…' : 'Iniciar setup'}
+                {!isComingSoon && navTarget !== 'setup' && <ArrowRight className="h-4 w-4" />}
               </Button>
               <Button
                 variant="outline"
                 size="lg"
                 onClick={goToPanel}
+                disabled={isNavigating}
               >
-                <LayoutDashboard className="h-4 w-4" />
-                Painel do conector
+                {navTarget === 'panel' ? <Loader2 className="h-4 w-4 animate-spin" /> : <LayoutDashboard className="h-4 w-4" />}
+                {navTarget === 'panel' ? 'Abrindo…' : 'Painel do conector'}
               </Button>
               {connector.docsUrl && (
                 <Button asChild variant="outline" size="lg">
@@ -262,19 +281,23 @@ export default function ConnectorAboutPage() {
             <button
               type="button"
               onClick={goToHub}
-              className="text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1.5 min-h-11"
+              disabled={isNavigating}
+              aria-busy={navTarget === 'hub'}
+              className="text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1.5 min-h-11 disabled:opacity-60"
             >
-              <ArrowLeft className="h-4 w-4" />
-              Todos os conectores
+              {navTarget === 'hub' ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowLeft className="h-4 w-4" />}
+              {navTarget === 'hub' ? 'Abrindo…' : 'Todos os conectores'}
             </button>
             <button
               type="button"
               onClick={goToPanel}
-              className="text-primary hover:underline inline-flex items-center gap-1.5 font-medium min-h-11"
+              disabled={isNavigating}
+              aria-busy={navTarget === 'panel'}
+              className="text-primary hover:underline inline-flex items-center gap-1.5 font-medium min-h-11 disabled:opacity-60"
             >
-              <LayoutDashboard className="h-4 w-4" />
-              Ir para o painel do conector
-              <ArrowRight className="h-4 w-4" />
+              {navTarget === 'panel' ? <Loader2 className="h-4 w-4 animate-spin" /> : <LayoutDashboard className="h-4 w-4" />}
+              {navTarget === 'panel' ? 'Abrindo painel…' : 'Ir para o painel do conector'}
+              {navTarget !== 'panel' && <ArrowRight className="h-4 w-4" />}
             </button>
           </div>
         </nav>
@@ -286,21 +309,24 @@ export default function ConnectorAboutPage() {
             size="lg"
             className="flex-1 min-h-11"
             onClick={goToPanel}
+            disabled={isNavigating}
             aria-label="Abrir painel do conector"
+            aria-busy={navTarget === 'panel'}
           >
-            <LayoutDashboard className="h-4 w-4" />
-            Painel
+            {navTarget === 'panel' ? <Loader2 className="h-4 w-4 animate-spin" /> : <LayoutDashboard className="h-4 w-4" />}
+            {navTarget === 'panel' ? 'Abrindo…' : 'Painel'}
           </Button>
           <Button
             onClick={handleStartSetup}
-            disabled={isComingSoon}
+            disabled={isComingSoon || isNavigating}
             size="lg"
             className="flex-1 shadow-glow min-h-11"
             aria-label={isComingSoon ? 'Em breve' : 'Iniciar setup do conector'}
+            aria-busy={navTarget === 'setup'}
           >
-            <KeyRound className="h-4 w-4" />
-            {isComingSoon ? 'Em breve' : 'Setup'}
-            {!isComingSoon && <ArrowRight className="h-4 w-4" />}
+            {navTarget === 'setup' ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
+            {isComingSoon ? 'Em breve' : navTarget === 'setup' ? 'Abrindo…' : 'Setup'}
+            {!isComingSoon && navTarget !== 'setup' && <ArrowRight className="h-4 w-4" />}
           </Button>
         </div>
       </motion.div>
