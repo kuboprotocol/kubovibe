@@ -120,8 +120,11 @@ export default function ConnectorAboutPage() {
               <BreadcrumbLink asChild>
                 <Link
                   to="/connectors"
-                  onClick={() => sessionStorage.setItem(scrollKey, String(window.scrollY))}
+                  onClick={onBreadcrumbClick('hub')}
+                  aria-busy={navTarget === 'hub'}
+                  className="inline-flex items-center gap-1.5"
                 >
+                  {navTarget === 'hub' && <Loader2 className="h-3 w-3 animate-spin" />}
                   Conectores
                 </Link>
               </BreadcrumbLink>
@@ -131,8 +134,11 @@ export default function ConnectorAboutPage() {
               <BreadcrumbLink asChild>
                 <Link
                   to={`/connectors/${connector.slug}`}
-                  onClick={() => sessionStorage.setItem(scrollKey, String(window.scrollY))}
+                  onClick={onBreadcrumbClick('panel')}
+                  aria-busy={navTarget === 'panel'}
+                  className="inline-flex items-center gap-1.5"
                 >
+                  {navTarget === 'panel' && <Loader2 className="h-3 w-3 animate-spin" />}
                   Painel do conector
                 </Link>
               </BreadcrumbLink>
