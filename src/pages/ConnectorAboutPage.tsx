@@ -49,19 +49,31 @@ export default function ConnectorAboutPage() {
   }, [scrollKey])
 
   const navLockRef = useRef(false)
-  const safeNav = (fn: () => void) => {
+  const [navTarget, setNavTarget] = useState<null | 'hub' | 'panel' | 'setup'>(null)
+  const isNavigating = navTarget !== null
+
+  const safeNav = (target: 'hub' | 'panel' | 'setup', fn: () => void) => {
     if (navLockRef.current) return
     navLockRef.current = true
+    setNavTarget(target)
     sessionStorage.setItem(scrollKey, String(window.scrollY))
     fn()
-    setTimeout(() => { navLockRef.current = false }, 600)
+    setTimeout(() => {
+      navLockRef.current = false
+      setNavTarget(null)
+    }, 600)
   }
 
-  const goToPanel = () => safeNav(() => navigate(`/connectors/${connector.slug}`))
-  const goToHub = () => safeNav(() => navigate('/connectors'))
+  const goToPanel = () => safeNav('panel', () => navigate(`/connectors/${connector.slug}`))
+  const goToHub = () => safeNav('hub', () => navigate('/connectors'))
   const handleStartSetup = () => {
     if (isComingSoon) return
-    safeNav(() => navigate(`/connectors/${connector.slug}/setup`))
+    safeNav('setup', () => navigate(`/connectors/${connector.slug}/setup`))
+  }
+
+  const onBreadcrumbClick = (target: 'hub' | 'panel') => () => {
+    sessionStorage.setItem(scrollKey, String(window.scrollY))
+    setNavTarget(target)
   }
 
   return (
