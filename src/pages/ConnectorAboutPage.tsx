@@ -172,10 +172,10 @@ export default function ConnectorAboutPage() {
               <Button
                 variant="outline"
                 size="lg"
-                onClick={() => navigate(`/connectors/${connector.slug}`)}
+                onClick={goToPanel}
               >
                 <LayoutDashboard className="h-4 w-4" />
-                Voltar ao painel
+                Painel do conector
               </Button>
               {connector.docsUrl && (
                 <Button asChild variant="outline" size="lg">
