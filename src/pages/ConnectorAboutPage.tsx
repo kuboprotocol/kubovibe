@@ -1,10 +1,21 @@
+import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowLeft, ArrowRight, CheckCircle2, ExternalLink, KeyRound, LayoutDashboard, ShieldCheck, Sparkles, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb'
 import { getConnectorBySlug } from '@/lib/connectorsConfig'
+
+const SCROLL_KEY_PREFIX = 'connector-about-scroll:'
 
 export default function ConnectorAboutPage() {
   const { slug = '' } = useParams<{ slug: string }>()
