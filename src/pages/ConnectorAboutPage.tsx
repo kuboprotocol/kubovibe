@@ -100,32 +100,34 @@ export default function ConnectorAboutPage() {
         </div>
       </div>
 
-      {/* Breadcrumbs */}
+      {/* Breadcrumbs — synced with router */}
       <div className="max-w-4xl mx-auto px-4 pt-4">
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbLink
-                onClick={(e) => { e.preventDefault(); goToHub() }}
-                href="/connectors"
-                className="cursor-pointer"
-              >
-                Conectores
+              <BreadcrumbLink asChild>
+                <Link
+                  to="/connectors"
+                  onClick={() => sessionStorage.setItem(scrollKey, String(window.scrollY))}
+                >
+                  Conectores
+                </Link>
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <BreadcrumbLink
-                onClick={(e) => { e.preventDefault(); goToPanel() }}
-                href={`/connectors/${connector.slug}`}
-                className="cursor-pointer"
-              >
-                Painel do conector
+              <BreadcrumbLink asChild>
+                <Link
+                  to={`/connectors/${connector.slug}`}
+                  onClick={() => sessionStorage.setItem(scrollKey, String(window.scrollY))}
+                >
+                  Painel do conector
+                </Link>
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <BreadcrumbPage>Sobre</BreadcrumbPage>
+              <BreadcrumbPage aria-current="page">Sobre</BreadcrumbPage>
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
