@@ -99,14 +99,14 @@ export default function ConnectorAboutPage() {
             </div>
           </div>
           <div className="hidden sm:flex items-center gap-2">
-            <Button variant="outline" onClick={goToPanel}>
-              <LayoutDashboard className="h-4 w-4" />
-              Painel do conector
+            <Button variant="outline" onClick={goToPanel} disabled={isNavigating}>
+              {navTarget === 'panel' ? <Loader2 className="h-4 w-4 animate-spin" /> : <LayoutDashboard className="h-4 w-4" />}
+              {navTarget === 'panel' ? 'Abrindo…' : 'Painel do conector'}
             </Button>
-            <Button onClick={handleStartSetup} disabled={isComingSoon}>
-              <KeyRound className="h-4 w-4" />
-              {isComingSoon ? 'Em breve' : 'Iniciar setup'}
-              {!isComingSoon && <ArrowRight className="h-4 w-4" />}
+            <Button onClick={handleStartSetup} disabled={isComingSoon || isNavigating}>
+              {navTarget === 'setup' ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
+              {isComingSoon ? 'Em breve' : navTarget === 'setup' ? 'Abrindo…' : 'Iniciar setup'}
+              {!isComingSoon && navTarget !== 'setup' && <ArrowRight className="h-4 w-4" />}
             </Button>
           </div>
         </div>
