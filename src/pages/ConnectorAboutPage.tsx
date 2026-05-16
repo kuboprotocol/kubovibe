@@ -35,9 +35,32 @@ export default function ConnectorAboutPage() {
 
   const Icon = connector.icon
   const isComingSoon = connector.status === 'coming_soon'
+  const scrollKey = `${SCROLL_KEY_PREFIX}${slug}`
+
+  useEffect(() => {
+    const saved = sessionStorage.getItem(scrollKey)
+    if (saved) window.scrollTo({ top: parseInt(saved, 10), behavior: 'auto' })
+  }, [scrollKey])
+
+  useEffect(() => {
+    const onScroll = () => sessionStorage.setItem(scrollKey, String(window.scrollY))
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [scrollKey])
+
+  const goToPanel = () => {
+    sessionStorage.setItem(scrollKey, String(window.scrollY))
+    navigate(`/connectors/${connector.slug}`)
+  }
+
+  const goToHub = () => {
+    sessionStorage.setItem(scrollKey, String(window.scrollY))
+    navigate('/connectors')
+  }
 
   const handleStartSetup = () => {
     if (isComingSoon) return
+    sessionStorage.setItem(scrollKey, String(window.scrollY))
     navigate(`/connectors/${connector.slug}/setup`)
   }
 
