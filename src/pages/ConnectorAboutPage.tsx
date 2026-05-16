@@ -254,13 +254,37 @@ export default function ConnectorAboutPage() {
           </p>
         </Card>
 
+        {/* Footer shortcuts */}
+        <nav aria-label="Navegação relacionada" className="pt-2 pb-4 border-t border-border/50 mt-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-4 text-sm">
+            <button
+              type="button"
+              onClick={goToHub}
+              className="text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1.5 min-h-11"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Todos os conectores
+            </button>
+            <button
+              type="button"
+              onClick={goToPanel}
+              className="text-primary hover:underline inline-flex items-center gap-1.5 font-medium min-h-11"
+            >
+              <LayoutDashboard className="h-4 w-4" />
+              Ir para o painel do conector
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
+        </nav>
+
         {/* Sticky bottom CTA on mobile */}
         <div className="sticky bottom-4 sm:hidden flex items-center gap-2">
           <Button
             variant="outline"
             size="lg"
-            className="flex-1"
-            onClick={() => navigate(`/connectors/${connector.slug}`)}
+            className="flex-1 min-h-11"
+            onClick={goToPanel}
+            aria-label="Abrir painel do conector"
           >
             <LayoutDashboard className="h-4 w-4" />
             Painel
@@ -269,7 +293,8 @@ export default function ConnectorAboutPage() {
             onClick={handleStartSetup}
             disabled={isComingSoon}
             size="lg"
-            className="flex-1 shadow-glow"
+            className="flex-1 shadow-glow min-h-11"
+            aria-label={isComingSoon ? 'Em breve' : 'Iniciar setup do conector'}
           >
             <KeyRound className="h-4 w-4" />
             {isComingSoon ? 'Em breve' : 'Setup'}
