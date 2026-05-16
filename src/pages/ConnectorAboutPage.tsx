@@ -48,20 +48,20 @@ export default function ConnectorAboutPage() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [scrollKey])
 
-  const goToPanel = () => {
+  const navLockRef = useRef(false)
+  const safeNav = (fn: () => void) => {
+    if (navLockRef.current) return
+    navLockRef.current = true
     sessionStorage.setItem(scrollKey, String(window.scrollY))
-    navigate(`/connectors/${connector.slug}`)
+    fn()
+    setTimeout(() => { navLockRef.current = false }, 600)
   }
 
-  const goToHub = () => {
-    sessionStorage.setItem(scrollKey, String(window.scrollY))
-    navigate('/connectors')
-  }
-
+  const goToPanel = () => safeNav(() => navigate(`/connectors/${connector.slug}`))
+  const goToHub = () => safeNav(() => navigate('/connectors'))
   const handleStartSetup = () => {
     if (isComingSoon) return
-    sessionStorage.setItem(scrollKey, String(window.scrollY))
-    navigate(`/connectors/${connector.slug}/setup`)
+    safeNav(() => navigate(`/connectors/${connector.slug}/setup`))
   }
 
   return (
