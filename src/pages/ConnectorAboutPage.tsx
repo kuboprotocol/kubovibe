@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowLeft, ArrowRight, CheckCircle2, ExternalLink, KeyRound, LayoutDashboard, Loader2, ShieldCheck, Sparkles, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -16,8 +16,23 @@ import {
 import { getConnectorBySlug } from '@/lib/connectorsConfig'
 
 const SCROLL_KEY_PREFIX = 'connector-about-scroll:'
+const NAV_STATE_KEY_PREFIX = 'connector-about-nav:'
+const DEFAULT_NAV_LOCK_MS = 600
 
-export default function ConnectorAboutPage() {
+type NavTarget = 'hub' | 'panel' | 'setup' | 'docs'
+
+const NAV_LABELS: Record<NavTarget, string> = {
+  hub: 'lista de conectores',
+  panel: 'painel do conector',
+  setup: 'setup do conector',
+  docs: 'documentação oficial',
+}
+
+interface ConnectorAboutPageProps {
+  navLockMs?: number
+}
+
+export default function ConnectorAboutPage({ navLockMs = DEFAULT_NAV_LOCK_MS }: ConnectorAboutPageProps = {}) {
   const { slug = '' } = useParams<{ slug: string }>()
   const navigate = useNavigate()
   const connector = getConnectorBySlug(slug)
@@ -36,11 +51,14 @@ export default function ConnectorAboutPage() {
   const Icon = connector.icon
   const isComingSoon = connector.status === 'coming_soon'
   const scrollKey = `${SCROLL_KEY_PREFIX}${slug}`
+  const navStateKey = `${NAV_STATE_KEY_PREFIX}${slug}`
+  const location = useLocation()
 
+  // Restore scroll on mount and whenever location key changes (popstate/forward)
   useEffect(() => {
     const saved = sessionStorage.getItem(scrollKey)
     if (saved) window.scrollTo({ top: parseInt(saved, 10), behavior: 'auto' })
-  }, [scrollKey])
+  }, [scrollKey, location.key])
 
   useEffect(() => {
     const onScroll = () => sessionStorage.setItem(scrollKey, String(window.scrollY))
@@ -48,20 +66,85 @@ export default function ConnectorAboutPage() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [scrollKey])
 
-  const navLockRef = useRef(false)
-  const [navTarget, setNavTarget] = useState<null | 'hub' | 'panel' | 'setup'>(null)
-  const isNavigating = navTarget !== null
+  // Sync scroll on browser back/forward (popstate)
+  useEffect(() => {
+    const onPopState = () => {
+      const saved = sessionStorage.getItem(scrollKey)
+      if (saved) {
+        requestAnimationFrame(() => window.scrollTo({ top: parseInt(saved, 10), behavior: 'auto' }))
+      }
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [scrollKey])
 
-  const safeNav = (target: 'hub' | 'panel' | 'setup', fn: () => void) => {
-    if (navLockRef.current) return
+  const navLockRef = useRef(false)
+  const lockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Persisted loading state per slug (survives remount/popstate within timeout)
+  const [navTarget, setNavTarget] = useState<NavTarget | null>(() => {
+    try {
+      const raw = sessionStorage.getItem(navStateKey)
+      if (!raw) return null
+      const { target, expiresAt } = JSON.parse(raw) as { target: NavTarget; expiresAt: number }
+      if (Date.now() < expiresAt) return target
+      sessionStorage.removeItem(navStateKey)
+      return null
+    } catch {
+      return null
+    }
+  })
+  const isNavigating = navTarget !== null
+  const [announcement, setAnnouncement] = useState('')
+
+  const clearNavState = useCallback(() => {
+    navLockRef.current = false
+    setNavTarget(null)
+    sessionStorage.removeItem(navStateKey)
+    if (lockTimerRef.current) {
+      clearTimeout(lockTimerRef.current)
+      lockTimerRef.current = null
+    }
+  }, [navStateKey])
+
+  // Auto-expire persisted nav state
+  useEffect(() => {
+    if (!navTarget) return
+    const raw = sessionStorage.getItem(navStateKey)
+    let remaining = navLockMs
+    if (raw) {
+      try {
+        const { expiresAt } = JSON.parse(raw) as { expiresAt: number }
+        remaining = Math.max(0, expiresAt - Date.now())
+      } catch {/* noop */}
+    }
     navLockRef.current = true
-    setNavTarget(target)
+    lockTimerRef.current = setTimeout(clearNavState, remaining)
+    return () => {
+      if (lockTimerRef.current) clearTimeout(lockTimerRef.current)
+    }
+  }, [navTarget, navStateKey, navLockMs, clearNavState])
+
+  // Note: do NOT clear nav state on unmount — loading must persist across remount within timeout
+  useEffect(() => () => {
+    if (lockTimerRef.current) clearTimeout(lockTimerRef.current)
+  }, [])
+
+  const beginNav = useCallback((target: NavTarget) => {
+    if (navLockRef.current) return false
+    navLockRef.current = true
+    const expiresAt = Date.now() + navLockMs
+    try {
+      sessionStorage.setItem(navStateKey, JSON.stringify({ target, expiresAt }))
+    } catch {/* noop */}
     sessionStorage.setItem(scrollKey, String(window.scrollY))
+    setNavTarget(target)
+    setAnnouncement(`Abrindo ${NAV_LABELS[target]}…`)
+    return true
+  }, [navLockMs, navStateKey, scrollKey])
+
+  const safeNav = (target: NavTarget, fn: () => void) => {
+    if (!beginNav(target)) return
     fn()
-    setTimeout(() => {
-      navLockRef.current = false
-      setNavTarget(null)
-    }, 600)
   }
 
   const goToPanel = () => safeNav('panel', () => navigate(`/connectors/${connector.slug}`))
@@ -70,14 +153,30 @@ export default function ConnectorAboutPage() {
     if (isComingSoon) return
     safeNav('setup', () => navigate(`/connectors/${connector.slug}/setup`))
   }
+  const handleOpenDocs = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (isNavigating) { e.preventDefault(); return }
+    beginNav('docs')
+  }
 
-  const onBreadcrumbClick = (target: 'hub' | 'panel') => () => {
-    sessionStorage.setItem(scrollKey, String(window.scrollY))
-    setNavTarget(target)
+  // Block keyboard activation (Enter/Space) on links/buttons while navigating
+  const blockKeyWhenBusy = (e: React.KeyboardEvent) => {
+    if (!isNavigating) return
+    if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+  }
+
+  const onBreadcrumbClick = (target: 'hub' | 'panel') => (e: React.MouseEvent) => {
+    if (!beginNav(target)) { e.preventDefault() }
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground" onKeyDownCapture={blockKeyWhenBusy}>
+      {/* Live region for navigation announcements */}
+      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+        {announcement}
+      </div>
       {/* Header */}
       <div className="border-b border-border bg-card/50 backdrop-blur-xl sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center gap-4">
@@ -121,7 +220,10 @@ export default function ConnectorAboutPage() {
                 <Link
                   to="/connectors"
                   onClick={onBreadcrumbClick('hub')}
+                  onKeyDown={blockKeyWhenBusy}
                   aria-busy={navTarget === 'hub'}
+                  aria-disabled={isNavigating && navTarget !== 'hub'}
+                  tabIndex={isNavigating && navTarget !== 'hub' ? -1 : 0}
                   className="inline-flex items-center gap-1.5"
                 >
                   {navTarget === 'hub' && <Loader2 className="h-3 w-3 animate-spin" />}
@@ -135,7 +237,10 @@ export default function ConnectorAboutPage() {
                 <Link
                   to={`/connectors/${connector.slug}`}
                   onClick={onBreadcrumbClick('panel')}
+                  onKeyDown={blockKeyWhenBusy}
                   aria-busy={navTarget === 'panel'}
+                  aria-disabled={isNavigating && navTarget !== 'panel'}
+                  tabIndex={isNavigating && navTarget !== 'panel' ? -1 : 0}
                   className="inline-flex items-center gap-1.5"
                 >
                   {navTarget === 'panel' && <Loader2 className="h-3 w-3 animate-spin" />}
@@ -199,10 +304,23 @@ export default function ConnectorAboutPage() {
                 {navTarget === 'panel' ? 'Abrindo…' : 'Painel do conector'}
               </Button>
               {connector.docsUrl && (
-                <Button asChild variant="outline" size="lg">
-                  <a href={connector.docsUrl} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="h-4 w-4" />
-                    Documentação oficial
+                <Button
+                  asChild
+                  variant="outline"
+                  size="lg"
+                  disabled={isNavigating && navTarget !== 'docs'}
+                  aria-busy={navTarget === 'docs'}
+                >
+                  <a
+                    href={connector.docsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={handleOpenDocs}
+                    onKeyDown={blockKeyWhenBusy}
+                    aria-disabled={isNavigating && navTarget !== 'docs'}
+                  >
+                    {navTarget === 'docs' ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
+                    {navTarget === 'docs' ? 'Abrindo docs…' : 'Documentação oficial'}
                   </a>
                 </Button>
               )}
