@@ -51,11 +51,14 @@ export default function ConnectorAboutPage({ navLockMs = DEFAULT_NAV_LOCK_MS }: 
   const Icon = connector.icon
   const isComingSoon = connector.status === 'coming_soon'
   const scrollKey = `${SCROLL_KEY_PREFIX}${slug}`
+  const navStateKey = `${NAV_STATE_KEY_PREFIX}${slug}`
+  const location = useLocation()
 
+  // Restore scroll on mount and whenever location key changes (popstate/forward)
   useEffect(() => {
     const saved = sessionStorage.getItem(scrollKey)
     if (saved) window.scrollTo({ top: parseInt(saved, 10), behavior: 'auto' })
-  }, [scrollKey])
+  }, [scrollKey, location.key])
 
   useEffect(() => {
     const onScroll = () => sessionStorage.setItem(scrollKey, String(window.scrollY))
@@ -63,20 +66,83 @@ export default function ConnectorAboutPage({ navLockMs = DEFAULT_NAV_LOCK_MS }: 
     return () => window.removeEventListener('scroll', onScroll)
   }, [scrollKey])
 
-  const navLockRef = useRef(false)
-  const [navTarget, setNavTarget] = useState<null | 'hub' | 'panel' | 'setup'>(null)
-  const isNavigating = navTarget !== null
+  // Sync scroll on browser back/forward (popstate)
+  useEffect(() => {
+    const onPopState = () => {
+      const saved = sessionStorage.getItem(scrollKey)
+      if (saved) {
+        requestAnimationFrame(() => window.scrollTo({ top: parseInt(saved, 10), behavior: 'auto' }))
+      }
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [scrollKey])
 
-  const safeNav = (target: 'hub' | 'panel' | 'setup', fn: () => void) => {
-    if (navLockRef.current) return
+  const navLockRef = useRef(false)
+  const lockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Persisted loading state per slug (survives remount/popstate within timeout)
+  const [navTarget, setNavTarget] = useState<NavTarget | null>(() => {
+    try {
+      const raw = sessionStorage.getItem(navStateKey)
+      if (!raw) return null
+      const { target, expiresAt } = JSON.parse(raw) as { target: NavTarget; expiresAt: number }
+      if (Date.now() < expiresAt) return target
+      sessionStorage.removeItem(navStateKey)
+      return null
+    } catch {
+      return null
+    }
+  })
+  const isNavigating = navTarget !== null
+  const [announcement, setAnnouncement] = useState('')
+
+  const clearNavState = useCallback(() => {
+    navLockRef.current = false
+    setNavTarget(null)
+    sessionStorage.removeItem(navStateKey)
+    if (lockTimerRef.current) {
+      clearTimeout(lockTimerRef.current)
+      lockTimerRef.current = null
+    }
+  }, [navStateKey])
+
+  // Auto-expire persisted nav state
+  useEffect(() => {
+    if (!navTarget) return
+    const raw = sessionStorage.getItem(navStateKey)
+    let remaining = navLockMs
+    if (raw) {
+      try {
+        const { expiresAt } = JSON.parse(raw) as { expiresAt: number }
+        remaining = Math.max(0, expiresAt - Date.now())
+      } catch {/* noop */}
+    }
     navLockRef.current = true
-    setNavTarget(target)
+    lockTimerRef.current = setTimeout(clearNavState, remaining)
+    return () => {
+      if (lockTimerRef.current) clearTimeout(lockTimerRef.current)
+    }
+  }, [navTarget, navStateKey, navLockMs, clearNavState])
+
+  // Clear lock when route actually changes away
+  useEffect(() => () => clearNavState(), [clearNavState])
+
+  const beginNav = useCallback((target: NavTarget) => {
+    if (navLockRef.current) return false
+    navLockRef.current = true
+    const expiresAt = Date.now() + navLockMs
+    try {
+      sessionStorage.setItem(navStateKey, JSON.stringify({ target, expiresAt }))
+    } catch {/* noop */}
     sessionStorage.setItem(scrollKey, String(window.scrollY))
+    setNavTarget(target)
+    setAnnouncement(`Abrindo ${NAV_LABELS[target]}…`)
+    return true
+  }, [navLockMs, navStateKey, scrollKey])
+
+  const safeNav = (target: NavTarget, fn: () => void) => {
+    if (!beginNav(target)) return
     fn()
-    setTimeout(() => {
-      navLockRef.current = false
-      setNavTarget(null)
-    }, 600)
   }
 
   const goToPanel = () => safeNav('panel', () => navigate(`/connectors/${connector.slug}`))
@@ -85,10 +151,22 @@ export default function ConnectorAboutPage({ navLockMs = DEFAULT_NAV_LOCK_MS }: 
     if (isComingSoon) return
     safeNav('setup', () => navigate(`/connectors/${connector.slug}/setup`))
   }
+  const handleOpenDocs = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (isNavigating) { e.preventDefault(); return }
+    beginNav('docs')
+  }
 
-  const onBreadcrumbClick = (target: 'hub' | 'panel') => () => {
-    sessionStorage.setItem(scrollKey, String(window.scrollY))
-    setNavTarget(target)
+  // Block keyboard activation (Enter/Space) on links/buttons while navigating
+  const blockKeyWhenBusy = (e: React.KeyboardEvent) => {
+    if (!isNavigating) return
+    if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+  }
+
+  const onBreadcrumbClick = (target: 'hub' | 'panel') => (e: React.MouseEvent) => {
+    if (!beginNav(target)) { e.preventDefault() }
   }
 
   return (
