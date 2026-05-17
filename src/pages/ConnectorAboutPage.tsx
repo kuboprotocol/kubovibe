@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowLeft, ArrowRight, CheckCircle2, ExternalLink, KeyRound, LayoutDashboard, Loader2, ShieldCheck, Sparkles, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
