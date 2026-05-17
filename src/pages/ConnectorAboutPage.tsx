@@ -218,7 +218,10 @@ export default function ConnectorAboutPage({ navLockMs = DEFAULT_NAV_LOCK_MS }: 
                 <Link
                   to="/connectors"
                   onClick={onBreadcrumbClick('hub')}
+                  onKeyDown={blockKeyWhenBusy}
                   aria-busy={navTarget === 'hub'}
+                  aria-disabled={isNavigating && navTarget !== 'hub'}
+                  tabIndex={isNavigating && navTarget !== 'hub' ? -1 : 0}
                   className="inline-flex items-center gap-1.5"
                 >
                   {navTarget === 'hub' && <Loader2 className="h-3 w-3 animate-spin" />}
