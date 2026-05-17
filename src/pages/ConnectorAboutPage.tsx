@@ -124,8 +124,10 @@ export default function ConnectorAboutPage({ navLockMs = DEFAULT_NAV_LOCK_MS }: 
     }
   }, [navTarget, navStateKey, navLockMs, clearNavState])
 
-  // Clear lock when route actually changes away
-  useEffect(() => () => clearNavState(), [clearNavState])
+  // Note: do NOT clear nav state on unmount — loading must persist across remount within timeout
+  useEffect(() => () => {
+    if (lockTimerRef.current) clearTimeout(lockTimerRef.current)
+  }, [])
 
   const beginNav = useCallback((target: NavTarget) => {
     if (navLockRef.current) return false
