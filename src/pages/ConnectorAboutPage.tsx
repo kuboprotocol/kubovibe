@@ -302,10 +302,23 @@ export default function ConnectorAboutPage({ navLockMs = DEFAULT_NAV_LOCK_MS }: 
                 {navTarget === 'panel' ? 'Abrindo…' : 'Painel do conector'}
               </Button>
               {connector.docsUrl && (
-                <Button asChild variant="outline" size="lg">
-                  <a href={connector.docsUrl} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="h-4 w-4" />
-                    Documentação oficial
+                <Button
+                  asChild
+                  variant="outline"
+                  size="lg"
+                  disabled={isNavigating && navTarget !== 'docs'}
+                  aria-busy={navTarget === 'docs'}
+                >
+                  <a
+                    href={connector.docsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={handleOpenDocs}
+                    onKeyDown={blockKeyWhenBusy}
+                    aria-disabled={isNavigating && navTarget !== 'docs'}
+                  >
+                    {navTarget === 'docs' ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
+                    {navTarget === 'docs' ? 'Abrindo docs…' : 'Documentação oficial'}
                   </a>
                 </Button>
               )}
