@@ -16,6 +16,21 @@ import {
 import { getConnectorBySlug } from '@/lib/connectorsConfig'
 
 const SCROLL_KEY_PREFIX = 'connector-about-scroll:'
+const NAV_STATE_KEY_PREFIX = 'connector-about-nav:'
+const DEFAULT_NAV_LOCK_MS = 600
+
+type NavTarget = 'hub' | 'panel' | 'setup' | 'docs'
+
+const NAV_LABELS: Record<NavTarget, string> = {
+  hub: 'lista de conectores',
+  panel: 'painel do conector',
+  setup: 'setup do conector',
+  docs: 'documentação oficial',
+}
+
+interface ConnectorAboutPageProps {
+  navLockMs?: number
+}
 
 export default function ConnectorAboutPage() {
   const { slug = '' } = useParams<{ slug: string }>()
