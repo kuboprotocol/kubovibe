@@ -32,7 +32,7 @@ interface ConnectorAboutPageProps {
   navLockMs?: number
 }
 
-export default function ConnectorAboutPage() {
+export default function ConnectorAboutPage({ navLockMs = DEFAULT_NAV_LOCK_MS }: ConnectorAboutPageProps = {}) {
   const { slug = '' } = useParams<{ slug: string }>()
   const navigate = useNavigate()
   const connector = getConnectorBySlug(slug)
