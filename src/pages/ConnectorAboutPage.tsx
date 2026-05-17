@@ -235,7 +235,10 @@ export default function ConnectorAboutPage({ navLockMs = DEFAULT_NAV_LOCK_MS }: 
                 <Link
                   to={`/connectors/${connector.slug}`}
                   onClick={onBreadcrumbClick('panel')}
+                  onKeyDown={blockKeyWhenBusy}
                   aria-busy={navTarget === 'panel'}
+                  aria-disabled={isNavigating && navTarget !== 'panel'}
+                  tabIndex={isNavigating && navTarget !== 'panel' ? -1 : 0}
                   className="inline-flex items-center gap-1.5"
                 >
                   {navTarget === 'panel' && <Loader2 className="h-3 w-3 animate-spin" />}
