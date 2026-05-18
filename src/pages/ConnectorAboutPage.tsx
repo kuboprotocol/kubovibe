@@ -212,8 +212,8 @@ export default function ConnectorAboutPage({ navLockMs = DEFAULT_NAV_LOCK_MS }: 
       </div>
 
       {/* Breadcrumbs — synced with router */}
-      <div className="max-w-4xl mx-auto px-4 pt-4">
-        <Breadcrumb>
+      <div className="max-w-4xl mx-auto px-4 pt-4" data-testid="connector-breadcrumb-region" data-slug={connector.slug}>
+        <Breadcrumb data-testid="connector-breadcrumb">
           <BreadcrumbList>
             <BreadcrumbItem>
               <BreadcrumbLink asChild>
@@ -225,6 +225,7 @@ export default function ConnectorAboutPage({ navLockMs = DEFAULT_NAV_LOCK_MS }: 
                   aria-disabled={isNavigating && navTarget !== 'hub'}
                   tabIndex={isNavigating && navTarget !== 'hub' ? -1 : 0}
                   className="inline-flex items-center gap-1.5"
+                  data-testid="breadcrumb-hub"
                 >
                   {navTarget === 'hub' && <Loader2 className="h-3 w-3 animate-spin" />}
                   Conectores
@@ -242,6 +243,7 @@ export default function ConnectorAboutPage({ navLockMs = DEFAULT_NAV_LOCK_MS }: 
                   aria-disabled={isNavigating && navTarget !== 'panel'}
                   tabIndex={isNavigating && navTarget !== 'panel' ? -1 : 0}
                   className="inline-flex items-center gap-1.5"
+                  data-testid="breadcrumb-panel"
                 >
                   {navTarget === 'panel' && <Loader2 className="h-3 w-3 animate-spin" />}
                   Painel do conector
@@ -250,7 +252,7 @@ export default function ConnectorAboutPage({ navLockMs = DEFAULT_NAV_LOCK_MS }: 
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <BreadcrumbPage aria-current="page">Sobre</BreadcrumbPage>
+              <BreadcrumbPage aria-current="page" data-testid="breadcrumb-current">Sobre</BreadcrumbPage>
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
