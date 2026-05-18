@@ -21,6 +21,7 @@ import ConnectorsHubPage from "./pages/ConnectorsHubPage";
 import ConnectorDetailPage from "./pages/ConnectorDetailPage";
 import ConnectorAboutPage from "./pages/ConnectorAboutPage";
 import ConnectorSetupPage from "./pages/ConnectorSetupPage";
+import ConnectorWeb3Page from "./pages/ConnectorWeb3Page";
 import ShortlinksPage from "./pages/ShortlinksPage";
 import LeaderboardPage from "./pages/LeaderboardPage";
 import PublicAppPage from "./pages/PublicAppPage";
