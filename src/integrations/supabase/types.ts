@@ -928,6 +928,75 @@ export type Database = {
         }
         Relationships: []
       }
+      web3_connections: {
+        Row: {
+          api_key_ciphertext: string | null
+          api_key_hint: string | null
+          api_key_iv: string | null
+          api_key_tag: string | null
+          connection_name: string
+          created_at: string
+          explorer_url: string
+          id: string
+          last_block: number | null
+          last_checked_at: string | null
+          last_error: string | null
+          last_latency_ms: number | null
+          last_status: string
+          network: string
+          provider: string
+          rpc_url_ciphertext: string
+          rpc_url_iv: string
+          rpc_url_tag: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          api_key_ciphertext?: string | null
+          api_key_hint?: string | null
+          api_key_iv?: string | null
+          api_key_tag?: string | null
+          connection_name: string
+          created_at?: string
+          explorer_url: string
+          id?: string
+          last_block?: number | null
+          last_checked_at?: string | null
+          last_error?: string | null
+          last_latency_ms?: number | null
+          last_status?: string
+          network: string
+          provider: string
+          rpc_url_ciphertext: string
+          rpc_url_iv: string
+          rpc_url_tag: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          api_key_ciphertext?: string | null
+          api_key_hint?: string | null
+          api_key_iv?: string | null
+          api_key_tag?: string | null
+          connection_name?: string
+          created_at?: string
+          explorer_url?: string
+          id?: string
+          last_block?: number | null
+          last_checked_at?: string | null
+          last_error?: string | null
+          last_latency_ms?: number | null
+          last_status?: string
+          network?: string
+          provider?: string
+          rpc_url_ciphertext?: string
+          rpc_url_iv?: string
+          rpc_url_tag?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       github_connections_safe: {
