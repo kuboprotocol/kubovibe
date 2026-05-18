@@ -1,69 +1,117 @@
-## Problema
+## Conector Web3 — Alchemy + multi-provider (v1 completo)
 
-Hoje o GitHub no /connectors ainda depende do OAuth real (`useGitHubConnection` → `/github-auth`). Mesmo passando pela `/connectors/github/setup`, a página de detalhe (`/connectors/github`) só mostra avatar/username/repos se o usuário tiver feito o **OAuth do GitHub**, não bastando ter cadastrado o PAT.
+Reaproveita a arquitetura existente de `api_credentials` (AES-256-GCM via `CONNECTOR_ENC_KEY`) e `connector-credentials-save/test`, adicionando uma camada Web3 com providers e networks tipados.
 
-Você quer o oposto: **a conta GitHub deve ser vinculada à KUBO usando apenas o Personal Access Token (PAT)** salvo na setup. Sem redirecionamento externo. O detalhe só aparece depois que o PAT é validado contra a API do GitHub.
+### 1. Provider catalog (frontend, tipado)
 
-## Plano
+`src/lib/web3Providers.ts`:
+- `providers`: alchemy, infura, quicknode, moralis, chainstack, custom-rpc.
+- Cada provider declara: id, label, logo, `apiKeyLabel`, `apiKeyHelp`, `docsUrl`, `networks: NetworkId[]`, e `buildRpcUrl(networkId, apiKey)`.
+- `networks`: catálogo único `NetworkCatalog` (id, label, family, chainId|null, defaultExplorer, requiresJsonRpc).
 
-### 1. Edge function `connector-credentials-save` — vincular GitHub ao salvar
-Quando `connector_slug === "github"`, após cifrar o PAT:
-- Chamar `GET https://api.github.com/user` com o token.
-- Se 200, gravar/atualizar `github_connections` com `user_id`, `access_token` (mesmo PAT), `github_username`, `github_avatar_url`, `scope = "pat"`.
-- Se 401/403, retornar erro 400 com mensagem clara — **não salva** a credencial inválida.
+### 2. Networks suportadas (v1)
 
-### 2. Página `ConnectorSetupPage` (GitHub)
-- Antes de redirecionar para `/connectors/github`, exibir resultado da validação (já temos UI de teste).
-- Só navegar para `/connectors/github` quando o PAT for aceito pelo GitHub.
-- Texto explicativo: *"Vamos vincular sua conta GitHub à KUBO usando seu PAT — sem login OAuth externo."*
+EVM (testáveis via `eth_blockNumber`):
+- ethereum-mainnet (1), ethereum-sepolia (11155111), ethereum-hoodi (560048)
+- bsc-mainnet (56), polygon-mainnet (137)
+- arbitrum-one (42161), arbitrum-sepolia (421614)
+- optimism-mainnet (10), base-mainnet (8453), boba-mainnet (288)
+- flow-evm-mainnet (747)
 
-### 3. Hook `useGitHubConnection`
-- Remover/desativar o `connect()` que dispara OAuth (`/github-auth`).
-- `connect()` agora apenas redireciona para `/connectors/github/setup`.
-- `disconnect()` continua deletando linha em `github_connections` **e** em `api_credentials` (slug `github`).
+Não-EVM (família própria, teste via endpoint específico):
+- solana-mainnet, solana-devnet → `getHealth` JSON-RPC
+- bitcoin-mainnet, bitcoin-cash, litecoin, dogecoin → REST de explorer (Blockstream/Blockchair). Sem Alchemy nativo; só com custom-rpc/Moralis.
 
-### 4. Página `ConnectorDetailPage` (GitHub)
-- Botão "Conectar" passa a navegar para `/connectors/github/setup` (não dispara OAuth).
-- `isConnected` continua lendo de `github_connections` — agora populada pelo PAT.
-- Bloco de avatar/username/repos funciona inalterado.
+`stellar-mainnet` (você escreveu "Stella") — confirmo com você antes de incluir.
 
-### 5. Hub `ConnectorsHubPage`
-- Remover `internalRoute` do GitHub em `connectorsConfig.ts` (se houver) para forçar `/connectors/github/setup` como entrada única.
-- Comportamento já correto para os demais conectores.
+UI deixa claro quais providers suportam cada network (filtra dropdown).
 
-### 6. Rota `/github-auth` e edge function `github-auth`/`github-callback`
-- Manter funcionando (não remover) para não quebrar quem já está conectado via OAuth, mas **não chamar mais** a partir do app.
-- Opcional: marcar como deprecated em comentário.
+### 3. Banco de dados
 
-## Detalhes técnicos
+Migração nova (não toca `api_credentials`):
 
-```text
-Fluxo novo:
-
-[Hub /connectors]
-       │ click GitHub
-       ▼
-[/connectors/github/setup]
-       │ usuário cola PAT + aceita termos
-       │ → connector-credentials-save
-       │     ├─ valida PAT em api.github.com/user
-       │     ├─ cifra e grava api_credentials
-       │     └─ upsert github_connections (username, avatar)
-       │ ← sucesso
-       ▼
-[/connectors/github]  ← já mostra avatar/repos vindos do PAT
+```sql
+create table public.web3_connections (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null,
+  provider text not null,           -- alchemy | infura | ...
+  network text not null,            -- ethereum-mainnet | solana-mainnet | ...
+  connection_name text not null,
+  rpc_url_ciphertext text not null, -- RPC pode conter a API key, cifrado
+  rpc_url_iv text not null,
+  rpc_url_tag text not null,
+  api_key_ciphertext text,          -- opcional (custom-rpc pode não ter)
+  api_key_iv text,
+  api_key_tag text,
+  api_key_hint text,
+  explorer_url text not null,
+  last_status text default 'unknown',  -- connected|offline|error|unknown
+  last_checked_at timestamptz,
+  last_block bigint,
+  last_error text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, provider, network, connection_name)
+);
+alter table public.web3_connections enable row level security;
+create policy "owner select" on public.web3_connections for select using (auth.uid()=user_id);
+create policy "owner insert" on public.web3_connections for insert with check (auth.uid()=user_id);
+create policy "owner update" on public.web3_connections for update using (auth.uid()=user_id);
+create policy "owner delete" on public.web3_connections for delete using (auth.uid()=user_id);
+create policy "service role all" on public.web3_connections for all using (auth.role()='service_role') with check (auth.role()='service_role');
 ```
 
-- Tabela `github_connections` já aceita `access_token TEXT` — guardamos o PAT em claro lá (RLS já restringe a service_role + dono). Alternativa: guardar só metadados em `github_connections` e ler o token sempre cifrado de `api_credentials` (mais seguro). **Recomendo a alternativa** para não duplicar segredo em claro.
-- O componente `GitHubReposList` que hoje usa `github_connections.access_token` precisa passar a chamar uma edge function (`github-repos`) que descriptografa o PAT de `api_credentials` e lista os repos — assim o token nunca vai para o frontend.
+Trigger `touch_updated_at` reutilizado.
 
-## Arquivos afetados
-- `supabase/functions/connector-credentials-save/index.ts` (validação + upsert github)
-- `supabase/functions/github-repos/index.ts` (ler PAT cifrado)
-- `src/hooks/useGitHubConnection.ts` (sem OAuth)
-- `src/pages/ConnectorSetupPage.tsx` (redirect condicional pós-validação)
-- `src/pages/ConnectorDetailPage.tsx` (botão conectar → /setup)
-- `src/lib/connectorsConfig.ts` (remover internalRoute do github, se houver)
+### 4. Edge Functions
 
-## Confirma?
-Quer que eu também aplique o mesmo padrão "validar antes de redirecionar para o detalhe" para os outros conectores (Stripe, Vercel, etc.), ou só para o GitHub agora?
+- `web3-connection-save` — valida zod, cifra rpc/api_key com `CONNECTOR_ENC_KEY`, upsert por `(provider,network,connection_name)`.
+- `web3-connection-test` — decifra RPC do registro, executa `eth_blockNumber` (EVM) / `getHealth` (Solana) / GET de explorer (UTXO), grava `last_status/last_block/last_checked_at/last_error`, retorna `{ok, status, blockNumber?, latencyMs, detail?}`.
+- `web3-connection-delete` — RLS já cobre, mas centraliza auditoria.
+
+Todas com `verify_jwt = true` (default) + `supabase.auth.getUser()`.
+
+### 5. Frontend
+
+- `src/pages/ConnectorWeb3Page.tsx` (rota `/connectors/web3/:provider`, ex.: `/connectors/web3/alchemy`).
+- Painel lateral `<Sheet>` ao clicar no provider no hub `/connectors`.
+- Campos: connectionName, network (Select agrupado por family), apiKey (toggle show/hide), rpcUrl (auto-preenchido por `buildRpcUrl`, editável), explorerUrl (auto-preenchido, editável).
+- Botões: **Testar conexão** (chama `web3-connection-test` sem salvar — passa payload em memória) e **Salvar** (chama `web3-connection-save`).
+- Status pill (Connected/Offline/Error) ligada a `last_status`, atualizada em tempo real via realtime na `web3_connections`.
+- Lista de conexões existentes acima do form.
+- Toasts via sonner; loading states com `Loader2`.
+
+### 6. Segurança
+
+- API keys e RPC URLs cifrados (RPC frequentemente contém a key na URL).
+- Apenas `masked_hint` retornado ao cliente. Nunca log de chave bruta.
+- Rate limit `bump_rate_limit('web3-test', user, 60)` máx 30/min por usuário.
+
+### 7. Roadmap (fora desta entrega)
+
+- WalletConnect/MetaMask (browser provider, sem servidor).
+- Schemas adicionais (gasPrice, network status dashboard).
+- Compartilhar conexões com projetos do builder.
+
+### Arquivos a criar/editar
+
+```
+src/lib/web3Providers.ts                              (novo)
+src/lib/web3Networks.ts                               (novo)
+src/pages/ConnectorWeb3Page.tsx                       (novo)
+src/components/connectors/Web3ConnectionForm.tsx      (novo)
+src/components/connectors/Web3ConnectionList.tsx      (novo)
+src/components/connectors/Web3StatusPill.tsx          (novo)
+src/App.tsx                                           (rota nova)
+src/pages/ConnectorsHubPage.tsx                       (entry points Alchemy/Infura/...)
+supabase/migrations/<ts>_web3_connections.sql         (novo)
+supabase/functions/web3-connection-save/index.ts      (novo)
+supabase/functions/web3-connection-test/index.ts      (novo)
+supabase/functions/web3-connection-delete/index.ts    (novo)
+```
+
+### Pergunta antes de implementar
+
+1. Confirmar "Stella" = **Stellar** (XLM) ou outra chain? Stellar não é EVM nem usa JSON-RPC padrão — incluir adiaria a v1.
+2. Para Bitcoin/BCH/Doge/LTC sem provider EVM, posso usar **Blockstream/Blockchair públicos** como teste (sem API key obrigatória)?
+3. OK em começar habilitando **Alchemy + Infura + Custom RPC** nesta PR e adicionar QuickNode/Moralis/Chainstack na próxima?
