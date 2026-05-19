@@ -5,7 +5,7 @@ import { ArrowLeft, ShieldCheck, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { getProvider } from '@/lib/web3Providers'
-import Web3ConnectionForm from '@/components/connectors/Web3ConnectionForm'
+import Web3ConnectionForm, { type Web3EditingConnection } from '@/components/connectors/Web3ConnectionForm'
 import Web3ConnectionList from '@/components/connectors/Web3ConnectionList'
 
 export default function ConnectorWeb3Page() {
@@ -13,6 +13,7 @@ export default function ConnectorWeb3Page() {
   const navigate = useNavigate()
   const provider = getProvider(providerParam)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [editing, setEditing] = useState<Web3EditingConnection | null>(null)
 
   if (!provider) {
     return (
