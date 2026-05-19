@@ -22,7 +22,15 @@ interface Row {
   updated_at: string
 }
 
-export default function Web3ConnectionList({ providerId, refreshKey = 0 }: { providerId: string; refreshKey?: number }) {
+export default function Web3ConnectionList({
+  providerId,
+  refreshKey = 0,
+  onEdit,
+}: {
+  providerId: string
+  refreshKey?: number
+  onEdit?: (row: Web3EditingConnection) => void
+}) {
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
