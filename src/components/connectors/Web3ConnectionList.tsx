@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Loader2, Plug, Trash2, ExternalLink } from 'lucide-react'
+import { Loader2, Plug, Trash2, ExternalLink, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { toast } from 'sonner'
 import { supabase } from '@/integrations/supabase/client'
 import { getNetwork } from '@/lib/web3Networks'
 import Web3StatusPill from './Web3StatusPill'
+import type { Web3EditingConnection } from './Web3ConnectionForm'
 
 interface Row {
   id: string
