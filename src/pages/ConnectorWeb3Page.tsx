@@ -77,9 +77,24 @@ export default function ConnectorWeb3Page() {
           </p>
         </Card>
 
-        <Web3ConnectionList providerId={provider.id} refreshKey={refreshKey} />
+        <Web3ConnectionList
+          providerId={provider.id}
+          refreshKey={refreshKey}
+          onEdit={(row) => {
+            setEditing(row)
+            if (typeof window !== 'undefined') window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
+          }}
+        />
 
-        <Web3ConnectionForm providerId={provider.id} onSaved={() => setRefreshKey((k) => k + 1)} />
+        <Web3ConnectionForm
+          providerId={provider.id}
+          editing={editing}
+          onCancelEdit={() => setEditing(null)}
+          onSaved={() => {
+            setRefreshKey((k) => k + 1)
+            setEditing(null)
+          }}
+        />
       </motion.div>
     </div>
   )
