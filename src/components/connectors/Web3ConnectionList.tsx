@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Loader2, Plug, Trash2, ExternalLink } from 'lucide-react'
+import { Loader2, Plug, Trash2, ExternalLink, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { toast } from 'sonner'
 import { supabase } from '@/integrations/supabase/client'
 import { getNetwork } from '@/lib/web3Networks'
 import Web3StatusPill from './Web3StatusPill'
+import type { Web3EditingConnection } from './Web3ConnectionForm'
 
 interface Row {
   id: string
@@ -21,7 +22,15 @@ interface Row {
   updated_at: string
 }
 
-export default function Web3ConnectionList({ providerId, refreshKey = 0 }: { providerId: string; refreshKey?: number }) {
+export default function Web3ConnectionList({
+  providerId,
+  refreshKey = 0,
+  onEdit,
+}: {
+  providerId: string
+  refreshKey?: number
+  onEdit?: (row: Web3EditingConnection) => void
+}) {
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -84,7 +93,7 @@ export default function Web3ConnectionList({ providerId, refreshKey = 0 }: { pro
       {rows.map((r) => {
         const net = getNetwork(r.network)
         return (
-          <Card key={r.id} className="p-4 flex items-center gap-4 flex-wrap">
+          <Card key={r.id} className="p-4 flex items-center gap-4 flex-wrap" data-testid="web3-connection-row" data-connection-id={r.id}>
             <div className="flex-1 min-w-0 space-y-1">
               <div className="flex items-center gap-2 flex-wrap">
                 <p className="font-medium truncate">{r.connection_name}</p>
@@ -100,10 +109,28 @@ export default function Web3ConnectionList({ providerId, refreshKey = 0 }: { pro
               <Button variant="outline" size="sm" asChild aria-label="Abrir explorer">
                 <a href={r.explorer_url} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" /></a>
               </Button>
-              <Button variant="outline" size="sm" onClick={() => handleTest(r.id)} disabled={busyId === r.id}>
+              <Button variant="outline" size="sm" onClick={() => handleTest(r.id)} disabled={busyId === r.id} aria-label="Testar" data-testid="row-test">
                 {busyId === r.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plug className="h-4 w-4" />}
               </Button>
-              <Button variant="outline" size="sm" onClick={() => handleDelete(r.id)} disabled={busyId === r.id} aria-label="Remover">
+              {onEdit && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onEdit({
+                    id: r.id,
+                    network: r.network,
+                    connection_name: r.connection_name,
+                    explorer_url: r.explorer_url,
+                    api_key_hint: r.api_key_hint,
+                  })}
+                  disabled={busyId === r.id}
+                  aria-label="Editar"
+                  data-testid="row-edit"
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={() => handleDelete(r.id)} disabled={busyId === r.id} aria-label="Remover" data-testid="row-delete">
                 <Trash2 className="h-4 w-4 text-red-400" />
               </Button>
             </div>

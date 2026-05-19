@@ -22,6 +22,7 @@ import ConnectorDetailPage from "./pages/ConnectorDetailPage";
 import ConnectorAboutPage from "./pages/ConnectorAboutPage";
 import ConnectorSetupPage from "./pages/ConnectorSetupPage";
 import ConnectorWeb3Page from "./pages/ConnectorWeb3Page";
+import ConnectorWeb3HubPage from "./pages/ConnectorWeb3HubPage";
 import ShortlinksPage from "./pages/ShortlinksPage";
 import LeaderboardPage from "./pages/LeaderboardPage";
 import PublicAppPage from "./pages/PublicAppPage";
@@ -64,6 +65,7 @@ const App = () => (
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
             <Route path="/connect" element={<ProtectedRoute><ConnectPage /></ProtectedRoute>} />
             <Route path="/connectors" element={<ProtectedRoute><ConnectorsHubPage /></ProtectedRoute>} />
+            <Route path="/connectors/web3" element={<ProtectedRoute><ConnectorWeb3HubPage /></ProtectedRoute>} />
             <Route path="/connectors/web3/:provider" element={<ProtectedRoute><ConnectorWeb3Page /></ProtectedRoute>} />
             <Route path="/connectors/:slug/setup" element={<ProtectedRoute><ConnectorSetupPage /></ProtectedRoute>} />
             <Route path="/connectors/:slug/about" element={<ProtectedRoute><ConnectorAboutPage /></ProtectedRoute>} />

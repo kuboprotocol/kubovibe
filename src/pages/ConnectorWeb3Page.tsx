@@ -5,7 +5,7 @@ import { ArrowLeft, ShieldCheck, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { getProvider } from '@/lib/web3Providers'
-import Web3ConnectionForm from '@/components/connectors/Web3ConnectionForm'
+import Web3ConnectionForm, { type Web3EditingConnection } from '@/components/connectors/Web3ConnectionForm'
 import Web3ConnectionList from '@/components/connectors/Web3ConnectionList'
 
 export default function ConnectorWeb3Page() {
@@ -13,6 +13,7 @@ export default function ConnectorWeb3Page() {
   const navigate = useNavigate()
   const provider = getProvider(providerParam)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [editing, setEditing] = useState<Web3EditingConnection | null>(null)
 
   if (!provider) {
     return (
@@ -29,9 +30,16 @@ export default function ConnectorWeb3Page() {
     <div className="min-h-screen bg-background text-foreground">
       <div className="border-b border-border bg-card/50 backdrop-blur-xl sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-4 py-4 flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/connectors')} aria-label="Voltar">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/connectors/web3')} aria-label="Voltar">
             <ArrowLeft className="h-5 w-5" />
           </Button>
+          <button
+            type="button"
+            onClick={() => navigate('/connectors/web3')}
+            className="hidden sm:inline text-xs text-muted-foreground hover:text-foreground"
+          >
+            ← Web3 Hub
+          </button>
           <div className="flex items-center gap-3 flex-1">
             <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${provider.color}20` }}>
               <span className="text-base font-bold" style={{ color: provider.color }}>{provider.label[0]}</span>
@@ -69,9 +77,24 @@ export default function ConnectorWeb3Page() {
           </p>
         </Card>
 
-        <Web3ConnectionList providerId={provider.id} refreshKey={refreshKey} />
+        <Web3ConnectionList
+          providerId={provider.id}
+          refreshKey={refreshKey}
+          onEdit={(row) => {
+            setEditing(row)
+            if (typeof window !== 'undefined') window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
+          }}
+        />
 
-        <Web3ConnectionForm providerId={provider.id} onSaved={() => setRefreshKey((k) => k + 1)} />
+        <Web3ConnectionForm
+          providerId={provider.id}
+          editing={editing}
+          onCancelEdit={() => setEditing(null)}
+          onSaved={() => {
+            setRefreshKey((k) => k + 1)
+            setEditing(null)
+          }}
+        />
       </motion.div>
     </div>
   )

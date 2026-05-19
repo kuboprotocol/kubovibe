@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Eye, EyeOff, Loader2, Plug, Save, ExternalLink } from 'lucide-react'
+import { Eye, EyeOff, Loader2, Plug, Save, ExternalLink, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -13,21 +13,49 @@ import Web3StatusPill from './Web3StatusPill'
 
 interface TestResult { ok: boolean; status: number; blockNumber?: number; detail?: string; latencyMs: number }
 
-export default function Web3ConnectionForm({ providerId, onSaved }: { providerId: ProviderId; onSaved?: () => void }) {
+export interface Web3EditingConnection {
+  id: string
+  network: string
+  connection_name: string
+  explorer_url: string
+  api_key_hint?: string | null
+}
+
+interface Props {
+  providerId: ProviderId
+  onSaved?: () => void
+  editing?: Web3EditingConnection | null
+  onCancelEdit?: () => void
+}
+
+export default function Web3ConnectionForm({ providerId, onSaved, editing, onCancelEdit }: Props) {
   const provider = getProvider(providerId)!
   const networks = useMemo(() => getNetworksForProvider(providerId), [providerId])
+  const isEditing = !!editing
 
-  const [connectionName, setConnectionName] = useState(`Minha conexão ${provider.label}`)
-  const [networkId, setNetworkId] = useState<string>(networks[0]?.id ?? '')
+  const [connectionName, setConnectionName] = useState(editing?.connection_name ?? `Minha conexão ${provider.label}`)
+  const [networkId, setNetworkId] = useState<string>(editing?.network ?? networks[0]?.id ?? '')
   const [apiKey, setApiKey] = useState('')
   const [showKey, setShowKey] = useState(false)
   const [rpcUrl, setRpcUrl] = useState('')
   const [rpcTouched, setRpcTouched] = useState(false)
-  const [explorerUrl, setExplorerUrl] = useState('')
-  const [explorerTouched, setExplorerTouched] = useState(false)
+  const [explorerUrl, setExplorerUrl] = useState(editing?.explorer_url ?? '')
+  const [explorerTouched, setExplorerTouched] = useState(!!editing)
   const [testing, setTesting] = useState(false)
   const [saving, setSaving] = useState(false)
   const [testResult, setTestResult] = useState<TestResult | null>(null)
+
+  // Reset when "editing" prop changes
+  useEffect(() => {
+    setConnectionName(editing?.connection_name ?? `Minha conexão ${provider.label}`)
+    setNetworkId(editing?.network ?? networks[0]?.id ?? '')
+    setApiKey('')
+    setRpcUrl('')
+    setRpcTouched(false)
+    setExplorerUrl(editing?.explorer_url ?? '')
+    setExplorerTouched(!!editing)
+    setTestResult(null)
+  }, [editing?.id, provider.label, networks, editing])
 
   // Auto-preencher RPC e explorer ao trocar de network / api key
   useEffect(() => {
@@ -82,19 +110,19 @@ export default function Web3ConnectionForm({ providerId, onSaved }: { providerId
     const err = validate(); if (err) { toast.error(err); return }
     setSaving(true)
     try {
-      const { data, error } = await supabase.functions.invoke('web3-connection-save', {
-        body: {
-          provider: providerId,
-          network: networkId,
-          connection_name: connectionName.trim(),
-          rpc_url: rpcUrl.trim(),
-          explorer_url: explorerUrl.trim(),
-          api_key: apiKey.trim() || null,
-        },
-      })
+      const body: Record<string, unknown> = {
+        provider: providerId,
+        network: networkId,
+        connection_name: connectionName.trim(),
+        rpc_url: rpcUrl.trim(),
+        explorer_url: explorerUrl.trim(),
+        api_key: apiKey.trim() || null,
+      }
+      if (editing?.id) body.id = editing.id
+      const { data, error } = await supabase.functions.invoke('web3-connection-save', { body })
       if (error) throw error
       if ((data as any)?.error) throw new Error(JSON.stringify((data as any).error))
-      toast.success('Conexão salva')
+      toast.success(isEditing ? 'Conexão atualizada' : 'Conexão salva')
       onSaved?.()
     } catch (e: any) {
       toast.error(`Falha ao salvar: ${e.message ?? 'erro'}`)
@@ -102,24 +130,40 @@ export default function Web3ConnectionForm({ providerId, onSaved }: { providerId
   }
 
   return (
-    <Card className="p-6 space-y-5">
+    <Card className="p-6 space-y-5" data-testid="web3-connection-form">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="font-semibold text-lg">Configurar conexão</h2>
+          <h2 className="font-semibold text-lg">
+            {isEditing ? 'Editar conexão' : 'Configurar conexão'}
+          </h2>
           <p className="text-xs text-muted-foreground">{provider.description}</p>
         </div>
-        <Web3StatusPill status={status} checking={testing} />
+        <div className="flex items-center gap-2">
+          <Web3StatusPill status={status} checking={testing} />
+          {isEditing && onCancelEdit && (
+            <Button variant="ghost" size="icon" onClick={onCancelEdit} aria-label="Cancelar edição">
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       </div>
+
+      {isEditing && (
+        <div className="text-xs rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-amber-200">
+          Por segurança, RPC URL e API Key não são exibidas. Reinforme os valores para atualizar a conexão.
+          {editing?.api_key_hint && <> Hint atual: <code className="opacity-80">{editing.api_key_hint}</code></>}
+        </div>
+      )}
 
       <div className="space-y-2">
         <Label htmlFor="connectionName">Nome da conexão</Label>
-        <Input id="connectionName" value={connectionName} onChange={(e) => setConnectionName(e.target.value)} placeholder="Ex.: Produção Mainnet" maxLength={80} />
+        <Input id="connectionName" data-testid="field-connection-name" value={connectionName} onChange={(e) => setConnectionName(e.target.value)} placeholder="Ex.: Produção Mainnet" maxLength={80} />
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="network">Network</Label>
         <Select value={networkId} onValueChange={(v) => { setNetworkId(v); setRpcTouched(false); setExplorerTouched(false); setTestResult(null) }}>
-          <SelectTrigger id="network"><SelectValue placeholder="Selecione uma network" /></SelectTrigger>
+          <SelectTrigger id="network" data-testid="field-network"><SelectValue placeholder="Selecione uma network" /></SelectTrigger>
           <SelectContent>
             {(['evm', 'solana', 'utxo'] as const).map((fam) => {
               const items = networks.filter((n) => n.family === fam)
@@ -140,6 +184,7 @@ export default function Web3ConnectionForm({ providerId, onSaved }: { providerId
         <div className="relative">
           <Input
             id="apiKey"
+            data-testid="field-api-key"
             type={showKey ? 'text' : 'password'}
             autoComplete="off"
             value={apiKey}
@@ -163,6 +208,7 @@ export default function Web3ConnectionForm({ providerId, onSaved }: { providerId
         <Label htmlFor="rpc">RPC URL</Label>
         <Input
           id="rpc"
+          data-testid="field-rpc-url"
           type="url"
           value={rpcUrl}
           onChange={(e) => { setRpcUrl(e.target.value.replace(/\s+/g, '')); setRpcTouched(true) }}
@@ -178,6 +224,7 @@ export default function Web3ConnectionForm({ providerId, onSaved }: { providerId
         <div className="flex gap-2">
           <Input
             id="explorer"
+            data-testid="field-explorer-url"
             type="url"
             value={explorerUrl}
             onChange={(e) => { setExplorerUrl(e.target.value); setExplorerTouched(true) }}
@@ -192,7 +239,13 @@ export default function Web3ConnectionForm({ providerId, onSaved }: { providerId
       </div>
 
       {testResult && (
-        <div className={`rounded-lg border p-3 text-sm ${testResult.ok ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200' : 'border-red-500/40 bg-red-500/10 text-red-200'}`}>
+        <div
+          data-testid="web3-test-result"
+          data-test-ok={testResult.ok ? 'true' : 'false'}
+          role="status"
+          aria-live="polite"
+          className={`rounded-lg border p-3 text-sm ${testResult.ok ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200' : 'border-red-500/40 bg-red-500/10 text-red-200'}`}
+        >
           <p className="font-medium">
             {testResult.ok ? 'Conexão OK' : 'Falha na conexão'} · {testResult.latencyMs}ms{testResult.status ? ` · HTTP ${testResult.status}` : ''}
           </p>
@@ -202,13 +255,13 @@ export default function Web3ConnectionForm({ providerId, onSaved }: { providerId
       )}
 
       <div className="flex gap-3 pt-2">
-        <Button variant="outline" onClick={handleTest} disabled={testing || saving} className="flex-1">
+        <Button variant="outline" onClick={handleTest} disabled={testing || saving} className="flex-1" data-testid="btn-test-connection">
           {testing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plug className="h-4 w-4 mr-2" />}
           Testar conexão
         </Button>
-        <Button onClick={handleSave} disabled={saving || testing} className="flex-1">
+        <Button onClick={handleSave} disabled={saving || testing} className="flex-1" data-testid="btn-save-connection">
           {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-          Salvar
+          {isEditing ? 'Atualizar' : 'Salvar'}
         </Button>
       </div>
 
