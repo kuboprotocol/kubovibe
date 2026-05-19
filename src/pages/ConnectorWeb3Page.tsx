@@ -30,9 +30,16 @@ export default function ConnectorWeb3Page() {
     <div className="min-h-screen bg-background text-foreground">
       <div className="border-b border-border bg-card/50 backdrop-blur-xl sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-4 py-4 flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/connectors')} aria-label="Voltar">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/connectors/web3')} aria-label="Voltar">
             <ArrowLeft className="h-5 w-5" />
           </Button>
+          <button
+            type="button"
+            onClick={() => navigate('/connectors/web3')}
+            className="hidden sm:inline text-xs text-muted-foreground hover:text-foreground"
+          >
+            ← Web3 Hub
+          </button>
           <div className="flex items-center gap-3 flex-1">
             <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${provider.color}20` }}>
               <span className="text-base font-bold" style={{ color: provider.color }}>{provider.label[0]}</span>
