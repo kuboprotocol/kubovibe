@@ -140,6 +140,7 @@ export default function Web3ConnectionForm({ providerId, onSaved, editing, onCan
       if (error) throw error
       if ((data as any)?.error) throw new Error(JSON.stringify((data as any).error))
       toast.success(isEditing ? 'Conexão atualizada' : 'Conexão salva')
+      setDirty(false)
       onSaved?.()
     } catch (e: any) {
       toast.error(`Falha ao salvar: ${e.message ?? 'erro'}`)
