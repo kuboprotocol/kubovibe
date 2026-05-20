@@ -2,6 +2,16 @@ import { useEffect, useState } from 'react'
 import { Loader2, Plug, Trash2, ExternalLink, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
 import { supabase } from '@/integrations/supabase/client'
 import { getNetwork } from '@/lib/web3Networks'
@@ -34,6 +44,8 @@ export default function Web3ConnectionList({
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<Row | null>(null)
+  const [confirmText, setConfirmText] = useState('')
 
   async function load() {
     setLoading(true)
@@ -72,17 +84,24 @@ export default function Web3ConnectionList({
     finally { setBusyId(null) }
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm('Remover esta conexão?')) return
-    setBusyId(id)
+  async function performDelete(row: Row) {
+    setBusyId(row.id)
     try {
-      const { error } = await supabase.functions.invoke('web3-connection-delete', { body: { id } })
+      const { error } = await supabase.functions.invoke('web3-connection-delete', { body: { id: row.id } })
       if (error) throw error
       toast.success('Conexão removida')
+      setRows((prev) => prev.filter((r) => r.id !== row.id))
       load()
     } catch (e: any) { toast.error(e.message ?? 'erro') }
-    finally { setBusyId(null) }
+    finally {
+      setBusyId(null)
+      setPendingDelete(null)
+      setConfirmText('')
+    }
   }
+
+  const requiredConfirm = pendingDelete?.connection_name ?? ''
+  const canConfirm = !!pendingDelete && confirmText.trim() === requiredConfirm.trim() && busyId !== pendingDelete.id
 
   if (loading) return <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
   if (rows.length === 0) return null
@@ -130,13 +149,55 @@ export default function Web3ConnectionList({
                   <Pencil className="h-4 w-4" />
                 </Button>
               )}
-              <Button variant="outline" size="sm" onClick={() => handleDelete(r.id)} disabled={busyId === r.id} aria-label="Remover" data-testid="row-delete">
+              <Button variant="outline" size="sm" onClick={() => { setPendingDelete(r); setConfirmText('') }} disabled={busyId === r.id} aria-label="Remover" data-testid="row-delete">
                 <Trash2 className="h-4 w-4 text-red-400" />
               </Button>
             </div>
           </Card>
         )
       })}
+
+      <AlertDialog
+        open={!!pendingDelete}
+        onOpenChange={(open) => { if (!open) { setPendingDelete(null); setConfirmText('') } }}
+      >
+        <AlertDialogContent data-testid="web3-delete-dialog">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover conexão Web3?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação é <strong>irreversível</strong>. A conexão{' '}
+              <strong>{pendingDelete?.connection_name}</strong> ({getNetwork(pendingDelete?.network ?? '')?.label ?? pendingDelete?.network})
+              será excluída e seus segredos cifrados serão apagados.
+              <br />
+              Para confirmar, digite o nome da conexão abaixo.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <input
+            data-testid="web3-delete-confirm-input"
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            placeholder={requiredConfirm}
+            aria-label="Confirmar nome da conexão"
+            autoComplete="off"
+            className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="web3-delete-cancel" disabled={!!pendingDelete && busyId === pendingDelete.id}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="web3-delete-confirm"
+              disabled={!canConfirm}
+              onClick={(e) => { e.preventDefault(); if (pendingDelete) performDelete(pendingDelete) }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {pendingDelete && busyId === pendingDelete.id ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Removendo…</>
+              ) : 'Remover definitivamente'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
