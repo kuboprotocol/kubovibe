@@ -2,6 +2,16 @@ import { useEffect, useState } from 'react'
 import { Loader2, Plug, Trash2, ExternalLink, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
 import { supabase } from '@/integrations/supabase/client'
 import { getNetwork } from '@/lib/web3Networks'
