@@ -44,6 +44,9 @@ export default function Web3ConnectionForm({ providerId, onSaved, editing, onCan
   const [testing, setTesting] = useState(false)
   const [saving, setSaving] = useState(false)
   const [testResult, setTestResult] = useState<TestResult | null>(null)
+  const [dirty, setDirty] = useState(false)
+
+  const markDirty = () => setDirty(true)
 
   // Reset when "editing" prop changes
   useEffect(() => {
@@ -55,7 +58,21 @@ export default function Web3ConnectionForm({ providerId, onSaved, editing, onCan
     setExplorerUrl(editing?.explorer_url ?? '')
     setExplorerTouched(!!editing)
     setTestResult(null)
+    setDirty(false)
   }, [editing?.id, provider.label, networks, editing])
+
+  // Warn on tab close while there are unsaved edits
+  useEffect(() => {
+    if (!dirty) return
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [dirty])
+
+  function tryCancelEdit() {
+    if (dirty && !confirm('Descartar alterações não salvas?')) return
+    onCancelEdit?.()
+  }
 
   // Auto-preencher RPC e explorer ao trocar de network / api key
   useEffect(() => {
@@ -123,6 +140,7 @@ export default function Web3ConnectionForm({ providerId, onSaved, editing, onCan
       if (error) throw error
       if ((data as any)?.error) throw new Error(JSON.stringify((data as any).error))
       toast.success(isEditing ? 'Conexão atualizada' : 'Conexão salva')
+      setDirty(false)
       onSaved?.()
     } catch (e: any) {
       toast.error(`Falha ao salvar: ${e.message ?? 'erro'}`)
@@ -130,7 +148,7 @@ export default function Web3ConnectionForm({ providerId, onSaved, editing, onCan
   }
 
   return (
-    <Card className="p-6 space-y-5" data-testid="web3-connection-form">
+    <Card className="p-6 space-y-5" data-testid="web3-connection-form" data-dirty={dirty ? 'true' : 'false'}>
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="font-semibold text-lg">
@@ -140,8 +158,18 @@ export default function Web3ConnectionForm({ providerId, onSaved, editing, onCan
         </div>
         <div className="flex items-center gap-2">
           <Web3StatusPill status={status} checking={testing} />
+          {dirty && (
+            <span
+              data-testid="form-dirty-indicator"
+              role="status"
+              aria-live="polite"
+              className="text-[10px] uppercase tracking-wider text-amber-300"
+            >
+              Não salvo
+            </span>
+          )}
           {isEditing && onCancelEdit && (
-            <Button variant="ghost" size="icon" onClick={onCancelEdit} aria-label="Cancelar edição">
+            <Button variant="ghost" size="icon" onClick={tryCancelEdit} aria-label="Cancelar edição" data-testid="btn-cancel-edit">
               <X className="h-4 w-4" />
             </Button>
           )}
@@ -149,7 +177,12 @@ export default function Web3ConnectionForm({ providerId, onSaved, editing, onCan
       </div>
 
       {isEditing && (
-        <div className="text-xs rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-amber-200">
+        <div
+          role="note"
+          aria-live="polite"
+          data-testid="edit-safety-banner"
+          className="text-xs rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-amber-200"
+        >
           Por segurança, RPC URL e API Key não são exibidas. Reinforme os valores para atualizar a conexão.
           {editing?.api_key_hint && <> Hint atual: <code className="opacity-80">{editing.api_key_hint}</code></>}
         </div>
@@ -157,12 +190,12 @@ export default function Web3ConnectionForm({ providerId, onSaved, editing, onCan
 
       <div className="space-y-2">
         <Label htmlFor="connectionName">Nome da conexão</Label>
-        <Input id="connectionName" data-testid="field-connection-name" value={connectionName} onChange={(e) => setConnectionName(e.target.value)} placeholder="Ex.: Produção Mainnet" maxLength={80} />
+        <Input id="connectionName" data-testid="field-connection-name" value={connectionName} onChange={(e) => { setConnectionName(e.target.value); markDirty() }} placeholder="Ex.: Produção Mainnet" maxLength={80} />
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="network">Network</Label>
-        <Select value={networkId} onValueChange={(v) => { setNetworkId(v); setRpcTouched(false); setExplorerTouched(false); setTestResult(null) }}>
+        <Select value={networkId} onValueChange={(v) => { setNetworkId(v); setRpcTouched(false); setExplorerTouched(false); setTestResult(null); markDirty() }}>
           <SelectTrigger id="network" data-testid="field-network"><SelectValue placeholder="Selecione uma network" /></SelectTrigger>
           <SelectContent>
             {(['evm', 'solana', 'utxo'] as const).map((fam) => {
@@ -188,7 +221,7 @@ export default function Web3ConnectionForm({ providerId, onSaved, editing, onCan
             type={showKey ? 'text' : 'password'}
             autoComplete="off"
             value={apiKey}
-            onChange={(e) => { setApiKey(e.target.value); setRpcTouched(false) }}
+            onChange={(e) => { setApiKey(e.target.value); setRpcTouched(false); markDirty() }}
             placeholder={provider.apiKeyPlaceholder}
             className="pr-10"
           />
@@ -211,7 +244,7 @@ export default function Web3ConnectionForm({ providerId, onSaved, editing, onCan
           data-testid="field-rpc-url"
           type="url"
           value={rpcUrl}
-          onChange={(e) => { setRpcUrl(e.target.value.replace(/\s+/g, '')); setRpcTouched(true) }}
+          onChange={(e) => { setRpcUrl(e.target.value.replace(/\s+/g, '')); setRpcTouched(true); markDirty() }}
           placeholder="https://eth-mainnet.g.alchemy.com/v2/SUA_API_KEY"
         />
         <p className="text-xs text-muted-foreground">
@@ -227,7 +260,7 @@ export default function Web3ConnectionForm({ providerId, onSaved, editing, onCan
             data-testid="field-explorer-url"
             type="url"
             value={explorerUrl}
-            onChange={(e) => { setExplorerUrl(e.target.value); setExplorerTouched(true) }}
+            onChange={(e) => { setExplorerUrl(e.target.value); setExplorerTouched(true); markDirty() }}
             placeholder="https://etherscan.io"
           />
           {explorerUrl && (

@@ -81,6 +81,11 @@ export default function ConnectorWeb3Page() {
           providerId={provider.id}
           refreshKey={refreshKey}
           onEdit={(row) => {
+            const formEl = typeof document !== 'undefined'
+              ? document.querySelector('[data-testid="web3-connection-form"]')
+              : null
+            const isDirty = formEl?.getAttribute('data-dirty') === 'true'
+            if (isDirty && !window.confirm('Você tem alterações não salvas. Trocar de conexão e descartá-las?')) return
             setEditing(row)
             if (typeof window !== 'undefined') window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
           }}
