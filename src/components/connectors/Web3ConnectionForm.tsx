@@ -44,6 +44,9 @@ export default function Web3ConnectionForm({ providerId, onSaved, editing, onCan
   const [testing, setTesting] = useState(false)
   const [saving, setSaving] = useState(false)
   const [testResult, setTestResult] = useState<TestResult | null>(null)
+  const [dirty, setDirty] = useState(false)
+
+  const markDirty = () => setDirty(true)
 
   // Reset when "editing" prop changes
   useEffect(() => {
@@ -55,7 +58,21 @@ export default function Web3ConnectionForm({ providerId, onSaved, editing, onCan
     setExplorerUrl(editing?.explorer_url ?? '')
     setExplorerTouched(!!editing)
     setTestResult(null)
+    setDirty(false)
   }, [editing?.id, provider.label, networks, editing])
+
+  // Warn on tab close while there are unsaved edits
+  useEffect(() => {
+    if (!dirty) return
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [dirty])
+
+  function tryCancelEdit() {
+    if (dirty && !confirm('Descartar alterações não salvas?')) return
+    onCancelEdit?.()
+  }
 
   // Auto-preencher RPC e explorer ao trocar de network / api key
   useEffect(() => {
