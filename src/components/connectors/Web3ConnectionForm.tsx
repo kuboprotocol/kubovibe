@@ -220,7 +220,7 @@ export default function Web3ConnectionForm({ providerId, onSaved, editing, onCan
             type={showKey ? 'text' : 'password'}
             autoComplete="off"
             value={apiKey}
-            onChange={(e) => { setApiKey(e.target.value); setRpcTouched(false) }}
+            onChange={(e) => { setApiKey(e.target.value); setRpcTouched(false); markDirty() }}
             placeholder={provider.apiKeyPlaceholder}
             className="pr-10"
           />
