@@ -259,7 +259,7 @@ export default function Web3ConnectionForm({ providerId, onSaved, editing, onCan
             data-testid="field-explorer-url"
             type="url"
             value={explorerUrl}
-            onChange={(e) => { setExplorerUrl(e.target.value); setExplorerTouched(true) }}
+            onChange={(e) => { setExplorerUrl(e.target.value); setExplorerTouched(true); markDirty() }}
             placeholder="https://etherscan.io"
           />
           {explorerUrl && (
