@@ -44,6 +44,8 @@ export default function Web3ConnectionList({
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<Row | null>(null)
+  const [confirmText, setConfirmText] = useState('')
 
   async function load() {
     setLoading(true)
