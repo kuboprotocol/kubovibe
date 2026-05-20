@@ -243,7 +243,7 @@ export default function Web3ConnectionForm({ providerId, onSaved, editing, onCan
           data-testid="field-rpc-url"
           type="url"
           value={rpcUrl}
-          onChange={(e) => { setRpcUrl(e.target.value.replace(/\s+/g, '')); setRpcTouched(true) }}
+          onChange={(e) => { setRpcUrl(e.target.value.replace(/\s+/g, '')); setRpcTouched(true); markDirty() }}
           placeholder="https://eth-mainnet.g.alchemy.com/v2/SUA_API_KEY"
         />
         <p className="text-xs text-muted-foreground">
