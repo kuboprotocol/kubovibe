@@ -157,8 +157,18 @@ export default function Web3ConnectionForm({ providerId, onSaved, editing, onCan
         </div>
         <div className="flex items-center gap-2">
           <Web3StatusPill status={status} checking={testing} />
+          {dirty && (
+            <span
+              data-testid="form-dirty-indicator"
+              role="status"
+              aria-live="polite"
+              className="text-[10px] uppercase tracking-wider text-amber-300"
+            >
+              Não salvo
+            </span>
+          )}
           {isEditing && onCancelEdit && (
-            <Button variant="ghost" size="icon" onClick={onCancelEdit} aria-label="Cancelar edição">
+            <Button variant="ghost" size="icon" onClick={tryCancelEdit} aria-label="Cancelar edição" data-testid="btn-cancel-edit">
               <X className="h-4 w-4" />
             </Button>
           )}
@@ -166,7 +176,12 @@ export default function Web3ConnectionForm({ providerId, onSaved, editing, onCan
       </div>
 
       {isEditing && (
-        <div className="text-xs rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-amber-200">
+        <div
+          role="note"
+          aria-live="polite"
+          data-testid="edit-safety-banner"
+          className="text-xs rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-amber-200"
+        >
           Por segurança, RPC URL e API Key não são exibidas. Reinforme os valores para atualizar a conexão.
           {editing?.api_key_hint && <> Hint atual: <code className="opacity-80">{editing.api_key_hint}</code></>}
         </div>
@@ -174,12 +189,12 @@ export default function Web3ConnectionForm({ providerId, onSaved, editing, onCan
 
       <div className="space-y-2">
         <Label htmlFor="connectionName">Nome da conexão</Label>
-        <Input id="connectionName" data-testid="field-connection-name" value={connectionName} onChange={(e) => setConnectionName(e.target.value)} placeholder="Ex.: Produção Mainnet" maxLength={80} />
+        <Input id="connectionName" data-testid="field-connection-name" value={connectionName} onChange={(e) => { setConnectionName(e.target.value); markDirty() }} placeholder="Ex.: Produção Mainnet" maxLength={80} />
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="network">Network</Label>
-        <Select value={networkId} onValueChange={(v) => { setNetworkId(v); setRpcTouched(false); setExplorerTouched(false); setTestResult(null) }}>
+        <Select value={networkId} onValueChange={(v) => { setNetworkId(v); setRpcTouched(false); setExplorerTouched(false); setTestResult(null); markDirty() }}>
           <SelectTrigger id="network" data-testid="field-network"><SelectValue placeholder="Selecione uma network" /></SelectTrigger>
           <SelectContent>
             {(['evm', 'solana', 'utxo'] as const).map((fam) => {
