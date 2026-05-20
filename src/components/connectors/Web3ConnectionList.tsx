@@ -84,17 +84,24 @@ export default function Web3ConnectionList({
     finally { setBusyId(null) }
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm('Remover esta conexão?')) return
-    setBusyId(id)
+  async function performDelete(row: Row) {
+    setBusyId(row.id)
     try {
-      const { error } = await supabase.functions.invoke('web3-connection-delete', { body: { id } })
+      const { error } = await supabase.functions.invoke('web3-connection-delete', { body: { id: row.id } })
       if (error) throw error
       toast.success('Conexão removida')
+      setRows((prev) => prev.filter((r) => r.id !== row.id))
       load()
     } catch (e: any) { toast.error(e.message ?? 'erro') }
-    finally { setBusyId(null) }
+    finally {
+      setBusyId(null)
+      setPendingDelete(null)
+      setConfirmText('')
+    }
   }
+
+  const requiredConfirm = pendingDelete?.connection_name ?? ''
+  const canConfirm = !!pendingDelete && confirmText.trim() === requiredConfirm.trim() && busyId !== pendingDelete.id
 
   if (loading) return <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
   if (rows.length === 0) return null
