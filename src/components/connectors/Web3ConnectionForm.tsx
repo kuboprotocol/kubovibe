@@ -148,7 +148,7 @@ export default function Web3ConnectionForm({ providerId, onSaved, editing, onCan
   }
 
   return (
-    <Card className="p-6 space-y-5" data-testid="web3-connection-form">
+    <Card className="p-6 space-y-5" data-testid="web3-connection-form" data-dirty={dirty ? 'true' : 'false'}>
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="font-semibold text-lg">
