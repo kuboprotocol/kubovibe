@@ -4,13 +4,16 @@ import path from 'node:path'
 
 /**
  * E2E: Web3 connection — delete edge function failure
- *  - Mocks web3-connection-delete to return 500
- *  - Confirms guard flow (typing exact name → confirm enabled)
- *  - After click, asserts:
- *      * Row stays in the list (no optimistic removal)
- *      * Error toast (sonner) is shown
- *      * Dialog closes / confirm button is no longer in a loading state
- *  - Writes report to test-results/web3-connection-delete-error-report.json
+ *
+ * Cobertura:
+ *  - "Código de acesso": input de confirmação exigindo o nome exato da conexão
+ *  - Acessibilidade do AlertDialog (role, aria-labelledby, foco no input)
+ *  - Falha simulada na edge function `web3-connection-delete` (HTTP 500)
+ *  - Restauração / undo implícito: a linha permanece intacta na lista
+ *  - Toast de erro do sonner é exibido
+ *  - Botão não fica preso em "Removendo…"
+ *  - Reabrir o diálogo após erro funciona (estado restaurável)
+ *  - Relatório JSON: test-results/web3-connection-delete-error-report.json
  */
 
 const TEST_EMAIL = process.env.TEST_EMAIL
@@ -44,17 +47,19 @@ async function login(page: Page) {
 test.describe('Web3 connector — delete edge function error', () => {
   test.skip(!TEST_EMAIL || !TEST_PASSWORD, 'TEST_EMAIL/TEST_PASSWORD required')
 
-  test('keeps row and shows error toast when delete edge function fails', async ({ page, context }) => {
+  test('keeps row + shows toast + dialog a11y + restorable after failure', async ({ page, context }) => {
     const report: {
       steps: unknown[]
       startedAt: string
       endedAt?: string
       success?: boolean
       deleteCalls: number
+      a11y: Record<string, boolean | string | null>
     } = {
       startedAt: new Date().toISOString(),
       steps: [],
       deleteCalls: 0,
+      a11y: {},
     }
     const log = (step: string, data: Record<string, unknown> = {}) =>
       report.steps.push({ step, at: new Date().toISOString(), ...data })
@@ -64,8 +69,6 @@ test.describe('Web3 connector — delete edge function error', () => {
 
     const state = { rows: [CONNECTION], deleteCalls: 0 }
 
-    // REST list always returns the seeded row (deletion is server-side; we simulate failure
-    // so the row must remain in the table even after subsequent reloads).
     await page.route(/\/rest\/v1\/web3_connections\?.*/, (route) =>
       route.fulfill({
         status: 200,
@@ -74,7 +77,6 @@ test.describe('Web3 connector — delete edge function error', () => {
       }),
     )
 
-    // Force the delete edge function to fail.
     await page.route(/\/functions\/v1\/web3-connection-delete(\?.*)?$/, (route) => {
       state.deleteCalls += 1
       return route.fulfill({
@@ -90,44 +92,71 @@ test.describe('Web3 connector — delete edge function error', () => {
     await expect(row).toContainText(CONNECTION.connection_name)
     log('row-rendered')
 
-    // Open dialog and pass the typed-name guard
+    // ---- Abrir diálogo + acessibilidade ----
     await row.getByTestId('row-delete').click()
     const dialog = page.getByTestId('web3-delete-dialog')
     await expect(dialog).toBeVisible()
-    await page.getByTestId('web3-delete-confirm-input').fill(CONNECTION.connection_name)
-    const confirmBtn = page.getByTestId('web3-delete-confirm')
-    await expect(confirmBtn).toBeEnabled()
-    log('guard-passed')
 
-    // Trigger the failing delete
+    const alertdialog = page.getByRole('alertdialog')
+    await expect(alertdialog).toBeVisible()
+    await expect(alertdialog).toHaveAttribute('aria-labelledby', /.+/)
+    await expect(alertdialog).toHaveAttribute('aria-describedby', /.+/)
+    await expect(page.getByRole('heading', { name: /remover conex/i })).toBeVisible()
+    report.a11y = {
+      role: 'alertdialog',
+      labelled: await alertdialog.getAttribute('aria-labelledby'),
+      described: await alertdialog.getAttribute('aria-describedby'),
+      titleVisible: true,
+    }
+    log('a11y-ok', report.a11y)
+
+    // ---- Código de acesso: confirm desabilitado até nome exato ----
+    const confirmBtn = page.getByTestId('web3-delete-confirm')
+    const accessInput = page.getByTestId('web3-delete-confirm-input')
+    await expect(confirmBtn).toBeDisabled()
+    await accessInput.fill('wrong-code')
+    await expect(confirmBtn).toBeDisabled()
+    await accessInput.fill(CONNECTION.connection_name)
+    await expect(confirmBtn).toBeEnabled()
+    log('access-code-validated')
+
+    // ---- Disparar delete (vai falhar) ----
     await confirmBtn.click()
 
-    // Toast assertion (sonner renders into [data-sonner-toaster])
+    // Toast de erro do sonner
     const errorToast = page
-      .locator('[data-sonner-toaster] [data-type="error"], [data-sonner-toaster] li[role="status"]')
+      .locator('[data-sonner-toaster] li, [data-sonner-toaster] [role="status"]')
       .filter({ hasText: /simulated edge function failure|erro|failed|falha/i })
     await expect(errorToast.first()).toBeVisible({ timeout: 10_000 })
     log('error-toast-visible')
 
-    // Row must NOT be removed (no optimistic delete on failure)
+    // ---- Restauração / undo: linha permanece intacta ----
     await expect(page.getByTestId('web3-connection-row')).toHaveCount(1)
     await expect(page.getByTestId('web3-connection-row').first()).toContainText(
       CONNECTION.connection_name,
     )
-    log('row-preserved')
-
-    // Edge function was called exactly once
     expect(state.deleteCalls).toBe(1)
     report.deleteCalls = state.deleteCalls
+    log('row-restored')
 
-    // Confirm button should leave loading state (either dialog still open with idle button
-    // or dialog closed). Either way, it must not be stuck in "Removendo…".
-    const stillLoading = await page
+    // Botão não preso em loading
+    const stuck = await page
       .getByTestId('web3-delete-confirm')
       .filter({ hasText: /Removendo/i })
       .count()
-    expect(stillLoading).toBe(0)
+    expect(stuck).toBe(0)
     log('button-not-stuck')
+
+    // ---- Diálogo é reabrível (estado restaurável) ----
+    // Se ainda estiver aberto, fecha pelo cancel; depois reabre.
+    if (await page.getByTestId('web3-delete-cancel').isVisible().catch(() => false)) {
+      await page.getByTestId('web3-delete-cancel').click()
+    }
+    await expect(page.getByTestId('web3-delete-dialog')).toBeHidden({ timeout: 5_000 })
+    await row.getByTestId('row-delete').click()
+    await expect(page.getByTestId('web3-delete-dialog')).toBeVisible()
+    await expect(page.getByTestId('web3-delete-confirm')).toBeDisabled()
+    log('dialog-reopenable')
 
     report.endedAt = new Date().toISOString()
     report.success = true
