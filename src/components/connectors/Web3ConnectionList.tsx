@@ -176,7 +176,18 @@ export default function Web3ConnectionList({
                   <Pencil className="h-4 w-4" />
                 </Button>
               )}
-              <Button variant="outline" size="sm" onClick={() => { setPendingDelete(r); setConfirmText('') }} disabled={busyId === r.id} aria-label="Remover" data-testid="row-delete">
+              <Button
+                ref={(el) => {
+                  if (el) triggerRefs.current.set(r.id, el)
+                }}
+                variant="outline"
+                size="sm"
+                onClick={(e) => openDeleteDialog(r, e.currentTarget)}
+                disabled={busyId === r.id}
+                aria-label={`Remover conexão ${r.connection_name}`}
+                aria-haspopup="dialog"
+                data-testid="row-delete"
+              >
                 <Trash2 className="h-4 w-4 text-red-400" />
               </Button>
             </div>
