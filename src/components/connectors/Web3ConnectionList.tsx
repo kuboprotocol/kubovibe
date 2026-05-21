@@ -197,9 +197,16 @@ export default function Web3ConnectionList({
 
       <AlertDialog
         open={!!pendingDelete}
-        onOpenChange={(open) => { if (!open) { setPendingDelete(null); setConfirmText('') } }}
+        onOpenChange={handleDialogOpenChange}
       >
-        <AlertDialogContent data-testid="web3-delete-dialog">
+        <AlertDialogContent
+          data-testid="web3-delete-dialog"
+          onOpenAutoFocus={(e) => {
+            // Foco inicial no input de confirmação ao invés do botão de ação
+            e.preventDefault()
+            requestAnimationFrame(() => confirmInputRef.current?.focus())
+          }}
+        >
           <AlertDialogHeader>
             <AlertDialogTitle>Remover conexão Web3?</AlertDialogTitle>
             <AlertDialogDescription>
@@ -211,11 +218,14 @@ export default function Web3ConnectionList({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <input
+            ref={confirmInputRef}
             data-testid="web3-delete-confirm-input"
             value={confirmText}
             onChange={(e) => setConfirmText(e.target.value)}
             placeholder={requiredConfirm}
             aria-label="Confirmar nome da conexão"
+            aria-required="true"
+            aria-invalid={confirmText.length > 0 && !canConfirm}
             autoComplete="off"
             className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
