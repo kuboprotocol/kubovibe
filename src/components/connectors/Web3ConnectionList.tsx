@@ -46,6 +46,33 @@ export default function Web3ConnectionList({
   const [busyId, setBusyId] = useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = useState<Row | null>(null)
   const [confirmText, setConfirmText] = useState('')
+  const confirmInputRef = useRef<HTMLInputElement | null>(null)
+  const triggerRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
+  const lastTriggerId = useRef<string | null>(null)
+
+  function openDeleteDialog(row: Row, trigger: HTMLButtonElement | null) {
+    if (trigger) {
+      triggerRefs.current.set(row.id, trigger)
+      lastTriggerId.current = row.id
+    }
+    setPendingDelete(row)
+    setConfirmText('')
+  }
+
+  function handleDialogOpenChange(open: boolean) {
+    if (!open) {
+      const id = lastTriggerId.current
+      setPendingDelete(null)
+      setConfirmText('')
+      // Restaura foco no botão Remover que abriu o diálogo
+      requestAnimationFrame(() => {
+        if (id) {
+          const btn = triggerRefs.current.get(id)
+          btn?.focus()
+        }
+      })
+    }
+  }
 
   async function load() {
     setLoading(true)
