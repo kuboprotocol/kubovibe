@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Loader2, Plug, Trash2, ExternalLink, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -46,6 +46,33 @@ export default function Web3ConnectionList({
   const [busyId, setBusyId] = useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = useState<Row | null>(null)
   const [confirmText, setConfirmText] = useState('')
+  const confirmInputRef = useRef<HTMLInputElement | null>(null)
+  const triggerRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
+  const lastTriggerId = useRef<string | null>(null)
+
+  function openDeleteDialog(row: Row, trigger: HTMLButtonElement | null) {
+    if (trigger) {
+      triggerRefs.current.set(row.id, trigger)
+      lastTriggerId.current = row.id
+    }
+    setPendingDelete(row)
+    setConfirmText('')
+  }
+
+  function handleDialogOpenChange(open: boolean) {
+    if (!open) {
+      const id = lastTriggerId.current
+      setPendingDelete(null)
+      setConfirmText('')
+      // Restaura foco no botão Remover que abriu o diálogo
+      requestAnimationFrame(() => {
+        if (id) {
+          const btn = triggerRefs.current.get(id)
+          btn?.focus()
+        }
+      })
+    }
+  }
 
   async function load() {
     setLoading(true)
@@ -149,7 +176,18 @@ export default function Web3ConnectionList({
                   <Pencil className="h-4 w-4" />
                 </Button>
               )}
-              <Button variant="outline" size="sm" onClick={() => { setPendingDelete(r); setConfirmText('') }} disabled={busyId === r.id} aria-label="Remover" data-testid="row-delete">
+              <Button
+                ref={(el) => {
+                  if (el) triggerRefs.current.set(r.id, el)
+                }}
+                variant="outline"
+                size="sm"
+                onClick={(e) => openDeleteDialog(r, e.currentTarget)}
+                disabled={busyId === r.id}
+                aria-label={`Remover conexão ${r.connection_name}`}
+                aria-haspopup="dialog"
+                data-testid="row-delete"
+              >
                 <Trash2 className="h-4 w-4 text-red-400" />
               </Button>
             </div>
@@ -159,9 +197,16 @@ export default function Web3ConnectionList({
 
       <AlertDialog
         open={!!pendingDelete}
-        onOpenChange={(open) => { if (!open) { setPendingDelete(null); setConfirmText('') } }}
+        onOpenChange={handleDialogOpenChange}
       >
-        <AlertDialogContent data-testid="web3-delete-dialog">
+        <AlertDialogContent
+          data-testid="web3-delete-dialog"
+          onOpenAutoFocus={(e) => {
+            // Foco inicial no input de confirmação ao invés do botão de ação
+            e.preventDefault()
+            requestAnimationFrame(() => confirmInputRef.current?.focus())
+          }}
+        >
           <AlertDialogHeader>
             <AlertDialogTitle>Remover conexão Web3?</AlertDialogTitle>
             <AlertDialogDescription>
@@ -173,11 +218,14 @@ export default function Web3ConnectionList({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <input
+            ref={confirmInputRef}
             data-testid="web3-delete-confirm-input"
             value={confirmText}
             onChange={(e) => setConfirmText(e.target.value)}
             placeholder={requiredConfirm}
             aria-label="Confirmar nome da conexão"
+            aria-required="true"
+            aria-invalid={confirmText.length > 0 && !canConfirm}
             autoComplete="off"
             className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
