@@ -32,6 +32,8 @@ interface Row {
   updated_at: string
 }
 
+const UNDO_WINDOW_MS = 6000
+
 export default function Web3ConnectionList({
   providerId,
   refreshKey = 0,
@@ -49,6 +51,8 @@ export default function Web3ConnectionList({
   const confirmInputRef = useRef<HTMLInputElement | null>(null)
   const triggerRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
   const lastTriggerId = useRef<string | null>(null)
+  // Undo bookkeeping: id -> { row, timer, undone }
+  const pendingUndo = useRef<Map<string, { row: Row; timer: number; undone: boolean }>>(new Map())
 
   function openDeleteDialog(row: Row, trigger: HTMLButtonElement | null) {
     if (trigger) {
@@ -64,12 +68,8 @@ export default function Web3ConnectionList({
       const id = lastTriggerId.current
       setPendingDelete(null)
       setConfirmText('')
-      // Restaura foco no botão Remover que abriu o diálogo
       requestAnimationFrame(() => {
-        if (id) {
-          const btn = triggerRefs.current.get(id)
-          btn?.focus()
-        }
+        if (id) triggerRefs.current.get(id)?.focus()
       })
     }
   }
@@ -88,7 +88,6 @@ export default function Web3ConnectionList({
 
   useEffect(() => { load() /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [providerId, refreshKey])
 
-  // Realtime: status mudou no servidor → atualiza linha
   useEffect(() => {
     const channel = supabase
       .channel(`web3-conn-${providerId}`)
@@ -111,24 +110,79 @@ export default function Web3ConnectionList({
     finally { setBusyId(null) }
   }
 
-  async function performDelete(row: Row) {
-    setBusyId(row.id)
+  function restoreRow(row: Row) {
+    setRows((prev) => {
+      if (prev.some((r) => r.id === row.id)) return prev
+      const next = [row, ...prev]
+      return next.sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1))
+    })
+  }
+
+  async function commitDelete(row: Row) {
     try {
       const { error } = await supabase.functions.invoke('web3-connection-delete', { body: { id: row.id } })
       if (error) throw error
-      toast.success('Conexão removida')
-      setRows((prev) => prev.filter((r) => r.id !== row.id))
-      load()
-    } catch (e: any) { toast.error(e.message ?? 'erro') }
-    finally {
-      setBusyId(null)
-      setPendingDelete(null)
-      setConfirmText('')
+      // success: nothing else to do, row already removed
+    } catch (e: any) {
+      // Rollback optimistic removal
+      restoreRow(row)
+      toast.error(e?.message ?? 'Falha ao remover. Linha restaurada.')
+    } finally {
+      pendingUndo.current.delete(row.id)
     }
   }
 
-  const requiredConfirm = pendingDelete?.connection_name ?? ''
-  const canConfirm = !!pendingDelete && confirmText.trim() === requiredConfirm.trim() && busyId !== pendingDelete.id
+  function scheduleDelete(row: Row) {
+    // Optimistic remove
+    setRows((prev) => prev.filter((r) => r.id !== row.id))
+
+    const timer = window.setTimeout(() => {
+      const entry = pendingUndo.current.get(row.id)
+      if (!entry || entry.undone) return
+      commitDelete(row)
+    }, UNDO_WINDOW_MS)
+
+    pendingUndo.current.set(row.id, { row, timer, undone: false })
+
+    toast.success('Conexão removida', {
+      description: `${row.connection_name} · desfazer disponível por ${UNDO_WINDOW_MS / 1000}s`,
+      duration: UNDO_WINDOW_MS,
+      action: {
+        label: 'Desfazer',
+        onClick: () => {
+          const entry = pendingUndo.current.get(row.id)
+          if (!entry) return
+          entry.undone = true
+          window.clearTimeout(entry.timer)
+          pendingUndo.current.delete(row.id)
+          restoreRow(row)
+          toast.message('Remoção desfeita', { description: row.connection_name })
+        },
+      },
+    })
+  }
+
+  function performDelete(row: Row) {
+    setPendingDelete(null)
+    setConfirmText('')
+    scheduleDelete(row)
+  }
+
+  // Required token: "<connection_name>#<provider>:<id-prefix>"
+  // ID prefix uses the first 8 chars of UUID — enough to be deliberate without forcing full UUID.
+  const idPrefix = pendingDelete ? pendingDelete.id.slice(0, 8) : ''
+  const requiredConfirm = pendingDelete
+    ? `${pendingDelete.connection_name}#${pendingDelete.provider}:${idPrefix}`
+    : ''
+  const canConfirm = !!pendingDelete && confirmText.trim() === requiredConfirm.trim()
+
+  // Cleanup pending timers on unmount
+  useEffect(() => {
+    return () => {
+      pendingUndo.current.forEach((e) => window.clearTimeout(e.timer))
+      pendingUndo.current.clear()
+    }
+  }, [])
 
   if (loading) return <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
   if (rows.length === 0) return null
@@ -195,14 +249,10 @@ export default function Web3ConnectionList({
         )
       })}
 
-      <AlertDialog
-        open={!!pendingDelete}
-        onOpenChange={handleDialogOpenChange}
-      >
+      <AlertDialog open={!!pendingDelete} onOpenChange={handleDialogOpenChange}>
         <AlertDialogContent
           data-testid="web3-delete-dialog"
           onOpenAutoFocus={(e) => {
-            // Foco inicial no input de confirmação ao invés do botão de ação
             e.preventDefault()
             requestAnimationFrame(() => confirmInputRef.current?.focus())
           }}
@@ -210,11 +260,20 @@ export default function Web3ConnectionList({
           <AlertDialogHeader>
             <AlertDialogTitle>Remover conexão Web3?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação é <strong>irreversível</strong>. A conexão{' '}
-              <strong>{pendingDelete?.connection_name}</strong> ({getNetwork(pendingDelete?.network ?? '')?.label ?? pendingDelete?.network})
+              Esta ação é <strong>irreversível</strong> após a janela de desfazer (
+              {UNDO_WINDOW_MS / 1000}s). A conexão{' '}
+              <strong>{pendingDelete?.connection_name}</strong> (
+              {getNetwork(pendingDelete?.network ?? '')?.label ?? pendingDelete?.network})
               será excluída e seus segredos cifrados serão apagados.
               <br />
-              Para confirmar, digite o nome da conexão abaixo.
+              Para confirmar, digite exatamente o token abaixo (nome, provider e prefixo do ID):
+              <br />
+              <code
+                data-testid="web3-delete-confirm-token"
+                className="mt-2 inline-block break-all rounded bg-muted px-2 py-1 text-xs font-mono"
+              >
+                {requiredConfirm}
+              </code>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <input
@@ -223,25 +282,22 @@ export default function Web3ConnectionList({
             value={confirmText}
             onChange={(e) => setConfirmText(e.target.value)}
             placeholder={requiredConfirm}
-            aria-label="Confirmar nome da conexão"
+            aria-label="Confirmar token (nome#provider:idprefix)"
             aria-required="true"
             aria-invalid={confirmText.length > 0 && !canConfirm}
             autoComplete="off"
-            className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            spellCheck={false}
+            className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
           <AlertDialogFooter>
-            <AlertDialogCancel data-testid="web3-delete-cancel" disabled={!!pendingDelete && busyId === pendingDelete.id}>
-              Cancelar
-            </AlertDialogCancel>
+            <AlertDialogCancel data-testid="web3-delete-cancel">Cancelar</AlertDialogCancel>
             <AlertDialogAction
               data-testid="web3-delete-confirm"
               disabled={!canConfirm}
               onClick={(e) => { e.preventDefault(); if (pendingDelete) performDelete(pendingDelete) }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {pendingDelete && busyId === pendingDelete.id ? (
-                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Removendo…</>
-              ) : 'Remover definitivamente'}
+              Remover definitivamente
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
