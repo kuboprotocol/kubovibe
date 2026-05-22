@@ -110,42 +110,43 @@ test.describe('Web3 connector — delete edge function error', () => {
     }
     log('a11y-ok', report.a11y)
 
-    // ---- Código de acesso: confirm desabilitado até nome exato ----
+    // ---- Código de acesso: token completo (nome#provider:idprefix) ----
     const confirmBtn = page.getByTestId('web3-delete-confirm')
     const accessInput = page.getByTestId('web3-delete-confirm-input')
     await expect(confirmBtn).toBeDisabled()
     await accessInput.fill('wrong-code')
     await expect(confirmBtn).toBeDisabled()
+    // Apenas o nome NÃO basta mais: precisa do token completo
     await accessInput.fill(CONNECTION.connection_name)
+    await expect(confirmBtn).toBeDisabled()
+    const requiredToken = await page
+      .getByTestId('web3-delete-confirm-token')
+      .innerText()
+    expect(requiredToken).toBe(
+      `${CONNECTION.connection_name}#${CONNECTION.provider}:${CONNECTION.id.slice(0, 8)}`,
+    )
+    await accessInput.fill(requiredToken)
     await expect(confirmBtn).toBeEnabled()
-    log('access-code-validated')
+    log('access-code-validated', { token: requiredToken })
 
-    // ---- Disparar delete (vai falhar) ----
+    // ---- Disparar delete (otimista; edge será chamada após janela de undo) ----
     await confirmBtn.click()
 
-    // Toast de erro do sonner
+    // Toast de erro do sonner (após rollback)
     const errorToast = page
       .locator('[data-sonner-toaster] li, [data-sonner-toaster] [role="status"]')
-      .filter({ hasText: /simulated edge function failure|erro|failed|falha/i })
-    await expect(errorToast.first()).toBeVisible({ timeout: 10_000 })
+      .filter({ hasText: /simulated edge function failure|falha ao remover|erro|failed|falha/i })
+    await expect(errorToast.first()).toBeVisible({ timeout: 15_000 })
     log('error-toast-visible')
 
-    // ---- Restauração / undo: linha permanece intacta ----
-    await expect(page.getByTestId('web3-connection-row')).toHaveCount(1)
+    // ---- Restauração / undo: linha restaurada após falha da edge ----
+    await expect(page.getByTestId('web3-connection-row')).toHaveCount(1, { timeout: 15_000 })
     await expect(page.getByTestId('web3-connection-row').first()).toContainText(
       CONNECTION.connection_name,
     )
     expect(state.deleteCalls).toBe(1)
     report.deleteCalls = state.deleteCalls
     log('row-restored')
-
-    // Botão não preso em loading
-    const stuck = await page
-      .getByTestId('web3-delete-confirm')
-      .filter({ hasText: /Removendo/i })
-      .count()
-    expect(stuck).toBe(0)
-    log('button-not-stuck')
 
     // ---- Diálogo é reabrível (estado restaurável) ----
     // Se ainda estiver aberto, fecha pelo cancel; depois reabre.
