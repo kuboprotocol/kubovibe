@@ -124,9 +124,16 @@ export default function Web3ConnectionList({
       if (error) throw error
       // success: nothing else to do, row already removed
     } catch (e: any) {
-      // Rollback optimistic removal
-      restoreRow(row)
-      toast.error(e?.message ?? 'Falha ao remover. Linha restaurada.')
+      // Janela de undo já expirou — usuário declinou desfazer. Tratamos como
+      // falha terminal: NÃO restauramos a linha automaticamente para não
+      // confundir o usuário; expomos ação "Tentar novamente" no toast.
+      toast.error('Falha ao remover conexão', {
+        description: e?.message ?? 'Erro ao chamar serviço de remoção.',
+        action: {
+          label: 'Tentar novamente',
+          onClick: () => { commitDelete(row) },
+        },
+      })
     } finally {
       pendingUndo.current.delete(row.id)
     }
