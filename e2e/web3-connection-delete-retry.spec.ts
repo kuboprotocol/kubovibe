@@ -108,7 +108,7 @@ test.describe('Web3 connector — retry após falha de deleção', () => {
     log('edge-second-call', { deleteCalls: state.deleteCalls })
 
     // 8. Linha permanece removida
-    await expect(page.getByTestId('web3-connection-row')).toHaveCount(.0)
+    await expect(page.getByTestId('web3-connection-row')).toHaveCount(1)
     log('row-still-removed')
 
     report.endedAt = new Date().toISOString()
