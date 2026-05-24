@@ -142,3 +142,43 @@ export function toastByText(page: Page, pattern: RegExp) {
     .locator('li, [role="status"]')
     .filter({ hasText: pattern })
 }
+
+/**
+ * Espera determinística pelo COMMIT da deleção após a janela de undo.
+ *
+ * Polling de `state.deleteCalls` até atingir o valor esperado (default 1)
+ * dentro de `UNDO_WINDOW_MS + buffer`. Substitui `page.waitForTimeout(...)`
+ * cego: falha rápido se o commit ocorrer cedo demais ou não ocorrer.
+ */
+export async function waitForUndoCommit(
+  _page: Page,
+  state: Pick<MockState, 'deleteCalls'>,
+  { expected = 1, buffer = 1_500 }: { expected?: number; buffer?: number } = {},
+) {
+  await expect
+    .poll(() => state.deleteCalls, {
+      timeout: UNDO_WINDOW_MS + buffer,
+      intervals: [200, 400, 800],
+      message: `Esperando deleteCalls === ${expected} dentro de UNDO_WINDOW_MS+${buffer}ms`,
+    })
+    .toBe(expected)
+}
+
+/**
+ * Inverso de `waitForUndoCommit`: garante que NENHUMA chamada à edge
+ * ocorreu durante toda a janela (ex.: cenário de undo bem-sucedido).
+ * Falha imediatamente se a contagem subir.
+ */
+export async function expectUndoTimerCancelled(
+  _page: Page,
+  state: Pick<MockState, 'deleteCalls'>,
+  { buffer = 1_500 }: { buffer?: number } = {},
+) {
+  await expect
+    .poll(() => state.deleteCalls, {
+      timeout: UNDO_WINDOW_MS + buffer,
+      intervals: [250, 500, 1_000],
+      message: 'Timer de undo deveria estar cancelado — deleteCalls não pode subir',
+    })
+    .toBe(0)
+}
