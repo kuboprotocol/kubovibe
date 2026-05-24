@@ -160,19 +160,9 @@ test.describe('Web3 connector — undo restaura linha após delete otimista', ()
     // Foco volta para o trigger (acessibilidade do AlertDialog já fechado antes)
     await expect(trigger).toBeVisible()
 
-    // ============================================================
-    // Verifica que o timer foi cancelado: deleteCalls precisa
-    // permanecer 0 ALÉM da janela. Sem waitForTimeout cego — usamos
-    // expect.poll que falha rápido se a contagem subir.
-    // ============================================================
-    const deadline = Date.now() + UNDO_WINDOW_MS + 1_500
-    await expect
-      .poll(() => state.deleteCalls, {
-        timeout: deadline - Date.now(),
-        intervals: [250, 500, 1_000],
-        message: 'edge web3-connection-delete não pode ser chamada após undo',
-      })
-      .toBe(0)
+    // Verifica que o timer foi cancelado: polling determinístico via helper.
+    const { expectUndoTimerCancelled } = await import('./helpers/web3Connector')
+    await expectUndoTimerCancelled(page, state)
     report.deleteCalls = state.deleteCalls
     log('edge-never-called', { deleteCalls: state.deleteCalls })
 
