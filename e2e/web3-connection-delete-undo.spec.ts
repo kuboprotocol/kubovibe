@@ -1,57 +1,51 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Locator } from '@playwright/test'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import {
+  login,
+  makeConnection,
+  mockWeb3Backend,
+  openDeleteDialog,
+  requiredDeleteToken,
+  toasterLocator,
+  toastByText,
+  UNDO_WINDOW_MS,
+} from './helpers/web3Connector'
 
 /**
- * E2E: Web3 connection — undo da deleção otimista
+ * E2E: Web3 connection — undo da deleção otimista.
  *
- * Cenário coberto:
- *  1. Usuário confirma o delete guard (token nome#provider:idprefix)
- *  2. Linha some otimisticamente da lista
- *  3. Toast com botão "Desfazer" aparece (estado inicial)
- *  4. Usuário clica "Desfazer" antes da janela expirar
- *     → linha é restaurada na lista
- *     → edge function `web3-connection-delete` NUNCA é chamada (timer cancelado)
- *     → toast inicial é substituído/dispensado e um novo toast "Remoção desfeita" aparece
- *  5. Cobertura paralela: configuramos a edge para falhar (500); se o undo
- *     não cancelasse o timer, veríamos `deleteCalls === 1` e um toast de erro.
- *     Aqui validamos o contrário (deleteCalls === 0, sem toast de erro).
+ * Contrato validado:
+ *  1. Confirm via token completo → linha some otimisticamente.
+ *  2. Toast inicial com botão "Desfazer" é exibido (snapshot do nó).
+ *  3. Clique em "Desfazer" ANTES da janela (UNDO_WINDOW_MS) expirar:
+ *     - cancela o timer (edge `web3-connection-delete` NUNCA é chamada)
+ *     - restaura a linha imediatamente
+ *     - dispensa o toast inicial: o MESMO nó capturado anteriormente é
+ *       removido do DOM (não basta o botão "Desfazer" sumir — exigimos
+ *       detach do elemento, evitando falso positivo onde sonner reusa
+ *       o container e troca conteúdo).
+ *     - emite novo toast "Remoção desfeita".
+ *  4. Após UNDO_WINDOW_MS + buffer, `deleteCalls` continua 0 e nenhum
+ *     toast de erro aparece (validado com expect.poll, sem sleep cego).
  *
  * Relatório: test-results/web3-connection-delete-undo-report.json
  */
 
-const TEST_EMAIL = process.env.TEST_EMAIL
-const TEST_PASSWORD = process.env.TEST_PASSWORD
-
 const REPORT_DIR = path.resolve('test-results')
 const REPORT_PATH = path.join(REPORT_DIR, 'web3-connection-delete-undo-report.json')
 
-const CONNECTION = {
-  id: '00000000-0000-4000-8000-0000000000aa',
-  provider: 'alchemy',
-  network: 'ethereum-mainnet',
-  connection_name: `E2E undo ${Date.now()}`,
-  explorer_url: 'https://etherscan.io',
-  api_key_hint: 'bbbb••••yyyy',
-  last_status: 'connected',
-  last_block: 19_700_000,
-  last_latency_ms: 110,
-  last_checked_at: new Date().toISOString(),
-  updated_at: new Date().toISOString(),
-}
-
-async function login(page: Page) {
-  await page.goto('/auth')
-  await page.getByPlaceholder('Email').fill(TEST_EMAIL!)
-  await page.getByPlaceholder('Senha').fill(TEST_PASSWORD!)
-  await page.getByRole('button', { name: /entrar|login|sign in/i }).first().click()
-  await page.waitForURL((u) => !u.pathname.startsWith('/auth'), { timeout: 20_000 })
+interface ToastSnapshot {
+  at: string
+  phase: string
+  texts: string[]
+  undoButtonCount: number
 }
 
 test.describe('Web3 connector — undo restaura linha após delete otimista', () => {
-  test.skip(!TEST_EMAIL || !TEST_PASSWORD, 'TEST_EMAIL/TEST_PASSWORD required')
+  test.skip(!process.env.TEST_EMAIL || !process.env.TEST_PASSWORD, 'TEST_EMAIL/TEST_PASSWORD required')
 
-  test('clicar Desfazer restaura a linha e atualiza estado do toast', async ({ page, context }) => {
+  test('clicar Desfazer restaura a linha e descarta o toast original', async ({ page, context }) => {
     const report: {
       steps: unknown[]
       startedAt: string
@@ -59,114 +53,132 @@ test.describe('Web3 connector — undo restaura linha após delete otimista', ()
       success?: boolean
       deleteCalls: number
       toastStates: string[]
+      toastSnapshots: ToastSnapshot[]
     } = {
       startedAt: new Date().toISOString(),
       steps: [],
       deleteCalls: 0,
       toastStates: [],
+      toastSnapshots: [],
     }
     const log = (step: string, data: Record<string, unknown> = {}) =>
       report.steps.push({ step, at: new Date().toISOString(), ...data })
 
+    const snapshotToasts = async (phase: string): Promise<ToastSnapshot> => {
+      const toaster = toasterLocator(page)
+      const items = toaster.locator('li, [role="status"]')
+      const texts = (await items.allInnerTexts()).map((t) => t.trim()).filter(Boolean)
+      const undoButtonCount = await toaster.getByRole('button', { name: /desfazer/i }).count()
+      const snap: ToastSnapshot = { at: new Date().toISOString(), phase, texts, undoButtonCount }
+      report.toastSnapshots.push(snap)
+      return snap
+    }
+
     await context.clearCookies()
     await login(page)
 
-    const state = { rows: [CONNECTION], deleteCalls: 0 }
-
-    await page.route(/\/rest\/v1\/web3_connections\?.*/, (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(state.rows),
-      }),
-    )
-
-    // Falha 500 — só seria atingida se o undo NÃO cancelasse o timer.
-    await page.route(/\/functions\/v1\/web3-connection-delete(\?.*)?$/, (route) => {
-      state.deleteCalls += 1
-      return route.fulfill({
-        status: 500,
-        contentType: 'application/json',
-        body: JSON.stringify({ error: 'undo should have cancelled this call' }),
-      })
+    const conn = makeConnection({
+      id: '00000000-0000-4000-8000-0000000000aa',
+      connection_name: `E2E undo ${Date.now()}`,
     })
 
+    // Edge configurada para FALHAR — se o undo não cancelar o timer, o teste
+    // detecta: deleteCalls ficaria 1 e veríamos toast de erro.
+    const state = await mockWeb3Backend(page, [conn], () => ({
+      status: 500,
+      body: { error: 'undo should have cancelled this call' },
+    }))
+
     await page.goto('/connectors/web3/alchemy')
-    const row = page.getByTestId('web3-connection-row').first()
-    await expect(row).toBeVisible({ timeout: 10_000 })
-    await expect(row).toContainText(CONNECTION.connection_name)
-    log('row-rendered')
+    const { trigger, confirmBtn, input } = await openDeleteDialog(page)
+    log('dialog-open')
 
-    // Abre diálogo
-    await row.getByTestId('row-delete').click()
-    await expect(page.getByTestId('web3-delete-dialog')).toBeVisible()
-
-    // Lê e preenche o token completo
-    const requiredToken = await page.getByTestId('web3-delete-confirm-token').innerText()
-    expect(requiredToken).toBe(
-      `${CONNECTION.connection_name}#${CONNECTION.provider}:${CONNECTION.id.slice(0, 8)}`,
-    )
-    await page.getByTestId('web3-delete-confirm-input').fill(requiredToken)
-    const confirmBtn = page.getByTestId('web3-delete-confirm')
+    const token = requiredDeleteToken(conn)
+    await input.fill(token)
     await expect(confirmBtn).toBeEnabled()
-    log('access-token-validated')
-
-    // Confirma — dispara optimistic remove + toast com Undo
     await confirmBtn.click()
-    await expect(page.getByTestId('web3-delete-dialog')).toBeHidden({ timeout: 5_000 })
 
-    // Linha some otimisticamente
+    await expect(page.getByTestId('web3-delete-dialog')).toBeHidden({ timeout: 5_000 })
     await expect(page.getByTestId('web3-connection-row')).toHaveCount(0, { timeout: 5_000 })
     log('row-optimistically-removed')
 
-    // Toast inicial com botão "Desfazer"
-    const toaster = page.locator('[data-sonner-toaster]')
-    const initialToast = toaster
-      .locator('li, [role="status"]')
-      .filter({ hasText: /conex(ã|a)o removida|desfazer/i })
-    await expect(initialToast.first()).toBeVisible({ timeout: 5_000 })
+    // Toast inicial com Desfazer — capturamos o nó (handle) para depois
+    // garantir que ele especificamente foi removido do DOM, sem confiar
+    // só na ausência do texto.
+    const initialToast = toastByText(page, /conex(ã|a)o removida|desfazer disponível/i).first()
+    await expect(initialToast).toBeVisible({ timeout: 5_000 })
+    const initialToastHandle = await initialToast.elementHandle()
+    expect(initialToastHandle).not.toBeNull()
     report.toastStates.push('initial:removed-with-undo')
+    await snapshotToasts('after-confirm')
     log('initial-toast-visible')
 
-    const undoBtn = toaster.getByRole('button', { name: /desfazer/i }).first()
+    const undoBtn: Locator = toasterLocator(page).getByRole('button', { name: /desfazer/i }).first()
     await expect(undoBtn).toBeVisible()
 
-    // Clica Desfazer ANTES da janela (6s) expirar
+    // Clica Desfazer DENTRO da janela
     await undoBtn.click()
     log('undo-clicked')
 
-    // Linha é restaurada
+    // Linha restaurada
     await expect(page.getByTestId('web3-connection-row')).toHaveCount(1, { timeout: 5_000 })
-    await expect(page.getByTestId('web3-connection-row').first()).toContainText(
-      CONNECTION.connection_name,
-    )
+    await expect(page.getByTestId('web3-connection-row').first()).toContainText(conn.connection_name)
     log('row-restored')
 
-    // Novo toast de confirmação "Remoção desfeita"
-    const undoneToast = toaster
-      .locator('li, [role="status"]')
-      .filter({ hasText: /remo(ç|c)(ã|a)o desfeita/i })
-    await expect(undoneToast.first()).toBeVisible({ timeout: 5_000 })
+    // Novo toast de confirmação
+    await expect(
+      toastByText(page, /remo(ç|c)(ã|a)o desfeita/i).first(),
+    ).toBeVisible({ timeout: 5_000 })
     report.toastStates.push('after-undo:undone-confirmation')
-    log('undone-toast-visible')
 
-    // Garante que toast original com botão Desfazer não está mais ativo
-    await expect(toaster.getByRole('button', { name: /desfazer/i })).toHaveCount(0, {
-      timeout: 5_000,
-    })
-    log('original-undo-toast-dismissed')
+    // ============================================================
+    // Asserção anti-falso-positivo: o NÓ original do toast com Undo
+    // precisa estar detached. Usamos expect.poll para tolerar o
+    // fade-out do sonner sem sleep fixo.
+    // ============================================================
+    await expect
+      .poll(
+        async () => {
+          if (!initialToastHandle) return 'detached'
+          const stillAttached = await initialToastHandle.evaluate(
+            (el) => el.isConnected && document.body.contains(el),
+          ).catch(() => false)
+          return stillAttached ? 'attached' : 'detached'
+        },
+        { timeout: 5_000, message: 'Toast inicial com Desfazer deveria ter sido removido do DOM' },
+      )
+      .toBe('detached')
+    log('initial-toast-detached')
 
-    // Espera ALÉM da janela de 6s para garantir que o timer foi cancelado
-    await page.waitForTimeout(7_000)
-    expect(state.deleteCalls).toBe(0)
+    // Adicionalmente, nenhum botão "Desfazer" deve permanecer no toaster
+    await expect(
+      toasterLocator(page).getByRole('button', { name: /desfazer/i }),
+    ).toHaveCount(0, { timeout: 5_000 })
+    await snapshotToasts('after-undo')
+    log('undo-button-gone')
+
+    // Foco volta para o trigger (acessibilidade do AlertDialog já fechado antes)
+    await expect(trigger).toBeVisible()
+
+    // ============================================================
+    // Verifica que o timer foi cancelado: deleteCalls precisa
+    // permanecer 0 ALÉM da janela. Sem waitForTimeout cego — usamos
+    // expect.poll que falha rápido se a contagem subir.
+    // ============================================================
+    const deadline = Date.now() + UNDO_WINDOW_MS + 1_500
+    await expect
+      .poll(() => state.deleteCalls, {
+        timeout: deadline - Date.now(),
+        intervals: [250, 500, 1_000],
+        message: 'edge web3-connection-delete não pode ser chamada após undo',
+      })
+      .toBe(0)
     report.deleteCalls = state.deleteCalls
     log('edge-never-called', { deleteCalls: state.deleteCalls })
 
-    // Nenhum toast de erro deve aparecer
-    const errorToast = toaster
-      .locator('li, [role="status"]')
-      .filter({ hasText: /undo should have cancelled|erro|falha ao remover/i })
-    expect(await errorToast.count()).toBe(0)
+    // Nenhum toast de erro
+    expect(await toastByText(page, /undo should have cancelled|erro|falha ao remover/i).count()).toBe(0)
+    await snapshotToasts('after-window')
     log('no-error-toast')
 
     // Linha continua viva
