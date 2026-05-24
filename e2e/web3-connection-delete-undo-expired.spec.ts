@@ -61,10 +61,10 @@ test.describe('Web3 connector — undo expira e commit acontece', () => {
     await expect(toastByText(page, /desfazer/i).first()).toBeVisible({ timeout: 3_000 })
     log('undo-toast-visible')
 
-    // Não clica — espera janela expirar
-    await page.waitForTimeout(UNDO_WINDOW_MS + 1_000)
+    // Não clica — espera commit determinístico via polling de deleteCalls
+    const { waitForUndoCommit } = await import('./helpers/web3Connector')
+    await waitForUndoCommit(page, state)
 
-    // Commit aconteceu
     expect(state.deleteCalls).toBe(1)
     report.deleteCalls = state.deleteCalls
     log('committed-after-window')
