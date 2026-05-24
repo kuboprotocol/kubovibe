@@ -8,6 +8,7 @@ import {
   openDeleteDialog,
   requiredDeleteToken,
   toastByText,
+  waitForUndoCommit,
   UNDO_WINDOW_MS,
 } from './helpers/web3Connector'
 
