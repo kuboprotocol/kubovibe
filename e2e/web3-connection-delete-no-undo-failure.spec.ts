@@ -72,8 +72,9 @@ test.describe('Web3 connector — falha pós-janela sem undo', () => {
     await expect(toaster.getByRole('button', { name: /desfazer/i }).first()).toBeVisible({ timeout: 3_000 })
     log('undo-toast-visible')
 
-    // Usuário NÃO clica em Desfazer — espera além da janela
-    await page.waitForTimeout(UNDO_WINDOW_MS + 1_500)
+    // Usuário NÃO clica em Desfazer — polling determinístico até commit
+    const { waitForUndoCommit } = await import('./helpers/web3Connector')
+    await waitForUndoCommit(page, state)
 
     // Edge chamada exatamente 1x (HTTP 500)
     expect(state.deleteCalls).toBe(1)
