@@ -8,6 +8,7 @@ import {
   openDeleteDialog,
   requiredDeleteToken,
   toastByText,
+  waitForUndoCommit,
   UNDO_WINDOW_MS,
 } from './helpers/web3Connector'
 
@@ -75,15 +76,13 @@ test.describe('Web3 connector — delete confirmation guard (happy path)', () =>
     await expect(page.getByTestId('web3-connection-row')).toHaveCount(0, { timeout: 5_000 })
     log('row-optimistically-removed')
 
-    // Edge function só é chamada após janela de undo
-    await page.waitForFunction(
-      () => !!document.querySelector('[data-sonner-toaster]'),
-      undefined,
-      { timeout: 2_000 },
-    ).catch(() => {/* toaster pode ter sumido */})
-
-    await page.waitForTimeout(UNDO_WINDOW_MS + 500)
+    // Edge function só é chamada após a janela de undo — polling determinístico
+    await waitForUndoCommit(page, state)
     expect(state.deleteCalls).toBe(1)
+    // Sem toast de erro
+    expect(await toastByText(page, /erro|falha|failed/i).count()).toBe(0)
+    report.deleteCalls = state.deleteCalls
+    log('delete-committed', { deleteCalls: state.deleteCalls })
     // Sem toast de erro
     expect(await toastByText(page, /erro|falha|failed/i).count()).toBe(0)
     report.deleteCalls = state.deleteCalls
