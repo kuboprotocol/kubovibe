@@ -77,7 +77,6 @@ test.describe('Web3 connector — delete confirmation guard (happy path)', () =>
     log('row-optimistically-removed')
 
     // Edge function só é chamada após a janela de undo — polling determinístico
-    const { waitForUndoCommit } = await import('./helpers/web3Connector')
     await waitForUndoCommit(page, state)
     expect(state.deleteCalls).toBe(1)
     // Sem toast de erro
