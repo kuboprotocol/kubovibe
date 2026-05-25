@@ -79,14 +79,22 @@ test.describe('Web3 connector — delete confirmation guard (happy path)', () =>
     // Edge function só é chamada após a janela de undo — polling determinístico
     await waitForUndoCommit(page, state)
     expect(state.deleteCalls).toBe(1)
+
+    // Payload contract: exatamente { id }, sem campos extras nem chamadas duplicadas
+    expect(state.deletePayloads).toHaveLength(1)
+    const payload = state.deletePayloads[0] as Record<string, unknown>
+    expect(payload).toEqual({ id: conn.id })
+    expect(Object.keys(payload).sort()).toEqual(['id'])
+    log('payload-contract-ok', { payload })
+
+    // Garante que NENHUMA chamada extra ocorre após o commit (debounce/retry fantasma)
+    await page.waitForTimeout(1_500)
+    expect(state.deleteCalls).toBe(1)
+
     // Sem toast de erro
     expect(await toastByText(page, /erro|falha|failed/i).count()).toBe(0)
     report.deleteCalls = state.deleteCalls
-    log('delete-committed', { deleteCalls: state.deleteCalls })
-    // Sem toast de erro
-    expect(await toastByText(page, /erro|falha|failed/i).count()).toBe(0)
-    report.deleteCalls = state.deleteCalls
-    log('delete-committed', { deleteCalls: state.deleteCalls })
+    log('delete-committed', { deleteCalls: state.deleteCalls, payloads: state.deletePayloads })
 
     report.endedAt = new Date().toISOString()
     report.success = true
