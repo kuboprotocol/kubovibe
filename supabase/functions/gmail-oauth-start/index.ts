@@ -23,12 +23,12 @@ Deno.serve(async (req) => {
     const clientId = Deno.env.get('GMAIL_OAUTH_CLIENT_ID')
     if (!clientId) return new Response(JSON.stringify({ error: 'GMAIL_OAUTH_CLIENT_ID not configured' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
-    const body = await req.json().catch(() => ({})) as { returnUrl?: string }
+    const body = await req.json().catch(() => ({})) as { returnUrl?: string; origin?: string }
     const returnUrl = body.returnUrl || '/connectors/gmail'
+    const origin = body.origin || 'https://kubovibe.dev'
 
     const redirectUri = `${Deno.env.get('SUPABASE_URL')}/functions/v1/gmail-oauth-callback`
-    // state encodes user_id + returnUrl (HMAC-signed seria mais robusto; user_id é validado depois via DB)
-    const state = btoa(JSON.stringify({ uid: user.id, ret: returnUrl, n: crypto.randomUUID() }))
+    const state = btoa(JSON.stringify({ uid: user.id, ret: returnUrl, origin, n: crypto.randomUUID() }))
 
     const params = new URLSearchParams({
       client_id: clientId,
