@@ -74,7 +74,7 @@ export default function ConnectorGmailPage() {
 
   const handleConnect = async () => {
     const { data, error } = await supabase.functions.invoke('gmail-oauth-start', {
-      body: { returnUrl: '/connectors/gmail' },
+      body: { returnUrl: '/connectors/gmail', origin: window.location.origin },
     })
     if (error || !data?.url) { toast.error('Não foi possível iniciar OAuth'); return }
     window.location.href = data.url as string

@@ -15,11 +15,14 @@ Deno.serve(async (req) => {
   const stateRaw = url.searchParams.get('state')
   const errorParam = url.searchParams.get('error')
 
-  if (errorParam) return redirect(`${APP_ORIGIN}/connectors/gmail?error=${encodeURIComponent(errorParam)}`)
-  if (!code || !stateRaw) return redirect(`${APP_ORIGIN}/connectors/gmail?error=missing_code`)
+  if (errorParam) return redirect(`${DEFAULT_ORIGIN}/connectors/gmail?error=${encodeURIComponent(errorParam)}`)
+  if (!code || !stateRaw) return redirect(`${DEFAULT_ORIGIN}/connectors/gmail?error=missing_code`)
 
-  let state: { uid: string; ret: string }
-  try { state = JSON.parse(atob(stateRaw)) } catch { return redirect(`${APP_ORIGIN}/connectors/gmail?error=bad_state`) }
+  let state: { uid: string; ret: string; origin?: string }
+  try { state = JSON.parse(atob(stateRaw)) } catch { return redirect(`${DEFAULT_ORIGIN}/connectors/gmail?error=bad_state`) }
+
+  const origin = state.origin || DEFAULT_ORIGIN
+  const ret = state.ret || '/connectors/gmail'
 
   try {
     const clientId = Deno.env.get('GMAIL_OAUTH_CLIENT_ID')!
@@ -38,15 +41,14 @@ Deno.serve(async (req) => {
       access_token?: string; refresh_token?: string; expires_in?: number; scope?: string; error?: string; error_description?: string
     }
     if (!tokenRes.ok || !tokens.access_token || !tokens.refresh_token) {
-      return redirect(`${APP_ORIGIN}${state.ret || '/connectors/gmail'}?error=${encodeURIComponent(tokens.error_description || tokens.error || 'token_exchange_failed')}`)
+      return redirect(`${origin}${ret}?error=${encodeURIComponent(tokens.error_description || tokens.error || 'token_exchange_failed')}`)
     }
 
-    // Busca perfil
     const profRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
     })
     const profile = await profRes.json() as { email?: string; name?: string; picture?: string }
-    if (!profile.email) return redirect(`${APP_ORIGIN}${state.ret}?error=no_email`)
+    if (!profile.email) return redirect(`${origin}${ret}?error=no_email`)
 
     const enc = await encryptSecret(tokens.refresh_token)
     const expiresAt = new Date(Date.now() + (tokens.expires_in ?? 3600) * 1000).toISOString()
@@ -66,7 +68,7 @@ Deno.serve(async (req) => {
       last_synced_at: new Date().toISOString(),
     }, { onConflict: 'user_id,email' })
 
-    if (upErr) return redirect(`${APP_ORIGIN}${state.ret}?error=${encodeURIComponent(upErr.message)}`)
+    if (upErr) return redirect(`${origin}${ret}?error=${encodeURIComponent(upErr.message)}`)
 
     await admin.from('connector_activity_logs').insert({
       user_id: state.uid,
@@ -77,8 +79,8 @@ Deno.serve(async (req) => {
       metadata: { email: profile.email },
     })
 
-    return redirect(`${APP_ORIGIN}${state.ret}?gmail=connected&email=${encodeURIComponent(profile.email)}`)
+    return redirect(`${origin}${ret}?gmail=connected&email=${encodeURIComponent(profile.email)}`)
   } catch (e) {
-    return redirect(`${APP_ORIGIN}${state.ret || '/connectors/gmail'}?error=${encodeURIComponent((e as Error).message)}`)
+    return redirect(`${origin}${ret}?error=${encodeURIComponent((e as Error).message)}`)
   }
 })
