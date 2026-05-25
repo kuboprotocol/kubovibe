@@ -456,6 +456,57 @@ export type Database = {
         }
         Relationships: []
       }
+      gmail_accounts: {
+        Row: {
+          access_token_cache: string | null
+          access_token_expires_at: string | null
+          avatar_url: string | null
+          created_at: string
+          display_name: string | null
+          email: string
+          id: string
+          last_synced_at: string | null
+          refresh_token_ciphertext: string
+          refresh_token_iv: string
+          refresh_token_tag: string
+          scope: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token_cache?: string | null
+          access_token_expires_at?: string | null
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          email: string
+          id?: string
+          last_synced_at?: string | null
+          refresh_token_ciphertext: string
+          refresh_token_iv: string
+          refresh_token_tag: string
+          scope?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token_cache?: string | null
+          access_token_expires_at?: string | null
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          email?: string
+          id?: string
+          last_synced_at?: string | null
+          refresh_token_ciphertext?: string
+          refresh_token_iv?: string
+          refresh_token_tag?: string
+          scope?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       orchestration_plans: {
         Row: {
           capabilities: string[]
