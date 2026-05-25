@@ -2,7 +2,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 import { encryptSecret } from '../_shared/gmailCrypto.ts'
 
-const APP_ORIGIN = Deno.env.get('APP_ORIGIN') || 'https://kubovibe.dev'
+const DEFAULT_ORIGIN = Deno.env.get('APP_ORIGIN') || 'https://kubovibe.dev'
 
 function redirect(to: string) {
   return new Response(null, { status: 302, headers: { ...corsHeaders, Location: to } })
