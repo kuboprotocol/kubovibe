@@ -33,6 +33,7 @@ import UnsubscribePage from "./pages/UnsubscribePage";
 import EmailDashboardPage from "./pages/EmailDashboardPage";
 import PlanPage from "./pages/PlanPage";
 import SharedAuditPage from "./pages/SharedAuditPage";
+import GamePage from "./pages/GamePage";
 
 const queryClient = new QueryClient();
 
@@ -83,6 +84,7 @@ const App = () => (
             <Route path="/app/:projectId" element={<PublicAppPage />} />
             <Route path="/app/:projectId/:slug" element={<PublicAppPage />} />
             <Route path="/unsubscribe" element={<UnsubscribePage />} />
+            <Route path="/game" element={<ProtectedRoute><GamePage /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
