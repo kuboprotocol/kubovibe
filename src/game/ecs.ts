@@ -34,6 +34,10 @@ export class World {
     return this.components.get(type)?.get(id) as T | undefined;
   }
 
+  removeComponent(id: EntityId, type: string): void {
+    this.components.get(type)?.delete(id);
+  }
+
   query(types: string[]): EntityId[] {
     if (types.length === 0) return [...this.entities];
     const first = this.components.get(types[0]);
