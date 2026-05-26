@@ -98,6 +98,14 @@ export default {
           from: { backgroundPosition: "200% 0" },
           to: { backgroundPosition: "-200% 0" },
         },
+        "neon-pulse": {
+          "0%, 100%": { opacity: "0.6", filter: "blur(0px)" },
+          "50%": { opacity: "1", filter: "blur(2px)" },
+        },
+        "aurora-shift": {
+          "0%, 100%": { transform: "translate3d(0,0,0) scale(1)" },
+          "50%": { transform: "translate3d(2%, -1%, 0) scale(1.05)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -106,6 +114,8 @@ export default {
         "scroll-left": "scroll-left 40s linear infinite",
         "float": "float 6s ease-in-out infinite",
         "shimmer": "shimmer 8s ease-in-out infinite",
+        "neon-pulse": "neon-pulse 3.2s ease-in-out infinite",
+        "aurora-shift": "aurora-shift 14s ease-in-out infinite",
       },
     },
   },
