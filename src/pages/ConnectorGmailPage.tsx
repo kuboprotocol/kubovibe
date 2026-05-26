@@ -183,7 +183,7 @@ export default function ConnectorGmailPage() {
     toast.success('Email enviado')
     setComposeOpen(false)
     setComposeData({ to: '', subject: '', body: '' })
-    fetchMessages(activeId)
+    fetchMessages(activeId, { pageToken: currentToken, filters: appliedFilters })
   }
 
   const active = accounts.find(a => a.id === activeId)
