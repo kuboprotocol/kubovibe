@@ -46,6 +46,12 @@
     --sidebar-accent-foreground: 43 80% 65%;
     --sidebar-border: 0 0% 16%;
     --sidebar-ring: 43 80% 55%;
+
+    /* Neon accents (Premium Dark UI layer — Skill Kubo VibeDev) */
+    --neon-purple: 263 85% 66%;       /* #8B5CF6 */
+    --neon-blue: 199 89% 60%;         /* #38BDF8 */
+    --neon-cyan: 187 92% 55%;
+    --neon-magenta: 292 84% 61%;
   }
 }
 
