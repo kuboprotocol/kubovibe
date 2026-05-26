@@ -101,6 +101,14 @@ export default function GamePage() {
         npc.memory.push({ role: 'user', content: text }, { role: 'assistant', content: reply });
         if (npc.memory.length > 12) npc.memory.splice(0, npc.memory.length - 12);
       }
+
+      // Execute the NPC action against the ECS (move/trade/attack/emote)
+      if (data?.action && worldRef.current) {
+        const evt = executeNPCAction(worldRef.current, selectedNPC.entity, data.action);
+        setActionLog(log => [evt, ...log].slice(0, 6));
+        if (evt.kind === 'rejected') toast.warning(evt.message);
+        else toast.success(evt.message);
+      }
     } catch (e) {
       toast.error((e as Error).message);
     } finally { setLoading(false); }
