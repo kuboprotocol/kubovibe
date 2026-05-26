@@ -115,16 +115,18 @@ async function healOne(policy: any, conn: any, apiKey: string, trigger: string) 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   try {
-    const url = new URL(req.url)
-    const cronSecret = req.headers.get('x-cron-secret') || url.searchParams.get('cron_secret')
-    const isCron = !!cronSecret && cronSecret === Deno.env.get('RLS_TEST_SECRET') // reuse internal secret
+    // Auth mode:
+    //  - If caller supplies a user JWT → run only for that user (manual trigger from dashboard).
+    //  - Otherwise → assume internal cron invocation; loop across every enabled policy.
     let scopeUserId: string | null = null
     let trigger = 'cron'
-
-    if (!isCron) {
-      const { user } = await authUser(req)
-      scopeUserId = user.id
-      trigger = 'manual'
+    const authHeader = req.headers.get('Authorization')
+    if (authHeader && !authHeader.includes(Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '__none__')) {
+      try {
+        const { user } = await authUser(req)
+        scopeUserId = user.id
+        trigger = 'manual'
+      } catch (_) { /* fall back to cron mode */ }
     }
 
     // load all enabled policies (optionally scoped to one user)
