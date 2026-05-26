@@ -224,6 +224,7 @@ export const connectors: ConnectorConfig[] = [
       { title: 'Crie uma API Key', description: 'Copie o token rnd_…' },
       { title: 'Cole no painel', description: 'A KUBO valida e cifra antes de persistir.' },
     ],
+  },
   {
     name: 'Discord',
     slug: 'discord',
