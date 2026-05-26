@@ -6,9 +6,10 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
-import { World, MovementSystem, NPCTag, Transform, EntityId } from '@/game/ecs';
+import { World, MovementSystem, EmoteSystem, NPCTag, Transform, Health, EntityId } from '@/game/ecs';
 import { generateWorld } from '@/game/procedural';
 import { GameRenderer } from '@/game/renderer';
+import { executeNPCAction, type NPCActionEvent } from '@/game/actions';
 import { toast } from 'sonner';
 import WGSLSandbox from '@/components/WGSLSandbox';
 
@@ -23,11 +24,14 @@ export default function GamePage() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [seed, setSeed] = useState(42);
+  const [actionLog, setActionLog] = useState<NPCActionEvent[]>([]);
+  const [playerHP, setPlayerHP] = useState<{ hp: number; max: number } | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
     const world = new World();
     world.registerSystem(MovementSystem);
+    world.registerSystem(EmoteSystem);
     generateWorld(world, seed);
     const renderer = new GameRenderer(containerRef.current);
     worldRef.current = world;
@@ -40,6 +44,12 @@ export default function GamePage() {
         const t = world.getComponent<Transform>(id, 'transform')!;
         if (Math.abs(t.x) > 12) t.x = -t.x * 0.9;
         if (Math.abs(t.z) > 12) t.z = -t.z * 0.9;
+      }
+      // Sync player HP HUD
+      const players = world.query(['player', 'health']);
+      if (players[0]) {
+        const h = world.getComponent<Health>(players[0], 'health')!;
+        setPlayerHP(prev => prev?.hp === h.hp ? prev : { hp: h.hp, max: h.max });
       }
       renderer.syncEntities(world);
     });
@@ -91,6 +101,14 @@ export default function GamePage() {
         npc.memory.push({ role: 'user', content: text }, { role: 'assistant', content: reply });
         if (npc.memory.length > 12) npc.memory.splice(0, npc.memory.length - 12);
       }
+
+      // Execute the NPC action against the ECS (move/trade/attack/emote)
+      if (data?.action && worldRef.current) {
+        const evt = executeNPCAction(worldRef.current, selectedNPC.entity, data.action);
+        setActionLog(log => [evt, ...log].slice(0, 6));
+        if (evt.kind === 'rejected') toast.warning(evt.message);
+        else toast.success(evt.message);
+      }
     } catch (e) {
       toast.error((e as Error).message);
     } finally { setLoading(false); }
@@ -127,6 +145,34 @@ export default function GamePage() {
             <span>Clique em um NPC dourado para conversar</span>
             <span>Procedural · ECS · Three.js · AI NPCs</span>
           </div>
+          {playerHP && (
+            <div className="absolute top-3 right-3 glass-premium px-3 py-2 rounded-lg text-xs">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-muted-foreground">PLAYER HP</span>
+                <span className="font-mono">{playerHP.hp}/{playerHP.max}</span>
+              </div>
+              <div className="w-32 h-1.5 bg-background/60 rounded overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-primary to-destructive transition-all"
+                  style={{ width: `${(playerHP.hp / playerHP.max) * 100}%` }}
+                />
+              </div>
+            </div>
+          )}
+          {actionLog.length > 0 && (
+            <div className="absolute bottom-3 left-3 right-3 glass-premium px-3 py-2 rounded-lg text-xs space-y-1 max-h-32 overflow-auto">
+              <div className="text-[10px] tracking-widest text-muted-foreground">ACTION LOG</div>
+              {actionLog.map((e, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <Badge
+                    variant={e.kind === 'rejected' ? 'destructive' : 'secondary'}
+                    className="text-[10px] py-0 h-4"
+                  >{e.kind}</Badge>
+                  <span className="truncate">{e.message}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </Card>
 
         <Card className="glass-premium p-4 flex flex-col h-[calc(100vh-160px)] min-h-[480px]">

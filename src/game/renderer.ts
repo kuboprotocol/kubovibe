@@ -1,6 +1,6 @@
 // Three.js bridge — renders the ECS world. Premium dark + ouro/neon aesthetic.
 import * as THREE from 'three';
-import { World, Transform, Renderable, EntityId } from './ecs';
+import { World, Transform, Renderable, EntityId, Emote } from './ecs';
 
 export class GameRenderer {
   scene: THREE.Scene;
@@ -80,6 +80,24 @@ export class GameRenderer {
       }
       mesh.position.set(t.x, t.y, t.z);
       mesh.rotation.y = t.rot;
+
+      // Emote animation: scale pulse + small hop. Driven by ECS Emote component (TTL ticked by EmoteSystem).
+      const emote = world.getComponent<Emote>(id, 'emote');
+      if (emote) {
+        const p = emote.elapsed / emote.ttl; // 0..1
+        const pulse = 1 + Math.sin(p * Math.PI) * 0.25;
+        mesh.scale.setScalar(r.scale * pulse);
+        if (emote.kind === 'cheer' || emote.kind === 'wave') {
+          mesh.position.y = t.y + Math.sin(p * Math.PI * 2) * 0.25;
+        } else if (emote.kind === 'attack') {
+          mesh.rotation.y += Math.sin(p * Math.PI * 4) * 0.4;
+        } else if (emote.kind === 'bow') {
+          mesh.rotation.x = Math.sin(p * Math.PI) * 0.6;
+        }
+      } else {
+        mesh.scale.setScalar(r.scale);
+        mesh.rotation.x = 0;
+      }
     }
     // Cleanup removed entities
     for (const [id, mesh] of this.meshes) {
