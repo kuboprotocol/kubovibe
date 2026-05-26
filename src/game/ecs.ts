@@ -95,7 +95,7 @@ export const EmoteSystem: System = {
     for (const id of world.query(['emote'])) {
       const e = world.getComponent<Emote>(id, 'emote')!;
       e.elapsed += dt;
-      if (e.elapsed >= e.ttl) world['components'].get('emote')?.delete(id);
+      if (e.elapsed >= e.ttl) world.removeComponent(id, 'emote');
     }
   },
 };
