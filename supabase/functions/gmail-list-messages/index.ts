@@ -61,9 +61,9 @@ Deno.serve(async (req) => {
       const r = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`, {
         headers: { Authorization: `Bearer ${token}` },
       })
-      const j = await r.json() as { id: string; snippet?: string; payload?: { headers?: { name: string; value: string }[] } }
+      const j = await r.json() as { id: string; threadId?: string; snippet?: string; labelIds?: string[]; payload?: { headers?: { name: string; value: string }[] } }
       const h = (n: string) => j.payload?.headers?.find(x => x.name.toLowerCase() === n.toLowerCase())?.value ?? ''
-      return { id: j.id, snippet: j.snippet ?? '', from: h('From'), subject: h('Subject'), date: h('Date') }
+      return { id: j.id, threadId: j.threadId, snippet: j.snippet ?? '', from: h('From'), subject: h('Subject'), date: h('Date'), labelIds: j.labelIds ?? [] }
     }))
 
     return new Response(JSON.stringify({
