@@ -59,21 +59,13 @@ export default function ConnectorSlackPage() {
     setSelected(ch)
     setLoadingMessages(true)
     try {
-      const { data, error } = await supabase.functions.invoke('slack-list-messages', {
-        body: undefined,
-        method: 'GET' as any,
-      } as any).catch(() => ({ data: null, error: { message: 'invoke fail' } }))
-      // fallback via direct fetch with query string (invoke does not pass query)
-      if (!data) {
-        const sess = await supabase.auth.getSession()
-        const token = sess.data.session?.access_token
-        const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/slack-list-messages?channel=${encodeURIComponent(ch.id)}&limit=50`
-        const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-        const json = await res.json()
-        if (!res.ok) throw new Error(json.error ?? 'erro')
-        setMessages(json.messages ?? [])
-      } else if (error) throw error
-      else setMessages((data as any)?.messages ?? [])
+      const sess = await supabase.auth.getSession()
+      const token = sess.data.session?.access_token
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/slack-list-messages?channel=${encodeURIComponent(ch.id)}&limit=50`
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'erro')
+      setMessages(json.messages ?? [])
     } catch (e: any) {
       toast.error('Falha ao carregar mensagens', { description: e.message })
       setMessages([])
