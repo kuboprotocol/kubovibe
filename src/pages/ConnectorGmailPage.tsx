@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
-import { ArrowLeft, Mail, Plus, RefreshCw, Send, Trash2, Inbox, Search, ChevronLeft, ChevronRight, X, Reply, Forward, MessageSquare, MailOpen } from 'lucide-react'
+import { ArrowLeft, Mail, Plus, RefreshCw, Send, Trash2, Inbox, Search, ChevronLeft, ChevronRight, X, Reply, Forward, MessageSquare, MailOpen, Download, ChevronDown, ChevronUp } from 'lucide-react'
 
 interface GmailAccount {
   id: string
@@ -76,9 +76,12 @@ export default function ConnectorGmailPage() {
   const [threadLoading, setThreadLoading] = useState(false)
   const [threadId, setThreadId] = useState<string | null>(null)
   const [threadMessages, setThreadMessages] = useState<ThreadMessage[]>([])
+  const [focusedMsgId, setFocusedMsgId] = useState<string | null>(null)
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [replyMode, setReplyMode] = useState<'reply' | 'forward' | null>(null)
   const [replyDraft, setReplyDraft] = useState({ to: '', subject: '', body: '' })
   const [replying, setReplying] = useState(false)
+
 
   useEffect(() => {
     const err = params.get('error')
@@ -220,6 +223,7 @@ export default function ConnectorGmailPage() {
     if (!activeId) return
     const tid = msg.threadId || msg.id
     setThreadId(tid); setThreadOpen(true); setThreadLoading(true); setThreadMessages([])
+    setFocusedMsgId(msg.id); setExpandedIds(new Set([msg.id]))
     setReplyMode(null); setReplyDraft({ to: '', subject: '', body: '' })
     const { data, error } = await supabase.functions.invoke('gmail-get-thread', {
       body: { accountId: activeId, threadId: tid },
@@ -232,7 +236,59 @@ export default function ConnectorGmailPage() {
     setThreadLoading(false)
   }
 
-  const lastMsg = useMemo(() => threadMessages[threadMessages.length - 1], [threadMessages])
+  // Ordena thread por data (asc) — antes/depois claros no painel
+  const sortedThread = useMemo(() => {
+    const parse = (s: string) => { const t = Date.parse(s); return Number.isFinite(t) ? t : 0 }
+    return [...threadMessages].sort((a, b) => parse(a.date) - parse(b.date))
+  }, [threadMessages])
+
+  const lastMsg = useMemo(() => sortedThread[sortedThread.length - 1], [sortedThread])
+
+  const toggleExpand = (id: string) => {
+    setExpandedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  }
+
+  const expandAll = () => setExpandedIds(new Set(sortedThread.map(m => m.id)))
+  const collapseAll = () => setExpandedIds(new Set(focusedMsgId ? [focusedMsgId] : []))
+
+  // ----- Exportação -----
+  const downloadBlob = (filename: string, content: string, mime: string) => {
+    const blob = new Blob([content], { type: mime })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
+  const csvEscape = (v: string) => `"${(v ?? '').replace(/"/g, '""')}"`
+
+  const exportInboxCsv = () => {
+    if (messages.length === 0) { toast.error('Nada para exportar'); return }
+    const header = ['date', 'from', 'subject', 'snippet', 'unread', 'id', 'threadId']
+    const rows = messages.map(m => [
+      m.date, m.from, m.subject, m.snippet,
+      (m.labelIds ?? []).includes('UNREAD') ? 'true' : 'false',
+      m.id, m.threadId ?? '',
+    ].map(csvEscape).join(','))
+    downloadBlob(`gmail-inbox-${Date.now()}.csv`, [header.join(','), ...rows].join('\n'), 'text/csv;charset=utf-8')
+    toast.success(`${messages.length} mensagens exportadas`)
+  }
+
+  const exportThread = (fmt: 'json' | 'txt') => {
+    if (sortedThread.length === 0) return
+    const subj = sortedThread[0]?.subject || 'thread'
+    const safe = subj.replace(/[^\w.-]+/g, '_').slice(0, 60) || 'thread'
+    if (fmt === 'json') {
+      downloadBlob(`gmail-${safe}-${Date.now()}.json`,
+        JSON.stringify({ threadId, messages: sortedThread }, null, 2), 'application/json')
+    } else {
+      const txt = sortedThread.map(m => (
+        `From: ${m.from}\nTo: ${m.to}${m.cc ? `\nCc: ${m.cc}` : ''}\nDate: ${m.date}\nSubject: ${m.subject}\n\n${m.bodyText || m.snippet}\n\n${'='.repeat(60)}\n`
+      )).join('\n')
+      downloadBlob(`gmail-${safe}-${Date.now()}.txt`, txt, 'text/plain;charset=utf-8')
+    }
+    toast.success('Conversa exportada')
+  }
+
 
   const startReply = () => {
     if (!lastMsg) return
