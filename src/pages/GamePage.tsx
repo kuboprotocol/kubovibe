@@ -6,9 +6,10 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
-import { World, MovementSystem, NPCTag, Transform, EntityId } from '@/game/ecs';
+import { World, MovementSystem, EmoteSystem, NPCTag, Transform, Health, EntityId } from '@/game/ecs';
 import { generateWorld } from '@/game/procedural';
 import { GameRenderer } from '@/game/renderer';
+import { executeNPCAction, type NPCActionEvent } from '@/game/actions';
 import { toast } from 'sonner';
 import WGSLSandbox from '@/components/WGSLSandbox';
 
@@ -23,11 +24,14 @@ export default function GamePage() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [seed, setSeed] = useState(42);
+  const [actionLog, setActionLog] = useState<NPCActionEvent[]>([]);
+  const [playerHP, setPlayerHP] = useState<{ hp: number; max: number } | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
     const world = new World();
     world.registerSystem(MovementSystem);
+    world.registerSystem(EmoteSystem);
     generateWorld(world, seed);
     const renderer = new GameRenderer(containerRef.current);
     worldRef.current = world;
@@ -40,6 +44,12 @@ export default function GamePage() {
         const t = world.getComponent<Transform>(id, 'transform')!;
         if (Math.abs(t.x) > 12) t.x = -t.x * 0.9;
         if (Math.abs(t.z) > 12) t.z = -t.z * 0.9;
+      }
+      // Sync player HP HUD
+      const players = world.query(['player', 'health']);
+      if (players[0]) {
+        const h = world.getComponent<Health>(players[0], 'health')!;
+        setPlayerHP(prev => prev?.hp === h.hp ? prev : { hp: h.hp, max: h.max });
       }
       renderer.syncEntities(world);
     });
