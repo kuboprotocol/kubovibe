@@ -91,17 +91,79 @@ export default function ConnectorGmailPage() {
     window.location.href = data.url as string
   }
 
-  const fetchMessages = async (accountId: string) => {
+  const fetchMessages = async (
+    accountId: string,
+    opts: { pageToken?: string | null; filters?: { q: string; from: string; subject: string }; resetPagination?: boolean } = {},
+  ) => {
+    const filters = opts.filters ?? appliedFilters
     setLoadingMsgs(true); setMessages([])
     const { data, error } = await supabase.functions.invoke('gmail-list-messages', {
-      body: { accountId, maxResults: 15 },
+      body: {
+        accountId,
+        maxResults: PAGE_SIZE,
+        q: filters.q || undefined,
+        from: filters.from || undefined,
+        subject: filters.subject || undefined,
+        pageToken: opts.pageToken || undefined,
+      },
     })
-    if (error) toast.error(error.message)
-    else setMessages((data as { messages?: GmailMessage[] })?.messages ?? [])
+    if (error) {
+      toast.error(error.message)
+      setNextToken(null); setResultEstimate(0)
+    } else {
+      const d = data as { messages?: GmailMessage[]; nextPageToken?: string | null; resultSizeEstimate?: number }
+      setMessages(d?.messages ?? [])
+      setNextToken(d?.nextPageToken ?? null)
+      setResultEstimate(d?.resultSizeEstimate ?? 0)
+      if (opts.resetPagination) { setPageTokens([]); setCurrentToken(null) }
+    }
     setLoadingMsgs(false)
   }
 
-  useEffect(() => { if (activeId) fetchMessages(activeId) }, [activeId])
+  useEffect(() => {
+    if (!activeId) return
+    setPageTokens([]); setCurrentToken(null)
+    fetchMessages(activeId, { pageToken: null, resetPagination: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId])
+
+  const applyFilters = () => {
+    if (!activeId) return
+    const next = { q: searchQ.trim(), from: filterFrom.trim(), subject: filterSubject.trim() }
+    setAppliedFilters(next)
+    setPageTokens([]); setCurrentToken(null)
+    fetchMessages(activeId, { pageToken: null, filters: next, resetPagination: true })
+  }
+
+  const clearFilters = () => {
+    setSearchQ(''); setFilterFrom(''); setFilterSubject('')
+    const empty = { q: '', from: '', subject: '' }
+    setAppliedFilters(empty)
+    if (activeId) {
+      setPageTokens([]); setCurrentToken(null)
+      fetchMessages(activeId, { pageToken: null, filters: empty, resetPagination: true })
+    }
+  }
+
+  const goNextPage = () => {
+    if (!activeId || !nextToken) return
+    setPageTokens(prev => [...prev, currentToken ?? ''])
+    setCurrentToken(nextToken)
+    fetchMessages(activeId, { pageToken: nextToken })
+  }
+
+  const goPrevPage = () => {
+    if (!activeId || pageTokens.length === 0) return
+    const prev = [...pageTokens]
+    const target = prev.pop() ?? ''
+    setPageTokens(prev)
+    const token = target || null
+    setCurrentToken(token)
+    fetchMessages(activeId, { pageToken: token })
+  }
+
+  const hasActiveFilters = appliedFilters.q || appliedFilters.from || appliedFilters.subject
+  const pageNumber = pageTokens.length + 1
 
   const handleDisconnect = async (id: string) => {
     if (!confirm('Desconectar esta conta Gmail?')) return
