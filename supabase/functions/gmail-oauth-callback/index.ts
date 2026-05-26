@@ -4,6 +4,12 @@ import { encryptSecret } from '../_shared/gmailCrypto.ts'
 
 const DEFAULT_ORIGIN = Deno.env.get('APP_ORIGIN') || 'https://kubovibe.dev'
 
+const REQUIRED_SCOPES = [
+  'https://www.googleapis.com/auth/gmail.readonly',
+  'https://www.googleapis.com/auth/gmail.send',
+  'https://www.googleapis.com/auth/userinfo.email',
+]
+
 function redirect(to: string) {
   return new Response(null, { status: 302, headers: { ...corsHeaders, Location: to } })
 }
@@ -12,17 +18,31 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   const url = new URL(req.url)
   const code = url.searchParams.get('code')
-  const stateRaw = url.searchParams.get('state')
+  const nonce = url.searchParams.get('state')
   const errorParam = url.searchParams.get('error')
 
+  const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
+
   if (errorParam) return redirect(`${DEFAULT_ORIGIN}/connectors/gmail?error=${encodeURIComponent(errorParam)}`)
-  if (!code || !stateRaw) return redirect(`${DEFAULT_ORIGIN}/connectors/gmail?error=missing_code`)
+  if (!code || !nonce) return redirect(`${DEFAULT_ORIGIN}/connectors/gmail?error=missing_code`)
 
-  let state: { uid: string; ret: string; origin?: string }
-  try { state = JSON.parse(atob(stateRaw)) } catch { return redirect(`${DEFAULT_ORIGIN}/connectors/gmail?error=bad_state`) }
+  // Valida e consome o state nonce (CSRF/replay protection)
+  const { data: stateRow } = await admin
+    .from('gmail_oauth_states')
+    .select('*')
+    .eq('nonce', nonce)
+    .maybeSingle()
 
-  const origin = state.origin || DEFAULT_ORIGIN
-  const ret = state.ret || '/connectors/gmail'
+  if (!stateRow) return redirect(`${DEFAULT_ORIGIN}/connectors/gmail?error=bad_state`)
+  const s = stateRow as { user_id: string; origin: string; return_url: string; expires_at: string; consumed_at: string | null }
+  if (s.consumed_at) return redirect(`${s.origin}${s.return_url}?error=state_replayed`)
+  if (new Date(s.expires_at).getTime() < Date.now()) return redirect(`${s.origin}${s.return_url}?error=state_expired`)
+
+  // Consome imediatamente (one-shot)
+  await admin.from('gmail_oauth_states').update({ consumed_at: new Date().toISOString() }).eq('nonce', nonce)
+
+  const origin = s.origin
+  const ret = s.return_url
 
   try {
     const clientId = Deno.env.get('GMAIL_OAUTH_CLIENT_ID')!
@@ -44,18 +64,25 @@ Deno.serve(async (req) => {
       return redirect(`${origin}${ret}?error=${encodeURIComponent(tokens.error_description || tokens.error || 'token_exchange_failed')}`)
     }
 
+    // Valida que todos os escopos requeridos foram concedidos
+    const granted = (tokens.scope ?? '').split(/\s+/).filter(Boolean)
+    const missing = REQUIRED_SCOPES.filter(s => !granted.includes(s))
+    if (missing.length > 0) {
+      return redirect(`${origin}${ret}?error=${encodeURIComponent('missing_scopes:' + missing.join(','))}`)
+    }
+
     const profRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
     })
-    const profile = await profRes.json() as { email?: string; name?: string; picture?: string }
+    const profile = await profRes.json() as { email?: string; name?: string; picture?: string; verified_email?: boolean }
     if (!profile.email) return redirect(`${origin}${ret}?error=no_email`)
+    if (profile.verified_email === false) return redirect(`${origin}${ret}?error=email_not_verified`)
 
     const enc = await encryptSecret(tokens.refresh_token)
     const expiresAt = new Date(Date.now() + (tokens.expires_in ?? 3600) * 1000).toISOString()
 
-    const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
     const { error: upErr } = await admin.from('gmail_accounts').upsert({
-      user_id: state.uid,
+      user_id: s.user_id,
       email: profile.email,
       display_name: profile.name ?? null,
       avatar_url: profile.picture ?? null,
@@ -71,13 +98,16 @@ Deno.serve(async (req) => {
     if (upErr) return redirect(`${origin}${ret}?error=${encodeURIComponent(upErr.message)}`)
 
     await admin.from('connector_activity_logs').insert({
-      user_id: state.uid,
+      user_id: s.user_id,
       connector_slug: 'gmail',
       event_type: 'gmail_connected',
       message: `Conta ${profile.email} conectada`,
       status: 'success',
-      metadata: { email: profile.email },
+      metadata: { email: profile.email, scopes: granted },
     })
+
+    // Limpa states expirados oportunisticamente
+    await admin.from('gmail_oauth_states').delete().lt('expires_at', new Date(Date.now() - 60_000).toISOString())
 
     return redirect(`${origin}${ret}?gmail=connected&email=${encodeURIComponent(profile.email)}`)
   } catch (e) {
