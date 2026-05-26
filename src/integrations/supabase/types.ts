@@ -573,6 +573,39 @@ export type Database = {
         }
         Relationships: []
       }
+      npc_memories: {
+        Row: {
+          created_at: string
+          id: string
+          memory: Json
+          npc_id: string
+          persona: string | null
+          updated_at: string
+          user_id: string
+          world_seed: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          memory?: Json
+          npc_id: string
+          persona?: string | null
+          updated_at?: string
+          user_id: string
+          world_seed?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          memory?: Json
+          npc_id?: string
+          persona?: string | null
+          updated_at?: string
+          user_id?: string
+          world_seed?: number
+        }
+        Relationships: []
+      }
       orchestration_plans: {
         Row: {
           capabilities: string[]
