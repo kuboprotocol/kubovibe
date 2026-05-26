@@ -10,6 +10,7 @@ import { World, MovementSystem, NPCTag, Transform, EntityId } from '@/game/ecs';
 import { generateWorld } from '@/game/procedural';
 import { GameRenderer } from '@/game/renderer';
 import { toast } from 'sonner';
+import WGSLSandbox from '@/components/WGSLSandbox';
 
 interface DialogueEntry { role: 'user' | 'assistant'; content: string; npcId: string }
 
@@ -169,6 +170,10 @@ export default function GamePage() {
             </div>
           )}
         </Card>
+      </div>
+
+      <div className="container mx-auto px-4 pb-6">
+        <WGSLSandbox />
       </div>
     </div>
   );
