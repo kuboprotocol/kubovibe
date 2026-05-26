@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
-import { ArrowLeft, Mail, Plus, RefreshCw, Send, Trash2, Inbox, Search, ChevronLeft, ChevronRight, X, Reply, Forward, MessageSquare } from 'lucide-react'
+import { ArrowLeft, Mail, Plus, RefreshCw, Send, Trash2, Inbox, Search, ChevronLeft, ChevronRight, X, Reply, Forward, MessageSquare, MailOpen } from 'lucide-react'
 
 interface GmailAccount {
   id: string
@@ -28,6 +28,7 @@ interface GmailMessage {
   subject: string
   snippet: string
   date: string
+  labelIds?: string[]
 }
 
 interface ThreadMessage {
@@ -296,6 +297,33 @@ export default function ConnectorGmailPage() {
     fetchMessages(activeId, { pageToken: currentToken, filters: appliedFilters })
   }
 
+  const [togglingId, setTogglingId] = useState<string | null>(null)
+  const isUnread = (m: GmailMessage) => (m.labelIds ?? []).includes('UNREAD')
+
+  const toggleRead = async (m: GmailMessage, e?: { stopPropagation: () => void }) => {
+    e?.stopPropagation()
+    if (!activeId) return
+    const markAs = isUnread(m) ? 'read' : 'unread'
+    // Optimistic update
+    setMessages(prev => prev.map(x => x.id === m.id
+      ? { ...x, labelIds: markAs === 'read' ? (x.labelIds ?? []).filter(l => l !== 'UNREAD') : Array.from(new Set([...(x.labelIds ?? []), 'UNREAD'])) }
+      : x))
+    setTogglingId(m.id)
+    const { data, error } = await supabase.functions.invoke('gmail-modify-message', {
+      body: { accountId: activeId, messageId: m.id, markAs },
+    })
+    setTogglingId(null)
+    if (error) {
+      toast.error(error.message)
+      // Revert
+      setMessages(prev => prev.map(x => x.id === m.id ? m : x))
+      return
+    }
+    const labels = (data as { labelIds?: string[] })?.labelIds
+    if (labels) setMessages(prev => prev.map(x => x.id === m.id ? { ...x, labelIds: labels } : x))
+    toast.success(markAs === 'read' ? 'Marcado como lida' : 'Marcado como não lida')
+  }
+
   const active = accounts.find(a => a.id === activeId)
 
   return (
@@ -417,23 +445,44 @@ export default function ConnectorGmailPage() {
                   <div className="p-8 text-center text-muted-foreground text-sm">{hasActiveFilters ? 'Nenhum email corresponde aos filtros.' : 'Caixa de entrada vazia.'}</div>
                 ) : (
                   <ul className="divide-y divide-border">
-                    {messages.map(m => (
-                      <li key={m.id}>
-                        <button
-                          type="button"
-                          data-testid="gmail-message-row"
-                          onClick={() => openThread(m)}
-                          className="w-full text-left px-4 py-3 hover:bg-accent/30 transition"
-                        >
-                          <div className="flex items-center justify-between gap-3 mb-1">
-                            <p className="text-sm font-medium truncate flex-1">{m.from || '(sem remetente)'}</p>
-                            <span className="text-xs text-muted-foreground whitespace-nowrap">{m.date ? new Date(m.date).toLocaleString() : ''}</span>
+                    {messages.map(m => {
+                      const unread = isUnread(m)
+                      return (
+                        <li key={m.id} className={unread ? 'bg-[#C9941A]/5' : ''}>
+                          <div className="flex items-stretch">
+                            <button
+                              type="button"
+                              data-testid="gmail-message-row"
+                              onClick={() => openThread(m)}
+                              className="flex-1 text-left px-4 py-3 hover:bg-accent/30 transition min-w-0"
+                            >
+                              <div className="flex items-center justify-between gap-3 mb-1">
+                                <p className={`text-sm truncate flex-1 ${unread ? 'font-bold' : 'font-medium'}`}>
+                                  {unread && <span className="inline-block w-2 h-2 rounded-full bg-[#C9941A] mr-2 align-middle" aria-label="Não lida" />}
+                                  {m.from || '(sem remetente)'}
+                                </p>
+                                <span className="text-xs text-muted-foreground whitespace-nowrap">{m.date ? new Date(m.date).toLocaleString() : ''}</span>
+                              </div>
+                              <p className={`text-sm truncate ${unread ? 'font-semibold' : ''}`}>{m.subject || '(sem assunto)'}</p>
+                              <p className="text-xs text-muted-foreground truncate mt-0.5">{m.snippet}</p>
+                            </button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-auto self-stretch rounded-none px-3 text-muted-foreground hover:text-[#C9941A]"
+                              onClick={(e) => toggleRead(m, e)}
+                              disabled={togglingId === m.id}
+                              data-testid="gmail-toggle-read"
+                              aria-label={unread ? 'Marcar como lida' : 'Marcar como não lida'}
+                              title={unread ? 'Marcar como lida' : 'Marcar como não lida'}
+                            >
+                              {unread ? <MailOpen className="h-4 w-4" /> : <Mail className="h-4 w-4" />}
+                            </Button>
                           </div>
-                          <p className="text-sm truncate">{m.subject || '(sem assunto)'}</p>
-                          <p className="text-xs text-muted-foreground truncate mt-0.5">{m.snippet}</p>
-                        </button>
-                      </li>
-                    ))}
+                        </li>
+                      )
+                    })}
                   </ul>
                 )}
 
