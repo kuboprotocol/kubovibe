@@ -24,6 +24,7 @@ import ConnectorSetupPage from "./pages/ConnectorSetupPage";
 import ConnectorWeb3Page from "./pages/ConnectorWeb3Page";
 import ConnectorWeb3HubPage from "./pages/ConnectorWeb3HubPage";
 import ConnectorGmailPage from "./pages/ConnectorGmailPage";
+import ConnectorSlackPage from "./pages/ConnectorSlackPage";
 import ShortlinksPage from "./pages/ShortlinksPage";
 import LeaderboardPage from "./pages/LeaderboardPage";
 import PublicAppPage from "./pages/PublicAppPage";
@@ -69,6 +70,7 @@ const App = () => (
             <Route path="/connectors/web3" element={<ProtectedRoute><ConnectorWeb3HubPage /></ProtectedRoute>} />
             <Route path="/connectors/web3/:provider" element={<ProtectedRoute><ConnectorWeb3Page /></ProtectedRoute>} />
             <Route path="/connectors/gmail" element={<ProtectedRoute><ConnectorGmailPage /></ProtectedRoute>} />
+            <Route path="/connectors/slack" element={<ProtectedRoute><ConnectorSlackPage /></ProtectedRoute>} />
             <Route path="/connectors/:slug/setup" element={<ProtectedRoute><ConnectorSetupPage /></ProtectedRoute>} />
             <Route path="/connectors/:slug/about" element={<ProtectedRoute><ConnectorAboutPage /></ProtectedRoute>} />
             <Route path="/connectors/:slug" element={<ProtectedRoute><ConnectorDetailPage /></ProtectedRoute>} />
