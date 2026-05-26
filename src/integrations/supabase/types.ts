@@ -726,6 +726,157 @@ export type Database = {
         }
         Relationships: []
       }
+      render_auto_heal_policies: {
+        Row: {
+          connection_id: string
+          created_at: string
+          e2e_run_on_deploy: boolean
+          e2e_webhook_url: string | null
+          enabled: boolean
+          health_url: string | null
+          id: string
+          max_restarts_per_hour: number
+          rollback_on_fail: boolean
+          service_id: string
+          service_name: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          connection_id: string
+          created_at?: string
+          e2e_run_on_deploy?: boolean
+          e2e_webhook_url?: string | null
+          enabled?: boolean
+          health_url?: string | null
+          id?: string
+          max_restarts_per_hour?: number
+          rollback_on_fail?: boolean
+          service_id: string
+          service_name?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          connection_id?: string
+          created_at?: string
+          e2e_run_on_deploy?: boolean
+          e2e_webhook_url?: string | null
+          enabled?: boolean
+          health_url?: string | null
+          id?: string
+          max_restarts_per_hour?: number
+          rollback_on_fail?: boolean
+          service_id?: string
+          service_name?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "render_auto_heal_policies_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "render_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      render_connections: {
+        Row: {
+          api_key_ciphertext: string
+          api_key_hint: string | null
+          api_key_iv: string
+          api_key_tag: string
+          created_at: string
+          id: string
+          last_checked_at: string | null
+          last_error: string | null
+          last_latency_ms: number | null
+          last_status: string
+          name: string
+          updated_at: string
+          user_id: string
+          workspace_id: string | null
+        }
+        Insert: {
+          api_key_ciphertext: string
+          api_key_hint?: string | null
+          api_key_iv: string
+          api_key_tag: string
+          created_at?: string
+          id?: string
+          last_checked_at?: string | null
+          last_error?: string | null
+          last_latency_ms?: number | null
+          last_status?: string
+          name?: string
+          updated_at?: string
+          user_id: string
+          workspace_id?: string | null
+        }
+        Update: {
+          api_key_ciphertext?: string
+          api_key_hint?: string | null
+          api_key_iv?: string
+          api_key_tag?: string
+          created_at?: string
+          id?: string
+          last_checked_at?: string | null
+          last_error?: string | null
+          last_latency_ms?: number | null
+          last_status?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string | null
+        }
+        Relationships: []
+      }
+      render_heal_events: {
+        Row: {
+          action: string
+          connection_id: string | null
+          created_at: string
+          detail: Json
+          id: string
+          service_id: string
+          status: string
+          trigger: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          connection_id?: string | null
+          created_at?: string
+          detail?: Json
+          id?: string
+          service_id: string
+          status: string
+          trigger: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          connection_id?: string | null
+          created_at?: string
+          detail?: Json
+          id?: string
+          service_id?: string
+          status?: string
+          trigger?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "render_heal_events_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "render_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shortlink_clicks: {
         Row: {
           clicked_at: string
