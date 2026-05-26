@@ -14,6 +14,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Progress } from '@/components/ui/progress'
 import { PromoCards } from '@/components/dashboard/PromoCards'
 import logoImg from '@/assets/logo-kubovibe.png'
+import CreditLedger from '@/components/CreditLedger'
+import { Gamepad2, Sparkles } from 'lucide-react'
 
 interface Project {
   id: string
@@ -148,6 +150,32 @@ export default function DashboardPage() {
         {/* Promo Cards */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.03 }}>
           <PromoCards />
+        </motion.div>
+
+        {/* Smart Economy + Quantum Engine entry */}
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.04 }}
+          className="grid lg:grid-cols-[1fr_360px] gap-4 mb-8 mt-6">
+          <div
+            onClick={() => navigate('/game')}
+            className="glass-premium hover-glow rounded-2xl p-6 cursor-pointer gradient-aurora animate-aurora-shift relative overflow-hidden group"
+          >
+            <div className="relative z-10 flex items-start justify-between">
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <Gamepad2 className="w-5 h-5 text-primary" />
+                  <span className="text-xs tracking-[0.3em] text-muted-foreground">KUBO QUANTUM ENGINE</span>
+                </div>
+                <h3 className="text-2xl font-display font-bold mb-2">
+                  Crie <span className="neon-text">mundos vivos</span> com IA
+                </h3>
+                <p className="text-sm text-muted-foreground max-w-md">
+                  Mundo procedural · NPCs com memória · ECS · WebGL/Three.js · Sandbox WGSL seguro
+                </p>
+              </div>
+              <Sparkles className="w-8 h-8 text-primary opacity-60 group-hover:opacity-100 group-hover:scale-110 transition-all" />
+            </div>
+          </div>
+          {user && <CreditLedger userId={user.id} />}
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="mb-6">
