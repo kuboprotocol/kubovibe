@@ -42,6 +42,17 @@ export default function ConnectorGmailPage() {
   const [sending, setSending] = useState(false)
   const [composeData, setComposeData] = useState({ to: '', subject: '', body: '' })
 
+  // Busca + paginação
+  const PAGE_SIZE = 15
+  const [searchQ, setSearchQ] = useState('')
+  const [filterFrom, setFilterFrom] = useState('')
+  const [filterSubject, setFilterSubject] = useState('')
+  const [appliedFilters, setAppliedFilters] = useState<{ q: string; from: string; subject: string }>({ q: '', from: '', subject: '' })
+  const [pageTokens, setPageTokens] = useState<string[]>([]) // histórico p/ "anterior"
+  const [currentToken, setCurrentToken] = useState<string | null>(null)
+  const [nextToken, setNextToken] = useState<string | null>(null)
+  const [resultEstimate, setResultEstimate] = useState<number>(0)
+
   // Handle callback feedback
   useEffect(() => {
     const err = params.get('error')
