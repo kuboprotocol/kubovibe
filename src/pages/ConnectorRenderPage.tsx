@@ -174,7 +174,7 @@ export default function ConnectorRenderPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <Helmet><title>Render Connector — KUBO Vibe</title></Helmet>
+      <title>Render Connector — KUBO Vibe</title>
       <div className="container max-w-7xl mx-auto px-4 py-6">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
