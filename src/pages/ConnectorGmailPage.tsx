@@ -450,6 +450,9 @@ export default function ConnectorGmailPage() {
                   <Button variant="outline" size="sm" onClick={() => fetchMessages(active.id, { pageToken: currentToken, filters: appliedFilters })} disabled={loadingMsgs} className="gap-1">
                     <RefreshCw className={`h-3.5 w-3.5 ${loadingMsgs ? 'animate-spin' : ''}`} /> Atualizar
                   </Button>
+                  <Button variant="outline" size="sm" onClick={exportInboxCsv} disabled={messages.length === 0} className="gap-1" data-testid="gmail-export-csv" title="Exportar resultados em CSV">
+                    <Download className="h-3.5 w-3.5" /> CSV
+                  </Button>
                   <Dialog open={composeOpen} onOpenChange={setComposeOpen}>
                     <DialogTrigger asChild>
                       <Button size="sm" className="gap-1" data-testid="gmail-compose-btn"><Send className="h-3.5 w-3.5" /> Novo</Button>
