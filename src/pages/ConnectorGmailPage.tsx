@@ -303,10 +303,62 @@ export default function ConnectorGmailPage() {
                 </div>
               </CardHeader>
               <CardContent className="p-0">
+                {/* Search & filters */}
+                <div className="px-4 py-3 border-b border-border bg-muted/30 space-y-2">
+                  <form
+                    onSubmit={(e) => { e.preventDefault(); applyFilters() }}
+                    className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_auto] gap-2"
+                  >
+                    <div className="relative">
+                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                      <Input
+                        value={searchQ}
+                        onChange={e => setSearchQ(e.target.value)}
+                        placeholder="Busca (sintaxe Gmail)"
+                        className="pl-8 h-9 text-sm"
+                        aria-label="Busca livre"
+                      />
+                    </div>
+                    <Input
+                      value={filterFrom}
+                      onChange={e => setFilterFrom(e.target.value)}
+                      placeholder="Remetente"
+                      className="h-9 text-sm"
+                      aria-label="Filtrar por remetente"
+                    />
+                    <Input
+                      value={filterSubject}
+                      onChange={e => setFilterSubject(e.target.value)}
+                      placeholder="Assunto"
+                      className="h-9 text-sm"
+                      aria-label="Filtrar por assunto"
+                    />
+                    <div className="flex gap-1">
+                      <Button type="submit" size="sm" className="h-9">Aplicar</Button>
+                      {hasActiveFilters && (
+                        <Button type="button" variant="ghost" size="sm" className="h-9 px-2" onClick={clearFilters} aria-label="Limpar filtros">
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </div>
+                  </form>
+                  {hasActiveFilters && (
+                    <p className="text-xs text-muted-foreground">
+                      Filtros ativos: {[
+                        appliedFilters.from && `de "${appliedFilters.from}"`,
+                        appliedFilters.subject && `assunto "${appliedFilters.subject}"`,
+                        appliedFilters.q && `"${appliedFilters.q}"`,
+                      ].filter(Boolean).join(' · ')}
+                    </p>
+                  )}
+                </div>
+
                 {loadingMsgs ? (
                   <div className="p-8 text-center text-muted-foreground text-sm">Carregando emails…</div>
                 ) : messages.length === 0 ? (
-                  <div className="p-8 text-center text-muted-foreground text-sm">Caixa de entrada vazia.</div>
+                  <div className="p-8 text-center text-muted-foreground text-sm">
+                    {hasActiveFilters ? 'Nenhum email corresponde aos filtros.' : 'Caixa de entrada vazia.'}
+                  </div>
                 ) : (
                   <ul className="divide-y divide-border">
                     {messages.map(m => (
@@ -322,6 +374,23 @@ export default function ConnectorGmailPage() {
                       </li>
                     ))}
                   </ul>
+                )}
+
+                {/* Pagination */}
+                {(messages.length > 0 || pageTokens.length > 0) && (
+                  <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-muted/20">
+                    <p className="text-xs text-muted-foreground">
+                      Página {pageNumber} · {messages.length} de ~{resultEstimate} {hasActiveFilters ? '(filtrado)' : ''}
+                    </p>
+                    <div className="flex gap-1">
+                      <Button variant="outline" size="sm" onClick={goPrevPage} disabled={loadingMsgs || pageTokens.length === 0} className="gap-1 h-8">
+                        <ChevronLeft className="h-3.5 w-3.5" /> Anterior
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={goNextPage} disabled={loadingMsgs || !nextToken} className="gap-1 h-8">
+                        Próximo <ChevronRight className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
                 )}
               </CardContent>
             </Card>
