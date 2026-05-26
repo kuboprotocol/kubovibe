@@ -1,4 +1,4 @@
-import { test, expect }  from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import {
@@ -7,21 +7,28 @@ import {
   mockWeb3Backend,
   openDeleteDialog,
   requiredDeleteToken,
+  snapshotToasts,
   toasterLocator,
   toastByText,
   waitForUndoCommit,
 } from './helpers/web3Connector'
 
 /**
- * E2E: após falha de deleção pós-janela, usuário clica em "Tentar novamente".
+ * E2E: "Tentar novamente" após falha de deleção pós-janela.
  *
- * Contrato validado:
- *  1. Confirma delete; linha some otimisticamente.
- *  2. Não clica em Desfazer; janela expira → edge chamada 1x (HTTP 500).
- *  3. Toast de erro com ação "Tentar novamente" é exibido.
- *  4. Usuário clica em "Tentar novamente".
- *  5. Edge é chamada NOVAMENTE (deleteCalls = 2).
- *  6. Linha permanece removida (sem rollback automático).
+ * Cenário: 1ª chamada à edge falha (500) → toast de erro com retry.
+ *          Usuário clica retry → 2ª chamada sucede (200).
+ *
+ * Contrato validado (sem falsos positivos):
+ *  1. Linha some otimisticamente; sem rollback em nenhum momento.
+ *  2. Após janela, edge chamada 1x → toast de erro com "Tentar novamente".
+ *  3. Clique em "Tentar novamente":
+ *     - Edge é chamada EXATAMENTE mais 1 vez (deleteCalls === 2).
+ *     - Payloads de AMBAS as chamadas são { id } — sem campos extras.
+ *     - Toast inicial de erro é SUBSTITUÍDO (não empilha) — mesma toast id.
+ *     - Botão "Tentar novamente" some após sucesso.
+ *  4. Nenhuma chamada extra ocorre depois (debounce/retry fantasma).
+ *  5. Linha permanece removida.
  *
  * Relatório: test-results/web3-connection-delete-retry-report.json
  */
@@ -32,16 +39,29 @@ const REPORT_PATH = path.join(REPORT_DIR, 'web3-connection-delete-retry-report.j
 test.describe('Web3 connector — retry após falha de deleção', () => {
   test.skip(!process.env.TEST_EMAIL || !process.env.TEST_PASSWORD, 'TEST_EMAIL/TEST_PASSWORD required')
 
-  test('retry dispara nova chamada à edge, linha continua removida', async ({ page, context }) => {
+  test('retry substitui toast, dispara 2ª chamada e remove botão "Tentar novamente"', async ({ page, context }) => {
     const report: {
       startedAt: string
       endedAt?: string
       success?: boolean
       deleteCalls: number
+      payloads: unknown[]
+      toastTimeline: { at: string; step: string; toasts: string[] }[]
       steps: unknown[]
-    } = { startedAt: new Date().toISOString(), deleteCalls: 0, steps: [] }
+    } = {
+      startedAt: new Date().toISOString(),
+      deleteCalls: 0,
+      payloads: [],
+      toastTimeline: [],
+      steps: [],
+    }
     const log = (step: string, data: Record<string, unknown> = {}) =>
       report.steps.push({ step, at: new Date().toISOString(), ...data })
+    const snapToasts = async (step: string) => {
+      const toasts = await snapshotToasts(page)
+      report.toastTimeline.push({ at: new Date().toISOString(), step, toasts })
+      log(`toasts:${step}`, { toasts })
+    }
 
     await context.clearCookies()
     await login(page)
@@ -51,11 +71,12 @@ test.describe('Web3 connector — retry após falha de deleção', () => {
       connection_name: `E2E retry-fail ${Date.now()}`,
     })
 
-    // Mock: edge sempre falha com 500 (o que importa é a contagem de calls)
-    const state = await mockWeb3Backend(page, [conn], () => ({
-      status: 500,
-      body: { error: 'simulated edge function failure' },
-    }))
+    // Handler: 1ª chamada falha (500), 2ª e subsequentes sucedem (200).
+    const state = await mockWeb3Backend(page, [conn], (_id, s) => {
+      if (s.deleteCalls === 1) return { status: 500, body: { error: 'simulated edge failure' } }
+      s.rows = s.rows.filter((r) => r.id !== _id)
+      return { status: 200, body: { success: true, id: _id } }
+    })
 
     await page.goto('/connectors/web3/alchemy')
     const { confirmBtn, input } = await openDeleteDialog(page)
@@ -69,34 +90,37 @@ test.describe('Web3 connector — retry após falha de deleção', () => {
     await expect(page.getByTestId('web3-connection-row')).toHaveCount(0, { timeout: 5_000 })
     log('row-optimistically-removed')
 
-    // 2. Toast inicial com botão Desfazer
+    // 2. Toast inicial com "Desfazer"
     const toaster = toasterLocator(page)
-    await expect(toaster.getByRole('button', { name: /desfazer/i }).first()).toBeVisible({ timeout: 3_000 })
-    log('undo-toast-visible')
+    const undoBtn = toaster.getByRole('button', { name: /desfazer/i }).first()
+    await expect(undoBtn).toBeVisible({ timeout: 3_000 })
+    await snapToasts('undo-visible')
 
-    // 3. Não clica em Desfazer — espera determinística pelo commit
+    // 3. Não clica em Desfazer; espera commit determinístico (deleteCalls === 1)
     await waitForUndoCommit(page, state)
-    log('undo-window-expired')
+    log('undo-window-expired', { deleteCalls: state.deleteCalls })
 
-    // 4. Edge chamada exatamente 1x
-    expect(state.deleteCalls).toBe(1)
-    report.deleteCalls = state.deleteCalls
-    log('edge-first-call', { deleteCalls: state.deleteCalls })
-
-    // 5. Toast de erro com ação "Tentar novamente"
-    const errorToast = toastByText(page, /falha ao remover|simulated edge function failure/i)
-    await expect(errorToast.first()).toBeVisible({ timeout: 5_000 })
-    log('error-toast-visible')
-
+    // 4. Toast de erro com retry
+    const errorToast = toastByText(page, /falha ao remover/i).first()
+    await expect(errorToast).toBeVisible({ timeout: 5_000 })
     const retryBtn = toaster.getByRole('button', { name: /tentar novamente/i }).first()
     await expect(retryBtn).toBeVisible()
-    log('retry-button-visible')
+    await snapToasts('error-visible')
 
-    // 6. Clica em "Tentar novamente"
+    // 5. Contrato de payload da 1ª chamada
+    expect(state.deletePayloads).toHaveLength(1)
+    expect(state.deletePayloads[0]).toEqual({ id: conn.id })
+    expect(Object.keys(state.deletePayloads[0] as object).sort()).toEqual(['id'])
+
+    // 6. Garante que NÃO houve rollback (linha continua removida antes do retry)
+    await expect(page.getByTestId('web3-connection-row')).toHaveCount(0)
+    log('no-rollback-pre-retry')
+
+    // 7. Clique em "Tentar novamente"
     await retryBtn.click()
     log('retry-clicked')
 
-    // 7. Verifica nova chamada à edge (determinística via polling)
+    // 8. Edge é chamada exatamente +1 vez
     await expect
       .poll(() => state.deleteCalls, {
         timeout: 8_000,
@@ -104,13 +128,33 @@ test.describe('Web3 connector — retry após falha de deleção', () => {
         message: 'Esperando deleteCalls === 2 após retry',
       })
       .toBe(2)
-    report.deleteCalls = state.deleteCalls
     log('edge-second-call', { deleteCalls: state.deleteCalls })
 
-    // 8. Linha permanece removida
-    await expect(page.getByTestId('web3-connection-row')).toHaveCount(0)
-    log('row-still-removed')
+    // 9. Payload da 2ª chamada: também { id }, sem campos extras
+    expect(state.deletePayloads).toHaveLength(2)
+    expect(state.deletePayloads[1]).toEqual({ id: conn.id })
+    expect(Object.keys(state.deletePayloads[1] as object).sort()).toEqual(['id'])
 
+    // 10. Toast de erro inicial é SUBSTITUÍDO — não há mais "Falha ao remover"
+    //     visível nem botão "Tentar novamente" (mesma toast id reutilizada).
+    await expect(toastByText(page, /falha ao remover/i)).toHaveCount(0, { timeout: 5_000 })
+    await expect(toaster.getByRole('button', { name: /tentar novamente/i })).toHaveCount(0)
+    await snapToasts('after-retry-success')
+    log('error-toast-replaced-and-retry-button-gone')
+
+    // 11. Toast de sucesso final visível
+    await expect(toastByText(page, /conexão removida/i).first()).toBeVisible({ timeout: 5_000 })
+
+    // 12. Nenhuma chamada extra após o commit do retry
+    await page.waitForTimeout(1_500)
+    expect(state.deleteCalls).toBe(2)
+
+    // 13. Linha permanece removida (sem rollback em todo o fluxo)
+    await expect(page.getByTestId('web3-connection-row')).toHaveCount(0)
+    log('no-rollback-post-retry')
+
+    report.deleteCalls = state.deleteCalls
+    report.payloads = state.deletePayloads
     report.endedAt = new Date().toISOString()
     report.success = true
     mkdirSync(REPORT_DIR, { recursive: true })

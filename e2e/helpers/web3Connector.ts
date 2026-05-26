@@ -143,6 +143,18 @@ export function toastByText(page: Page, pattern: RegExp) {
     .filter({ hasText: pattern })
 }
 
+/** Snapshot textual de todos os toasts visíveis — logging determinístico. */
+export async function snapshotToasts(page: Page): Promise<string[]> {
+  const items = toasterLocator(page).locator('li, [role="status"]')
+  const count = await items.count()
+  const out: string[] = []
+  for (let i = 0; i < count; i++) {
+    const text = (await items.nth(i).innerText().catch(() => '')).replace(/\s+/g, ' ').trim()
+    if (text) out.push(text)
+  }
+  return out
+}
+
 /**
  * Espera determinística pelo COMMIT da deleção após a janela de undo.
  *
