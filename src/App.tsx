@@ -24,6 +24,7 @@ import ConnectorSetupPage from "./pages/ConnectorSetupPage";
 import ConnectorWeb3Page from "./pages/ConnectorWeb3Page";
 import ConnectorWeb3HubPage from "./pages/ConnectorWeb3HubPage";
 import ConnectorGmailPage from "./pages/ConnectorGmailPage";
+import ConnectorSlackPage from "./pages/ConnectorSlackPage";
 import ShortlinksPage from "./pages/ShortlinksPage";
 import LeaderboardPage from "./pages/LeaderboardPage";
 import PublicAppPage from "./pages/PublicAppPage";
