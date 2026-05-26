@@ -137,6 +137,7 @@ export default function GamePage() {
       if (npc) {
         npc.memory.push({ role: 'user', content: text }, { role: 'assistant', content: reply });
         if (npc.memory.length > 12) npc.memory.splice(0, npc.memory.length - 12);
+        void persistMemory(selectedNPC.npcId, selectedNPC.persona, npc.memory);
       }
 
       // Execute the NPC action against the ECS (move/trade/attack/emote)
