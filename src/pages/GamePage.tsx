@@ -171,6 +171,10 @@ export default function GamePage() {
           )}
         </Card>
       </div>
+
+      <div className="container mx-auto px-4 pb-6">
+        <WGSLSandbox />
+      </div>
     </div>
   );
 }
