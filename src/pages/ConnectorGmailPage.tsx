@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
-import { ArrowLeft, Mail, Plus, RefreshCw, Send, Trash2, Inbox } from 'lucide-react'
+import { ArrowLeft, Mail, Plus, RefreshCw, Send, Trash2, Inbox, Search, ChevronLeft, ChevronRight, X } from 'lucide-react'
 
 interface GmailAccount {
   id: string
@@ -41,6 +41,17 @@ export default function ConnectorGmailPage() {
   const [composeOpen, setComposeOpen] = useState(false)
   const [sending, setSending] = useState(false)
   const [composeData, setComposeData] = useState({ to: '', subject: '', body: '' })
+
+  // Busca + paginação
+  const PAGE_SIZE = 15
+  const [searchQ, setSearchQ] = useState('')
+  const [filterFrom, setFilterFrom] = useState('')
+  const [filterSubject, setFilterSubject] = useState('')
+  const [appliedFilters, setAppliedFilters] = useState<{ q: string; from: string; subject: string }>({ q: '', from: '', subject: '' })
+  const [pageTokens, setPageTokens] = useState<string[]>([]) // histórico p/ "anterior"
+  const [currentToken, setCurrentToken] = useState<string | null>(null)
+  const [nextToken, setNextToken] = useState<string | null>(null)
+  const [resultEstimate, setResultEstimate] = useState<number>(0)
 
   // Handle callback feedback
   useEffect(() => {
@@ -80,17 +91,79 @@ export default function ConnectorGmailPage() {
     window.location.href = data.url as string
   }
 
-  const fetchMessages = async (accountId: string) => {
+  const fetchMessages = async (
+    accountId: string,
+    opts: { pageToken?: string | null; filters?: { q: string; from: string; subject: string }; resetPagination?: boolean } = {},
+  ) => {
+    const filters = opts.filters ?? appliedFilters
     setLoadingMsgs(true); setMessages([])
     const { data, error } = await supabase.functions.invoke('gmail-list-messages', {
-      body: { accountId, maxResults: 15 },
+      body: {
+        accountId,
+        maxResults: PAGE_SIZE,
+        q: filters.q || undefined,
+        from: filters.from || undefined,
+        subject: filters.subject || undefined,
+        pageToken: opts.pageToken || undefined,
+      },
     })
-    if (error) toast.error(error.message)
-    else setMessages((data as { messages?: GmailMessage[] })?.messages ?? [])
+    if (error) {
+      toast.error(error.message)
+      setNextToken(null); setResultEstimate(0)
+    } else {
+      const d = data as { messages?: GmailMessage[]; nextPageToken?: string | null; resultSizeEstimate?: number }
+      setMessages(d?.messages ?? [])
+      setNextToken(d?.nextPageToken ?? null)
+      setResultEstimate(d?.resultSizeEstimate ?? 0)
+      if (opts.resetPagination) { setPageTokens([]); setCurrentToken(null) }
+    }
     setLoadingMsgs(false)
   }
 
-  useEffect(() => { if (activeId) fetchMessages(activeId) }, [activeId])
+  useEffect(() => {
+    if (!activeId) return
+    setPageTokens([]); setCurrentToken(null)
+    fetchMessages(activeId, { pageToken: null, resetPagination: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId])
+
+  const applyFilters = () => {
+    if (!activeId) return
+    const next = { q: searchQ.trim(), from: filterFrom.trim(), subject: filterSubject.trim() }
+    setAppliedFilters(next)
+    setPageTokens([]); setCurrentToken(null)
+    fetchMessages(activeId, { pageToken: null, filters: next, resetPagination: true })
+  }
+
+  const clearFilters = () => {
+    setSearchQ(''); setFilterFrom(''); setFilterSubject('')
+    const empty = { q: '', from: '', subject: '' }
+    setAppliedFilters(empty)
+    if (activeId) {
+      setPageTokens([]); setCurrentToken(null)
+      fetchMessages(activeId, { pageToken: null, filters: empty, resetPagination: true })
+    }
+  }
+
+  const goNextPage = () => {
+    if (!activeId || !nextToken) return
+    setPageTokens(prev => [...prev, currentToken ?? ''])
+    setCurrentToken(nextToken)
+    fetchMessages(activeId, { pageToken: nextToken })
+  }
+
+  const goPrevPage = () => {
+    if (!activeId || pageTokens.length === 0) return
+    const prev = [...pageTokens]
+    const target = prev.pop() ?? ''
+    setPageTokens(prev)
+    const token = target || null
+    setCurrentToken(token)
+    fetchMessages(activeId, { pageToken: token })
+  }
+
+  const hasActiveFilters = appliedFilters.q || appliedFilters.from || appliedFilters.subject
+  const pageNumber = pageTokens.length + 1
 
   const handleDisconnect = async (id: string) => {
     if (!confirm('Desconectar esta conta Gmail?')) return
@@ -110,7 +183,7 @@ export default function ConnectorGmailPage() {
     toast.success('Email enviado')
     setComposeOpen(false)
     setComposeData({ to: '', subject: '', body: '' })
-    fetchMessages(activeId)
+    fetchMessages(activeId, { pageToken: currentToken, filters: appliedFilters })
   }
 
   const active = accounts.find(a => a.id === activeId)
@@ -189,7 +262,7 @@ export default function ConnectorGmailPage() {
                   <Badge variant="outline" className="ml-2">OAuth Google</Badge>
                 </CardTitle>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => fetchMessages(active.id)} disabled={loadingMsgs} className="gap-1">
+                  <Button variant="outline" size="sm" onClick={() => fetchMessages(active.id, { pageToken: currentToken, filters: appliedFilters })} disabled={loadingMsgs} className="gap-1">
                     <RefreshCw className={`h-3.5 w-3.5 ${loadingMsgs ? 'animate-spin' : ''}`} /> Atualizar
                   </Button>
                   <Dialog open={composeOpen} onOpenChange={setComposeOpen}>
@@ -230,10 +303,62 @@ export default function ConnectorGmailPage() {
                 </div>
               </CardHeader>
               <CardContent className="p-0">
+                {/* Search & filters */}
+                <div className="px-4 py-3 border-b border-border bg-muted/30 space-y-2">
+                  <form
+                    onSubmit={(e) => { e.preventDefault(); applyFilters() }}
+                    className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_auto] gap-2"
+                  >
+                    <div className="relative">
+                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                      <Input
+                        value={searchQ}
+                        onChange={e => setSearchQ(e.target.value)}
+                        placeholder="Busca (sintaxe Gmail)"
+                        className="pl-8 h-9 text-sm"
+                        aria-label="Busca livre"
+                      />
+                    </div>
+                    <Input
+                      value={filterFrom}
+                      onChange={e => setFilterFrom(e.target.value)}
+                      placeholder="Remetente"
+                      className="h-9 text-sm"
+                      aria-label="Filtrar por remetente"
+                    />
+                    <Input
+                      value={filterSubject}
+                      onChange={e => setFilterSubject(e.target.value)}
+                      placeholder="Assunto"
+                      className="h-9 text-sm"
+                      aria-label="Filtrar por assunto"
+                    />
+                    <div className="flex gap-1">
+                      <Button type="submit" size="sm" className="h-9">Aplicar</Button>
+                      {hasActiveFilters && (
+                        <Button type="button" variant="ghost" size="sm" className="h-9 px-2" onClick={clearFilters} aria-label="Limpar filtros">
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </div>
+                  </form>
+                  {hasActiveFilters && (
+                    <p className="text-xs text-muted-foreground">
+                      Filtros ativos: {[
+                        appliedFilters.from && `de "${appliedFilters.from}"`,
+                        appliedFilters.subject && `assunto "${appliedFilters.subject}"`,
+                        appliedFilters.q && `"${appliedFilters.q}"`,
+                      ].filter(Boolean).join(' · ')}
+                    </p>
+                  )}
+                </div>
+
                 {loadingMsgs ? (
                   <div className="p-8 text-center text-muted-foreground text-sm">Carregando emails…</div>
                 ) : messages.length === 0 ? (
-                  <div className="p-8 text-center text-muted-foreground text-sm">Caixa de entrada vazia.</div>
+                  <div className="p-8 text-center text-muted-foreground text-sm">
+                    {hasActiveFilters ? 'Nenhum email corresponde aos filtros.' : 'Caixa de entrada vazia.'}
+                  </div>
                 ) : (
                   <ul className="divide-y divide-border">
                     {messages.map(m => (
@@ -249,6 +374,23 @@ export default function ConnectorGmailPage() {
                       </li>
                     ))}
                   </ul>
+                )}
+
+                {/* Pagination */}
+                {(messages.length > 0 || pageTokens.length > 0) && (
+                  <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-muted/20">
+                    <p className="text-xs text-muted-foreground">
+                      Página {pageNumber} · {messages.length} de ~{resultEstimate} {hasActiveFilters ? '(filtrado)' : ''}
+                    </p>
+                    <div className="flex gap-1">
+                      <Button variant="outline" size="sm" onClick={goPrevPage} disabled={loadingMsgs || pageTokens.length === 0} className="gap-1 h-8">
+                        <ChevronLeft className="h-3.5 w-3.5" /> Anterior
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={goNextPage} disabled={loadingMsgs || !nextToken} className="gap-1 h-8">
+                        Próximo <ChevronRight className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
                 )}
               </CardContent>
             </Card>
