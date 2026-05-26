@@ -262,7 +262,7 @@ export default function ConnectorGmailPage() {
                   <Badge variant="outline" className="ml-2">OAuth Google</Badge>
                 </CardTitle>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => fetchMessages(active.id)} disabled={loadingMsgs} className="gap-1">
+                  <Button variant="outline" size="sm" onClick={() => fetchMessages(active.id, { pageToken: currentToken, filters: appliedFilters })} disabled={loadingMsgs} className="gap-1">
                     <RefreshCw className={`h-3.5 w-3.5 ${loadingMsgs ? 'animate-spin' : ''}`} /> Atualizar
                   </Button>
                   <Dialog open={composeOpen} onOpenChange={setComposeOpen}>
