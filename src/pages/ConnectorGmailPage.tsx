@@ -188,6 +188,7 @@ export default function ConnectorGmailPage() {
     const empty = { q: '', from: '', subject: '' }
     setAppliedFilters(empty)
     if (activeId) {
+      persistFilters(activeId, empty)
       setPageTokens([]); setCurrentToken(null)
       fetchMessages(activeId, { pageToken: null, filters: empty, resetPagination: true })
     }
