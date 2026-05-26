@@ -118,20 +118,31 @@ export default function Web3ConnectionList({
     })
   }
 
-  async function commitDelete(row: Row) {
+  async function commitDelete(row: Row, attempt = 1) {
+    // Toast id estável por linha → garante que cada retry SUBSTITUI o toast
+    // anterior (loading/erro/sucesso) em vez de empilhar. UX limpa + assert
+    // determinístico no E2E (botão "Tentar novamente" some após retry bem-sucedido).
+    const toastId = `web3-del-${row.id}`
+    if (attempt > 1) {
+      toast.loading('Tentando novamente…', { id: toastId, description: row.connection_name })
+    }
     try {
       const { error } = await supabase.functions.invoke('web3-connection-delete', { body: { id: row.id } })
       if (error) throw error
-      // success: nothing else to do, row already removed
+      // Sucesso: substitui o toast anterior pelo de sucesso e remove o botão
+      // "Tentar novamente". NÃO restauramos a linha (sem rollback automático).
+      if (attempt > 1) {
+        toast.success('Conexão removida', { id: toastId, description: row.connection_name })
+      }
     } catch (e: any) {
-      // Janela de undo já expirou — usuário declinou desfazer. Tratamos como
-      // falha terminal: NÃO restauramos a linha automaticamente para não
-      // confundir o usuário; expomos ação "Tentar novamente" no toast.
+      // Falha terminal: NÃO restauramos a linha. Re-expomos "Tentar novamente"
+      // no MESMO toast id para substituir o anterior (sem empilhamento).
       toast.error('Falha ao remover conexão', {
+        id: toastId,
         description: e?.message ?? 'Erro ao chamar serviço de remoção.',
         action: {
           label: 'Tentar novamente',
-          onClick: () => { commitDelete(row) },
+          onClick: () => { commitDelete(row, attempt + 1) },
         },
       })
     } finally {
