@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.gmail-oauth-callback]
 verify_jwt = false
+
+[functions.gmail-sync-accounts]
+verify_jwt = false
