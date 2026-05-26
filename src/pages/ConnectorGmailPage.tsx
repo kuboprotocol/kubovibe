@@ -141,17 +141,44 @@ export default function ConnectorGmailPage() {
     setLoadingMsgs(false)
   }
 
+  // Chave de persistência por usuário+conta — isola filtros entre contas/contextos
+  const filtersStorageKey = (accId: string) => `gmail:filters:${user?.id ?? 'anon'}:${accId}`
+
+  const loadStoredFilters = (accId: string): { q: string; from: string; subject: string } => {
+    try {
+      const raw = localStorage.getItem(filtersStorageKey(accId))
+      if (!raw) return { q: '', from: '', subject: '' }
+      const parsed = JSON.parse(raw)
+      return {
+        q: typeof parsed.q === 'string' ? parsed.q : '',
+        from: typeof parsed.from === 'string' ? parsed.from : '',
+        subject: typeof parsed.subject === 'string' ? parsed.subject : '',
+      }
+    } catch { return { q: '', from: '', subject: '' } }
+  }
+
+  const persistFilters = (accId: string, f: { q: string; from: string; subject: string }) => {
+    try {
+      if (!f.q && !f.from && !f.subject) localStorage.removeItem(filtersStorageKey(accId))
+      else localStorage.setItem(filtersStorageKey(accId), JSON.stringify(f))
+    } catch { /* storage indisponível — silencioso */ }
+  }
+
   useEffect(() => {
     if (!activeId) return
+    const stored = loadStoredFilters(activeId)
+    setSearchQ(stored.q); setFilterFrom(stored.from); setFilterSubject(stored.subject)
+    setAppliedFilters(stored)
     setPageTokens([]); setCurrentToken(null)
-    fetchMessages(activeId, { pageToken: null, resetPagination: true })
+    fetchMessages(activeId, { pageToken: null, filters: stored, resetPagination: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeId])
+  }, [activeId, user?.id])
 
   const applyFilters = () => {
     if (!activeId) return
     const next = { q: searchQ.trim(), from: filterFrom.trim(), subject: filterSubject.trim() }
     setAppliedFilters(next)
+    persistFilters(activeId, next)
     setPageTokens([]); setCurrentToken(null)
     fetchMessages(activeId, { pageToken: null, filters: next, resetPagination: true })
   }
