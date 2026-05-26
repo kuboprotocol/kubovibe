@@ -561,32 +561,77 @@ export default function ConnectorGmailPage() {
       </main>
 
       {/* Thread dialog */}
-      <Dialog open={threadOpen} onOpenChange={(o) => { setThreadOpen(o); if (!o) { setReplyMode(null); setThreadMessages([]); setThreadId(null) } }}>
+      <Dialog open={threadOpen} onOpenChange={(o) => { setThreadOpen(o); if (!o) { setReplyMode(null); setThreadMessages([]); setThreadId(null); setFocusedMsgId(null); setExpandedIds(new Set()) } }}>
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto" data-testid="gmail-thread-dialog">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <MessageSquare className="h-4 w-4" /> {threadMessages[0]?.subject || 'Conversa'}
-              <Badge variant="outline" className="ml-auto">{threadMessages.length} {threadMessages.length === 1 ? 'mensagem' : 'mensagens'}</Badge>
+            <DialogTitle className="flex items-center gap-2 flex-wrap">
+              <MessageSquare className="h-4 w-4" /> {sortedThread[0]?.subject || 'Conversa'}
+              <Badge variant="outline">{sortedThread.length} {sortedThread.length === 1 ? 'mensagem' : 'mensagens'}</Badge>
+              <div className="ml-auto flex items-center gap-1">
+                <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={expandAll} disabled={sortedThread.length === 0}>Expandir tudo</Button>
+                <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={collapseAll} disabled={sortedThread.length === 0}>Recolher</Button>
+                <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={() => exportThread('json')} disabled={sortedThread.length === 0} data-testid="gmail-thread-export-json">
+                  <Download className="h-3 w-3" /> JSON
+                </Button>
+                <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={() => exportThread('txt')} disabled={sortedThread.length === 0} data-testid="gmail-thread-export-txt">
+                  <Download className="h-3 w-3" /> TXT
+                </Button>
+              </div>
             </DialogTitle>
           </DialogHeader>
           {threadLoading ? (
             <div className="py-10 text-center text-muted-foreground text-sm">Carregando conversa…</div>
           ) : (
             <div className="space-y-3">
-              {threadMessages.map((m, idx) => (
-                <Card key={m.id} data-testid="gmail-thread-message" className={idx === threadMessages.length - 1 ? 'border-[#C9941A]/40' : ''}>
-                  <CardHeader className="pb-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-medium truncate">{m.from}</p>
-                      <span className="text-xs text-muted-foreground whitespace-nowrap">{m.date ? new Date(m.date).toLocaleString() : ''}</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground truncate">Para: {m.to}</p>
-                  </CardHeader>
-                  <CardContent>
-                    <pre className="text-sm whitespace-pre-wrap font-sans">{m.bodyText || m.snippet}</pre>
-                  </CardContent>
-                </Card>
-              ))}
+              {sortedThread.length > 1 && (
+                <p className="text-xs text-muted-foreground">Ordenado por data (mais antiga → mais recente)</p>
+              )}
+              {sortedThread.map((m, idx) => {
+                const isFocused = m.id === focusedMsgId
+                const isExpanded = expandedIds.has(m.id)
+                const focusedIdx = sortedThread.findIndex(x => x.id === focusedMsgId)
+                const position = focusedIdx >= 0
+                  ? (idx < focusedIdx ? 'antes' : idx > focusedIdx ? 'depois' : 'selecionada')
+                  : null
+                return (
+                  <Card
+                    key={m.id}
+                    data-testid="gmail-thread-message"
+                    className={isFocused ? 'border-[#C9941A] ring-1 ring-[#C9941A]/30' : (idx === sortedThread.length - 1 ? 'border-[#C9941A]/40' : '')}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => toggleExpand(m.id)}
+                      className="w-full text-left"
+                      aria-expanded={isExpanded}
+                    >
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-xs text-muted-foreground tabular-nums">#{idx + 1}</span>
+                            {position && (
+                              <Badge variant={position === 'selecionada' ? 'default' : 'outline'} className="text-[10px] uppercase">{position}</Badge>
+                            )}
+                            <p className="text-sm font-medium truncate">{m.from}</p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-xs text-muted-foreground whitespace-nowrap">{m.date ? new Date(m.date).toLocaleString() : ''}</span>
+                            {isExpanded ? <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />}
+                          </div>
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate">Para: {m.to}{m.cc ? ` · Cc: ${m.cc}` : ''}</p>
+                        {!isExpanded && <p className="text-xs text-muted-foreground truncate mt-1">{m.snippet}</p>}
+                      </CardHeader>
+                    </button>
+                    {isExpanded && (
+                      <CardContent>
+                        <pre className="text-sm whitespace-pre-wrap font-sans">{m.bodyText || m.snippet}</pre>
+                      </CardContent>
+                    )}
+                  </Card>
+                )
+              })}
+
 
               {replyMode === null ? (
                 <div className="flex gap-2 pt-2">
