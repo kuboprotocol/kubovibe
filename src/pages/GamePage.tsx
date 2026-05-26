@@ -54,13 +54,30 @@ export default function GamePage() {
       renderer.syncEntities(world);
     });
 
-    const onClick = (e: MouseEvent) => {
+    const onClick = async (e: MouseEvent) => {
       const id = renderer.pickEntity(e.clientX, e.clientY);
       if (id == null) return;
       const npc = world.getComponent<NPCTag>(id, 'npc');
-      if (npc) {
-        setSelectedNPC({ entity: id, npcId: npc.npcId, persona: npc.persona });
-        setDialogue([]);
+      if (!npc) return;
+      setSelectedNPC({ entity: id, npcId: npc.npcId, persona: npc.persona });
+      setDialogue([]);
+      try {
+        const { data: auth } = await supabase.auth.getUser();
+        if (!auth.user) return;
+        const { data } = await supabase
+          .from('npc_memories')
+          .select('memory')
+          .eq('user_id', auth.user.id)
+          .eq('npc_id', npc.npcId)
+          .eq('world_seed', seed)
+          .maybeSingle();
+        const stored = (data?.memory as Array<{ role: 'user'|'assistant'; content: string }> | undefined) ?? [];
+        if (stored.length) {
+          npc.memory = stored.slice(-12);
+          setDialogue(stored.map(m => ({ ...m, npcId: npc.npcId })));
+        }
+      } catch (err) {
+        console.warn('load npc memory failed', err);
       }
     };
     containerRef.current.addEventListener('click', onClick);
@@ -70,6 +87,26 @@ export default function GamePage() {
       renderer.dispose();
     };
   }, [seed]);
+
+  const persistMemory = async (
+    npcId: string,
+    persona: string,
+    memory: Array<{ role: 'user'|'assistant'; content: string }>,
+  ) => {
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) return;
+      await supabase.from('npc_memories').upsert({
+        user_id: auth.user.id,
+        npc_id: npcId,
+        world_seed: seed,
+        persona,
+        memory,
+      }, { onConflict: 'user_id,npc_id,world_seed' });
+    } catch (err) {
+      console.warn('persist npc memory failed', err);
+    }
+  };
 
   const send = async () => {
     if (!selectedNPC || !input.trim() || loading) return;
@@ -100,6 +137,7 @@ export default function GamePage() {
       if (npc) {
         npc.memory.push({ role: 'user', content: text }, { role: 'assistant', content: reply });
         if (npc.memory.length > 12) npc.memory.splice(0, npc.memory.length - 12);
+        void persistMemory(selectedNPC.npcId, selectedNPC.persona, npc.memory);
       }
 
       // Execute the NPC action against the ECS (move/trade/attack/emote)
