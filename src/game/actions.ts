@@ -1,6 +1,6 @@
 // Executes actions returned by the game-npc-ai edge function on the ECS world.
 // Schema produced by the NPC: { type: 'move'|'trade'|'attack'|'emote', payload: {...} }
-import { World, T, Transform, Velocity, Health, EntityId, NPCTag, PlayerTag } from './ecs';
+import { World, T, Transform, Velocity, Health, EntityId, NPCTag, Emote } from './ecs';
 
 export type NPCActionType = 'move' | 'trade' | 'attack' | 'emote';
 
@@ -104,6 +104,6 @@ export function executeNPCAction(
 }
 
 // Public helper for badges/animations
-export function getActiveEmote(world: World, entity: EntityId) {
-  return world.getComponent(entity, 'emote') as { kind: string; ttl: number; elapsed: number } | undefined;
+export function getActiveEmote(world: World, entity: EntityId): Emote | undefined {
+  return world.getComponent<Emote>(entity, 'emote');
 }
