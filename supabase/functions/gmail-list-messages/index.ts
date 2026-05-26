@@ -5,9 +5,21 @@ import { getFreshAccessToken, loadAccount } from '../_shared/gmailToken.ts'
 
 const Body = z.object({
   accountId: z.string().uuid(),
-  q: z.string().max(256).optional(),
+  q: z.string().max(512).optional(),
+  from: z.string().max(256).optional(),
+  subject: z.string().max(256).optional(),
   maxResults: z.number().int().min(1).max(50).optional(),
+  pageToken: z.string().max(2048).optional(),
 })
+
+/** Combina filtros estruturados (from/subject) com q livre em sintaxe Gmail. */
+function buildQuery(input: { q?: string; from?: string; subject?: string }) {
+  const parts: string[] = []
+  if (input.from?.trim()) parts.push(`from:${JSON.stringify(input.from.trim())}`)
+  if (input.subject?.trim()) parts.push(`subject:${JSON.stringify(input.subject.trim())}`)
+  if (input.q?.trim()) parts.push(input.q.trim())
+  return parts.join(' ')
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -29,12 +41,19 @@ Deno.serve(async (req) => {
     const token = await getFreshAccessToken(admin, acct)
 
     const max = parsed.data.maxResults ?? 15
-    const q = parsed.data.q ?? ''
+    const q = buildQuery(parsed.data)
+
     const listUrl = new URL('https://gmail.googleapis.com/gmail/v1/users/me/messages')
     listUrl.searchParams.set('maxResults', String(max))
     if (q) listUrl.searchParams.set('q', q)
+    if (parsed.data.pageToken) listUrl.searchParams.set('pageToken', parsed.data.pageToken)
+
     const listRes = await fetch(listUrl, { headers: { Authorization: `Bearer ${token}` } })
-    const listJson = await listRes.json() as { messages?: { id: string }[] }
+    const listJson = await listRes.json() as {
+      messages?: { id: string }[]
+      nextPageToken?: string
+      resultSizeEstimate?: number
+    }
     if (!listRes.ok) return new Response(JSON.stringify({ error: 'gmail_list_failed', detail: listJson }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
     const ids = (listJson.messages ?? []).slice(0, max)
@@ -47,7 +66,12 @@ Deno.serve(async (req) => {
       return { id: j.id, snippet: j.snippet ?? '', from: h('From'), subject: h('Subject'), date: h('Date') }
     }))
 
-    return new Response(JSON.stringify({ messages: details }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    return new Response(JSON.stringify({
+      messages: details,
+      nextPageToken: listJson.nextPageToken ?? null,
+      resultSizeEstimate: listJson.resultSizeEstimate ?? details.length,
+      query: q || null,
+    }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   } catch (e) {
     return new Response(JSON.stringify({ error: (e as Error).message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   }
