@@ -300,7 +300,7 @@ export default function ConnectorGmailPage() {
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const isUnread = (m: GmailMessage) => (m.labelIds ?? []).includes('UNREAD')
 
-  const toggleRead = async (m: GmailMessage, e?: React.MouseEvent) => {
+  const toggleRead = async (m: GmailMessage, e?: { stopPropagation: () => void }) => {
     e?.stopPropagation()
     if (!activeId) return
     const markAs = isUnread(m) ? 'read' : 'unread'
