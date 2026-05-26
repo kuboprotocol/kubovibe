@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
-import { ArrowLeft, Mail, Plus, RefreshCw, Send, Trash2, Inbox, Search, ChevronLeft, ChevronRight, X, Reply, Forward, MessageSquare } from 'lucide-react'
+import { ArrowLeft, Mail, Plus, RefreshCw, Send, Trash2, Inbox, Search, ChevronLeft, ChevronRight, X, Reply, Forward, MessageSquare, MailOpen } from 'lucide-react'
 
 interface GmailAccount {
   id: string
@@ -28,6 +28,7 @@ interface GmailMessage {
   subject: string
   snippet: string
   date: string
+  labelIds?: string[]
 }
 
 interface ThreadMessage {
