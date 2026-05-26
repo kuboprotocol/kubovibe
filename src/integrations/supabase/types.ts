@@ -283,6 +283,42 @@ export type Database = {
           },
         ]
       }
+      credit_transactions: {
+        Row: {
+          balance_after: number
+          category: string
+          created_at: string
+          delta: number
+          id: string
+          idempotency_key: string | null
+          metadata: Json
+          reason: string
+          user_id: string
+        }
+        Insert: {
+          balance_after: number
+          category?: string
+          created_at?: string
+          delta: number
+          id?: string
+          idempotency_key?: string | null
+          metadata?: Json
+          reason: string
+          user_id: string
+        }
+        Update: {
+          balance_after?: number
+          category?: string
+          created_at?: string
+          delta?: number
+          id?: string
+          idempotency_key?: string | null
+          metadata?: Json
+          reason?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       email_send_log: {
         Row: {
           created_at: string
@@ -1328,6 +1364,17 @@ export type Database = {
       enqueue_email: {
         Args: { payload: Json; queue_name: string }
         Returns: number
+      }
+      execute_atomic_credit_deduction: {
+        Args: {
+          _amount: number
+          _category?: string
+          _idempotency_key?: string
+          _metadata?: Json
+          _reason: string
+          _user_id: string
+        }
+        Returns: Json
       }
       is_kubo_admin: { Args: never; Returns: boolean }
       move_to_dlq: {
