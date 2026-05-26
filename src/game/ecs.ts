@@ -61,6 +61,8 @@ export interface Velocity extends Component { __type: 'velocity'; vx: number; vy
 export interface Renderable extends Component { __type: 'renderable'; mesh: 'cube' | 'sphere' | 'npc'; color: number; scale: number }
 export interface NPCTag extends Component { __type: 'npc'; npcId: string; persona: string; memory: Array<{ role: 'user'|'assistant'; content: string }> }
 export interface PlayerTag extends Component { __type: 'player' }
+export interface Emote extends Component { __type: 'emote'; kind: 'wave' | 'bow' | 'cheer' | 'attack'; ttl: number; elapsed: number }
+export interface Health extends Component { __type: 'health'; hp: number; max: number }
 
 export const T = {
   transform: (x = 0, y = 0, z = 0, rot = 0): Transform => ({ __type: 'transform', x, y, z, rot }),
@@ -68,6 +70,8 @@ export const T = {
   renderable: (mesh: Renderable['mesh'], color = 0xc9941a, scale = 1): Renderable => ({ __type: 'renderable', mesh, color, scale }),
   npc: (npcId: string, persona: string): NPCTag => ({ __type: 'npc', npcId, persona, memory: [] }),
   player: (): PlayerTag => ({ __type: 'player' }),
+  emote: (kind: Emote['kind'], ttl = 1.2): Emote => ({ __type: 'emote', kind, ttl, elapsed: 0 }),
+  health: (max = 100): Health => ({ __type: 'health', hp: max, max }),
 };
 
 // ---------- Systems ----------
@@ -80,3 +84,15 @@ export const MovementSystem: System = {
     }
   },
 };
+
+// Ticks down emote TTL and removes expired ones so the renderer can stop the animation.
+export const EmoteSystem: System = {
+  update(world, dt) {
+    for (const id of world.query(['emote'])) {
+      const e = world.getComponent<Emote>(id, 'emote')!;
+      e.elapsed += dt;
+      if (e.elapsed >= e.ttl) world['components'].get('emote')?.delete(id);
+    }
+  },
+};
+
