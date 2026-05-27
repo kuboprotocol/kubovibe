@@ -121,7 +121,37 @@ Deno.test("BLOCKS shader exceeding size limit", async () => {
 Deno.test("REJECTS request without shader field", async () => {
   const { status, json } = await callSanitizer({ stage: "fragment" });
   assertEquals(status, 400);
-  assertEquals(json.error, "shader required");
+  assertEquals(json.error, "shader is required");
+});
+
+Deno.test("REJECTS empty shader string", async () => {
+  const { status, json } = await callSanitizer({ shader: "", stage: "fragment" });
+  assertEquals(status, 400);
+  assertEquals(json.error, "shader cannot be empty");
+});
+
+Deno.test("REJECTS shader as number type", async () => {
+  const { status, json } = await callSanitizer({ shader: 12345, stage: "fragment" });
+  assertEquals(status, 400);
+  assertEquals(json.error, "shader must be a string, received number");
+});
+
+Deno.test("REJECTS unknown stage value", async () => {
+  const { status, json } = await callSanitizer({ shader: SAFE_FRAGMENT, stage: "geometry" });
+  assertEquals(status, 400);
+  assert(json.error.includes("stage must be one of"));
+});
+
+Deno.test("REJECTS stage as number type", async () => {
+  const { status, json } = await callSanitizer({ shader: SAFE_FRAGMENT, stage: 123 });
+  assertEquals(status, 400);
+  assert(json.error.includes("stage must be one of"));
+});
+
+Deno.test("REJECTS non-object body (array)", async () => {
+  const { status, json } = await callSanitizer(["not", "an", "object"]);
+  assertEquals(status, 400);
+  assertEquals(json.error, "Request body must be a JSON object");
 });
 
 Deno.test("CORS preflight returns ok", async () => {
