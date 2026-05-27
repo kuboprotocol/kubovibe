@@ -40,13 +40,44 @@ function sanitizeWGSLShader(src: string): { ok: boolean; violations: ViolationRe
   };
 }
 
+const VALID_STAGES = ['vertex', 'fragment', 'compute'] as const;
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
     const body = (await req.json()) as SanitizeRequest;
-    if (!body?.shader || typeof body.shader !== 'string') {
-      return new Response(JSON.stringify({ error: 'shader required' }), {
+
+    if (body === null || typeof body !== 'object') {
+      return new Response(JSON.stringify({ error: 'Request body must be a JSON object' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (!('shader' in body)) {
+      return new Response(JSON.stringify({ error: 'shader is required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (typeof body.shader !== 'string') {
+      return new Response(JSON.stringify({ error: `shader must be a string, received ${typeof body.shader}` }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (body.shader.trim().length === 0) {
+      return new Response(JSON.stringify({ error: 'shader cannot be empty' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if ('stage' in body && !VALID_STAGES.includes(body.stage as any)) {
+      return new Response(JSON.stringify({ error: `stage must be one of: ${VALID_STAGES.join(', ')}` }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
