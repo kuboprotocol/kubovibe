@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
   try {
     const body = (await req.json()) as SanitizeRequest;
 
-    if (body === null || typeof body !== 'object') {
+    if (body === null || typeof body !== 'object' || Array.isArray(body)) {
       return new Response(JSON.stringify({ error: 'Request body must be a JSON object' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
