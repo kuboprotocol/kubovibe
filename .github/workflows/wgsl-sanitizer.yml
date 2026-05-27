@@ -1,0 +1,63 @@
+name: WGSL Sanitizer Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: wgsl-sanitizer-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration:
+    name: Integration Tests
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    env:
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v1.x
+
+      - name: Run integration tests
+        run: |
+          echo "::group::wgsl-sanitizer integration tests"
+          deno test \
+            --allow-net \
+            --allow-env \
+            --allow-read \
+            --no-check \
+            supabase/functions/wgsl-sanitizer/index_test.ts
+          echo "::endgroup::"
+
+  fuzz:
+    name: Fuzz Tests
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    env:
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v1.x
+
+      - name: Run fuzz tests
+        run: |
+          echo "::group::wgsl-sanitizer fuzz tests"
+          deno test \
+            --allow-net \
+            --allow-env \
+            --allow-read \
+            --no-check \
+            supabase/functions/wgsl-sanitizer/fuzz_test.ts
+          echo "::endgroup::"
