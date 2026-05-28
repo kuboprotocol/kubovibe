@@ -60,10 +60,7 @@ Deno.serve(async (req) => {
     const ghUser = await userRes.json()
 
     // Persist token server-side via service role — never trafega pelo client
-    const admin = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-    )
+    // (admin client already created above for state validation)
     await admin.from('github_connections').upsert({
       user_id: uid,
       access_token: accessToken,
