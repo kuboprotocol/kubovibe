@@ -38,8 +38,45 @@ async function callSanitizer(body: unknown) {
   return { status: res.status, json } as { status: number; json: any };
 }
 
-// ---------- Safe shader generators ----------
-const SAFE_BUILDERS: Array<(rand: () => number) => string> = [
+// ---------- Safe shader generators, grouped per pipeline stage ----------
+type Builder = (rand: () => number) => string;
+
+const VERTEX_SAFE_BUILDERS: Builder[] = [
+  (rand) => `
+@vertex
+fn vs_main(@location(0) pos: vec3<f32>) -> @builtin(position) vec4<f32> {
+  return vec4<f32>(pos * ${(rand() * 0.99 + 0.01).toFixed(3)}, 1.0);
+}`,
+  (rand) => {
+    const scale = (rand() * 2.0).toFixed(3);
+    return `
+@vertex
+fn vs_main(@builtin(vertex_index) vi: u32) -> @builtin(position) vec4<f32> {
+  let x = f32(vi) * ${scale};
+  return vec4<f32>(x, 0.0, 0.0, 1.0);
+}`;
+  },
+];
+
+const FRAGMENT_SAFE_BUILDERS: Builder[] = [
+  (rand) => `
+@fragment
+fn fs_main(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
+  return vec4<f32>(uv, ${rand().toFixed(3)}, 1.0);
+}`,
+  (rand) => {
+    const r = rand().toFixed(3);
+    const g = rand().toFixed(3);
+    const b = rand().toFixed(3);
+    return `
+@fragment
+fn fs_main() -> @location(0) vec4<f32> {
+  return vec4<f32>(${r}, ${g}, ${b}, 1.0);
+}`;
+  },
+];
+
+const COMPUTE_SAFE_BUILDERS: Builder[] = [
   (rand) => {
     const wg = pick(rand, [1, 2, 4, 8, 16, 32, 64]);
     return `
@@ -62,11 +99,6 @@ fn cs_main() {
   }
 }`;
   },
-  (rand) => `
-@fragment
-fn fs_main(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
-  return vec4<f32>(uv, ${rand().toFixed(3)}, 1.0);
-}`,
   (rand) => {
     const n = randInt(rand, 1, 4096);
     return `var<private> buf: array<f32, ${n}>;
@@ -85,18 +117,9 @@ fn cs_main() {
 
 // ---------- Dangerous shader generators ----------
 type DangerousCase = { shader: string; expectedRule: string };
-const DANGEROUS_BUILDERS: Array<(rand: () => number) => DangerousCase> = [
-  (rand) => {
-    const sp = " ".repeat(randInt(rand, 0, 5));
-    return {
-      shader: `fn bad${randInt(rand, 0, 9999)}() { while${sp}(${sp}true${sp}) { } }`,
-      expectedRule: "INFINITE_WHILE_TRUE",
-    };
-  },
-  (rand) => ({
-    shader: `fn bad${randInt(rand, 0, 9999)}() { loop { let x = ${randInt(rand, 1, 9)}; } }`,
-    expectedRule: "INFINITE_LOOP_NO_BREAK",
-  }),
+
+// Compute-stage-specific dangerous payload (workgroup runaway)
+const COMPUTE_DANGEROUS_BUILDERS: Array<(rand: () => number) => DangerousCase> = [
   (rand) => {
     const size = randInt(rand, 1000, 99999);
     return {
@@ -112,6 +135,21 @@ const DANGEROUS_BUILDERS: Array<(rand: () => number) => DangerousCase> = [
       expectedRule: "RUNAWAY_WORKGROUP",
     };
   },
+];
+
+// Stage-agnostic dangerous patterns (apply to vertex/fragment/compute bodies)
+const SHARED_DANGEROUS_BUILDERS: Array<(rand: () => number) => DangerousCase> = [
+  (rand) => {
+    const sp = " ".repeat(randInt(rand, 0, 5));
+    return {
+      shader: `fn bad${randInt(rand, 0, 9999)}() { while${sp}(${sp}true${sp}) { } }`,
+      expectedRule: "INFINITE_WHILE_TRUE",
+    };
+  },
+  (rand) => ({
+    shader: `fn bad${randInt(rand, 0, 9999)}() { loop { let x = ${randInt(rand, 1, 9)}; } }`,
+    expectedRule: "INFINITE_LOOP_NO_BREAK",
+  }),
   (rand) => {
     const name = `recur${randInt(rand, 0, 9999)}`;
     return {
@@ -152,56 +190,105 @@ function withNoise(rand: () => number, src: string): string {
 const FUZZ_ITERATIONS = 40;
 const BASE_SEED = 0xC0FFEE;
 
-Deno.test("FUZZ: safe shader variants are always allowed", async () => {
-  const rand = rng(BASE_SEED);
+// ---------- Helpers ----------
+async function fuzzSafe(stage: "vertex" | "fragment" | "compute", builders: Builder[], seed: number) {
+  const rand = rng(seed);
   for (let i = 0; i < FUZZ_ITERATIONS; i++) {
-    const builder = pick(rand, SAFE_BUILDERS);
-    const shader = withNoise(rand, builder(rand));
-    const { status, json } = await callSanitizer({ shader });
+    const shader = withNoise(rand, pick(rand, builders)(rand));
+    const { status, json } = await callSanitizer({ shader, stage });
     assertEquals(
       status,
       200,
-      `iter=${i} expected 200 got ${status} for shader:\n${shader}\nresp=${JSON.stringify(json)}`,
+      `[${stage}] iter=${i} expected 200 got ${status} for shader:\n${shader}\nresp=${JSON.stringify(json)}`,
     );
-    assertEquals(json.blocked, false, `iter=${i} unexpected block:\n${shader}`);
+    assertEquals(json.blocked, false, `[${stage}] iter=${i} unexpected block:\n${shader}`);
     assertEquals(
       json.violations.length,
       0,
-      `iter=${i} unexpected violations ${JSON.stringify(json.violations)} for:\n${shader}`,
+      `[${stage}] iter=${i} unexpected violations ${JSON.stringify(json.violations)} for:\n${shader}`,
     );
   }
-});
+}
 
-Deno.test("FUZZ: dangerous shader variants are always blocked", async () => {
-  const rand = rng(BASE_SEED ^ 0xDEADBEEF);
-  for (let i = 0; i < FUZZ_ITERATIONS; i++) {
-    const builder = pick(rand, DANGEROUS_BUILDERS);
-    const { shader: payload, expectedRule } = builder(rand);
+async function fuzzDangerous(
+  stage: "vertex" | "fragment" | "compute" | undefined,
+  builders: Array<(rand: () => number) => DangerousCase>,
+  seed: number,
+  iterations = FUZZ_ITERATIONS,
+) {
+  const rand = rng(seed);
+  for (let i = 0; i < iterations; i++) {
+    const { shader: payload, expectedRule } = pick(rand, builders)(rand);
     const shader = withNoise(rand, payload);
-    const { status, json } = await callSanitizer({ shader });
+    const body: Record<string, unknown> = { shader };
+    if (stage) body.stage = stage;
+    const { status, json } = await callSanitizer(body);
+    const tag = stage ? `[${stage}]` : "[shared]";
     assertEquals(
       status,
       403,
-      `iter=${i} expected 403 got ${status} for rule=${expectedRule}, shader:\n${shader}\nresp=${JSON.stringify(json)}`,
+      `${tag} iter=${i} expected 403 got ${status} for rule=${expectedRule}, shader:\n${shader}\nresp=${JSON.stringify(json)}`,
     );
     assertEquals(json.blocked, true);
     assert(
       Array.isArray(json.violations) && json.violations.length > 0,
-      `iter=${i} no violations reported for:\n${shader}`,
+      `${tag} iter=${i} no violations reported for:\n${shader}`,
     );
     assert(
       json.violations.some((v: any) => v.rule === expectedRule),
-      `iter=${i} expected rule ${expectedRule} not found in ${JSON.stringify(json.violations)} for:\n${shader}`,
+      `${tag} iter=${i} expected ${expectedRule} not in ${JSON.stringify(json.violations)} for:\n${shader}`,
     );
-    assertEquals(json.sanitized, "", `iter=${i} sanitized output should be empty when blocked`);
+    assertEquals(json.sanitized, "", `${tag} iter=${i} sanitized must be empty when blocked`);
   }
+}
+
+// =====================================================================
+// [vertex]
+// =====================================================================
+Deno.test("[vertex] FUZZ: safe vertex shader variants are always allowed", async () => {
+  await fuzzSafe("vertex", VERTEX_SAFE_BUILDERS, BASE_SEED ^ 0x11111111);
 });
 
-Deno.test("FUZZ: dangerous payloads embedded in larger safe-looking shaders are still blocked", async () => {
+Deno.test("[vertex] FUZZ: dangerous patterns in vertex stage are always blocked", async () => {
+  await fuzzDangerous("vertex", SHARED_DANGEROUS_BUILDERS, BASE_SEED ^ 0x22222222);
+});
+
+// =====================================================================
+// [fragment]
+// =====================================================================
+Deno.test("[fragment] FUZZ: safe fragment shader variants are always allowed", async () => {
+  await fuzzSafe("fragment", FRAGMENT_SAFE_BUILDERS, BASE_SEED ^ 0x33333333);
+});
+
+Deno.test("[fragment] FUZZ: dangerous patterns in fragment stage are always blocked", async () => {
+  await fuzzDangerous("fragment", SHARED_DANGEROUS_BUILDERS, BASE_SEED ^ 0x44444444);
+});
+
+// =====================================================================
+// [compute]
+// =====================================================================
+Deno.test("[compute] FUZZ: safe compute shader variants are always allowed", async () => {
+  await fuzzSafe("compute", COMPUTE_SAFE_BUILDERS, BASE_SEED ^ 0x55555555);
+});
+
+Deno.test("[compute] FUZZ: dangerous compute-specific patterns are always blocked", async () => {
+  await fuzzDangerous("compute", COMPUTE_DANGEROUS_BUILDERS, BASE_SEED ^ 0x66666666);
+});
+
+Deno.test("[compute] FUZZ: shared dangerous patterns in compute stage are blocked", async () => {
+  await fuzzDangerous("compute", SHARED_DANGEROUS_BUILDERS, BASE_SEED ^ 0x77777777);
+});
+
+// =====================================================================
+// [shared] — cross-stage payload embedding
+// =====================================================================
+Deno.test("[shared] FUZZ: dangerous payloads embedded in larger safe-looking shaders are still blocked", async () => {
   const rand = rng(BASE_SEED ^ 0x12345678);
+  const ALL_SAFE = [...VERTEX_SAFE_BUILDERS, ...FRAGMENT_SAFE_BUILDERS, ...COMPUTE_SAFE_BUILDERS];
+  const ALL_DANGEROUS = [...SHARED_DANGEROUS_BUILDERS, ...COMPUTE_DANGEROUS_BUILDERS];
   for (let i = 0; i < FUZZ_ITERATIONS / 2; i++) {
-    const safe = pick(rand, SAFE_BUILDERS)(rand);
-    const danger = pick(rand, DANGEROUS_BUILDERS)(rand);
+    const safe = pick(rand, ALL_SAFE)(rand);
+    const danger = pick(rand, ALL_DANGEROUS)(rand);
     const shader = `${safe}\n${danger.shader}\n${safe}`;
     const { status, json } = await callSanitizer({ shader });
     assertEquals(
