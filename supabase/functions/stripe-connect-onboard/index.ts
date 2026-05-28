@@ -4,6 +4,9 @@
 // ============================================================
 
 import Stripe from "npm:stripe@^18";
+import { createClient } from "npm:@supabase/supabase-js@^2";
+
+import Stripe from "npm:stripe@^18";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,12 +26,50 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+  try {
+    // Require authenticated caller and verify ownership of the connected account
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const userClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+    const { data: { user }, error: authErr } = await userClient.auth.getUser();
+    if (authErr || !user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { account_id, return_url, refresh_url } = await req.json();
 
     if (!account_id) {
       return new Response(
         JSON.stringify({ error: "account_id is required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Confirm the caller owns this Stripe connected account
+    const admin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+    const { data: owned } = await admin
+      .from("connected_accounts")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("stripe_account_id", account_id)
+      .maybeSingle();
+    if (!owned) {
+      return new Response(
+        JSON.stringify({ error: "Forbidden: account does not belong to caller" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
