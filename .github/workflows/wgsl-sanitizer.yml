@@ -16,10 +16,19 @@ permissions:
   pull-requests: write
 
 jobs:
+  # ----------------------------------------------------------------------
+  # Integration tests — one job per pipeline stage.
+  # Each test is tagged with [vertex] / [fragment] / [compute] / [shared]
+  # in its name, so --filter selects only that stage.
+  # ----------------------------------------------------------------------
   integration:
-    name: Integration Tests
+    name: Integration / ${{ matrix.stage }}
     timeout-minutes: 5
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        stage: [vertex, fragment, compute, shared]
     env:
       VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
       VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
@@ -30,30 +39,40 @@ jobs:
         with:
           deno-version: v1.x
 
-      - name: Run integration tests with coverage
+      - name: Run integration tests [${{ matrix.stage }}]
         run: |
-          echo "::group::wgsl-sanitizer integration tests"
+          echo "::group::wgsl-sanitizer integration tests — stage=${{ matrix.stage }}"
           deno test \
             --allow-net \
             --allow-env \
             --allow-read \
             --allow-write \
             --no-check \
-            --coverage=coverage/integration \
+            --coverage=coverage/integration-${{ matrix.stage }} \
+            --filter="[${{ matrix.stage }}]" \
             supabase/functions/wgsl-sanitizer/index_test.ts
           echo "::endgroup::"
 
-      - name: Upload integration coverage
+      - name: Upload integration coverage [${{ matrix.stage }}]
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-integration
-          path: coverage/integration
+          name: coverage-integration-${{ matrix.stage }}
+          path: coverage/integration-${{ matrix.stage }}
           retention-days: 7
+          if-no-files-found: ignore
 
+  # ----------------------------------------------------------------------
+  # Fuzz tests — one job per pipeline stage.
+  # ----------------------------------------------------------------------
   fuzz:
-    name: Fuzz Tests
+    name: Fuzz / ${{ matrix.stage }}
     timeout-minutes: 10
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        stage: [vertex, fragment, compute, shared]
     env:
       VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
       VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
@@ -64,30 +83,36 @@ jobs:
         with:
           deno-version: v1.x
 
-      - name: Run fuzz tests with coverage
+      - name: Run fuzz tests [${{ matrix.stage }}]
         run: |
-          echo "::group::wgsl-sanitizer fuzz tests"
+          echo "::group::wgsl-sanitizer fuzz tests — stage=${{ matrix.stage }}"
           deno test \
             --allow-net \
             --allow-env \
             --allow-read \
             --allow-write \
             --no-check \
-            --coverage=coverage/fuzz \
+            --coverage=coverage/fuzz-${{ matrix.stage }} \
+            --filter="[${{ matrix.stage }}]" \
             supabase/functions/wgsl-sanitizer/fuzz_test.ts
           echo "::endgroup::"
 
-      - name: Upload fuzz coverage
+      - name: Upload fuzz coverage [${{ matrix.stage }}]
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-fuzz
-          path: coverage/fuzz
+          name: coverage-fuzz-${{ matrix.stage }}
+          path: coverage/fuzz-${{ matrix.stage }}
           retention-days: 7
+          if-no-files-found: ignore
 
+  # ----------------------------------------------------------------------
+  # Coverage aggregation — combines per-stage coverage and publishes PR comment.
+  # ----------------------------------------------------------------------
   coverage-report:
     name: Coverage Report
     needs: [integration, fuzz]
-    if: always() && (needs.integration.result == 'success' || needs.fuzz.result == 'success')
+    if: always()
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -96,42 +121,36 @@ jobs:
         with:
           deno-version: v1.x
 
-      - name: Download integration coverage
+      - name: Download all coverage artifacts
         uses: actions/download-artifact@v4
         with:
-          name: coverage-integration
-          path: coverage/integration
-        continue-on-error: true
-
-      - name: Download fuzz coverage
-        uses: actions/download-artifact@v4
-        with:
-          name: coverage-fuzz
-          path: coverage/fuzz
+          path: coverage-artifacts
+          pattern: coverage-*
         continue-on-error: true
 
       - name: Generate combined coverage report
         id: coverage
         run: |
           mkdir -p coverage/combined
-          # Merge raw coverage files from both jobs
-          if [ -d coverage/integration ]; then
-            cp -r coverage/integration/* coverage/combined/ 2>/dev/null || true
-          fi
-          if [ -d coverage/fuzz ]; then
-            cp -r coverage/fuzz/* coverage/combined/ 2>/dev/null || true
+          # Merge raw coverage files from every per-stage job
+          if [ -d coverage-artifacts ]; then
+            find coverage-artifacts -mindepth 2 -type f -exec cp {} coverage/combined/ \; 2>/dev/null || true
           fi
 
           INCLUDE='supabase/functions/wgsl-sanitizer/'
+
+          if [ -z "$(ls -A coverage/combined 2>/dev/null)" ]; then
+            echo "No coverage data collected (all test jobs may have failed before producing coverage)." | tee coverage-summary.md
+            cat coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
 
           echo "::group::Detailed coverage"
           deno coverage coverage/combined --include="$INCLUDE" --exclude='_test\.ts|fuzz_test\.ts' | tee coverage-detailed.txt
           echo "::endgroup::"
 
-          # LCOV for tooling
           deno coverage coverage/combined --include="$INCLUDE" --exclude='_test\.ts|fuzz_test\.ts' --lcov --output=coverage.lcov
 
-          # Compute totals from lcov (LF=lines found, LH=lines hit)
           LF=$(grep -E '^LF:' coverage.lcov | awk -F: '{s+=$2} END {print s+0}')
           LH=$(grep -E '^LH:' coverage.lcov | awk -F: '{s+=$2} END {print s+0}')
           if [ "$LF" -gt 0 ]; then
@@ -139,14 +158,22 @@ jobs:
           else
             PCT="0.00"
           fi
-          echo "lines_found=$LF" >> "$GITHUB_OUTPUT"
-          echo "lines_hit=$LH"   >> "$GITHUB_OUTPUT"
-          echo "pct=$PCT"        >> "$GITHUB_OUTPUT"
 
           {
             echo "## WGSL Sanitizer — Coverage Report"
             echo ""
             echo "**Total line coverage:** \`${PCT}%\` (${LH}/${LF} lines)"
+            echo ""
+            echo "### Stage results"
+            echo ""
+            echo "| Stage | Integration | Fuzz |"
+            echo "|-------|-------------|------|"
+            echo "| vertex   | ${{ needs.integration.result == 'success' && '✅' || '❌' }} | ${{ needs.fuzz.result == 'success' && '✅' || '❌' }} |"
+            echo "| fragment | ${{ needs.integration.result == 'success' && '✅' || '❌' }} | ${{ needs.fuzz.result == 'success' && '✅' || '❌' }} |"
+            echo "| compute  | ${{ needs.integration.result == 'success' && '✅' || '❌' }} | ${{ needs.fuzz.result == 'success' && '✅' || '❌' }} |"
+            echo "| shared   | ${{ needs.integration.result == 'success' && '✅' || '❌' }} | ${{ needs.fuzz.result == 'success' && '✅' || '❌' }} |"
+            echo ""
+            echo "<sub>Stage-level pass/fail comes from the matrix jobs — open the Checks tab to see which stage broke.</sub>"
             echo ""
             echo "<details><summary>Per-file breakdown</summary>"
             echo ""
@@ -160,6 +187,7 @@ jobs:
           cat coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload combined coverage artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
@@ -168,6 +196,7 @@ jobs:
             coverage-detailed.txt
             coverage-summary.md
           retention-days: 30
+          if-no-files-found: ignore
 
       - name: Publish coverage comment on PR
         if: github.event_name == 'pull_request'
