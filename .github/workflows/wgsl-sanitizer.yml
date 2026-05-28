@@ -11,6 +11,10 @@ concurrency:
   group: wgsl-sanitizer-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   integration:
     name: Integration Tests
@@ -26,16 +30,25 @@ jobs:
         with:
           deno-version: v1.x
 
-      - name: Run integration tests
+      - name: Run integration tests with coverage
         run: |
           echo "::group::wgsl-sanitizer integration tests"
           deno test \
             --allow-net \
             --allow-env \
             --allow-read \
+            --allow-write \
             --no-check \
+            --coverage=coverage/integration \
             supabase/functions/wgsl-sanitizer/index_test.ts
           echo "::endgroup::"
+
+      - name: Upload integration coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-integration
+          path: coverage/integration
+          retention-days: 7
 
   fuzz:
     name: Fuzz Tests
@@ -51,13 +64,114 @@ jobs:
         with:
           deno-version: v1.x
 
-      - name: Run fuzz tests
+      - name: Run fuzz tests with coverage
         run: |
           echo "::group::wgsl-sanitizer fuzz tests"
           deno test \
             --allow-net \
             --allow-env \
             --allow-read \
+            --allow-write \
             --no-check \
+            --coverage=coverage/fuzz \
             supabase/functions/wgsl-sanitizer/fuzz_test.ts
           echo "::endgroup::"
+
+      - name: Upload fuzz coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-fuzz
+          path: coverage/fuzz
+          retention-days: 7
+
+  coverage-report:
+    name: Coverage Report
+    needs: [integration, fuzz]
+    if: always() && (needs.integration.result == 'success' || needs.fuzz.result == 'success')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v1.x
+
+      - name: Download integration coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-integration
+          path: coverage/integration
+        continue-on-error: true
+
+      - name: Download fuzz coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-fuzz
+          path: coverage/fuzz
+        continue-on-error: true
+
+      - name: Generate combined coverage report
+        id: coverage
+        run: |
+          mkdir -p coverage/combined
+          # Merge raw coverage files from both jobs
+          if [ -d coverage/integration ]; then
+            cp -r coverage/integration/* coverage/combined/ 2>/dev/null || true
+          fi
+          if [ -d coverage/fuzz ]; then
+            cp -r coverage/fuzz/* coverage/combined/ 2>/dev/null || true
+          fi
+
+          INCLUDE='supabase/functions/wgsl-sanitizer/'
+
+          echo "::group::Detailed coverage"
+          deno coverage coverage/combined --include="$INCLUDE" --exclude='_test\.ts|fuzz_test\.ts' | tee coverage-detailed.txt
+          echo "::endgroup::"
+
+          # LCOV for tooling
+          deno coverage coverage/combined --include="$INCLUDE" --exclude='_test\.ts|fuzz_test\.ts' --lcov --output=coverage.lcov
+
+          # Compute totals from lcov (LF=lines found, LH=lines hit)
+          LF=$(grep -E '^LF:' coverage.lcov | awk -F: '{s+=$2} END {print s+0}')
+          LH=$(grep -E '^LH:' coverage.lcov | awk -F: '{s+=$2} END {print s+0}')
+          if [ "$LF" -gt 0 ]; then
+            PCT=$(awk "BEGIN {printf \"%.2f\", ($LH/$LF)*100}")
+          else
+            PCT="0.00"
+          fi
+          echo "lines_found=$LF" >> "$GITHUB_OUTPUT"
+          echo "lines_hit=$LH"   >> "$GITHUB_OUTPUT"
+          echo "pct=$PCT"        >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## WGSL Sanitizer — Coverage Report"
+            echo ""
+            echo "**Total line coverage:** \`${PCT}%\` (${LH}/${LF} lines)"
+            echo ""
+            echo "<details><summary>Per-file breakdown</summary>"
+            echo ""
+            echo '```'
+            cat coverage-detailed.txt
+            echo '```'
+            echo ""
+            echo "</details>"
+          } > coverage-summary.md
+
+          cat coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload combined coverage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            coverage.lcov
+            coverage-detailed.txt
+            coverage-summary.md
+          retention-days: 30
+
+      - name: Publish coverage comment on PR
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: wgsl-sanitizer-coverage
+          path: coverage-summary.md
