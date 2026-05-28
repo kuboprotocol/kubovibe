@@ -492,6 +492,33 @@ export type Database = {
         }
         Relationships: []
       }
+      github_oauth_states: {
+        Row: {
+          consumed_at: string | null
+          created_at: string
+          expires_at: string
+          nonce: string
+          return_url: string
+          user_id: string
+        }
+        Insert: {
+          consumed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          nonce: string
+          return_url?: string
+          user_id: string
+        }
+        Update: {
+          consumed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          nonce?: string
+          return_url?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       gmail_accounts: {
         Row: {
           access_token_cache: string | null
