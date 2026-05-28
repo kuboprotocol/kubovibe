@@ -26,7 +26,6 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-  try {
     // Require authenticated caller and verify ownership of the connected account
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
