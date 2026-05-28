@@ -6,16 +6,28 @@ Deno.serve(async (req) => {
   const error = url.searchParams.get('error')
   const stateParam = url.searchParams.get('state')
 
-  // Parse state to get app return URL + uid
+  // The state parameter is now an opaque nonce; user_id and returnUrl are looked up server-side.
   let appBaseUrl = ''
   let uid: string | null = null
-  try {
-    if (stateParam) {
-      const decoded = JSON.parse(atob(stateParam))
-      if (decoded.returnUrl) appBaseUrl = new URL(decoded.returnUrl).origin
-      if (decoded.uid) uid = String(decoded.uid)
+
+  const admin = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+  )
+
+  if (stateParam) {
+    const { data: stateRow } = await admin
+      .from('github_oauth_states')
+      .select('user_id, return_url, expires_at, consumed_at')
+      .eq('nonce', stateParam)
+      .maybeSingle()
+    if (stateRow && !stateRow.consumed_at && new Date(stateRow.expires_at).getTime() > Date.now()) {
+      uid = String(stateRow.user_id)
+      try { if (stateRow.return_url) appBaseUrl = new URL(stateRow.return_url).origin } catch { /* ignore */ }
+      // One-shot consume
+      await admin.from('github_oauth_states').update({ consumed_at: new Date().toISOString() }).eq('nonce', stateParam)
     }
-  } catch { /* ignore */ }
+  }
 
   const redirect = (path: string) => {
     const target = appBaseUrl ? `${appBaseUrl}${path}` : path
@@ -48,10 +60,7 @@ Deno.serve(async (req) => {
     const ghUser = await userRes.json()
 
     // Persist token server-side via service role — never trafega pelo client
-    const admin = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-    )
+    // (admin client already created above for state validation)
     await admin.from('github_connections').upsert({
       user_id: uid,
       access_token: accessToken,

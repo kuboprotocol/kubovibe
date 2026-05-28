@@ -45,13 +45,20 @@ Deno.serve(async (req) => {
 
     const { returnUrl } = await req.json().catch(() => ({ returnUrl: '' }))
 
-    // Encode the app return URL + user_id in the state so the callback can persist + redirect
-    const statePayload = JSON.stringify({
-      nonce: crypto.randomUUID(),
-      returnUrl: returnUrl || '',
-      uid: u.user.id,
+    // Store nonce server-side; the callback will validate against this row.
+    // We do NOT trust uid from the state — the callback reads it from the DB row.
+    const nonce = crypto.randomUUID()
+    const { error: insertErr } = await adminClient.from('github_oauth_states').insert({
+      nonce,
+      user_id: u.user.id,
+      return_url: returnUrl || '',
     })
-    const state = btoa(statePayload)
+    if (insertErr) {
+      return new Response(JSON.stringify({ error: 'failed_to_persist_state' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500,
+      })
+    }
+    const state = nonce
 
     const params = new URLSearchParams({
       client_id: clientId,

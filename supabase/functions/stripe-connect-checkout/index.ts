@@ -5,6 +5,25 @@
 // ============================================================
 
 import Stripe from "npm:stripe@^18";
+import { createClient } from "npm:@supabase/supabase-js@^2";
+
+const ALLOWED_REDIRECT_ORIGINS = [
+  "https://kubovibe.lovable.app",
+  "https://kubovibe.dev",
+  "https://id-preview--5ce8b966-167f-4e5a-be1c-165ac92bd64e.lovable.app",
+];
+
+function isAllowedRedirect(u: string | undefined): boolean {
+  if (!u) return true;
+  try {
+    const origin = new URL(u).origin;
+    return ALLOWED_REDIRECT_ORIGINS.includes(origin);
+  } catch {
+    return false;
+  }
+}
+
+import Stripe from "npm:stripe@^18";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -22,6 +41,25 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    // Require authenticated caller
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+    const { data: { user }, error: authErr } = await supabase.auth.getUser();
+    if (authErr || !user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const {
       product_name,
       price_cents,
@@ -38,6 +76,13 @@ Deno.serve(async (req: Request) => {
         JSON.stringify({
           error: "product_name, price_cents, and connected_account_id required",
         }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!isAllowedRedirect(success_url) || !isAllowedRedirect(cancel_url)) {
+      return new Response(
+        JSON.stringify({ error: "success_url/cancel_url must be on an allowed origin" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
