@@ -210,35 +210,88 @@ jobs:
         with:
           deno-version: v1.x
 
-      - name: Download all coverage artifacts
+      - name: Download integration coverage artifacts (per stage)
         uses: actions/download-artifact@v4
         with:
-          path: coverage-artifacts
-          pattern: coverage-*
+          path: coverage-artifacts/integration
+          pattern: coverage-integration-*
+          merge-multiple: false
+        continue-on-error: true
+
+      - name: Download fuzz coverage artifacts (per stage)
+        uses: actions/download-artifact@v4
+        with:
+          path: coverage-artifacts/fuzz
+          pattern: coverage-fuzz-*
+          merge-multiple: false
         continue-on-error: true
 
       - name: Generate combined coverage report
         id: coverage
         run: |
-          mkdir -p coverage/combined
-          # Merge raw coverage files from every per-stage job
-          if [ -d coverage-artifacts ]; then
-            find coverage-artifacts -mindepth 2 -type f -exec cp {} coverage/combined/ \; 2>/dev/null || true
-          fi
-
+          set -euo pipefail
           INCLUDE='supabase/functions/wgsl-sanitizer/'
+          EXCLUDE='_test\.ts|fuzz_test\.ts'
+          STAGES=(vertex fragment compute shared)
+          KINDS=(integration fuzz)
 
+          mkdir -p coverage/combined per-stage-lcov
+
+          # ----- Per-stage coverage computation -----
+          declare -A STAGE_PCT STAGE_LH STAGE_LF
+          for kind in "${KINDS[@]}"; do
+            for stage in "${STAGES[@]}"; do
+              key="${kind}-${stage}"
+              src="coverage-artifacts/${kind}/coverage-${kind}-${stage}"
+              dst="coverage/per-stage/${key}"
+              mkdir -p "$dst"
+              if [ -d "$src" ]; then
+                # Flatten raw coverage profile files (*.json) into the per-stage dir
+                find "$src" -type f -name '*.json' -exec cp {} "$dst/" \; 2>/dev/null || true
+                # Also feed the combined pool used for the overall total
+                find "$src" -type f -name '*.json' -exec cp {} coverage/combined/ \; 2>/dev/null || true
+              fi
+
+              if [ -n "$(ls -A "$dst" 2>/dev/null)" ]; then
+                lcov_file="per-stage-lcov/${key}.lcov"
+                deno coverage "$dst" --include="$INCLUDE" --exclude="$EXCLUDE" --lcov --output="$lcov_file" || true
+                if [ -s "$lcov_file" ]; then
+                  lf=$(grep -E '^LF:' "$lcov_file" | awk -F: '{s+=$2} END {print s+0}')
+                  lh=$(grep -E '^LH:' "$lcov_file" | awk -F: '{s+=$2} END {print s+0}')
+                else
+                  lf=0; lh=0
+                fi
+              else
+                lf=0; lh=0
+              fi
+
+              STAGE_LF[$key]=$lf
+              STAGE_LH[$key]=$lh
+              if [ "$lf" -gt 0 ]; then
+                STAGE_PCT[$key]=$(awk "BEGIN {printf \"%.2f\", ($lh/$lf)*100}")
+              else
+                STAGE_PCT[$key]="—"
+              fi
+            done
+          done
+
+          # ----- Combined total -----
           if [ -z "$(ls -A coverage/combined 2>/dev/null)" ]; then
-            echo "No coverage data collected (all test jobs may have failed before producing coverage)." | tee coverage-summary.md
-            cat coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
+            {
+              echo "## WGSL Sanitizer — Coverage Report"
+              echo ""
+              echo "_No coverage data collected — all test jobs may have failed before producing coverage._"
+            } | tee coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
+            : > coverage.lcov
+            : > coverage-detailed.txt
             exit 0
           fi
 
           echo "::group::Detailed coverage"
-          deno coverage coverage/combined --include="$INCLUDE" --exclude='_test\.ts|fuzz_test\.ts' | tee coverage-detailed.txt
+          deno coverage coverage/combined --include="$INCLUDE" --exclude="$EXCLUDE" | tee coverage-detailed.txt
           echo "::endgroup::"
 
-          deno coverage coverage/combined --include="$INCLUDE" --exclude='_test\.ts|fuzz_test\.ts' --lcov --output=coverage.lcov
+          deno coverage coverage/combined --include="$INCLUDE" --exclude="$EXCLUDE" --lcov --output=coverage.lcov
 
           LF=$(grep -E '^LF:' coverage.lcov | awk -F: '{s+=$2} END {print s+0}')
           LH=$(grep -E '^LH:' coverage.lcov | awk -F: '{s+=$2} END {print s+0}')
@@ -248,21 +301,51 @@ jobs:
             PCT="0.00"
           fi
 
+          icon() {
+            case "$1" in
+              success) echo "✅" ;;
+              failure) echo "❌" ;;
+              cancelled) echo "🚫" ;;
+              skipped) echo "⏭️" ;;
+              *) echo "❔" ;;
+            esac
+          }
+          INTEG_ICON=$(icon "${{ needs.integration.result }}")
+          FUZZ_ICON=$(icon "${{ needs.fuzz.result }}")
+
+          fmt_cell() {
+            local key="$1"
+            local pct="${STAGE_PCT[$key]}"
+            local lh="${STAGE_LH[$key]}"
+            local lf="${STAGE_LF[$key]}"
+            if [ "$pct" = "—" ]; then
+              echo "—"
+            else
+              echo "\`${pct}%\` (${lh}/${lf})"
+            fi
+          }
+
           {
             echo "## WGSL Sanitizer — Coverage Report"
             echo ""
             echo "**Total line coverage:** \`${PCT}%\` (${LH}/${LF} lines)"
             echo ""
-            echo "### Stage results"
+            echo "Aggregated from per-stage artifacts: \`coverage-integration-{vertex,fragment,compute,shared}\` + \`coverage-fuzz-{...}\`."
+            echo ""
+            echo "### Coverage by stage"
             echo ""
             echo "| Stage | Integration | Fuzz |"
             echo "|-------|-------------|------|"
-            echo "| vertex   | ${{ needs.integration.result == 'success' && '✅' || '❌' }} | ${{ needs.fuzz.result == 'success' && '✅' || '❌' }} |"
-            echo "| fragment | ${{ needs.integration.result == 'success' && '✅' || '❌' }} | ${{ needs.fuzz.result == 'success' && '✅' || '❌' }} |"
-            echo "| compute  | ${{ needs.integration.result == 'success' && '✅' || '❌' }} | ${{ needs.fuzz.result == 'success' && '✅' || '❌' }} |"
-            echo "| shared   | ${{ needs.integration.result == 'success' && '✅' || '❌' }} | ${{ needs.fuzz.result == 'success' && '✅' || '❌' }} |"
+            for stage in "${STAGES[@]}"; do
+              echo "| ${stage} | $(fmt_cell "integration-${stage}") | $(fmt_cell "fuzz-${stage}") |"
+            done
             echo ""
-            echo "<sub>Stage-level pass/fail comes from the matrix jobs — open the Checks tab to see which stage broke.</sub>"
+            echo "### Job results"
+            echo ""
+            echo "- Integration matrix: ${INTEG_ICON} \`${{ needs.integration.result }}\`"
+            echo "- Fuzz matrix: ${FUZZ_ICON} \`${{ needs.fuzz.result }}\`"
+            echo ""
+            echo "<sub>Per-stage pass/fail comes from the matrix jobs — open the Checks tab to see which stage broke.</sub>"
             echo ""
             echo "<details><summary>Per-file breakdown</summary>"
             echo ""
@@ -274,6 +357,7 @@ jobs:
           } > coverage-summary.md
 
           cat coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
+
 
       - name: Upload combined coverage artifacts
         if: always()
