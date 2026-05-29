@@ -22,13 +22,23 @@ jobs:
   # in its name, so --filter selects only that stage.
   # ----------------------------------------------------------------------
   integration:
-    name: Integration / ${{ matrix.stage }}
+    name: Integration / ${{ matrix.stage }} / deno-${{ matrix.deno-version }}
     timeout-minutes: 5
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         stage: [vertex, fragment, compute, shared]
+        deno-version: ["v1.x", "v2.x", "canary"]
+        include:
+          - deno-version: "v1.x"
+            primary: true
+          - deno-version: "v2.x"
+            primary: false
+          - deno-version: "canary"
+            primary: false
+            experimental: true
+    continue-on-error: ${{ matrix.experimental == true }}
     env:
       VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
       VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
@@ -37,42 +47,87 @@ jobs:
 
       - uses: denoland/setup-deno@v2
         with:
-          deno-version: v1.x
+          deno-version: ${{ matrix.deno-version }}
 
-      - name: Run integration tests [${{ matrix.stage }}]
+      - name: Print Deno version
+        run: deno --version
+
+      - name: Run integration tests [${{ matrix.stage }}] on deno ${{ matrix.deno-version }}
+        id: run_tests
         run: |
-          echo "::group::wgsl-sanitizer integration tests — stage=${{ matrix.stage }}"
+          mkdir -p logs
+          LOG_FILE="logs/integration-${{ matrix.stage }}-${{ matrix.deno-version }}.log"
+          echo "::group::wgsl-sanitizer integration tests — stage=${{ matrix.stage }} deno=${{ matrix.deno-version }}"
+          set -o pipefail
           deno test \
             --allow-net \
             --allow-env \
             --allow-read \
             --allow-write \
             --no-check \
-            --coverage=coverage/integration-${{ matrix.stage }} \
+            --coverage=coverage/integration-${{ matrix.stage }}-${{ matrix.deno-version }} \
             --filter="[${{ matrix.stage }}]" \
-            supabase/functions/wgsl-sanitizer/index_test.ts
+            supabase/functions/wgsl-sanitizer/index_test.ts 2>&1 | tee "$LOG_FILE"
+          STATUS=${PIPESTATUS[0]}
           echo "::endgroup::"
+          exit $STATUS
 
-      - name: Upload integration coverage [${{ matrix.stage }}]
+      - name: Surface failure logs
+        if: failure()
+        run: |
+          LOG_FILE="logs/integration-${{ matrix.stage }}-${{ matrix.deno-version }}.log"
+          echo "::error title=Integration ${{ matrix.stage }} failed on deno ${{ matrix.deno-version }}::See log tail below"
+          {
+            echo "## ❌ Integration / ${{ matrix.stage }} / deno-${{ matrix.deno-version }} failed"
+            echo ""
+            echo '<details><summary>Last 200 log lines</summary>'
+            echo ""
+            echo '```'
+            tail -n 200 "$LOG_FILE" || echo "(no log captured)"
+            echo '```'
+            echo ""
+            echo '</details>'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload run logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
+          name: logs-integration-${{ matrix.stage }}-${{ matrix.deno-version }}
+          path: logs/integration-${{ matrix.stage }}-${{ matrix.deno-version }}.log
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Upload integration coverage [${{ matrix.stage }}]
+        if: always() && matrix.primary == true
+        uses: actions/upload-artifact@v4
+        with:
           name: coverage-integration-${{ matrix.stage }}
-          path: coverage/integration-${{ matrix.stage }}
+          path: coverage/integration-${{ matrix.stage }}-${{ matrix.deno-version }}
           retention-days: 7
           if-no-files-found: ignore
 
   # ----------------------------------------------------------------------
-  # Fuzz tests — one job per pipeline stage.
+  # Fuzz tests — matrix over stage × Deno version.
   # ----------------------------------------------------------------------
   fuzz:
-    name: Fuzz / ${{ matrix.stage }}
+    name: Fuzz / ${{ matrix.stage }} / deno-${{ matrix.deno-version }}
     timeout-minutes: 10
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         stage: [vertex, fragment, compute, shared]
+        deno-version: ["v1.x", "v2.x", "canary"]
+        include:
+          - deno-version: "v1.x"
+            primary: true
+          - deno-version: "v2.x"
+            primary: false
+          - deno-version: "canary"
+            primary: false
+            experimental: true
+    continue-on-error: ${{ matrix.experimental == true }}
     env:
       VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
       VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
@@ -81,28 +136,62 @@ jobs:
 
       - uses: denoland/setup-deno@v2
         with:
-          deno-version: v1.x
+          deno-version: ${{ matrix.deno-version }}
 
-      - name: Run fuzz tests [${{ matrix.stage }}]
+      - name: Print Deno version
+        run: deno --version
+
+      - name: Run fuzz tests [${{ matrix.stage }}] on deno ${{ matrix.deno-version }}
         run: |
-          echo "::group::wgsl-sanitizer fuzz tests — stage=${{ matrix.stage }}"
+          mkdir -p logs
+          LOG_FILE="logs/fuzz-${{ matrix.stage }}-${{ matrix.deno-version }}.log"
+          echo "::group::wgsl-sanitizer fuzz tests — stage=${{ matrix.stage }} deno=${{ matrix.deno-version }}"
+          set -o pipefail
           deno test \
             --allow-net \
             --allow-env \
             --allow-read \
             --allow-write \
             --no-check \
-            --coverage=coverage/fuzz-${{ matrix.stage }} \
+            --coverage=coverage/fuzz-${{ matrix.stage }}-${{ matrix.deno-version }} \
             --filter="[${{ matrix.stage }}]" \
-            supabase/functions/wgsl-sanitizer/fuzz_test.ts
+            supabase/functions/wgsl-sanitizer/fuzz_test.ts 2>&1 | tee "$LOG_FILE"
+          STATUS=${PIPESTATUS[0]}
           echo "::endgroup::"
+          exit $STATUS
 
-      - name: Upload fuzz coverage [${{ matrix.stage }}]
+      - name: Surface failure logs
+        if: failure()
+        run: |
+          LOG_FILE="logs/fuzz-${{ matrix.stage }}-${{ matrix.deno-version }}.log"
+          echo "::error title=Fuzz ${{ matrix.stage }} failed on deno ${{ matrix.deno-version }}::See log tail below"
+          {
+            echo "## ❌ Fuzz / ${{ matrix.stage }} / deno-${{ matrix.deno-version }} failed"
+            echo ""
+            echo '<details><summary>Last 200 log lines</summary>'
+            echo ""
+            echo '```'
+            tail -n 200 "$LOG_FILE" || echo "(no log captured)"
+            echo '```'
+            echo ""
+            echo '</details>'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload run logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
+          name: logs-fuzz-${{ matrix.stage }}-${{ matrix.deno-version }}
+          path: logs/fuzz-${{ matrix.stage }}-${{ matrix.deno-version }}.log
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Upload fuzz coverage [${{ matrix.stage }}]
+        if: always() && matrix.primary == true
+        uses: actions/upload-artifact@v4
+        with:
           name: coverage-fuzz-${{ matrix.stage }}
-          path: coverage/fuzz-${{ matrix.stage }}
+          path: coverage/fuzz-${{ matrix.stage }}-${{ matrix.deno-version }}
           retention-days: 7
           if-no-files-found: ignore
 
