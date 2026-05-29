@@ -42,6 +42,7 @@ jobs:
     env:
       VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
       VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+      DENO_DIR: ${{ github.workspace }}/.deno-cache
     steps:
       - uses: actions/checkout@v4
 
@@ -49,8 +50,23 @@ jobs:
         with:
           deno-version: ${{ matrix.deno-version }}
 
+      - name: Cache Deno dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.deno-cache
+          key: deno-${{ runner.os }}-${{ matrix.deno-version }}-integration-${{ hashFiles('supabase/functions/wgsl-sanitizer/**/*.ts', 'supabase/functions/_shared/**/*.ts', 'deno.json', 'deno.jsonc', 'import_map.json') }}
+          restore-keys: |
+            deno-${{ runner.os }}-${{ matrix.deno-version }}-integration-
+            deno-${{ runner.os }}-${{ matrix.deno-version }}-
+
       - name: Print Deno version
         run: deno --version
+
+      - name: Warm Deno cache
+        run: |
+          deno cache --no-check \
+            supabase/functions/wgsl-sanitizer/index.ts \
+            supabase/functions/wgsl-sanitizer/index_test.ts
 
       - name: Run integration tests [${{ matrix.stage }}] on deno ${{ matrix.deno-version }}
         id: run_tests
