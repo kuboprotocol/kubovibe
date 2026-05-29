@@ -358,6 +358,73 @@ jobs:
 
           cat coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Highlight failing stages with job links
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_ID: ${{ github.run_id }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # Fetch every job from this workflow run (paginated)
+          gh api --paginate "repos/${REPO}/actions/runs/${RUN_ID}/jobs" \
+            -q '.jobs[] | {name: .name, status: .status, conclusion: .conclusion, html_url: .html_url}' \
+            > jobs.ndjson || echo "[]" > jobs.ndjson
+
+          # Pick only failed Integration / Fuzz matrix jobs and parse stage out of the name
+          # Job names look like: "Integration / vertex / deno-v1.x" or "Fuzz / compute / deno-v2.x"
+          FAILED=$(jq -rs '
+            map(select(.conclusion == "failure"
+                       and (.name | test("^(Integration|Fuzz) / (vertex|fragment|compute|shared) /"))))
+            | map({
+                kind: (.name | capture("^(?<k>Integration|Fuzz)").k),
+                stage: (.name | capture("/ (?<s>vertex|fragment|compute|shared) /").s),
+                deno: (.name | capture("deno-(?<d>[^ ]+)$").d // "?"),
+                url: .html_url,
+                name: .name
+              })
+          ' jobs.ndjson)
+
+          COUNT=$(echo "$FAILED" | jq 'length')
+
+          if [ "$COUNT" -eq 0 ]; then
+            HIGHLIGHT=$'\n### ✅ All stages passed\n\nNo failing `Integration` or `Fuzz` matrix jobs detected for this run.\n'
+          else
+            # Collect distinct failed stages, ordered: vertex, fragment, compute, shared
+            STAGES=$(echo "$FAILED" | jq -r '[.[].stage] | unique | .[]' | \
+                     awk 'BEGIN{order["vertex"]=1;order["fragment"]=2;order["compute"]=3;order["shared"]=4} {print order[$0]"\t"$0}' | \
+                     sort -n | cut -f2)
+
+            STAGE_BADGES=""
+            for s in $STAGES; do
+              STAGE_BADGES="${STAGE_BADGES}\`${s}\` "
+            done
+
+            {
+              echo ""
+              echo "### ❌ Failing stages: ${STAGE_BADGES}"
+              echo ""
+              echo "| Stage | Kind | Deno | Job |"
+              echo "|-------|------|------|-----|"
+              echo "$FAILED" | jq -r '.[] | "| \(.stage) | \(.kind) | \(.deno) | [open job](\(.url)) |"'
+              echo ""
+              RUN_URL="${{ github.server_url }}/${REPO}/actions/runs/${RUN_ID}"
+              echo "[View full workflow run](${RUN_URL})"
+            } > stage-failures.md
+
+            HIGHLIGHT=$(cat stage-failures.md)
+          fi
+
+          # Prepend highlight to the existing coverage-summary.md so it shows up at the top of the PR comment
+          {
+            head -n 1 coverage-summary.md
+            printf '%s\n' "$HIGHLIGHT"
+            tail -n +2 coverage-summary.md
+          } > coverage-summary.new.md
+          mv coverage-summary.new.md coverage-summary.md
+
+          cat coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
+
 
       - name: Upload combined coverage artifacts
         if: always()
