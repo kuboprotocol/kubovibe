@@ -1154,7 +1154,7 @@ ORDER BY n.nspname, c.relname;
 
 #### Verificação dedicada de tabelas e views via `pg_class` por `relkind` (todos os schemas)
 
-Além da varredura por nome, execute uma consulta **direta no catálogo** filtrando por `relkind` para garantir que não restaram tabelas (`r`) ou views (`v`) remanescentes das amostras em **qualquer schema** — incluindo schemas de sistema, extensões e schemas criados dinamicamente. Esta query detecta objetos mesmo que tenham sido renomeados ou movidos entre schemas, desde que ainda existam no catálogo.
+Além da varredura por nome, execute uma consulta **direta no catálogo** filtrando por `relkind` para garantir que não restaram tabelas (`r`), views (`v`) ou materialized views (`m`) remanescentes das amostras em **qualquer schema** — incluindo schemas de sistema, extensões e schemas criados dinamicamente. Esta query detecta objetos mesmo que tenham sido renomeados ou movidos entre schemas, desde que ainda existam no catálogo.
 
 **Consulta filtrando exclusivamente tabelas (`r`) e views (`v`):**
 
@@ -1188,7 +1188,40 @@ ORDER BY n.nspname, c.relname;
 (0 rows)
 ```
 
-> Se esta consulta retornar `(0 rows)`, confirma que **nenhuma tabela ou view** derivada das amostras permanece em nenhum schema do PostgreSQL após o rollback. Esta verificação é complementar às anteriores e garante que o rollback foi concluído sem deixar objetos de relação (`pg_class`) ativos no catálogo.
+> Se esta consulta retornar `(0 rows)`, confirma que **nenhuma tabela ou view** derivada das amostras permanece em nenhum schema do PostgreSQL após o rollback.
+
+---
+
+**Consulta adicional — materialized views (`m`):**
+
+```bash
+psql "$DATABASE_URL" -c "
+SELECT n.nspname AS schema_name,
+       c.relname AS object_name,
+       'materialized view' AS object_type,
+       pg_get_userbyid(c.relowner) AS owner,
+       obj_description(c.oid, 'pg_class') AS description
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE c.relkind = 'm'
+  AND (
+    c.relname ILIKE '%example_objects%'
+    OR c.relname ILIKE '%example_triggers%'
+    OR c.relname ILIKE '%example_trigger_events%'
+  )
+ORDER BY n.nspname, c.relname;
+"
+```
+
+**Resultado esperado:**
+
+```
+ schema_name | object_name | object_type | owner | description
+-------------+-------------+-------------+-------+-------------
+(0 rows)
+```
+
+> Se esta consulta retornar `(0 rows)`, confirma que **nenhuma materialized view** derivada das amostras permanece em nenhum schema. As três verificações de `relkind` (tabelas, views e materialized views) são complementares às anteriores e garantem que o rollback foi concluído sem deixar objetos de relação (`pg_class`) ativos no catálogo do PostgreSQL.
 
 
 
