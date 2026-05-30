@@ -436,6 +436,19 @@ Triggers ativos no banco (schemas `public`, `auth` e `storage`), com timing, eve
 
 > **Nota sobre contagem:** o catálogo `information_schema.triggers` conta **cada evento separadamente**. O trigger `enforce_bucket_name_length_trigger` em `storage.buckets` aparece em **duas linhas** (`INSERT` e `UPDATE`), o que eleva o total de 14 "trigger names" para **15 linhas no catálogo**. O README lista ambas as linhas para refletir o schema real.
 
+```sql
+-- Reproduzir a contagem no banco (retorna 15 linhas — INSERT e UPDATE separados)
+SELECT
+    trigger_name,
+    event_object_table  AS tabela,
+    action_timing       AS timing,
+    event_manipulation  AS evento,
+    action_statement    AS funcao
+FROM information_schema.triggers
+WHERE trigger_schema IN ('public', 'auth', 'storage')
+ORDER BY trigger_schema, trigger_name, event_manipulation;
+```
+
 #### Schema `auth`
 
 | Trigger | Tabela | Timing | Evento | Função | Tabelas/colunas afetadas |
