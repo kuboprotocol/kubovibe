@@ -479,6 +479,59 @@ Trigger genérico que executa `NEW.updated_at = now(); RETURN NEW;`. Garante tim
 
 ---
 
+### Funções Executadas pelas Triggers — Detalhamento
+
+Detalhe de cada função SQL/PLpgSQL invocada pelas triggers acima: assinatura, retorno, efeitos no banco e tratamento de erro.
+
+#### `public.handle_new_user() RETURNS trigger`
+
+- **Trigger que invoca:** `on_auth_user_created` (AFTER INSERT em `auth.users`).
+- **Segurança:** `SECURITY DEFINER`, `search_path = public`.
+- **Retorno:** `NEW` (row inserida em `auth.users`, inalterada — é AFTER, então não modifica o registro original).
+- **Modifica:**
+  1. `INSERT INTO public.profiles (id, display_name, referral_code)` — sempre, para todo novo usuário.
+     - `id ← NEW.id`
+     - `display_name ← COALESCE(NEW.raw_user_meta_data->>'display_name', NEW.email)`
+     - `referral_code ← substr(NEW.id::text, 1, 8)`
+  2. Se `NEW.raw_user_meta_data->>'referral_code'` existir e bater com um `profiles.referral_code` de outro usuário:
+     - `INSERT INTO public.referrals (referrer_id, referred_id, credits_awarded=100)`
+     - `UPDATE public.subscriptions SET edits_limit = edits_limit + 100, updated_at = now() WHERE user_id = referrer AND is_active = true`
+     - `PERFORM net.http_post(...)` → Edge Function `send-transactional-email` com template `referral-notification` e `idempotencyKey = 'referral-<referrer>-<referred>'`.
+- **Tratamento de erro:** o bloco de notificação por email está envolvido em `BEGIN ... EXCEPTION WHEN OTHERS THEN RAISE WARNING` — falha de email **não aborta** o signup. Falhas de `INSERT` em `profiles`/`referrals` **propagam** e abortam a transação.
+
+#### `public.touch_updated_at() RETURNS trigger`
+
+- **Triggers que invocam (9):** `api_credentials_touch`, `trg_audit_shares_updated`, `gmail_accounts_touch`, `trg_npc_memories_updated_at`, `render_policies_touch`, `render_connections_touch`, `trg_slide_decks_updated`, `trg_slide_pages_updated`, `web3_connections_touch_updated_at`.
+- **Segurança:** sem `SECURITY DEFINER` (executa como o usuário do `UPDATE`).
+- **Retorno:** `NEW` com `updated_at` reescrito para `now()`.
+- **Modifica:** apenas `NEW.updated_at` (em memória, antes do `UPDATE` ser persistido — `BEFORE UPDATE`). Não toca nenhuma outra tabela.
+- **Corpo:** `BEGIN NEW.updated_at = now(); RETURN NEW; END;`
+- **Efeito prático:** garante que o timestamp seja sempre o da transação, mesmo se o cliente enviar `updated_at` explicitamente ou omitir o campo.
+
+#### `storage.enforce_bucket_name_length()` *(gerenciada pelo Supabase)*
+
+- **Triggers que invocam:** `enforce_bucket_name_length_trigger` (BEFORE INSERT **e** BEFORE UPDATE em `storage.buckets`).
+- **Retorno:** `NEW` se o nome do bucket respeitar os limites de tamanho; caso contrário, `RAISE EXCEPTION` aborta a operação.
+- **Modifica:** nada — função puramente validadora.
+
+#### `storage.protect_delete()` *(gerenciada pelo Supabase)*
+
+- **Triggers que invocam:** `protect_buckets_delete` (BEFORE DELETE em `storage.buckets`) e `protect_objects_delete` (BEFORE DELETE em `storage.objects`).
+- **Retorno:** `OLD` se a deleção for permitida; `RAISE EXCEPTION` para buckets/objetos protegidos do sistema.
+- **Modifica:** nada — gate de proteção contra DELETE acidental em recursos internos do Storage.
+
+#### `storage.update_updated_at_column()` *(gerenciada pelo Supabase)*
+
+- **Trigger que invoca:** `update_objects_updated_at` (BEFORE UPDATE em `storage.objects`).
+- **Retorno:** `NEW` com `updated_at = now()`.
+- **Modifica:** apenas `NEW.updated_at` da row em `storage.objects` — análogo ao `touch_updated_at()` do schema `public`.
+
+> **Observação:** funções do schema `storage` são propriedade do Supabase e podem ser alteradas em upgrades da plataforma; o projeto **não as redefine** nem depende do corpo exato — apenas do contrato (validação de nome, proteção de delete e sincronização de `updated_at`).
+
+---
+
+
+
 
 
 ```sql
