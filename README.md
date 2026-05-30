@@ -430,49 +430,55 @@ Conquistas permanentes desbloqueadas (visíveis no perfil público).
 
 ---
 
-### Triggers e Defaults Efetivos
+### Triggers do Banco — Listagem Completa
 
-Triggers ativos no schema `public` e `auth` que preenchem colunas ou sobrescrevem defaults em tempo de inserção/atualização.
+Triggers ativos no banco (schemas `public`, `auth` e `storage`), com timing, evento, tabela/colunas afetadas e função executada. Lista extraída de `information_schema.triggers` + `pg_trigger`.
 
-#### `on_auth_user_created` → `handle_new_user()`
+#### Schema `auth`
 
-| Atributo | Valor |
-|---|---|
-| **Tabela de origem** | `auth.users` (schema `auth`) |
-| **Evento** | `AFTER INSERT` |
-| **Função** | `handle_new_user()` (SECURITY DEFINER) |
-| **Colunas preenchidas / ações** | |
-| `profiles.id` | `NEW.id` (UUID do `auth.users`) — **PK/FK implícita**. |
-| `profiles.display_name` | `COALESCE(NEW.raw_user_meta_data->>'display_name', NEW.email)` |
-| `profiles.referral_code` | `substr(NEW.id::text, 1, 8)` — código de 8 chars gerado automaticamente. |
-| `referrals.referrer_id` | ID do usuário que indicou (buscado por `referral_code` nos metadados). |
-| `referrals.referred_id` | `NEW.id` — o novo usuário. |
-| `referrals.credits_awarded` | `100` (fixo). |
-| `subscriptions.edits_limit` | Incrementado em `+100` no plano ativo do referrer. |
-| **Efeitos colaterais** | Envia email transacional ao referrer via `net.http_post` → Edge Function `send-transactional-email`. |
-| **Defaults efetivos via trigger** | `profiles.referral_code` não possui default na DDL; o trigger é a **única fonte** do valor. `profiles.display_name` também é populado exclusivamente pelo trigger (coluna `DEFAULT None`). |
+| Trigger | Tabela | Timing | Evento | Função | Tabelas/colunas afetadas |
+|---|---|---|---|---|---|
+| `on_auth_user_created` | `auth.users` | `AFTER` | `INSERT` | `public.handle_new_user()` (SECURITY DEFINER) | **Insere em `public.profiles`** (`id`, `display_name`, `referral_code`). Se houver `referral_code` em `raw_user_meta_data`: **insere em `public.referrals`** (`referrer_id`, `referred_id`, `credits_awarded=100`) e **atualiza `public.subscriptions.edits_limit`** (`+100`) do referrer. Dispara `net.http_post` → Edge Function `send-transactional-email`. |
 
-> **Nota:** a coluna `profiles.referral_code` não tem `DEFAULT` na tabela (`Default: None`). O trigger `handle_new_user` é a fonte obrigatória do código de indicação.
+> `profiles.referral_code` e `profiles.display_name` **não têm `DEFAULT` na DDL** — este trigger é a única fonte desses valores.
 
-#### `touch_updated_at` → `touch_updated_at()`
+#### Schema `public` — `touch_updated_at()` (`BEFORE UPDATE`)
 
-Trigger genérico `BEFORE UPDATE` que mantém `updated_at` sincronizado. Aplicado nas tabelas:
+Trigger genérico que executa `NEW.updated_at = now(); RETURN NEW;`. Garante timestamp transacional independentemente do cliente.
 
-| Trigger | Tabela | Coluna atualizada | Default da coluna |
-|---|---|---|---|
-| `trg_audit_shares_updated` | `audit_shares` | `updated_at` | `now()` |
-| `trg_slide_decks_updated` | `slide_decks` | `updated_at` | `now()` |
-| `trg_slide_pages_updated` | `slide_pages` | `updated_at` | `now()` |
-| `api_credentials_touch` | `api_credentials` | `updated_at` | `now()` |
-| `web3_connections_touch_updated_at` | `web3_connections` | `updated_at` | `now()` |
-| `gmail_accounts_touch` | `gmail_accounts` | `updated_at` | `now()` |
-| `render_connections_touch` | `render_connections` | `updated_at` | `now()` |
-| `render_policies_touch` | `render_auto_heal_policies` | `updated_at` | `now()` |
-| `trg_npc_memories_updated_at` | `npc_memories` | `updated_at` | `now()` |
+| Trigger | Tabela | Timing | Evento | Coluna afetada |
+|---|---|---|---|---|
+| `api_credentials_touch` | `public.api_credentials` | `BEFORE` | `UPDATE` | `updated_at` |
+| `trg_audit_shares_updated` | `public.audit_shares` | `BEFORE` | `UPDATE` | `updated_at` |
+| `gmail_accounts_touch` | `public.gmail_accounts` | `BEFORE` | `UPDATE` | `updated_at` |
+| `trg_npc_memories_updated_at` | `public.npc_memories` | `BEFORE` | `UPDATE` | `updated_at` |
+| `render_policies_touch` | `public.render_auto_heal_policies` | `BEFORE` | `UPDATE` | `updated_at` |
+| `render_connections_touch` | `public.render_connections` | `BEFORE` | `UPDATE` | `updated_at` |
+| `trg_slide_decks_updated` | `public.slide_decks` | `BEFORE` | `UPDATE` | `updated_at` |
+| `trg_slide_pages_updated` | `public.slide_pages` | `BEFORE` | `UPDATE` | `updated_at` |
+| `web3_connections_touch_updated_at` | `public.web3_connections` | `BEFORE` | `UPDATE` | `updated_at` |
 
-> **Comportamento:** `NEW.updated_at = now(); RETURN NEW;`. O trigger garante que qualquer `UPDATE` reflita o timestamp exato da transação, independente do cliente enviar ou não o campo.
+#### Schema `storage` (gerenciado pelo Supabase)
+
+| Trigger | Tabela | Timing | Evento | Função | Efeito |
+|---|---|---|---|---|---|
+| `enforce_bucket_name_length_trigger` | `storage.buckets` | `BEFORE` | `INSERT` | `storage.enforce_bucket_name_length()` | Valida tamanho do nome do bucket antes de inserir. |
+| `enforce_bucket_name_length_trigger` | `storage.buckets` | `BEFORE` | `UPDATE` | `storage.enforce_bucket_name_length()` | Valida tamanho do nome do bucket antes de atualizar. |
+| `protect_buckets_delete` | `storage.buckets` | `BEFORE` | `DELETE` | `storage.protect_delete()` | Bloqueia deleção indevida de buckets do sistema. |
+| `protect_objects_delete` | `storage.objects` | `BEFORE` | `DELETE` | `storage.protect_delete()` | Bloqueia deleção indevida de objetos protegidos. |
+| `update_objects_updated_at` | `storage.objects` | `BEFORE` | `UPDATE` | `storage.update_updated_at_column()` | Atualiza `updated_at` da row de objeto. |
+
+#### Resumo por timing/evento
+
+- **`AFTER INSERT`**: 1 trigger (`on_auth_user_created`) — orquestra criação de perfil/referral/email.
+- **`BEFORE UPDATE`**: 11 triggers — 9 de `touch_updated_at` (public) + 1 de `enforce_bucket_name_length` (storage.buckets) + 1 de `update_objects_updated_at` (storage.objects).
+- **`BEFORE INSERT`**: 1 trigger (`enforce_bucket_name_length_trigger` em `storage.buckets`).
+- **`BEFORE DELETE`**: 2 triggers (`protect_buckets_delete`, `protect_objects_delete`).
+
+> Schemas `auth` e `storage` são reservados pelo Supabase — não modificar diretamente. A única dependência aplicacional é `on_auth_user_created`, que invoca código no schema `public`.
 
 ---
+
 
 
 ```sql
