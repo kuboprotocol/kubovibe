@@ -806,6 +806,26 @@ WHERE (params.trigger_filter = '' OR LOWER(t.trigger_name) LIKE '%' || params.tr
 ORDER BY t.trigger_name, t.event_manipulation;
 ```
 
+#### Rollback (dropar tabelas de exemplo)
+
+Salve o comando abaixo em `rollback_example_tables.sql` e execute com `psql` para remover as tabelas de exemplo em ordem correta (respeitando as chaves estrangeiras):
+
+```sql
+-- rollback_example_tables.sql
+DROP TABLE IF EXISTS public.example_trigger_events CASCADE;
+DROP TABLE IF EXISTS public.example_triggers      CASCADE;
+DROP TABLE IF EXISTS public.example_objects       CASCADE;
+```
+
+```bash
+psql "$DATABASE_URL" -f rollback_example_tables.sql
+```
+
+> **Ordem obrigatória**: `example_trigger_events` → `example_triggers` → `example_objects`. A tabela de eventos depende de `example_triggers`, que por sua vez depende de `example_objects`.
+
+
+
+
 
 
 |---|---|---|---|---|---|
