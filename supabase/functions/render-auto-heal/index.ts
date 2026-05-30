@@ -116,18 +116,29 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   try {
     // Auth mode:
-    //  - If caller supplies a user JWT → run only for that user (manual trigger from dashboard).
-    //  - Otherwise → assume internal cron invocation; loop across every enabled policy.
+    //  - User JWT (Bearer)            → run only for that user (manual trigger from dashboard).
+    //  - Service-role key (Bearer)    → trusted cron invocation; loop across every enabled policy.
+    //  - Anything else / no header    → 401. Prevents anonymous mass-restart abuse.
     let scopeUserId: string | null = null
     let trigger = 'cron'
-    const authHeader = req.headers.get('Authorization')
-    if (authHeader && !authHeader.includes(Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '__none__')) {
+    const authHeader = req.headers.get('Authorization') ?? ''
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '__none__'
+    const isServiceRole = authHeader.includes(serviceKey)
+
+    if (!authHeader) {
+      return json({ error: 'unauthorized' }, 401)
+    }
+
+    if (!isServiceRole) {
       try {
         const { user } = await authUser(req)
         scopeUserId = user.id
         trigger = 'manual'
-      } catch (_) { /* fall back to cron mode */ }
+      } catch (_) {
+        return json({ error: 'unauthorized' }, 401)
+      }
     }
+
 
     // load all enabled policies (optionally scoped to one user)
     let q = admin()
