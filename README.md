@@ -449,6 +449,18 @@ WHERE trigger_schema IN ('public', 'auth', 'storage')
 ORDER BY trigger_schema, trigger_name, event_manipulation;
 ```
 
+```sql
+-- Listagem compacta por trigger e evento
+SELECT
+    trigger_name,
+    event_manipulation  AS evento,
+    event_object_table  AS tabela,
+    action_timing       AS timing
+FROM information_schema.triggers
+WHERE trigger_schema IN ('public', 'auth', 'storage')
+ORDER BY trigger_name, event_manipulation;
+```
+
 #### Schema `auth`
 
 | Trigger | Tabela | Timing | Evento | Função | Tabelas/colunas afetadas |
