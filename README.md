@@ -728,8 +728,61 @@ FROM public.example_objects WHERE schema_name='storage' AND object_name='buckets
 INSERT INTO public.example_triggers (trigger_name, object_id, action_timing, event_manipulation, action_statement)
 SELECT 'on_auth_user_created', id, 'AFTER', 'INSERT',
        'EXECUTE FUNCTION public.handle_new_user()'
-FROM public.example_objects WHERE schema_name='auth' AND object_name='users';
 ```
+
+#### Passo a passo para rodar o DDL e o seed (psql)
+
+1. **Salve o DDL em um arquivo** (`example_tables.sql`):
+
+```sql
+-- example_tables.sql
+-- Execute este bloco uma única vez para criar as tabelas de exemplo
+\echo '>>> Criando tabelas de exemplo...'
+\i ddl_example_tables.sql
+\echo '>>> Inserindo seed de demonstração...'
+\i seed_example_tables.sql
+\echo '>>> Pronto. Agora você pode rodar as queries com :trigger_filter e :table_filter.'
+```
+
+2. **Salve apenas o DDL** (`ddl_example_tables.sql`) com o bloco de `CREATE TABLE` e `CREATE INDEX` mostrado acima.
+
+3. **Salve apenas o seed** (`seed_example_tables.sql`) com os `INSERT INTO public.example_objects ...` e `INSERT INTO public.example_triggers ...` mostrados acima.
+
+4. **Execute via psql** (ajuste a connection string conforme seu ambiente):
+
+```bash
+# Usando variáveis de ambiente do Supabase (recomendado)
+psql "$DATABASE_URL" -f example_tables.sql
+
+# Ou com parâmetros explícitos
+psql -h localhost -U postgres -d kubo_vibe_dev -f example_tables.sql
+```
+
+5. **Verifique se as tabelas foram criadas e populadas**:
+
+```sql
+\dt public.example_*
+SELECT * FROM public.example_objects;
+SELECT * FROM public.example_triggers;
+```
+
+6. **Agora rode as queries parametrizadas** do Exemplo 10 (ou a query equivalente nas tabelas de exemplo abaixo):
+
+```bash
+# Sem filtro (retorna tudo)
+psql -v trigger_filter='' -v table_filter='' -f triggers.sql
+
+# Filtrar por nome do trigger
+psql -v trigger_filter='bucket' -v table_filter='' -f triggers.sql
+
+# Filtrar por nome da tabela
+psql -v trigger_filter='' -v table_filter='user' -f triggers.sql
+
+# Combinar ambos os filtros
+psql -v trigger_filter='auth' -v table_filter='users' -f triggers.sql
+```
+
+> **Nota**: os arquivos `.sql` devem estar no mesmo diretório de onde você executa o `psql`, ou use caminhos absolutos (ex.: `/path/to/triggers.sql`).
 
 Query equivalente ao Exemplo 10, agora aplicada às tabelas de exemplo:
 
