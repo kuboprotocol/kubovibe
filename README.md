@@ -914,6 +914,71 @@ WHERE referenced.relname IN (
 
 > Se ambas as queries retornarem `(0 rows)`, não há dependências residuais no catálogo do PostgreSQL.
 
+#### Verificar triggers, funções e rotinas residuais
+
+Confirme que não restaram triggers, funções, procedures ou rotinas que façam referência direta às tabelas de exemplo removidas:
+
+```bash
+psql "$DATABASE_URL" -c "
+SELECT tgname AS trigger_name,
+       tgrelid::regclass AS target_table,
+       proname AS function_name
+FROM pg_trigger t
+JOIN pg_proc p ON t.tgfoid = p.oid
+WHERE tgrelid::regclass::text IN (
+    'public.example_objects',
+    'public.example_triggers',
+    'public.example_trigger_events'
+  )
+  AND NOT tgisinternal;
+"
+```
+
+**Resultado esperado:**
+
+```
+ trigger_name | target_table | function_name
+--------------+--------------+---------------
+(0 rows)
+```
+
+Verifique também se existem funções ou procedures com corpo SQL que referenciem as tabelas removidas (busca no texto-fonte):
+
+```bash
+psql "$DATABASE_URL" -c "
+SELECT n.nspname AS schema_name,
+       p.proname AS routine_name,
+       CASE p.prokind
+         WHEN 'f' THEN 'function'
+         WHEN 'p' THEN 'procedure'
+         WHEN 'a' THEN 'aggregate'
+         WHEN 'w' THEN 'window'
+       END AS routine_type
+FROM pg_proc p
+JOIN pg_namespace n ON p.pronamespace = n.oid
+WHERE n.nspname = 'public'
+  AND p.prosrc ILIKE '%example_objects%'
+   OR p.prosrc ILIKE '%example_triggers%'
+   OR p.prosrc ILIKE '%example_trigger_events%';
+"
+```
+
+**Resultado esperado:**
+
+```
+ schema_name | routine_name | routine_type
+-------------+--------------+--------------
+(0 rows)
+```
+
+> **Nota**: `prosrc` contém o corpo textual da rotina (para funções em SQL/plpgsql). Se a query retornar `(0 rows)`, não há rotinas no schema `public` que referenciem as tabelas de exemplo.
+
+
+
+
+
+
+
 
 
 
