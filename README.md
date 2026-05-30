@@ -1335,7 +1335,52 @@ ORDER BY n.nspname, c.relname, t.tgname;
 (0 rows)
 ```
 
-> Se esta consulta retornar `(0 rows)`, confirma que **nenhum trigger** derivado das amostras permanece em nenhum schema. As verificações de `relkind` (tabelas, views, materialized views e sequências) somadas às checagens em `pg_proc` e `pg_trigger` garantem que o rollback foi concluído sem deixar objetos de relação, rotinas ou triggers ativos no catálogo do PostgreSQL.
+> Se esta consulta retornar `(0 rows)`, confirma que **nenhum trigger** derivado das amostras permanece em nenhum schema.
+
+---
+
+**Consulta adicional — constraints (`pg_constraint`):**
+
+```bash
+psql "$DATABASE_URL" -c "
+SELECT n.nspname AS schema_name,
+       c.relname AS table_name,
+       con.conname AS constraint_name,
+       CASE con.contype
+         WHEN 'c' THEN 'CHECK'
+         WHEN 'f' THEN 'FOREIGN KEY'
+         WHEN 'p' THEN 'PRIMARY KEY'
+         WHEN 'u' THEN 'UNIQUE'
+         WHEN 't' THEN 'TRIGGER'
+         WHEN 'x' THEN 'EXCLUSION'
+         ELSE con.contype::text
+       END AS constraint_type,
+       pg_get_constraintdef(con.oid, true) AS definition,
+       pg_get_userbyid(c.relowner) AS owner
+FROM pg_constraint con
+JOIN pg_class c ON c.oid = con.conrelid
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE (
+    con.conname ILIKE '%example_objects%'
+    OR con.conname ILIKE '%example_triggers%'
+    OR con.conname ILIKE '%example_trigger_events%'
+    OR c.relname ILIKE '%example_objects%'
+    OR c.relname ILIKE '%example_triggers%'
+    OR c.relname ILIKE '%example_trigger_events%'
+  )
+ORDER BY n.nspname, c.relname, con.conname;
+"
+```
+
+**Resultado esperado:**
+
+```
+ schema_name | table_name | constraint_name | constraint_type | definition | owner
+-------------+------------+-----------------+-----------------+------------+-------
+(0 rows)
+```
+
+> Se esta consulta retornar `(0 rows)`, confirma que **nenhuma constraint** derivada das amostras permanece em nenhum schema. As verificações de `relkind` (tabelas, views, materialized views e sequências) somadas às checagens em `pg_proc`, `pg_trigger` e `pg_constraint` garantem que o rollback foi concluído sem deixar objetos de relação, rotinas, triggers ou constraints ativas no catálogo do PostgreSQL.
 
 
 
