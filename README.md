@@ -534,7 +534,50 @@ WHERE trigger_schema IN ('public', 'auth', 'storage')
 ORDER BY trigger_name, event_manipulation;
 ```
 
-| Trigger | Tabela | Timing | Evento | Função | Tabelas/colunas afetadas |
+```sql
+-- Exemplo 4: busca case-insensitive por trigger_name (ILIKE)
+SELECT
+    trigger_name,
+    event_manipulation  AS evento,
+    event_object_table  AS tabela,
+    action_timing       AS timing,
+    action_statement    AS funcao_chamada
+FROM information_schema.triggers
+WHERE trigger_schema IN ('public', 'auth', 'storage')
+  AND trigger_name ILIKE '%bucket%'
+ORDER BY trigger_name, event_manipulation;
+```
+
+```sql
+-- Exemplo 5: busca case-insensitive por event_object_table (ILIKE)
+SELECT
+    trigger_name,
+    event_manipulation  AS evento,
+    event_object_table  AS tabela,
+    action_timing       AS timing,
+    action_statement    AS funcao_chamada
+FROM information_schema.triggers
+WHERE trigger_schema IN ('public', 'auth', 'storage')
+  AND event_object_table ILIKE '%object%'
+ORDER BY trigger_name, event_manipulation;
+```
+
+```sql
+-- Exemplo 6: busca combinada case-insensitive (trigger_name OU tabela)
+SELECT
+    trigger_name,
+    event_manipulation  AS evento,
+    event_object_table  AS tabela,
+    action_timing       AS timing,
+    action_statement    AS funcao_chamada
+FROM information_schema.triggers
+WHERE trigger_schema IN ('public', 'auth', 'storage')
+  AND (
+    trigger_name ILIKE '%auth%'
+    OR event_object_table ILIKE '%user%'
+  )
+ORDER BY trigger_name, event_manipulation;
+```
 |---|---|---|---|---|---|
 | `on_auth_user_created` | `auth.users` | `AFTER` | `INSERT` | `public.handle_new_user()` (SECURITY DEFINER) | **Insere em `public.profiles`** (`id`, `display_name`, `referral_code`). Se houver `referral_code` em `raw_user_meta_data`: **insere em `public.referrals`** (`referrer_id`, `referred_id`, `credits_awarded=100`) e **atualiza `public.subscriptions.edits_limit`** (`+100`) do referrer. Dispara `net.http_post` → Edge Function `send-transactional-email`. |
 
