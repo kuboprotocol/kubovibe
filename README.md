@@ -973,6 +973,100 @@ WHERE n.nspname = 'public'
 
 > **Nota**: `prosrc` contém o corpo textual da rotina (para funções em SQL/plpgsql). Se a query retornar `(0 rows)`, não há rotinas no schema `public` que referenciem as tabelas de exemplo.
 
+#### Verificar objetos dependentes por schema (defaults, constraints, policies)
+
+Após o rollback, valide em **cada schema** que não restaram objetos dependentes ligados às tabelas de exemplo — incluindo `DEFAULT`s, `CHECK`/`UNIQUE`/`PK`/`FK` constraints e RLS policies. Essas consultas varrem todo o catálogo (não apenas `public`) para detectar referências residuais em qualquer schema.
+
+**1. Defaults de colunas que referenciem as tabelas de exemplo:**
+
+```bash
+psql "$DATABASE_URL" -c "
+SELECT n.nspname AS schema_name,
+       c.relname AS table_name,
+       a.attname AS column_name,
+       pg_get_expr(ad.adbin, ad.adrelid) AS default_expr
+FROM pg_attrdef ad
+JOIN pg_attribute a ON a.attrelid = ad.adrelid AND a.attnum = ad.adnum
+JOIN pg_class c ON c.oid = ad.adrelid
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE pg_get_expr(ad.adbin, ad.adrelid) ILIKE '%example_objects%'
+   OR pg_get_expr(ad.adbin, ad.adrelid) ILIKE '%example_triggers%'
+   OR pg_get_expr(ad.adbin, ad.adrelid) ILIKE '%example_trigger_events%';
+"
+```
+
+**Resultado esperado:**
+
+```
+ schema_name | table_name | column_name | default_expr
+-------------+------------+-------------+--------------
+(0 rows)
+```
+
+**2. Constraints (CHECK, UNIQUE, PK, FK, EXCLUDE) que referenciem as tabelas em qualquer schema:**
+
+```bash
+psql "$DATABASE_URL" -c "
+SELECT n.nspname AS schema_name,
+       c.relname AS table_name,
+       con.conname AS constraint_name,
+       CASE con.contype
+         WHEN 'c' THEN 'CHECK'
+         WHEN 'f' THEN 'FOREIGN KEY'
+         WHEN 'p' THEN 'PRIMARY KEY'
+         WHEN 'u' THEN 'UNIQUE'
+         WHEN 'x' THEN 'EXCLUDE'
+       END AS constraint_type,
+       pg_get_constraintdef(con.oid) AS definition
+FROM pg_constraint con
+JOIN pg_class c ON c.oid = con.conrelid
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE pg_get_constraintdef(con.oid) ILIKE '%example_objects%'
+   OR pg_get_constraintdef(con.oid) ILIKE '%example_triggers%'
+   OR pg_get_constraintdef(con.oid) ILIKE '%example_trigger_events%';
+"
+```
+
+**Resultado esperado:**
+
+```
+ schema_name | table_name | constraint_name | constraint_type | definition
+-------------+------------+-----------------+-----------------+------------
+(0 rows)
+```
+
+**3. RLS policies que referenciem as tabelas em qualquer schema:**
+
+```bash
+psql "$DATABASE_URL" -c "
+SELECT schemaname,
+       tablename,
+       policyname,
+       cmd,
+       qual,
+       with_check
+FROM pg_policies
+WHERE COALESCE(qual, '') ILIKE '%example_objects%'
+   OR COALESCE(qual, '') ILIKE '%example_triggers%'
+   OR COALESCE(qual, '') ILIKE '%example_trigger_events%'
+   OR COALESCE(with_check, '') ILIKE '%example_objects%'
+   OR COALESCE(with_check, '') ILIKE '%example_triggers%'
+   OR COALESCE(with_check, '') ILIKE '%example_trigger_events%'
+   OR tablename IN ('example_objects', 'example_triggers', 'example_trigger_events');
+"
+```
+
+**Resultado esperado:**
+
+```
+ schemaname | tablename | policyname | cmd | qual | with_check
+------------+-----------+------------+-----+------+------------
+(0 rows)
+```
+
+> Se as três consultas retornarem `(0 rows)`, não existem defaults, constraints ou policies residuais — em nenhum schema — ligados às tabelas de exemplo. Combinadas com as verificações anteriores (FKs, views/sequências, triggers e rotinas), confirmam um rollback completo e sem dependências órfãs no catálogo do PostgreSQL.
+
+
 
 
 
