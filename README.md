@@ -492,7 +492,47 @@ WHERE trigger_schema IN ('public', 'auth', 'storage')
 ORDER BY trigger_name, event_manipulation;
 ```
 
-#### Schema `auth`
+```sql
+-- Exemplo 1: filtrar por trigger_name exato (INSERT e UPDATE separados se existirem)
+SELECT
+    trigger_name,
+    event_manipulation  AS evento,
+    event_object_table  AS tabela,
+    action_timing       AS timing,
+    action_statement    AS funcao_chamada
+FROM information_schema.triggers
+WHERE trigger_schema IN ('public', 'auth', 'storage')
+  AND trigger_name = 'enforce_bucket_name_length_trigger'
+ORDER BY event_manipulation;
+```
+
+```sql
+-- Exemplo 2: filtrar por event_object_table (todas as triggers da tabela)
+SELECT
+    trigger_name,
+    event_manipulation  AS evento,
+    event_object_table  AS tabela,
+    action_timing       AS timing,
+    action_statement    AS funcao_chamada
+FROM information_schema.triggers
+WHERE trigger_schema IN ('public', 'auth', 'storage')
+  AND event_object_table = 'buckets'
+ORDER BY trigger_name, event_manipulation;
+```
+
+```sql
+-- Exemplo 3: busca parcial por nome de trigger (LIKE)
+SELECT
+    trigger_name,
+    event_manipulation  AS evento,
+    event_object_table  AS tabela,
+    action_timing       AS timing,
+    action_statement    AS funcao_chamada
+FROM information_schema.triggers
+WHERE trigger_schema IN ('public', 'auth', 'storage')
+  AND trigger_name LIKE '%touch%'
+ORDER BY trigger_name, event_manipulation;
+```
 
 | Trigger | Tabela | Timing | Evento | Função | Tabelas/colunas afetadas |
 |---|---|---|---|---|---|
