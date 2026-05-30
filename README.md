@@ -1066,6 +1066,92 @@ WHERE COALESCE(qual, '') ILIKE '%example_objects%'
 
 > Se as três consultas retornarem `(0 rows)`, não existem defaults, constraints ou policies residuais — em nenhum schema — ligados às tabelas de exemplo. Combinadas com as verificações anteriores (FKs, views/sequências, triggers e rotinas), confirmam um rollback completo e sem dependências órfãs no catálogo do PostgreSQL.
 
+#### Varredura global via `pg_depend` + `pg_class` (todos os schemas)
+
+Como verificação final, faça uma varredura **catálogo-wide** cruzando `pg_depend` com `pg_class` para detectar **qualquer** objeto (em qualquer schema) que ainda dependa das tabelas de exemplo. Esta consulta cobre tudo o que o PostgreSQL registra como dependência: views, materialized views, sequências, índices, constraints, defaults, triggers, regras, tipos compostos, funções, extensões, etc.
+
+**1. Dependências ativas via `pg_depend` (somente executa caso as tabelas ainda existam — após o rollback o CTE fica vazio e retorna `(0 rows)`):**
+
+```bash
+psql "$DATABASE_URL" -c "
+WITH targets AS (
+  SELECT c.oid AS refobjid,
+         n.nspname AS ref_schema,
+         c.relname AS ref_table
+  FROM pg_class c
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+  WHERE c.relname IN ('example_objects', 'example_triggers', 'example_trigger_events')
+)
+SELECT t.ref_schema,
+       t.ref_table         AS referenced_table,
+       dn.nspname          AS dependent_schema,
+       dc.relname          AS dependent_object,
+       dc.relkind          AS dependent_kind,
+       d.deptype           AS dependency_type,
+       d.classid::regclass AS catalog
+FROM pg_depend d
+JOIN targets t       ON d.refobjid = t.refobjid
+JOIN pg_class dc     ON dc.oid = d.objid
+JOIN pg_namespace dn ON dn.oid = dc.relnamespace
+WHERE d.deptype IN ('n', 'a', 'i', 'e', 'p')
+ORDER BY dn.nspname, dc.relname;
+"
+```
+
+**Tipos de dependência (`deptype`):**
+- `n` = normal — objeto independente que referencia outro
+- `a` = auto — removido automaticamente com o referenciado
+- `i` = internal — parte da implementação interna
+- `e` = extension — pertence a uma extensão
+- `p` = pin — objeto fixo do sistema
+
+**Tipos de objeto (`relkind`):**
+- `r` = tabela ordinária, `v` = view, `m` = materialized view, `i` = índice, `S` = sequência, `t` = TOAST, `c` = tipo composto, `f` = foreign table, `p` = tabela particionada
+
+**Resultado esperado:**
+
+```
+ ref_schema | referenced_table | dependent_schema | dependent_object | dependent_kind | dependency_type | catalog
+------------+------------------+------------------+------------------+----------------+-----------------+---------
+(0 rows)
+```
+
+**2. Varredura por nome em `pg_class` cruzada com `pg_namespace` (detecta qualquer relação remanescente em qualquer schema cujo nome derive das tabelas de exemplo — incluindo índices, sequências e tipos compostos órfãos):**
+
+```bash
+psql "$DATABASE_URL" -c "
+SELECT n.nspname AS schema_name,
+       c.relname AS object_name,
+       CASE c.relkind
+         WHEN 'r' THEN 'table'
+         WHEN 'v' THEN 'view'
+         WHEN 'm' THEN 'materialized view'
+         WHEN 'i' THEN 'index'
+         WHEN 'S' THEN 'sequence'
+         WHEN 'c' THEN 'composite type'
+         WHEN 'f' THEN 'foreign table'
+         WHEN 'p' THEN 'partitioned table'
+         ELSE c.relkind::text
+       END AS object_type
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE c.relname ILIKE '%example_objects%'
+   OR c.relname ILIKE '%example_triggers%'
+   OR c.relname ILIKE '%example_trigger_events%'
+ORDER BY n.nspname, c.relname;
+"
+```
+
+**Resultado esperado:**
+
+```
+ schema_name | object_name | object_type
+-------------+-------------+-------------
+(0 rows)
+```
+
+> Se ambas as queries retornarem `(0 rows)`, a varredura via `pg_depend`/`pg_class` confirma que **nenhum objeto em nenhum schema** mantém dependência ou nome derivado das tabelas de exemplo. Esta é a verificação mais abrangente e fecha o ciclo de validação do rollback no catálogo do PostgreSQL.
+
 
 
 
