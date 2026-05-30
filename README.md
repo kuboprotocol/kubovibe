@@ -1726,7 +1726,65 @@ As tabelas `profiles` e `smart_economy_ledger` estão na publicação `supabase_
 
 ---
 
+## CI / Post-Migration Security
+
+Workflow `.github/workflows/post-migration-security.yml` executa automaticamente a cada push ou PR que altere `supabase/migrations/**` ou `supabase/functions/**`.
+
+### O que o workflow faz
+
+O job roda três camadas de verificação sequenciais e quebra o build se qualquer uma falhar:
+
+1. **Lint estático nas migrations** — bloqueia padrões inseguros detectados por `grep`:
+   - `CREATE TABLE public.*` sem `GRANT` ou `ENABLE RLS` subsequente
+   - `SECURITY DEFINER` sem `SET search_path` fixo
+   - `ALTER DATABASE postgres`
+   - Modificações em schemas reservados (`auth`, `storage`, `realtime`, `vault`, `supabase_functions`)
+   - Uso de `SERVICE_ROLE_KEY` em código fonte do frontend (`src/`)
+   - Chamadas a `rpc('execute_sql')` em edge functions
+
+2. **Checagens no banco via `psql`** — quando o secret `SUPABASE_DB_URL` está configurado:
+   - Toda tabela em `public` deve ter RLS habilitado (`pg_class.relrowsecurity = true`)
+   - Toda tabela em `public` deve ter pelo menos uma policy (`pg_policies`)
+   - Toda tabela em `public` deve ter `GRANT` para `authenticated`, `anon` e `service_role`
+   - Funções `SECURITY DEFINER` devem ter `SET search_path` fixo
+
+3. **Supabase linter oficial** — quando `SUPABASE_ACCESS_TOKEN` e `SUPABASE_PROJECT_REF` estão configurados:
+   - Executa `supabase db lint --level error` para validação programática do schema
+
+### Secrets obrigatórios (GitHub Actions)
+
+| Secret | Onde obter | Obrigatório para |
+|---|---|---|
+| `SUPABASE_DB_URL` | Lovable Cloud / Connectors → mostra a connection string do PostgreSQL | Checagens no banco (camada 2) |
+| `SUPABASE_ACCESS_TOKEN` | [Supabase Dashboard](https://app.supabase.com) → Account → Access Tokens → Generate new token | Linter oficial (camada 3) |
+| `SUPABASE_PROJECT_REF` | URL do projeto: `https://supabase.com/dashboard/project/<ref>` | Linter oficial (camada 3) |
+
+### Como configurar
+
+1. Acesse **Settings → Secrets and variables → Actions** no repositório GitHub
+2. Clique em **New repository secret**
+3. Adicione os três secrets acima com os valores correspondentes
+4. O workflow passa a disparar automaticamente em todo push/PR que tocar migrations ou edge functions
+
+### Gatilhos
+
+- `push` para branches que alterem `supabase/migrations/**` ou `supabase/functions/**`
+- `pull_request` para as mesmas paths
+- `workflow_dispatch` — execução manual pelo botão "Run workflow" no GitHub Actions
+
+### Resultado esperado
+
+Se todas as camadas passarem, o job exibe um summary com:
+- Ícone verde para lint estático
+- Ícone verde para checagens no banco (ou cinza se `SUPABASE_DB_URL` ausente)
+- Ícone verde para Supabase linter (ou cinza se token/proj_ref ausente)
+
+Se alguma camada falhar, o job encerra com `exit 1` e impede o merge do PR.
+
+---
+
 ## Como Executar Localmente
+
 
 ```sh
 # 1. Clone o repositório
