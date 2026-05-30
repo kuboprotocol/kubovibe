@@ -434,6 +434,8 @@ Conquistas permanentes desbloqueadas (visíveis no perfil público).
 
 Triggers ativos no banco (schemas `public`, `auth` e `storage`), com timing, evento, tabela/colunas afetadas e função executada. Lista extraída de `information_schema.triggers` + `pg_trigger`.
 
+> **Nota sobre contagem:** o catálogo `information_schema.triggers` conta **cada evento separadamente**. O trigger `enforce_bucket_name_length_trigger` em `storage.buckets` aparece em **duas linhas** (`INSERT` e `UPDATE`), o que eleva o total de 14 "trigger names" para **15 linhas no catálogo**. O README lista ambas as linhas para refletir o schema real.
+
 #### Schema `auth`
 
 | Trigger | Tabela | Timing | Evento | Função | Tabelas/colunas afetadas |
