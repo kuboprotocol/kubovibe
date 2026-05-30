@@ -367,6 +367,69 @@ Conquistas permanentes desbloqueadas (visíveis no perfil público).
 
 ---
 
+### Índices e Constraints — Smart Economy Core
+
+Índices do PostgreSQL (incluindo únicos) para as tabelas do núcleo econômico. Todos são `btree`.
+
+#### `profiles`
+| Índice | Tipo | Coluna(s) | Descrição |
+|---|---|---|---|
+| `profiles_pkey` | UNIQUE | `id` | Chave primária (mesmo UUID de `auth.users.id`). |
+| `profiles_referral_code_key` | UNIQUE | `referral_code` | Garante unicidade do código de indicação de 8 chars. |
+
+#### `subscriptions`
+| Índice | Tipo | Coluna(s) | Descrição |
+|---|---|---|---|
+| `subscriptions_pkey` | UNIQUE | `id` | Chave primária da assinatura. |
+| `subscriptions_user_id_key` | UNIQUE | `user_id` | Garante 1 assinatura ativa por usuário (usada pelo `FOR UPDATE` na RPC). |
+
+#### `credit_transactions` — ledger
+| Índice | Tipo | Coluna(s) | Filtro / Ordem | Descrição |
+|---|---|---|---|---|
+| `credit_transactions_pkey` | UNIQUE | `id` | — | Chave primária do ledger. |
+| `credit_transactions_idem_uniq` | UNIQUE | `user_id`, `idempotency_key` | `WHERE idempotency_key IS NOT NULL` | Impede replay de webhooks (Stripe, Unity, shortlinks). |
+| `credit_transactions_user_created_idx` | INDEX | `user_id`, `created_at` | `DESC` | Histórico rápido de transações por usuário (últimas primeiro). |
+
+#### `ad_rewards`
+| Índice | Tipo | Coluna(s) | Descrição |
+|---|---|---|---|
+| `ad_rewards_pkey` | UNIQUE | `id` | Chave primária. |
+
+> Nota: o anti-fraude de limite diário (max 10/dia) é aplicado em Edge Function / client-side; não há constraint de banco nessa tabela além da PK.
+
+#### `shortlinks`
+| Índice | Tipo | Coluna(s) | Descrição |
+|---|---|---|---|
+| `shortlinks_pkey` | UNIQUE | `id` | Chave primária. |
+| `shortlinks_slug_key` | UNIQUE | `slug` | Slug público (`/l/:slug`) obrigatoriamente único. |
+
+#### `shortlink_clicks`
+| Índice | Tipo | Coluna(s) | Descrição |
+|---|---|---|---|
+| `shortlink_clicks_pkey` | UNIQUE | `id` | Chave primária da sessão de click. |
+
+> Nota: não há índice composto em `(user_id, shortlink_id)` porque a validação de elegibilidade (único click por usuário/link) é feita em lógica de aplicação + timer `wait_seconds`.
+
+#### `referrals`
+| Índice | Tipo | Coluna(s) | Descrição |
+|---|---|---|---|
+| `referrals_pkey` | UNIQUE | `id` | Chave primária. |
+| `referrals_referred_id_key` | UNIQUE | `referred_id` | Um usuário só pode ser indicado uma vez (1:1 com `referred_id`). |
+
+#### `user_streaks`
+| Índice | Tipo | Coluna(s) | Descrição |
+|---|---|---|---|
+| `user_streaks_pkey` | UNIQUE | `id` | Chave primária. |
+| `user_streaks_user_id_key` | UNIQUE | `user_id` | Um streak por usuário (usado no leaderboard Top 50). |
+
+#### `user_badges`
+| Índice | Tipo | Coluna(s) | Descrição |
+|---|---|---|---|
+| `user_badges_pkey` | UNIQUE | `id` | Chave primária. |
+| `user_badges_user_id_badge_type_key` | UNIQUE | `user_id`, `badge_type` | Impede duplicação da mesma conquista para o mesmo usuário. |
+
+---
+
 ### Assinatura da RPC
 
 ```sql
