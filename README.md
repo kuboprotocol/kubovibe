@@ -823,6 +823,42 @@ psql "$DATABASE_URL" -f rollback_example_tables.sql
 
 > **Ordem obrigatória**: `example_trigger_events` → `example_triggers` → `example_objects`. A tabela de eventos depende de `example_triggers`, que por sua vez depende de `example_objects`.
 
+#### Verificar remoção após rollback
+
+Após executar o rollback, confirme que as tabelas de exemplo não existem mais no banco:
+
+```bash
+psql "$DATABASE_URL" -c "
+SELECT table_name
+FROM information_schema.tables
+WHERE table_schema = 'public'
+  AND table_name IN ('example_objects', 'example_triggers', 'example_trigger_events');
+"
+```
+
+**Resultado esperado** (sem linhas retornadas):
+
+```
+ table_name 
+------------
+(0 rows)
+```
+
+Ou, de forma mais direta, via `psql` interativo:
+
+```sql
+\dt public.example_*      -- deve exibir "Did not find any relations."
+SELECT count(*) FROM public.example_objects;        -- deve falhar: relation does not exist
+```
+
+> Se a query retornar `(0 rows)` e `\dt` não listar as tabelas, o rollback foi executado com sucesso.
+
+
+
+
+
+
+
 
 
 
