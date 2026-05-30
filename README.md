@@ -434,6 +434,8 @@ Conquistas permanentes desbloqueadas (visíveis no perfil público).
 
 Triggers ativos no banco (schemas `public`, `auth` e `storage`), com timing, evento, tabela/colunas afetadas e função executada. Lista extraída de `information_schema.triggers` + `pg_trigger`.
 
+> **Nota sobre contagem:** o catálogo `information_schema.triggers` conta **cada evento separadamente**. O trigger `enforce_bucket_name_length_trigger` em `storage.buckets` aparece em **duas linhas** (`INSERT` e `UPDATE`), o que eleva o total de 14 "trigger names" para **15 linhas no catálogo**. O README lista ambas as linhas para refletir o schema real.
+
 #### Schema `auth`
 
 | Trigger | Tabela | Timing | Evento | Função | Tabelas/colunas afetadas |
@@ -474,6 +476,8 @@ Trigger genérico que executa `NEW.updated_at = now(); RETURN NEW;`. Garante tim
 - **`BEFORE UPDATE`**: 11 triggers — 9 de `touch_updated_at` (public) + 1 de `enforce_bucket_name_length` (storage.buckets) + 1 de `update_objects_updated_at` (storage.objects).
 - **`BEFORE INSERT`**: 1 trigger (`enforce_bucket_name_length_trigger` em `storage.buckets`).
 - **`BEFORE DELETE`**: 2 triggers (`protect_buckets_delete`, `protect_objects_delete`).
+
+**Total: 15 linhas no catálogo** (`information_schema.triggers`) — `enforce_bucket_name_length_trigger` conta como 2 linhas (INSERT + UPDATE) porque o catálogo indexa por `(trigger_name, event_manipulation)`.
 
 > Schemas `auth` e `storage` são reservados pelo Supabase — não modificar diretamente. A única dependência aplicacional é `on_auth_user_created`, que invoca código no schema `public`.
 
