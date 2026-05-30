@@ -48,7 +48,87 @@ Chama modelos AI (texto, JSON estruturado, batch, geração e edição de imagem
 
 ---
 
+## Diagrama de Arquitetura
+
+```mermaid
+flowchart TB
+    subgraph Client["Cliente (Browser / Capacitor)"]
+        UI["React 18 + Vite 5<br/>Tailwind + shadcn/ui"]
+        Builder["Builder Interface<br/>Canvas / KUBO FLOW AI"]
+        Game["Quantum Game Engine<br/>Three.js + ECS + WebGPU"]
+        WGSL["WGSL Sanitizer<br/>(src/game/wgsl-safe.ts)"]
+    end
+
+    subgraph Skills["Skills Multi-Agente"]
+        S1["kubo-vibedev-ai-system"]
+        S2["video-creator (Remotion)"]
+        S3["product-shot"]
+        S4["ai-gateway"]
+    end
+
+    subgraph Cloud["Lovable Cloud (Supabase)"]
+        Auth["Auth<br/>JWT + GitHub/Google OAuth"]
+        DB[("PostgreSQL<br/>profiles · ledger · user_roles")]
+        RPC["RPC<br/>execute_atomic_credit_deduction"]
+        RT["Realtime CDC<br/>WebSocket"]
+        Storage["Storage<br/>uploads / WebP"]
+        EF["Edge Functions<br/>game-npc-ai · stripe · email"]
+    end
+
+    subgraph External["Integrações Externas"]
+        AIGW["Lovable AI Gateway<br/>Gemini · GPT-5 · DeepSeek"]
+        Stripe["Stripe / Polar<br/>Pagamentos + Connect"]
+        IPFS["web3.storage / IPFS"]
+        Email["Resend (notify.kubovibe.dev)"]
+        GH["GitHub OAuth + Deploy"]
+    end
+
+    UI --> Builder
+    Builder --> Skills
+    Builder --> EF
+    Game --> WGSL
+    WGSL --> Game
+
+    Skills --> AIGW
+    UI --> Auth
+    Auth --> DB
+    Builder --> RPC
+    RPC --> DB
+    DB --> RT
+    RT --> UI
+    UI --> Storage
+
+    EF --> AIGW
+    EF --> Stripe
+    EF --> IPFS
+    EF --> Email
+    EF --> GH
+    EF --> DB
+```
+
+### Fluxo de Crédito Atômico
+
+```mermaid
+sequenceDiagram
+    participant U as Usuário
+    participant F as Frontend
+    participant R as RPC execute_atomic_credit_deduction
+    participant L as smart_economy_ledger
+    participant W as Realtime CDC
+    U->>F: Ação (gerar app / vídeo / render)
+    F->>R: deduct(user_id, tokens, op_type, provider, cost)
+    R->>R: UPDATE profiles SET credits = credits - tokens (row lock)
+    R->>L: INSERT ledger (gross_revenue, api_cost)
+    R-->>F: novo saldo
+    L->>W: CDC change event
+    W-->>F: subscribe → UI atualiza saldo em <0.4ms
+```
+
+---
+
 ## Arquitetura Técnica
+
+
 
 ### Frontend
 - **React 18** + **Vite 5**
