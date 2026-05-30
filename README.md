@@ -124,7 +124,130 @@ sequenceDiagram
     W-->>F: subscribe → UI atualiza saldo em <0.4ms
 ```
 
+### ERD — Smart Economy Core
+
+Modelo de dados das tabelas envolvidas no ledger de créditos atômicos. As relações são lógicas via `user_id` (sem foreign keys físicas, para isolar deleções de `auth.users` e permitir RLS por `auth.uid()`).
+
+```mermaid
+erDiagram
+    AUTH_USERS ||--|| PROFILES : "1:1 (id)"
+    AUTH_USERS ||--o| SUBSCRIPTIONS : "1:1 (user_id)"
+    AUTH_USERS ||--o{ CREDIT_TRANSACTIONS : "1:N (user_id)"
+    AUTH_USERS ||--o{ AD_REWARDS : "1:N (user_id)"
+    AUTH_USERS ||--o{ SHORTLINK_CLICKS : "1:N (user_id)"
+    AUTH_USERS ||--o{ USER_BADGES : "1:N (user_id)"
+    AUTH_USERS ||--|| USER_STREAKS : "1:1 (user_id)"
+    AUTH_USERS ||--o{ REFERRALS : "referrer_id / referred_id"
+    SHORTLINKS  ||--o{ SHORTLINK_CLICKS : "1:N (shortlink_id)"
+
+    AUTH_USERS {
+        uuid id PK
+        text email
+    }
+
+    PROFILES {
+        uuid id PK "= auth.users.id"
+        text display_name
+        text avatar_url
+        text referral_code
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    SUBSCRIPTIONS {
+        uuid id PK
+        uuid user_id FK
+        text plan "beta|starter|ultra"
+        int  edits_limit
+        int  edits_used
+        bool is_active
+        timestamptz paid_at
+    }
+
+    CREDIT_TRANSACTIONS {
+        uuid id PK
+        uuid user_id FK
+        int  delta "+ ganho / - consumo"
+        int  balance_after
+        text reason
+        text category
+        text idempotency_key UK
+        jsonb metadata
+        timestamptz created_at
+    }
+
+    AD_REWARDS {
+        uuid id PK
+        uuid user_id FK
+        text ad_type "unity_rewarded|youtube"
+        numeric reward_credits "default 0.5"
+        timestamptz created_at
+    }
+
+    SHORTLINKS {
+        uuid id PK
+        text slug UK
+        text destination_url
+        numeric reward_credits
+        int  wait_seconds
+        bool is_active
+    }
+
+    SHORTLINK_CLICKS {
+        uuid id PK
+        uuid user_id FK
+        uuid shortlink_id FK
+        bool completed
+        numeric reward_credited
+        text ip_address
+        timestamptz clicked_at
+        timestamptz completed_at
+    }
+
+    REFERRALS {
+        uuid id PK
+        uuid referrer_id FK
+        uuid referred_id FK
+        numeric credits_awarded "default 100"
+        timestamptz created_at
+    }
+
+    USER_STREAKS {
+        uuid id PK
+        uuid user_id FK
+        int  current_streak
+        int  longest_streak
+        date last_activity_date
+    }
+
+    USER_BADGES {
+        uuid id PK
+        uuid user_id FK
+        text badge_type
+        timestamptz unlocked_at
+    }
+```
+
+### Fontes de Crédito → Ledger
+
+```mermaid
+flowchart LR
+    A[Ad Reward<br/>0.5 cred · max 10/dia] --> LED
+    S[Shortlink Click<br/>+wait_seconds]     --> LED
+    R[Referral<br/>+100 cred]                --> LED
+    ST[Streak Bonus diário]                  --> LED
+    SUB[Subscription / Stripe<br/>edits_limit] --> LED
+    BUILD[Build / AI Gen<br/>consumo -] --> LED
+
+    LED[(credit_transactions<br/>delta + balance_after<br/>idempotency_key)]
+    LED -- atualiza --> P[(profiles / subscriptions)]
+    LED -- CDC --> RT[Realtime → UI]
+```
+
+> Toda mutação de saldo passa por `execute_atomic_credit_deduction` (row-lock + INSERT no ledger na mesma transação). `idempotency_key` evita dupla contagem em webhooks (Stripe, Unity Ads, shortlinks).
+
 ---
+
 
 ## Arquitetura Técnica
 
