@@ -1152,6 +1152,44 @@ ORDER BY n.nspname, c.relname;
 
 > Se ambas as queries retornarem `(0 rows)`, a varredura via `pg_depend`/`pg_class` confirma que **nenhum objeto em nenhum schema** mantém dependência ou nome derivado das tabelas de exemplo. Esta é a verificação mais abrangente e fecha o ciclo de validação do rollback no catálogo do PostgreSQL.
 
+#### Verificação dedicada de tabelas e views via `pg_class` por `relkind` (todos os schemas)
+
+Além da varredura por nome, execute uma consulta **direta no catálogo** filtrando por `relkind` para garantir que não restaram tabelas (`r`) ou views (`v`) remanescentes das amostras em **qualquer schema** — incluindo schemas de sistema, extensões e schemas criados dinamicamente. Esta query detecta objetos mesmo que tenham sido renomeados ou movidos entre schemas, desde que ainda existam no catálogo.
+
+**Consulta filtrando exclusivamente tabelas (`r`) e views (`v`):**
+
+```bash
+psql "$DATABASE_URL" -c "
+SELECT n.nspname AS schema_name,
+       c.relname AS object_name,
+       CASE c.relkind
+         WHEN 'r' THEN 'table'
+         WHEN 'v' THEN 'view'
+       END AS object_type,
+       pg_get_userbyid(c.relowner) AS owner,
+       obj_description(c.oid, 'pg_class') AS description
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE c.relkind IN ('r', 'v')
+  AND (
+    c.relname ILIKE '%example_objects%'
+    OR c.relname ILIKE '%example_triggers%'
+    OR c.relname ILIKE '%example_trigger_events%'
+  )
+ORDER BY n.nspname, c.relname;
+"
+```
+
+**Resultado esperado:**
+
+```
+ schema_name | object_name | object_type | owner | description
+-------------+-------------+-------------+-------+-------------
+(0 rows)
+```
+
+> Se esta consulta retornar `(0 rows)`, confirma que **nenhuma tabela ou view** derivada das amostras permanece em nenhum schema do PostgreSQL após o rollback. Esta verificação é complementar às anteriores e garante que o rollback foi concluído sem deixar objetos de relação (`pg_class`) ativos no catálogo.
+
 
 
 
