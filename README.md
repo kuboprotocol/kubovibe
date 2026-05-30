@@ -248,6 +248,144 @@ flowchart LR
 
 ---
 
+### Dicionário de Dados — Smart Economy Core
+
+Convenções: **PK** = chave primária · **FK*** = relação lógica (sem foreign key física, validada por RLS via `auth.uid()`) · **UK** = unique · timestamps em `timestamptz` UTC.
+
+#### `profiles`
+Espelho público de `auth.users`. Criado automaticamente pelo trigger `handle_new_user` no signup.
+
+| Campo | Tipo | Chave | Nulo | Default | Descrição |
+|---|---|---|---|---|---|
+| `id` | uuid | PK · FK*→`auth.users.id` | não | — | Mesmo id do usuário em `auth.users` (1:1). |
+| `display_name` | text | — | sim | — | Nome exibido (cai para `email` se ausente). |
+| `avatar_url` | text | — | sim | — | URL pública do avatar (bucket `avatars`, com cache-bust por timestamp). |
+| `referral_code` | text | — | sim | `substr(id,1,8)` | Código de indicação único de 8 chars. |
+| `created_at` | timestamptz | — | não | `now()` | Criação. |
+| `updated_at` | timestamptz | — | não | `now()` | Última atualização. |
+
+#### `subscriptions`
+Plano ativo e cota de créditos do usuário. Linha bloqueada via `FOR UPDATE` na RPC.
+
+| Campo | Tipo | Chave | Nulo | Default | Descrição |
+|---|---|---|---|---|---|
+| `id` | uuid | PK | não | `gen_random_uuid()` | Identificador da assinatura. |
+| `user_id` | uuid | FK*→`auth.users.id` | não | — | Dono da assinatura (1:1 ativa por usuário). |
+| `plan` | text | — | não | `'beta'` | `beta` · `starter` · `ultra`. |
+| `edits_limit` | int | — | não | `20` | Cota total de créditos do ciclo. |
+| `edits_used` | int | — | não | `0` | Consumidos no ciclo. Saldo = `edits_limit - edits_used`. |
+| `is_active` | bool | — | não | `true` | Se `false`, RPC rejeita com `subscription_not_found`. |
+| `paid_at` | timestamptz | — | sim | `now()` | Último pagamento confirmado (Stripe/Polar webhook). |
+| `created_at` / `updated_at` | timestamptz | — | não | `now()` | Auditoria. |
+
+#### `credit_transactions` — ledger imutável
+Toda mutação de saldo grava aqui dentro da mesma transação do `UPDATE subscriptions`.
+
+| Campo | Tipo | Chave | Nulo | Default | Descrição |
+|---|---|---|---|---|---|
+| `id` | uuid | PK | não | `gen_random_uuid()` | Id da transação. |
+| `user_id` | uuid | FK*→`auth.users.id` | não | — | Dono. |
+| `delta` | int | — | não | — | `+` ganho / `−` consumo. |
+| `balance_after` | int | — | não | — | Saldo resultante (snapshot). |
+| `reason` | text | — | não | — | Texto humano (ex.: `ai_generation`, `ad_reward`). |
+| `category` | text | — | não | `'general'` | Bucket para analytics. |
+| `metadata` | jsonb | — | não | `'{}'` | Payload livre (op_type, provider, api_cost, etc.). |
+| `idempotency_key` | text | UK por `user_id` | sim | — | Bloqueia replay de webhook (Stripe, Unity, shortlinks). |
+| `created_at` | timestamptz | — | não | `now()` | Insert time. |
+
+#### `ad_rewards`
+Recompensas por anúncios assistidos (Unity Ads nativo / YouTube fallback web).
+
+| Campo | Tipo | Chave | Nulo | Default | Descrição |
+|---|---|---|---|---|---|
+| `id` | uuid | PK | não | `gen_random_uuid()` | — |
+| `user_id` | uuid | FK*→`auth.users.id` | não | — | Quem recebeu. |
+| `ad_type` | text | — | não | `'unity_rewarded'` | `unity_rewarded` · `youtube`. |
+| `reward_credits` | numeric | — | não | `0.5` | Créditos creditados (limite 10/dia). |
+| `created_at` | timestamptz | — | não | `now()` | Anti-fraude por janela diária. |
+
+#### `shortlinks`
+Catálogo público de links monetizados. Somente `service_role` escreve.
+
+| Campo | Tipo | Chave | Nulo | Default | Descrição |
+|---|---|---|---|---|---|
+| `id` | uuid | PK | não | `gen_random_uuid()` | — |
+| `slug` | text | UK | não | — | Slug público (`/l/:slug`). |
+| `title` | text | — | não | `'Shortlink'` | Rótulo. |
+| `destination_url` | text | — | não | — | Destino final após espera. |
+| `reward_credits` | numeric | — | não | `0.5` | Pago por click válido. |
+| `wait_seconds` | int | — | não | `8` | Tempo mínimo antes do redirect (anti-bot). |
+| `is_active` | bool | — | não | `true` | Visível para `anon`/`authenticated`. |
+| `created_at` | timestamptz | — | não | `now()` | — |
+
+#### `shortlink_clicks`
+Sessões de click — uma por (user, shortlink, tentativa). Crédito só com `completed=true`.
+
+| Campo | Tipo | Chave | Nulo | Default | Descrição |
+|---|---|---|---|---|---|
+| `id` | uuid | PK | não | `gen_random_uuid()` | — |
+| `user_id` | uuid | FK*→`auth.users.id` | não | — | Clicador autenticado. |
+| `shortlink_id` | uuid | FK*→`shortlinks.id` | não | — | Link clicado. |
+| `ip_address` | text | — | sim | — | Auditoria anti-fraude. |
+| `completed` | bool | — | não | `false` | `true` após `wait_seconds`. |
+| `reward_credited` | numeric | — | não | `0` | Quanto foi pago (snapshot). |
+| `clicked_at` | timestamptz | — | não | `now()` | Início. |
+| `completed_at` | timestamptz | — | sim | — | Quando virou elegível. |
+
+#### `referrals`
+Indicações resgatadas — gravadas pelo trigger `handle_new_user` quando o novo usuário traz `referral_code`.
+
+| Campo | Tipo | Chave | Nulo | Default | Descrição |
+|---|---|---|---|---|---|
+| `id` | uuid | PK | não | `gen_random_uuid()` | — |
+| `referrer_id` | uuid | FK*→`auth.users.id` | não | — | Quem indicou (recebe os créditos). |
+| `referred_id` | uuid | FK*→`auth.users.id` | não | — | Novo usuário. |
+| `credits_awarded` | numeric | — | não | `100` | Bônus aplicado em `subscriptions.edits_limit`. |
+| `created_at` | timestamptz | — | não | `now()` | — |
+
+#### `user_streaks`
+Sequência diária para gamificação e leaderboard.
+
+| Campo | Tipo | Chave | Nulo | Default | Descrição |
+|---|---|---|---|---|---|
+| `id` | uuid | PK | não | `gen_random_uuid()` | — |
+| `user_id` | uuid | FK*→`auth.users.id` (1:1) | não | — | Dono. |
+| `current_streak` | int | — | não | `0` | Dias consecutivos atuais. |
+| `longest_streak` | int | — | não | `0` | Recorde — usado para ranking do Top 50. |
+| `last_activity_date` | date | — | sim | — | Última atividade contada. |
+| `created_at` / `updated_at` | timestamptz | — | não | `now()` | — |
+
+#### `user_badges`
+Conquistas permanentes desbloqueadas (visíveis no perfil público).
+
+| Campo | Tipo | Chave | Nulo | Default | Descrição |
+|---|---|---|---|---|---|
+| `id` | uuid | PK | não | `gen_random_uuid()` | — |
+| `user_id` | uuid | FK*→`auth.users.id` | não | — | Dono. |
+| `badge_type` | text | — | não | — | Slug da conquista (ex.: `first_app`, `streak_30`). |
+| `unlocked_at` | timestamptz | — | não | `now()` | Quando foi obtida (somente `service_role` insere). |
+
+---
+
+### Assinatura da RPC
+
+```sql
+execute_atomic_credit_deduction(
+  _user_id         uuid,
+  _amount          integer,         -- > 0 (consumo)
+  _reason          text,
+  _category        text  default 'general',
+  _metadata        jsonb default '{}',
+  _idempotency_key text  default null
+) returns jsonb -- { success, replayed, transaction_id, balance_after }
+```
+
+Erros possíveis: `amount_must_be_positive` · `subscription_not_found` · `insufficient_credits`.
+
+---
+
+
+
 
 ## Arquitetura Técnica
 
