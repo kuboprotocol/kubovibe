@@ -1254,7 +1254,38 @@ ORDER BY n.nspname, c.relname;
 (0 rows)
 ```
 
-> Se esta consulta retornar `(0 rows)`, confirma que **nenhuma sequência** derivada das amostras permanece em nenhum schema. As quatro verificações de `relkind` (tabelas, views, materialized views e sequências) são complementares às anteriores e garantem que o rollback foi concluído sem deixar objetos de relação (`pg_class`) ativos no catálogo do PostgreSQL.
+> Se esta consulta retornar `(0 rows)`, confirma que **nenhuma sequência** derivada das amostras permanece em nenhum schema.
+
+---
+
+**Consulta adicional — funções (`pg_proc`):**
+
+```bash
+psql "$DATABASE_URL" -c "
+SELECT n.nspname AS schema_name,
+       p.proname AS function_name,
+       pg_get_function_identity_arguments(p.oid) AS arguments,
+       pg_get_userbyid(p.proowner) AS owner
+FROM pg_proc p
+JOIN pg_namespace n ON n.oid = p.pronamespace
+WHERE (
+    p.proname ILIKE '%example_objects%'
+    OR p.proname ILIKE '%example_triggers%'
+    OR p.proname ILIKE '%example_trigger_events%'
+  )
+ORDER BY n.nspname, p.proname;
+"
+```
+
+**Resultado esperado:**
+
+```
+ schema_name | function_name | arguments | owner
+-------------+---------------+-----------+-------
+(0 rows)
+```
+
+> Se esta consulta retornar `(0 rows)`, confirma que **nenhuma função** derivada das amostras permanece em nenhum schema. As verificações de `relkind` (tabelas, views, materialized views e sequências) somadas à checagem em `pg_proc` garantem que o rollback foi concluído sem deixar objetos de relação ou rotinas ativas no catálogo do PostgreSQL.
 
 
 
