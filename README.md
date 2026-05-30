@@ -430,7 +430,50 @@ Conquistas permanentes desbloqueadas (visíveis no perfil público).
 
 ---
 
-### Assinatura da RPC
+### Triggers e Defaults Efetivos
+
+Triggers ativos no schema `public` e `auth` que preenchem colunas ou sobrescrevem defaults em tempo de inserção/atualização.
+
+#### `on_auth_user_created` → `handle_new_user()`
+
+| Atributo | Valor |
+|---|---|
+| **Tabela de origem** | `auth.users` (schema `auth`) |
+| **Evento** | `AFTER INSERT` |
+| **Função** | `handle_new_user()` (SECURITY DEFINER) |
+| **Colunas preenchidas / ações** | |
+| `profiles.id` | `NEW.id` (UUID do `auth.users`) — **PK/FK implícita**. |
+| `profiles.display_name` | `COALESCE(NEW.raw_user_meta_data->>'display_name', NEW.email)` |
+| `profiles.referral_code` | `substr(NEW.id::text, 1, 8)` — código de 8 chars gerado automaticamente. |
+| `referrals.referrer_id` | ID do usuário que indicou (buscado por `referral_code` nos metadados). |
+| `referrals.referred_id` | `NEW.id` — o novo usuário. |
+| `referrals.credits_awarded` | `100` (fixo). |
+| `subscriptions.edits_limit` | Incrementado em `+100` no plano ativo do referrer. |
+| **Efeitos colaterais** | Envia email transacional ao referrer via `net.http_post` → Edge Function `send-transactional-email`. |
+| **Defaults efetivos via trigger** | `profiles.referral_code` não possui default na DDL; o trigger é a **única fonte** do valor. `profiles.display_name` também é populado exclusivamente pelo trigger (coluna `DEFAULT None`). |
+
+> **Nota:** a coluna `profiles.referral_code` não tem `DEFAULT` na tabela (`Default: None`). O trigger `handle_new_user` é a fonte obrigatória do código de indicação.
+
+#### `touch_updated_at` → `touch_updated_at()`
+
+Trigger genérico `BEFORE UPDATE` que mantém `updated_at` sincronizado. Aplicado nas tabelas:
+
+| Trigger | Tabela | Coluna atualizada | Default da coluna |
+|---|---|---|---|
+| `trg_audit_shares_updated` | `audit_shares` | `updated_at` | `now()` |
+| `trg_slide_decks_updated` | `slide_decks` | `updated_at` | `now()` |
+| `trg_slide_pages_updated` | `slide_pages` | `updated_at` | `now()` |
+| `api_credentials_touch` | `api_credentials` | `updated_at` | `now()` |
+| `web3_connections_touch_updated_at` | `web3_connections` | `updated_at` | `now()` |
+| `gmail_accounts_touch` | `gmail_accounts` | `updated_at` | `now()` |
+| `render_connections_touch` | `render_connections` | `updated_at` | `now()` |
+| `render_policies_touch` | `render_auto_heal_policies` | `updated_at` | `now()` |
+| `trg_npc_memories_updated_at` | `npc_memories` | `updated_at` | `now()` |
+
+> **Comportamento:** `NEW.updated_at = now(); RETURN NEW;`. O trigger garante que qualquer `UPDATE` reflita o timestamp exato da transação, independente do cliente enviar ou não o campo.
+
+---
+
 
 ```sql
 execute_atomic_credit_deduction(
