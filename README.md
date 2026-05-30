@@ -1,73 +1,227 @@
-# Welcome to your Kubo Vibe project
+# Kubo VibeDev
 
-## Project info
+> Plataforma autônoma de criação, execução e monetização de software baseada em IA.
+> Transforma ideias em produtos digitais completos — SaaS, metaversos, jogos AAA e aplicações Web3.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+---
 
-## How can I edit this code?
+## Visão Geral
 
-There are several ways of editing your application.
+O **Kubo VibeDev** é uma plataforma SaaS com inteligência artificial que permite a criação automática de aplicações digitais, incluindo sistemas Web2 e Web3.
 
-**Use Kubo Vibe Dev** 
+**O que ele faz:**
+- Gera aplicações completas (frontend + backend)
+- Cria APIs e microserviços automaticamente
+- Estrutura bancos de dados PostgreSQL
+- Realiza deploy em cloud
+- Integra sistemas de pagamento e blockchain
+- Cria jogos 2D/3D, metaversos e MMOs via **Quantum Game Engine**
+- Produz vídeos motion graphics, mockups de produto e assets de IA
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+**URL de Produção:** https://kubovibe.dev  
+**Preview:** https://id-preview--5ce8b966-167f-4e5a-be1c-165ac92bd64e.lovable.app
 
-Changes made via Lovable will be committed automatically to this repo.
+---
 
-**Use your preferred IDE**
+## Skills do Sistema (IA Multi-Agente)
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+O Kubo VibeDev opera com 4 skills de IA especializadas, acionadas automaticamente ou via `/` no chat:
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+| Skill | Status | Função |
+|-------|--------|--------|
+| **kubo-vibedev-ai-system** | Ativa | Orquestração multiagente + Quantum Game Engine |
+| **video-creator** | Ativa | Vídeos motion graphics via Remotion |
+| **product-shot** | Ativa | Screenshots polidos com frame macOS + mesh gradients |
+| **ai-gateway** | Ativa | Scripts que chamam modelos AI via Lovable AI Gateway |
 
-Follow these steps:
+### kubo-vibedev-ai-system
+Orquestra o ecossistema completo. Quando ativada, a IA instancia imediatamente a equipe multiagente (Dev, UI, Backend, Deploy, Data & Ops, Autonomous Action) para execução paralela. Inclui o **Kubo VibeDev Quantum Game Creator** — sistema AI-FIRST avançado que transforma prompts em jogos completos de nível AAA.
+
+### video-creator
+Cria vídeos motion graphics em qualidade de agência usando **Remotion + React + Tailwind**, renderizando MP4 via CLI headless para `/mnt/documents/`. Use quando precisar de vídeo, motion, animação cinematográfica, trailer ou peça de marketing animada.
+
+### product-shot
+Gera screenshots de produto polidos (frame macOS com traffic lights, cantos arredondados, sombra e mesh gradient) a partir de uma captura do app. Use para mockup, hero image, screenshot bonito ou imagem para landing/marketing. Presets: `sunset`, `ocean`, `aurora`, `candy`, `midnight`, `fog`, `peach`, `arctic`, `ember`, `lavender`.
+
+### ai-gateway
+Chama modelos AI (texto, JSON estruturado, batch, geração e edição de imagem) a partir de scripts no sandbox via Lovable AI Gateway, sem precisar de API key extra. Modelo padrão: `google/gemini-3-flash-preview`.
+
+---
+
+## Arquitetura Técnica
+
+### Frontend
+- **React 18** + **Vite 5**
+- **TypeScript 5** (strict)
+- **Tailwind CSS v3** com design tokens semânticos
+- **shadcn/ui** componentes customizados
+- **Framer Motion** para transições suaves (<300ms)
+- Identidade visual: *Premium Dark UI* — dark metallic, glassmorphism, gold (`#C9941A`) accents
+- Tipografia: Orbitron (headings), Inter (body)
+
+### Backend (Lovable Cloud)
+- **Supabase** PostgreSQL com RLS (Row Level Security)
+- **Edge Functions** para lógica serverless
+- **Realtime CDC** para streaming de eventos via WebSocket
+- Autenticação: Supabase Auth + GitHub OAuth + Google OAuth
+
+### Quantum Game Engine (`/src/game`)
+Módulo de game engine avançado com:
+
+| Componente | Descrição |
+|------------|-----------|
+| `ecs.ts` | Entity-Component-System core — determinístico, allocation-light |
+| `wgsl-safe.ts` | Sanitizador WGSL com edge function `wgsl-sanitizer` — bloqueia DoS, loops infinitos, buffer overflow |
+| `procedural.ts` | Geração procedural de mundos infinitos |
+| `renderer.ts` | Renderizador WebGPU/Three.js com pipeline otimizado |
+| `actions.ts` | Sistema de ações e gameplay |
+
+**Segurança WebGPU:** Todo shader proveniente de input de usuário ou IA passa obrigatoriamente pelo `wgsl-sanitizer` antes de tocar `device.createShaderModule()`. O edge function bloqueia padrões perigosos (loops infinitos, workgroups excessivos, arrays >64KB, recursão).
+
+---
+
+## Smart Economy Core
+
+Sistema econômico atômico com ledger de créditos e dedução transacional segura.
+
+### Tabelas Principais
+- **`profiles`** — perfis de usuário com tier (FREE, CREATOR, PRO, STUDIO) e saldo de créditos
+- **`smart_economy_ledger`** — ledger financeiro com todas as operações (MUSIC_GEN, VIDEO_GEN, CLIP_CUT, WEBGPU_RENDER)
+- **`user_roles`** — roles separados (admin, moderator, user) com função `has_role()` security definer
+
+### RPC Atômico
+```sql
+execute_atomic_credit_deduction(p_user_id, p_tokens_consumed, p_op_type, p_provider, p_api_cost)
+```
+Dedução atômica de créditos com `SELECT ... FOR UPDATE` implícito, evitando race conditions. Sempre usar esta RPC — nunca atualizar `current_credits` diretamente do cliente.
+
+### Realtime CDC
+As tabelas `profiles` e `smart_economy_ledger` estão na publicação `supabase_realtime`, permitindo streaming de eventos financeiros com latência <0.4ms para dashboards em tempo real.
+
+---
+
+## Estrutura de Diretórios
+
+```
+/
+├── .agents/skills/           # Skills drafts (não ativas diretamente)
+│   ├── ai-gateway/SKILL.md
+│   ├── product-shot/SKILL.md
+│   └── video-creator/SKILL.md
+├── .workspace/skills/        # Skills ativas
+│   └── kubo-vibedev-ai-system/SKILL.md
+├── .github/workflows/        # CI/CD (WGSL sanitizer, testes)
+├── src/
+│   ├── game/                 # Quantum Game Engine
+│   │   ├── ecs.ts
+│   │   ├── wgsl-safe.ts
+│   │   ├── procedural.ts
+│   │   ├── renderer.ts
+│   │   └── actions.ts
+│   ├── integrations/
+│   │   └── supabase/
+│   │       ├── client.ts     # Cliente Supabase (auto-gerado)
+│   │       └── types.ts      # Tipos do schema (auto-gerado)
+│   └── ...                   # Páginas, componentes, hooks
+├── supabase/
+│   ├── functions/            # Edge Functions
+│   │   ├── game-npc-ai/      # IA de NPCs para o game engine
+│   │   └── wgsl-sanitizer/   # Sanitizador de shaders WGSL
+│   └── migrations/           # 42+ migrations do schema
+├── supabase/config.toml      # Configuração do projeto
+├── public/                   # Assets estáticos
+├── index.html
+├── package.json
+├── tailwind.config.ts
+└── README.md                 # ← você está aqui
+```
+
+---
+
+## Autenticação e Segurança
+
+- **JWT** via Supabase Auth com refresh rotation
+- **GitHub OAuth** e **Google OAuth** configurados
+- **RLS** em todas as tabelas públicas — users só veem seus próprios dados
+- **user_roles** em tabela separada (nunca no profile) — `has_role()` security definer
+- Admin: `kuboprotocol@gmail.com` tem unlimited credits e dev access
+- WebGPU: interceptor anti-injeção ativo em runtime
+- Anti-fraude: timers de 10s/15s, tracking por IP/User, RLS reforçado
+
+---
+
+## Como Executar Localmente
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
+# 1. Clone o repositório
 git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
 cd <YOUR_PROJECT_NAME>
 
-# Step 3: Install the necessary dependencies.
+# 2. Instale as dependências
 npm i
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# 3. Inicie o servidor de desenvolvimento
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+**Requisitos:** Node.js & npm instalados. Recomendado: [nvm](https://github.com/nvm-sh/nvm).
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+---
 
-**Use GitHub Codespaces**
+## Deploy
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+O projeto é implantado automaticamente via **Vercel** quando publicado pelo Lovable:
 
-## What technologies are used for this project?
+1. Acesse o projeto no Lovable
+2. Clique em **Share → Publish**
 
-This project is built with:
+Ou faça push para o repo — a integração Git reflete as alterações automaticamente.
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+### Domínio Customizado
 
-## How can I deploy this project?
+Navegue até **Project > Settings > Domains** e clique em **Connect Domain**.
+Leia mais: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain)
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+---
 
-## Can I connect a custom domain to my Lovable project?
+## Tecnologias Utilizadas
 
-Yes, you can!
+| Camada | Tecnologia |
+|--------|-----------|
+| Frontend | React 18, Vite 5, TypeScript 5, Tailwind CSS, shadcn/ui, Framer Motion |
+| Backend | Supabase (PostgreSQL + Edge Functions + Realtime) |
+| Game Engine | Three.js, WebGPU, ECS custom, WGSL |
+| Auth | Supabase Auth, GitHub OAuth, Google OAuth |
+| Pagamentos | Stripe Checkout + Webhooks, Polar (fallback) |
+| Vídeo | Remotion + React + Tailwind |
+| Imagens | Lovable AI Gateway (Gemini) + mesh gradients |
+| Infra | Vercel (frontend), Lovable Cloud (backend) |
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+---
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+## Principais Funcionalidades
+
+- **Builder Interface** — Prompt, chat, KUBO Tools, FLOW AI modes
+- **Canvas Tool** — Ferramenta visual de design com 20+ templates
+- **Cloning System** — Firecrawl + DeepSeek + Tailwind para clonar sites
+- **KUBO FLOW AI** — Modos FLOW (Free), THINK (Starter), SHIP (Ultra) com detecção de complexidade
+- **Publishing System** — `/app/:projectId/:slug` URL pública com badge "Built with Kubo Vibe"
+- **Reward System** — 0.5 créditos/vídeo (max 10/dia), timer de 15s
+- **Gamification** — Daily streak bonuses e badges permanentes
+- **Leaderboard** — Top 50 global por longest_streak
+- **Referral System** — 100 créditos/referral, código de 8 caracteres
+- **Connectors Hub** — GitHub OAuth real, IPFS deploy
+- **Email Infra** — notify.kubovibe.dev, React Email, pg_net em DB triggers
+- **Native Mobile** — Capacitor hybrid (dev.kubovibe.app)
+
+---
+
+## Contato
+
+**KUBO PROTOCOL**  
+CNPJ: 58.864.433/0001-90  
+Website: https://kubovibe.dev
+
+---
+
+> *"A primeira IA do mundo capaz de criar universos digitais vivos sem depender de engines tradicionais."*
