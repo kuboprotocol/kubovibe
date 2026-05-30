@@ -474,6 +474,24 @@ WHERE trigger_schema IN ('public', 'auth', 'storage')
 ORDER BY trigger_name, event_manipulation;
 ```
 
+```sql
+-- Filtrar triggers por nome ou tabela (INSERT e UPDATE separados)
+SELECT
+    trigger_name,
+    event_manipulation  AS evento,
+    event_object_table  AS tabela,
+    action_timing       AS timing,
+    action_statement    AS funcao_chamada
+FROM information_schema.triggers
+WHERE trigger_schema IN ('public', 'auth', 'storage')
+  AND (
+    trigger_name LIKE '%enforce%bucket%'
+    OR event_object_table = 'buckets'
+    OR trigger_name = 'on_auth_user_created'
+  )
+ORDER BY trigger_name, event_manipulation;
+```
+
 #### Schema `auth`
 
 | Trigger | Tabela | Timing | Evento | Função | Tabelas/colunas afetadas |
