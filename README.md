@@ -853,6 +853,73 @@ SELECT count(*) FROM public.example_objects;        -- deve falhar: relation doe
 
 > Se a query retornar `(0 rows)` e `\dt` não listar as tabelas, o rollback foi executado com sucesso.
 
+#### Verificar dependências residuais no catálogo
+
+Confirme que não restaram chaves estrangeiras, views, triggers ou sequências ligadas às tabelas removidas:
+
+```bash
+psql "$DATABASE_URL" -c "
+SELECT conname AS constraint_name,
+       conrelid::regclass AS source_table,
+       confrelid::regclass AS referenced_table
+FROM pg_constraint
+WHERE contype = 'f'
+  AND confrelid::regclass::text IN (
+    'public.example_objects',
+    'public.example_triggers',
+    'public.example_trigger_events'
+  );
+"
+```
+
+**Resultado esperado:**
+
+```
+ constraint_name | source_table | referenced_table
+-----------------+--------------+------------------
+(0 rows)
+```
+
+Verifique também views, materialized views e sequências órfãs:
+
+```bash
+psql "$DATABASE_URL" -c "
+SELECT dependent.relname AS dependent_object,
+       dependent.relkind AS tipo,
+       referenced.relname AS referenced_table
+FROM pg_depend d
+JOIN pg_class dependent   ON d.objid = dependent.oid
+JOIN pg_class referenced  ON d.refobjid = referenced.oid
+WHERE referenced.relname IN (
+    'example_objects',
+    'example_triggers',
+    'example_trigger_events'
+  )
+  AND dependent.relkind IN ('v', 'm', 'S');
+"
+```
+
+**Tipos (`relkind`):**
+- `v` = view
+- `m` = materialized view
+- `S` = sequence
+
+**Resultado esperado:**
+
+```
+ dependent_object | tipo | referenced_table
+------------------+------+------------------
+(0 rows)
+```
+
+> Se ambas as queries retornarem `(0 rows)`, não há dependências residuais no catálogo do PostgreSQL.
+
+
+
+
+
+
+
 
 
 
