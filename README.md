@@ -461,6 +461,19 @@ WHERE trigger_schema IN ('public', 'auth', 'storage')
 ORDER BY trigger_name, event_manipulation;
 ```
 
+```sql
+-- Detalhamento por trigger com função chamada (INSERT e UPDATE separados)
+SELECT
+    trigger_name,
+    event_manipulation  AS evento,
+    event_object_table  AS tabela,
+    action_timing       AS timing,
+    action_statement    AS funcao_chamada
+FROM information_schema.triggers
+WHERE trigger_schema IN ('public', 'auth', 'storage')
+ORDER BY trigger_name, event_manipulation;
+```
+
 #### Schema `auth`
 
 | Trigger | Tabela | Timing | Evento | Função | Tabelas/colunas afetadas |
