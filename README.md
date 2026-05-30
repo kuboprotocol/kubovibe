@@ -1221,7 +1221,40 @@ ORDER BY n.nspname, c.relname;
 (0 rows)
 ```
 
-> Se esta consulta retornar `(0 rows)`, confirma que **nenhuma materialized view** derivada das amostras permanece em nenhum schema. As três verificações de `relkind` (tabelas, views e materialized views) são complementares às anteriores e garantem que o rollback foi concluído sem deixar objetos de relação (`pg_class`) ativos no catálogo do PostgreSQL.
+> Se esta consulta retornar `(0 rows)`, confirma que **nenhuma materialized view** derivada das amostras permanece em nenhum schema.
+
+---
+
+**Consulta adicional — sequências (`S`):**
+
+```bash
+psql "$DATABASE_URL" -c "
+SELECT n.nspname AS schema_name,
+       c.relname AS object_name,
+       'sequence' AS object_type,
+       pg_get_userbyid(c.relowner) AS owner,
+       obj_description(c.oid, 'pg_class') AS description
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE c.relkind = 'S'
+  AND (
+    c.relname ILIKE '%example_objects%'
+    OR c.relname ILIKE '%example_triggers%'
+    OR c.relname ILIKE '%example_trigger_events%'
+  )
+ORDER BY n.nspname, c.relname;
+"
+```
+
+**Resultado esperado:**
+
+```
+ schema_name | object_name | object_type | owner | description
+-------------+-------------+-------------+-------+-------------
+(0 rows)
+```
+
+> Se esta consulta retornar `(0 rows)`, confirma que **nenhuma sequência** derivada das amostras permanece em nenhum schema. As quatro verificações de `relkind` (tabelas, views, materialized views e sequências) são complementares às anteriores e garantem que o rollback foi concluído sem deixar objetos de relação (`pg_class`) ativos no catálogo do PostgreSQL.
 
 
 
