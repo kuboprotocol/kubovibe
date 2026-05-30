@@ -260,7 +260,7 @@ Espelho público de `auth.users`. Criado automaticamente pelo trigger `handle_ne
 | `id` | uuid | PK · FK*→`auth.users.id` | não | — | Mesmo id do usuário em `auth.users` (1:1). |
 | `display_name` | text | — | sim | — | Nome exibido (cai para `email` se ausente). |
 | `avatar_url` | text | — | sim | — | URL pública do avatar (bucket `avatars`, com cache-bust por timestamp). |
-| `referral_code` | text | — | sim | `substr(id,1,8)` | Código de indicação único de 8 chars. |
+| `referral_code` | text | UK | sim | — *(trigger `handle_new_user` → `substr(id::text,1,8)`)* | Código de indicação único de 8 chars. |
 | `created_at` | timestamptz | — | não | `now()` | Criação. |
 | `updated_at` | timestamptz | — | não | `now()` | Última atualização. |
 
