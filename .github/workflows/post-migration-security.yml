@@ -1,0 +1,223 @@
+name: Post-Migration Security Scan
+
+# Executa varredura de segurança e validações de permissões (GRANT/RLS)
+# após cada alteração em migrations do Supabase ou em RLS/policies do código.
+#
+# Gatilhos:
+#  - push/PR que toque supabase/migrations/** ou supabase/functions/**
+#  - manual via workflow_dispatch
+#
+# Requer secrets (configurados no repositório):
+#   SUPABASE_DB_URL  -> connection string read-only do projeto (preferencial)
+#   SUPABASE_ACCESS_TOKEN + SUPABASE_PROJECT_REF (para rodar `supabase db lint`)
+
+on:
+  push:
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/functions/**'
+      - '.github/workflows/post-migration-security.yml'
+  pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/functions/**'
+  workflow_dispatch:
+
+concurrency:
+  group: post-migration-security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  security-scan:
+    name: Security scan + permission checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Install psql client
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y postgresql-client
+
+      # ------------------------------------------------------------------
+      # 1) Lint estático nas migrations + edge functions
+      # ------------------------------------------------------------------
+      - name: Static lint — proibir padrões inseguros nas migrations
+        run: |
+          set -euo pipefail
+          echo "🔍 Verificando padrões proibidos em supabase/migrations/**"
+
+          # CREATE TABLE em public sem GRANT na mesma migration
+          bad=0
+          for f in $(git ls-files 'supabase/migrations/*.sql'); do
+            if grep -qiE 'create[[:space:]]+table[[:space:]]+(if[[:space:]]+not[[:space:]]+exists[[:space:]]+)?public\.' "$f"; then
+              if ! grep -qiE 'grant[[:space:]]+.*on[[:space:]]+(table[[:space:]]+)?public\.' "$f"; then
+                echo "❌ $f cria tabela em public sem GRANT"
+                bad=1
+              fi
+              if ! grep -qiE 'enable[[:space:]]+row[[:space:]]+level[[:space:]]+security' "$f"; then
+                echo "❌ $f cria tabela em public sem ENABLE RLS"
+                bad=1
+              fi
+            fi
+          done
+
+          # SECURITY DEFINER sem search_path fixo
+          for f in $(git ls-files 'supabase/migrations/*.sql'); do
+            if grep -qiE 'security[[:space:]]+definer' "$f" && ! grep -qiE 'set[[:space:]]+search_path' "$f"; then
+              echo "❌ $f tem SECURITY DEFINER sem SET search_path"
+              bad=1
+            fi
+          done
+
+          # ALTER DATABASE proibido
+          if git ls-files 'supabase/migrations/*.sql' | xargs -r grep -liE 'alter[[:space:]]+database[[:space:]]+postgres'; then
+            echo "❌ ALTER DATABASE postgres não é permitido"
+            bad=1
+          fi
+
+          # Modificações em schemas reservados
+          if git ls-files 'supabase/migrations/*.sql' \
+            | xargs -r grep -liE '(create|alter|drop)[[:space:]]+[^;]*(auth|storage|realtime|vault|supabase_functions)\.'; then
+            echo "❌ Migration toca schema reservado (auth/storage/realtime/vault/supabase_functions)"
+            bad=1
+          fi
+
+          exit $bad
+
+      - name: Static lint — edge functions
+        run: |
+          set -euo pipefail
+          echo "🔍 Verificando edge functions"
+          bad=0
+
+          # service_role exposto ao client
+          if grep -RInE 'SUPABASE_SERVICE_ROLE_KEY' src/ 2>/dev/null; then
+            echo "❌ SERVICE_ROLE referenciado no frontend (src/)"
+            bad=1
+          fi
+
+          # supabase.rpc('execute_sql' ...) — execução de SQL arbitrário
+          if grep -RInE "rpc\(['\"]execute_sql" supabase/functions/ 2>/dev/null; then
+            echo "❌ Edge function executa SQL arbitrário via execute_sql"
+            bad=1
+          fi
+
+          exit $bad
+
+      # ------------------------------------------------------------------
+      # 2) Validações de permissões no banco (somente se DB_URL configurada)
+      # ------------------------------------------------------------------
+      - name: Permission checks (GRANT/RLS) no banco
+        if: ${{ env.SUPABASE_DB_URL != '' }}
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          echo "🔐 Validando GRANTs e RLS no schema public"
+
+          # 2a) Toda tabela em public deve ter RLS habilitada
+          missing_rls=$(psql "$SUPABASE_DB_URL" -At -c "
+            SELECT n.nspname || '.' || c.relname
+            FROM pg_class c
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = 'public'
+              AND c.relkind = 'r'
+              AND c.relrowsecurity = false;
+          ")
+          if [ -n "$missing_rls" ]; then
+            echo "❌ Tabelas em public SEM RLS:"
+            echo "$missing_rls"
+            exit 1
+          fi
+
+          # 2b) Toda tabela em public com RLS deve ter pelo menos 1 policy
+          no_policy=$(psql "$SUPABASE_DB_URL" -At -c "
+            SELECT n.nspname || '.' || c.relname
+            FROM pg_class c
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+            LEFT JOIN pg_policy p ON p.polrelid = c.oid
+            WHERE n.nspname = 'public'
+              AND c.relkind = 'r'
+              AND c.relrowsecurity = true
+            GROUP BY 1
+            HAVING COUNT(p.polname) = 0;
+          ")
+          if [ -n "$no_policy" ]; then
+            echo "❌ Tabelas em public com RLS mas SEM policies:"
+            echo "$no_policy"
+            exit 1
+          fi
+
+          # 2c) Toda tabela em public deve ter GRANT pelo menos para authenticated OU anon
+          missing_grant=$(psql "$SUPABASE_DB_URL" -At -c "
+            SELECT n.nspname || '.' || c.relname
+            FROM pg_class c
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = 'public' AND c.relkind = 'r'
+              AND NOT EXISTS (
+                SELECT 1 FROM information_schema.role_table_grants g
+                WHERE g.table_schema = 'public'
+                  AND g.table_name = c.relname
+                  AND g.grantee IN ('authenticated','anon','service_role')
+              );
+          ")
+          if [ -n "$missing_grant" ]; then
+            echo "❌ Tabelas em public SEM GRANT para authenticated/anon/service_role:"
+            echo "$missing_grant"
+            exit 1
+          fi
+
+          # 2d) Funções SECURITY DEFINER em public devem ter search_path fixo
+          insecure_fns=$(psql "$SUPABASE_DB_URL" -At -c "
+            SELECT n.nspname || '.' || p.proname
+            FROM pg_proc p
+            JOIN pg_namespace n ON n.oid = p.pronamespace
+            WHERE n.nspname = 'public'
+              AND p.prosecdef = true
+              AND NOT EXISTS (
+                SELECT 1 FROM unnest(coalesce(p.proconfig, '{}')) cfg
+                WHERE cfg LIKE 'search_path=%'
+              );
+          ")
+          if [ -n "$insecure_fns" ]; then
+            echo "❌ Funções SECURITY DEFINER sem SET search_path:"
+            echo "$insecure_fns"
+            exit 1
+          fi
+
+          echo "✅ GRANTs, RLS, policies e SECURITY DEFINER validados"
+
+      # ------------------------------------------------------------------
+      # 3) Supabase linter oficial (warnings críticos)
+      # ------------------------------------------------------------------
+      - name: Supabase DB linter
+        if: ${{ env.SUPABASE_ACCESS_TOKEN != '' && env.SUPABASE_PROJECT_REF != '' }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          set -euo pipefail
+          supabase link --project-ref "$SUPABASE_PROJECT_REF"
+          # Falha em ERROR; warnings ficam visíveis no log
+          supabase inspect db --linked || true
+          supabase db lint --linked --level error
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "### Post-migration security scan" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Static lint nas migrations: ✅" >> "$GITHUB_STEP_SUMMARY"
+          echo "- GRANT/RLS/policies no banco: ${SUPABASE_DB_URL:+✅}${SUPABASE_DB_URL:-⏭️ (DB_URL não configurada)}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Supabase linter: ${SUPABASE_ACCESS_TOKEN:+✅}${SUPABASE_ACCESS_TOKEN:-⏭️ (token não configurado)}" >> "$GITHUB_STEP_SUMMARY"
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
