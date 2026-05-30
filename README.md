@@ -1380,7 +1380,106 @@ ORDER BY n.nspname, c.relname, con.conname;
 (0 rows)
 ```
 
-> Se esta consulta retornar `(0 rows)`, confirma que **nenhuma constraint** derivada das amostras permanece em nenhum schema. As verificações de `relkind` (tabelas, views, materialized views e sequências) somadas às checagens em `pg_proc`, `pg_trigger` e `pg_constraint` garantem que o rollback foi concluído sem deixar objetos de relação, rotinas, triggers ou constraints ativas no catálogo do PostgreSQL.
+> Se esta consulta retornar `(0 rows)`, confirma que **nenhuma constraint** derivada das amostras permanece em nenhum schema.
+
+---
+
+**Consulta adicional — views (`relkind = 'v'`):**
+
+```bash
+psql "$DATABASE_URL" -c "
+SELECT n.nspname AS schema_name,
+       c.relname AS object_name,
+       'view' AS object_type,
+       pg_get_userbyid(c.relowner) AS owner,
+       obj_description(c.oid, 'pg_class') AS description
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE c.relkind = 'v'
+  AND (
+    c.relname ILIKE '%example_objects%'
+    OR c.relname ILIKE '%example_triggers%'
+    OR c.relname ILIKE '%example_trigger_events%'
+  )
+ORDER BY n.nspname, c.relname;
+"
+```
+
+**Resultado esperado:**
+
+```
+ schema_name | object_name | object_type | owner | description
+-------------+-------------+-------------+-------+-------------
+(0 rows)
+```
+
+> Se esta consulta retornar `(0 rows)`, confirma que **nenhuma view** derivada das amostras permanece em nenhum schema.
+
+---
+
+**Consulta adicional — índices (`relkind = 'i'`):**
+
+```bash
+psql "$DATABASE_URL" -c "
+SELECT n.nspname AS schema_name,
+       c.relname AS object_name,
+       'index' AS object_type,
+       pg_get_userbyid(c.relowner) AS owner,
+       obj_description(c.oid, 'pg_class') AS description
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE c.relkind = 'i'
+  AND (
+    c.relname ILIKE '%example_objects%'
+    OR c.relname ILIKE '%example_triggers%'
+    OR c.relname ILIKE '%example_trigger_events%'
+  )
+ORDER BY n.nspname, c.relname;
+"
+```
+
+**Resultado esperado:**
+
+```
+ schema_name | object_name | object_type | owner | description
+-------------+-------------+-------------+-------+-------------
+(0 rows)
+```
+
+> Se esta consulta retornar `(0 rows)`, confirma que **nenhum índice** derivado das amostras permanece em nenhum schema.
+
+---
+
+**Consulta adicional — schemas (`pg_namespace`):**
+
+```bash
+psql "$DATABASE_URL" -c "
+SELECT n.nspname AS schema_name,
+       pg_get_userbyid(n.nspowner) AS owner,
+       obj_description(n.oid, 'pg_namespace') AS description
+FROM pg_namespace n
+WHERE n.nspname ILIKE '%example_objects%'
+   OR n.nspname ILIKE '%example_triggers%'
+   OR n.nspname ILIKE '%example_trigger_events%'
+ORDER BY n.nspname;
+"
+```
+
+**Resultado esperado:**
+
+```
+ schema_name | owner | description
+-------------+-------+-------------
+(0 rows)
+```
+
+> Se esta consulta retornar `(0 rows)`, confirma que **nenhum schema** derivado das amostras permanece no catálogo. As verificações de `relkind` (tabelas `r`, views `v`, materialized views `m`, sequências `S`, índices `i`) somadas às checagens em `pg_proc`, `pg_trigger`, `pg_constraint` e `pg_namespace` garantem rollback completo no catálogo do PostgreSQL.
+
+---
+
+**Padrão das consultas (rollback):** todas as verificações acima seguem o mesmo formato — `psql "$DATABASE_URL" -c "..."`, projeção iniciada por `schema_name`, filtro `ILIKE` com os três padrões (`%example_objects%`, `%example_triggers%`, `%example_trigger_events%`), `ORDER BY n.nspname, <object>` e resultado esperado `(0 rows)`. Mantenha esse padrão ao adicionar novas checagens de rollback.
+
+
 
 
 
