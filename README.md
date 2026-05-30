@@ -665,6 +665,95 @@ psql -v trigger_filter='' -v table_filter='user' -f triggers.sql
 psql -v trigger_filter='auth' -v table_filter='users' -f triggers.sql
 ```
 
+### Tabelas de exemplo (DDL compatível com os filtros)
+
+DDL de demonstração para validar os filtros por `trigger_name` e `event_object_table`. Os tipos das chaves e colunas seguem o padrão do `information_schema.triggers` (`trigger_name`, `event_object_table` e `event_object_schema` são `text`/`name`), garantindo compatibilidade direta com `LOWER()` + `LIKE`.
+
+```sql
+-- 1) Tabela de objetos monitorados (ex.: "buckets", "users", "objects")
+CREATE TABLE public.example_objects (
+    id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    schema_name   text NOT NULL,                 -- compatível com event_object_schema
+    object_name   text NOT NULL,                 -- compatível com event_object_table
+    created_at    timestamptz NOT NULL DEFAULT now(),
+    updated_at    timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (schema_name, object_name)
+);
+
+-- 2) Tabela de triggers cadastrados (espelha trigger_name/timing/evento)
+CREATE TABLE public.example_triggers (
+    id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    trigger_name        text NOT NULL UNIQUE,    -- compatível com trigger_name
+    object_id           uuid NOT NULL REFERENCES public.example_objects(id) ON DELETE CASCADE,
+    action_timing       text NOT NULL CHECK (action_timing IN ('BEFORE','AFTER','INSTEAD OF')),
+    event_manipulation  text NOT NULL CHECK (event_manipulation IN ('INSERT','UPDATE','DELETE','TRUNCATE')),
+    action_statement    text NOT NULL,           -- ex.: 'EXECUTE FUNCTION public.touch_updated_at()'
+    created_at          timestamptz NOT NULL DEFAULT now()
+);
+
+-- 3) Tabela de eventos disparados (log de execuções)
+CREATE TABLE public.example_trigger_events (
+    id            bigserial PRIMARY KEY,
+    trigger_id    uuid NOT NULL REFERENCES public.example_triggers(id) ON DELETE CASCADE,
+    fired_event   text NOT NULL CHECK (fired_event IN ('INSERT','UPDATE','DELETE','TRUNCATE')),
+    row_pk        text,                          -- PK do registro afetado (genérico)
+    payload       jsonb NOT NULL DEFAULT '{}'::jsonb,
+    fired_at      timestamptz NOT NULL DEFAULT now()
+);
+
+-- Índices úteis para os filtros LOWER() + LIKE
+CREATE INDEX idx_example_objects_lower_name    ON public.example_objects   (LOWER(object_name));
+CREATE INDEX idx_example_triggers_lower_name   ON public.example_triggers  (LOWER(trigger_name));
+CREATE INDEX idx_example_trigger_events_event  ON public.example_trigger_events (fired_event);
+```
+
+Seed mínimo para testar os exemplos anteriores:
+
+```sql
+INSERT INTO public.example_objects (schema_name, object_name) VALUES
+    ('storage', 'buckets'),
+    ('storage', 'objects'),
+    ('auth',    'users');
+
+INSERT INTO public.example_triggers (trigger_name, object_id, action_timing, event_manipulation, action_statement)
+SELECT 'enforce_bucket_name_length_trigger', id, 'BEFORE', 'INSERT',
+       'EXECUTE FUNCTION storage.enforce_bucket_name_length()'
+FROM public.example_objects WHERE schema_name='storage' AND object_name='buckets';
+
+INSERT INTO public.example_triggers (trigger_name, object_id, action_timing, event_manipulation, action_statement)
+SELECT 'enforce_bucket_name_length_trigger', id, 'BEFORE', 'UPDATE',
+       'EXECUTE FUNCTION storage.enforce_bucket_name_length()'
+FROM public.example_objects WHERE schema_name='storage' AND object_name='buckets';
+
+INSERT INTO public.example_triggers (trigger_name, object_id, action_timing, event_manipulation, action_statement)
+SELECT 'on_auth_user_created', id, 'AFTER', 'INSERT',
+       'EXECUTE FUNCTION public.handle_new_user()'
+FROM public.example_objects WHERE schema_name='auth' AND object_name='users';
+```
+
+Query equivalente ao Exemplo 10, agora aplicada às tabelas de exemplo:
+
+```sql
+WITH params AS (
+  SELECT
+    LOWER(:'trigger_filter') AS trigger_filter,
+    LOWER(:'table_filter')   AS table_filter
+)
+SELECT
+    t.trigger_name,
+    t.event_manipulation AS evento,
+    o.object_name        AS tabela,
+    t.action_timing      AS timing,
+    t.action_statement   AS funcao_chamada
+FROM public.example_triggers t
+JOIN public.example_objects  o ON o.id = t.object_id
+CROSS JOIN params
+WHERE (params.trigger_filter = '' OR LOWER(t.trigger_name) LIKE '%' || params.trigger_filter || '%')
+  AND (params.table_filter   = '' OR LOWER(o.object_name)  LIKE '%' || params.table_filter   || '%')
+ORDER BY t.trigger_name, t.event_manipulation;
+```
+
+
 
 |---|---|---|---|---|---|
 | `on_auth_user_created` | `auth.users` | `AFTER` | `INSERT` | `public.handle_new_user()` (SECURITY DEFINER) | **Insere em `public.profiles`** (`id`, `display_name`, `referral_code`). Se houver `referral_code` em `raw_user_meta_data`: **insere em `public.referrals`** (`referrer_id`, `referred_id`, `credits_awarded=100`) e **atualiza `public.subscriptions.edits_limit`** (`+100`) do referrer. Dispara `net.http_post` → Edge Function `send-transactional-email`. |
