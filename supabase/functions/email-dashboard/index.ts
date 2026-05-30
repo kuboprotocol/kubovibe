@@ -37,6 +37,19 @@ Deno.serve(async (req) => {
     }
 
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Admin-only: bloqueia leitura de PII de e-mails por usuários comuns
+    // RPC chamada via userClient para que auth.uid() resolva corretamente
+    const { data: isAdminData, error: adminErr } = await userClient.rpc("is_kubo_admin");
+    const isAdmin = !adminErr && isAdminData === true;
+    if (!isAdmin) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+
     const url = new URL(req.url);
     const since = url.searchParams.get("since") || new Date(Date.now() - 7 * 86400000).toISOString();
 
