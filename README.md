@@ -1795,27 +1795,43 @@ gh run watch
 gh run list --workflow=post-migration-security.yml --limit 5
 ```
 
-#### 3) Reproduzindo as checagens localmente
+#### 3) Reproduzindo as 3 camadas localmente (script unificado)
+
+Use o script `scripts/verify-security-local.sh` — roda exatamente o mesmo fluxo do CI e grava relatórios em `reports/security/`:
+
 ```bash
-# Camada 1 — lint estático (sem secrets)
-for f in $(git ls-files "supabase/migrations/*.sql"); do
-  grep -qiE "create[[:space:]]+table[[:space:]]+(if[[:space:]]+not[[:space:]]+exists[[:space:]]+)?public\." "$f" || continue
-  grep -qiE "grant[[:space:]]+.*on[[:space:]]+(table[[:space:]]+)?public\." "$f" || echo "MISSING GRANT: $f"
-  grep -qiE "enable[[:space:]]+row[[:space:]]+level[[:space:]]+security" "$f" || echo "MISSING RLS: $f"
-done
+# Camada 1 apenas (sem secrets)
+./scripts/verify-security-local.sh
 
-# Camada 2 — checagens no banco (requer psql + SUPABASE_DB_URL)
+# Camadas 1 + 2 (psql necessário)
 export SUPABASE_DB_URL='postgresql://postgres.<ref>:<pwd>@...pooler.supabase.com:6543/postgres?sslmode=require'
-psql "$SUPABASE_DB_URL" -At -c "
-  SELECT n.nspname||'.'||c.relname FROM pg_class c
-  JOIN pg_namespace n ON n.oid = c.relnamespace
-  WHERE n.nspname='public' AND c.relkind='r' AND c.relrowsecurity=false;
-"
+./scripts/verify-security-local.sh
 
-# Camada 3 — Supabase linter oficial
+# Camadas 1 + 2 + 3 (supabase CLI necessário)
 export SUPABASE_ACCESS_TOKEN='sbp_...'
-supabase link --project-ref dlqmmubasyldcylhnqqd
-supabase db lint --linked --level error
+export SUPABASE_PROJECT_REF='dlqmmubasyldcylhnqqd'
+./scripts/verify-security-local.sh
+
+# Saída:
+#   reports/security/static-lint.log
+#   reports/security/db-checks.log
+#   reports/security/supabase-linter.log
+#   reports/security/summary.md    ← tabela com Status por camada
+# Exit code: 0 sucesso, 1 falha
+```
+
+### Relatórios persistidos pelo CI
+
+A cada execução o workflow:
+
+1. Roda `scripts/verify-security-local.sh` dentro do runner
+2. Faz upload via `actions/upload-artifact@v4` com o nome **`post-migration-security-reports-<run_id>`** (retention de 30 dias)
+3. Inclui o `summary.md` no painel **Actions → run → Summary**
+
+Para baixar os relatórios:
+```bash
+gh run download <run-id> -n post-migration-security-reports-<run-id>
+# ou pela UI: Actions → run → seção "Artifacts" no final da página
 ```
 
 ### Resultado esperado
@@ -1824,8 +1840,10 @@ Se todas as camadas passarem, o job exibe um summary com:
 - Ícone verde para lint estático
 - Ícone verde para checagens no banco (ou cinza se `SUPABASE_DB_URL` ausente)
 - Ícone verde para Supabase linter (ou cinza se token/proj_ref ausente)
+- Link para o artifact com os 4 logs/relatórios
 
 Se alguma camada falhar, o job encerra com `exit 1` e impede o merge do PR.
+
 
 ### Troubleshooting
 

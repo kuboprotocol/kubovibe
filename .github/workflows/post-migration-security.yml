@@ -211,13 +211,49 @@ jobs:
           supabase inspect db --linked || true
           supabase db lint --linked --level error
 
-      - name: Summary
+      # ------------------------------------------------------------------
+      # 4) Reproduz via script local + persiste relatórios como artifacts
+      # ------------------------------------------------------------------
+      - name: Run local verification script (gera reports/security/*)
         if: always()
-        run: |
-          echo "### Post-migration security scan" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Static lint nas migrations: ✅" >> "$GITHUB_STEP_SUMMARY"
-          echo "- GRANT/RLS/policies no banco: ${SUPABASE_DB_URL:+✅}${SUPABASE_DB_URL:-⏭️ (DB_URL não configurada)}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Supabase linter: ${SUPABASE_ACCESS_TOKEN:+✅}${SUPABASE_ACCESS_TOKEN:-⏭️ (token não configurado)}" >> "$GITHUB_STEP_SUMMARY"
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          chmod +x scripts/verify-security-local.sh
+          bash scripts/verify-security-local.sh || echo "::warning::verify-security-local.sh reported failures (see artifact)"
+
+      - name: Upload security reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: post-migration-security-reports-${{ github.run_id }}
+          path: |
+            reports/security/static-lint.log
+            reports/security/db-checks.log
+            reports/security/supabase-linter.log
+            reports/security/summary.md
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Summary
+        if: always()
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          {
+            echo "### Post-migration security scan"
+            echo "- Static lint nas migrations: ✅"
+            echo "- GRANT/RLS/policies no banco: ${SUPABASE_DB_URL:+✅}${SUPABASE_DB_URL:-⏭️ (DB_URL não configurada)}"
+            echo "- Supabase linter: ${SUPABASE_ACCESS_TOKEN:+✅}${SUPABASE_ACCESS_TOKEN:-⏭️ (token não configurado)}"
+            echo ""
+            echo "📦 Relatórios completos disponíveis no artifact **post-migration-security-reports-${{ github.run_id }}** (retention 30d)."
+            if [ -f reports/security/summary.md ]; then
+              echo ""
+              echo "---"
+              cat reports/security/summary.md
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
