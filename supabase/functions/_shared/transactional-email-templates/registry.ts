@@ -11,8 +11,10 @@ export interface TemplateEntry {
 
 import { template as welcomeEmail } from './welcome.tsx'
 import { template as referralNotification } from './referral-notification.tsx'
+import { template as domainTransferStatus } from './domain-transfer-status.tsx'
 
 export const TEMPLATES: Record<string, TemplateEntry> = {
   'welcome': welcomeEmail,
   'referral-notification': referralNotification,
+  'domain-transfer-status': domainTransferStatus,
 }
