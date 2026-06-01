@@ -1049,9 +1049,11 @@ export type Database = {
       }
       skill_imports: {
         Row: {
+          cancel_requested: boolean
           created_at: string
           file_name: string
           id: string
+          logs: Json
           notes: string | null
           progress: Json
           size_bytes: number | null
@@ -1059,11 +1061,14 @@ export type Database = {
           storage_path: string
           updated_at: string
           uploaded_by: string
+          validation: Json | null
         }
         Insert: {
+          cancel_requested?: boolean
           created_at?: string
           file_name: string
           id?: string
+          logs?: Json
           notes?: string | null
           progress?: Json
           size_bytes?: number | null
@@ -1071,11 +1076,14 @@ export type Database = {
           storage_path: string
           updated_at?: string
           uploaded_by: string
+          validation?: Json | null
         }
         Update: {
+          cancel_requested?: boolean
           created_at?: string
           file_name?: string
           id?: string
+          logs?: Json
           notes?: string | null
           progress?: Json
           size_bytes?: number | null
@@ -1083,6 +1091,7 @@ export type Database = {
           storage_path?: string
           updated_at?: string
           uploaded_by?: string
+          validation?: Json | null
         }
         Relationships: []
       }
