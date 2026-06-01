@@ -25,6 +25,8 @@ type Transfer = {
   id: string; domain_name: string; status: string; status_message: string | null;
   ionos_transfer_id: string | null; current_registrar: string | null;
   started_at: string; completed_at: string | null; updated_at: string;
+  notify_email: string | null; retry_count: number; next_retry_at: string | null;
+  last_error: string | null; cancel_reason: string | null; cancel_requested_at: string | null;
 };
 type DebugLog = {
   id: string; event_type: string; status: string; message: string;
