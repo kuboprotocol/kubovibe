@@ -546,6 +546,9 @@ export default function AdminSkillsPage() {
                       <p className="text-xs text-muted-foreground">
                         {(u.size / 1024).toFixed(1)} KB ·{" "}
                         {u.aborted ? "Cancelado" : STEP_LABEL[u.step]}
+                        {u.attempt && u.attempt > 1 && !u.aborted
+                          ? ` · tentativa ${u.attempt}/${4}`
+                          : ""}
                       </p>
                     </div>
                     <span className="text-xs font-mono tabular-nums text-muted-foreground">
