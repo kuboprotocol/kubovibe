@@ -80,6 +80,16 @@ export default function AdminSkillsPage() {
 
   const isAdmin = user?.email?.toLowerCase() === ADMIN_EMAIL;
 
+  const normalize = (row: Record<string, unknown>): SkillImport => {
+    const p = row.progress as { step?: string; percent?: number } | null;
+    return {
+      ...(row as unknown as SkillImport),
+      progress: p && typeof p === "object"
+        ? { step: (p.step as StepKey) ?? "queued", percent: Number(p.percent ?? 0) }
+        : { step: "queued", percent: 0 },
+    };
+  };
+
   const fetchItems = useCallback(async () => {
     const { data, error } = await supabase
       .from("skill_imports")
@@ -89,7 +99,7 @@ export default function AdminSkillsPage() {
       toast.error("Falha ao carregar histórico");
       return;
     }
-    setItems((data ?? []) as SkillImport[]);
+    setItems((data ?? []).map((r) => normalize(r as Record<string, unknown>)));
   }, []);
 
   // Initial load + Realtime subscription for live status/progress updates
