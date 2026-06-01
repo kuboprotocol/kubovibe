@@ -114,10 +114,10 @@ export default function AdminSkillsPage() {
         { event: "*", schema: "public", table: "skill_imports" },
         (payload) => {
           setItems((prev) => {
-            if (payload.eventType === "DELETE") {
+          if (payload.eventType === "DELETE") {
               return prev.filter((it) => it.id !== (payload.old as { id: string }).id);
             }
-            const row = payload.new as SkillImport;
+            const row = normalize(payload.new as Record<string, unknown>);
             const idx = prev.findIndex((it) => it.id === row.id);
             if (idx === -1) return [row, ...prev];
             const copy = prev.slice();
