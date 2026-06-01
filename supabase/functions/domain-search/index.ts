@@ -69,8 +69,10 @@ Deno.serve(async (req) => {
     const auth = req.headers.get("Authorization");
     if (!auth?.startsWith("Bearer ")) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: auth } } });
-    const { data: claims } = await supabase.auth.getClaims(auth.replace("Bearer ", ""));
-    if (!claims?.claims) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const svc = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const { data: userRes } = await supabase.auth.getUser();
+    if (!userRes?.user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const userId = userRes.user.id;
 
     const body = await req.json().catch(() => ({}));
     const query: string = String(body?.query ?? "").trim().toLowerCase().replace(/[^a-z0-9.-]/g, "");
@@ -93,6 +95,16 @@ Deno.serve(async (req) => {
       const av = await checkIonosAvailability(d, apiKey);
       return { domain: d, tld, available: av.available, price_credits: price, reason: av.reason };
     }));
+
+    const availableCount = results.filter((r) => r.available === true).length;
+    try {
+      await svc.from("connector_activity_logs").insert({
+        connector_slug: "ionos", user_id: userId, event_type: "search",
+        status: "success",
+        message: `Busca "${query}" → ${results.length} candidatos, ${availableCount} disponíveis`,
+        metadata: { query, count: results.length, available: availableCount, has_ionos: hasIonos },
+      });
+    } catch { /* ignore */ }
 
     return new Response(JSON.stringify({ query, results, has_ionos: hasIonos }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e: any) {

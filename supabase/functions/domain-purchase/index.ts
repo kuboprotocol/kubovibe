@@ -121,24 +121,40 @@ Deno.serve(async (req) => {
     // 3) Place order on IONOS (best effort)
     let ionos_domain_id: string | null = null;
     let status = apiKey ? "processing" : "pending";
+    let ionosResponseBody: any = null;
+    let ionosHttpStatus: number | null = null;
     if (apiKey) {
       try {
         const r = await fetch(`${IONOS_API}/domainorders`, {
           method: "POST",
           headers: { "X-API-Key": apiKey, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            properties: { name: domain, registrationPeriod: 1, autoRenewal: true },
-          }),
+          body: JSON.stringify([{ domainName: domain, period: 1, autoRenewal: true }]),
         });
+        ionosHttpStatus = r.status;
+        const text = await r.text();
+        try { ionosResponseBody = JSON.parse(text); } catch { ionosResponseBody = text; }
         if (r.ok) {
-          const d = await r.json();
-          ionos_domain_id = String(d?.id ?? d?.[0]?.id ?? "");
+          const first = Array.isArray(ionosResponseBody) ? ionosResponseBody[0] : ionosResponseBody;
+          ionos_domain_id = String(first?.id ?? first?.orderId ?? "");
           status = "active";
         } else {
           status = "failed";
         }
-      } catch { status = "failed"; }
+      } catch (e: any) {
+        status = "failed";
+        ionosResponseBody = { error: e?.message };
+      }
     }
+
+    // Log
+    try {
+      await svc.from("connector_activity_logs").insert({
+        connector_slug: "ionos", user_id: user.id, event_type: "purchase",
+        status: status === "failed" ? "error" : "success",
+        message: `Compra ${domain} (${price}c) → ${status}`,
+        metadata: { domain, tld, price, status, ionos_domain_id, http: ionosHttpStatus, ionos_body: ionosResponseBody },
+      });
+    } catch { /* ignore */ }
 
     // 4) Persist domain
     const { data: dom, error: ie } = await svc.from("kubo_domains").insert({
