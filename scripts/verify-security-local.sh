@@ -16,6 +16,9 @@
 # Exit code: 0 se todas as camadas executadas passaram, 1 se alguma falhou.
 
 set -uo pipefail
+# Bash 'lastpipe' ensures `... | tee` keeps variable mutations in the parent shell.
+shopt -s lastpipe 2>/dev/null || true
+set +m
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
