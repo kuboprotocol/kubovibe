@@ -621,17 +621,42 @@ function DebugTab() {
 
   useEffect(() => { load(); }, []);
 
+  const exportCSV = () => {
+    const headers = ["created_at", "event_type", "status", "message", "metadata"];
+    const rows = logs.map((l) => [
+      new Date(l.created_at).toISOString(),
+      l.event_type,
+      l.status,
+      JSON.stringify(l.message ?? ""),
+      JSON.stringify(l.metadata ?? {}),
+    ]);
+    const csv = [headers.join(","), ...rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `ionos-logs-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`${logs.length} log(s) exportados`);
+  };
+
   return (
     <Card className="bg-card/60 backdrop-blur border-border/40">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
             <CardTitle className="font-orbitron flex items-center gap-2"><Terminal className="w-5 h-5 text-primary" /> Debug logs IONOS</CardTitle>
-            <CardDescription>Últimos 100 eventos: busca, compra, transferência, status.</CardDescription>
+            <CardDescription>Últimos 100 eventos: busca, compra, transferência, status, retry, cancelamento.</CardDescription>
           </div>
-          <Button size="sm" variant="outline" onClick={load} disabled={loading}>
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-          </Button>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={exportCSV} disabled={!logs.length}>
+              <Download className="w-4 h-4 mr-1" /> Exportar CSV
+            </Button>
+            <Button size="sm" variant="outline" onClick={load} disabled={loading}>
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
