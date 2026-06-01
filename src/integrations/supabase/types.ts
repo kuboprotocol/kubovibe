@@ -650,15 +650,67 @@ export type Database = {
           },
         ]
       }
+      kubo_domain_transfer_events: {
+        Row: {
+          created_at: string
+          event_type: string
+          from_status: string | null
+          id: string
+          message: string | null
+          metadata: Json
+          to_status: string | null
+          transfer_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_type: string
+          from_status?: string | null
+          id?: string
+          message?: string | null
+          metadata?: Json
+          to_status?: string | null
+          transfer_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          from_status?: string | null
+          id?: string
+          message?: string | null
+          metadata?: Json
+          to_status?: string | null
+          transfer_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kubo_domain_transfer_events_transfer_id_fkey"
+            columns: ["transfer_id"]
+            isOneToOne: false
+            referencedRelation: "kubo_domain_transfers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       kubo_domain_transfers: {
         Row: {
           auth_code: string
+          cancel_reason: string | null
+          cancel_requested_at: string | null
           completed_at: string | null
           current_registrar: string | null
           domain_id: string | null
           domain_name: string
           id: string
           ionos_transfer_id: string | null
+          last_error: string | null
+          last_notified_status: string | null
+          last_retry_at: string | null
+          next_retry_at: string | null
+          notify_email: string | null
+          retry_count: number
           started_at: string
           status: string
           status_message: string | null
@@ -667,12 +719,20 @@ export type Database = {
         }
         Insert: {
           auth_code: string
+          cancel_reason?: string | null
+          cancel_requested_at?: string | null
           completed_at?: string | null
           current_registrar?: string | null
           domain_id?: string | null
           domain_name: string
           id?: string
           ionos_transfer_id?: string | null
+          last_error?: string | null
+          last_notified_status?: string | null
+          last_retry_at?: string | null
+          next_retry_at?: string | null
+          notify_email?: string | null
+          retry_count?: number
           started_at?: string
           status?: string
           status_message?: string | null
@@ -681,12 +741,20 @@ export type Database = {
         }
         Update: {
           auth_code?: string
+          cancel_reason?: string | null
+          cancel_requested_at?: string | null
           completed_at?: string | null
           current_registrar?: string | null
           domain_id?: string | null
           domain_name?: string
           id?: string
           ionos_transfer_id?: string | null
+          last_error?: string | null
+          last_notified_status?: string | null
+          last_retry_at?: string | null
+          next_retry_at?: string | null
+          notify_email?: string | null
+          retry_count?: number
           started_at?: string
           status?: string
           status_message?: string | null
