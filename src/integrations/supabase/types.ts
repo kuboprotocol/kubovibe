@@ -1053,6 +1053,7 @@ export type Database = {
           file_name: string
           id: string
           notes: string | null
+          progress: Json
           size_bytes: number | null
           status: string
           storage_path: string
@@ -1064,6 +1065,7 @@ export type Database = {
           file_name: string
           id?: string
           notes?: string | null
+          progress?: Json
           size_bytes?: number | null
           status?: string
           storage_path: string
@@ -1075,6 +1077,7 @@ export type Database = {
           file_name?: string
           id?: string
           notes?: string | null
+          progress?: Json
           size_bytes?: number | null
           status?: string
           storage_path?: string
