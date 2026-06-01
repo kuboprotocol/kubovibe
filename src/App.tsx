@@ -35,6 +35,7 @@ import PlanPage from "./pages/PlanPage";
 import SharedAuditPage from "./pages/SharedAuditPage";
 import GamePage from "./pages/GamePage";
 import AdminSkillsPage from "./pages/AdminSkillsPage";
+import DomainsPage from "./pages/DomainsPage";
 
 const queryClient = new QueryClient();
 
