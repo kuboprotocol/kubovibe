@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Globe, Search, ArrowLeftRight, Link2, ServerCog, Loader2, Check, X, Sparkles, Plus, Trash2, Shield, Zap, ArrowLeft, RefreshCw, Terminal, KeyRound, Rocket, Info } from "lucide-react";
+import { Globe, Search, ArrowLeftRight, Link2, ServerCog, Loader2, Check, X, Sparkles, Plus, Trash2, Shield, Zap, ArrowLeft, RefreshCw, Terminal, KeyRound, Rocket, Info, Ban, Download, Mail } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
