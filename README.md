@@ -1828,11 +1828,48 @@ A cada execução o workflow:
 2. Faz upload via `actions/upload-artifact@v4` com o nome **`post-migration-security-reports-<run_id>`** (retention de 30 dias)
 3. Inclui o `summary.md` no painel **Actions → run → Summary**
 
-Para baixar os relatórios:
+#### Download guiado dos artifacts
+
+**Opção A — UI (recomendada para não-técnicos):**
+1. Abra **Actions** → clique no run desejado
+2. Role até a seção **Artifacts** (final da página)
+3. Clique em `post-migration-security-reports-<run_id>` → baixa um `.zip`
+4. Extraia para inspecionar os 4 logs + `summary.md` + ZIP interno consolidado
+
+**Opção B — GitHub CLI (automação / CI):**
 ```bash
-gh run download <run-id> -n post-migration-security-reports-<run-id>
-# ou pela UI: Actions → run → seção "Artifacts" no final da página
+# Lista os 5 runs mais recentes
+gh run list --workflow=post-migration-security.yml --limit 5
+
+# Baixa para ./reports/ci/<run-id>/
+RUN_ID=<run-id>
+mkdir -p reports/ci/$RUN_ID
+gh run download $RUN_ID \
+  -n post-migration-security-reports-$RUN_ID \
+  -D reports/ci/$RUN_ID
+
+# Inspeciona o summary direto no terminal
+cat reports/ci/$RUN_ID/summary.md
+unzip -l reports/ci/$RUN_ID/post-migration-security-$RUN_ID.zip
 ```
+
+**Opção C — `curl` + API (sem `gh`):**
+```bash
+TOKEN=$GITHUB_TOKEN  REPO=OWNER/REPO  RUN_ID=<run-id>
+ART_ID=$(curl -s -H "Authorization: Bearer $TOKEN" \
+  "https://api.github.com/repos/$REPO/actions/runs/$RUN_ID/artifacts" \
+  | jq -r '.artifacts[0].id')
+curl -L -H "Authorization: Bearer $TOKEN" \
+  "https://api.github.com/repos/$REPO/actions/artifacts/$ART_ID/zip" \
+  -o reports.zip
+unzip reports.zip -d reports/ci/$RUN_ID/
+```
+
+#### ZIP local consolidado
+
+O script `verify-security-local.sh` também gera um ZIP carimbado com timestamp em
+`reports/security/post-migration-security-<UTC>.zip`, com o mesmo conteúdo do
+artifact do CI — pronto para anexar em tickets, PRs ou auditorias externas.
 
 ### Resultado esperado
 
@@ -1940,3 +1977,18 @@ Website: https://kubovibe.dev
 ---
 
 > *"A primeira IA do mundo capaz de criar universos digitais vivos sem depender de engines tradicionais."*
+
+---
+
+## Skills Orchestration
+
+Skills ativas em `.workspace/skills/` (verificar com `ls .workspace/skills/`):
+
+1. `kubo-vibedev-ai-system` — orquestrador raiz (primária por padrão)
+2. `kubo-vibe-3d-websites-engine` — 3D / WebGPU
+3. `ai-gateway` — roteamento LLM
+4. `product-shot` — mockups de produto
+5. `video-creator` — vídeos / roteiros
+
+Regras de precedência, handoff, isolamento e fluxo para **registrar novas
+skills via ZIP** estão em [`docs/SKILLS_ORCHESTRATION.md`](docs/SKILLS_ORCHESTRATION.md).

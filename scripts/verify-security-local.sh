@@ -181,6 +181,16 @@ fi
   echo "Logs: \`$STATIC_LOG\`, \`$DB_LOG\`, \`$LINTER_LOG\`"
 } > "$SUMMARY"
 
+# -------------------------------------------------------------------
+# Bundle ZIP (facilita download/anexo)
+# -------------------------------------------------------------------
+ZIP_OUT="$REPORT_DIR/post-migration-security-$(date -u +%Y%m%dT%H%M%SZ).zip"
+if command -v zip >/dev/null 2>&1; then
+  (cd "$REPORT_DIR" && zip -q "$(basename "$ZIP_OUT")" \
+    static-lint.log db-checks.log supabase-linter.log summary.md 2>/dev/null) || true
+  echo "📦 ZIP: $ZIP_OUT"
+fi
+
 echo ""
 echo "📄 Summary: $SUMMARY"
 echo "Static=$status_static  DB=$status_db  Linter=$status_linter"
