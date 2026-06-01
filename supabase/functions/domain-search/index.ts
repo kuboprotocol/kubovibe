@@ -96,6 +96,16 @@ Deno.serve(async (req) => {
       return { domain: d, tld, available: av.available, price_credits: price, reason: av.reason };
     }));
 
+    const availableCount = results.filter((r) => r.available === true).length;
+    try {
+      await svc.from("connector_activity_logs").insert({
+        connector_slug: "ionos", user_id: userId, event_type: "search",
+        status: "success",
+        message: `Busca "${query}" → ${results.length} candidatos, ${availableCount} disponíveis`,
+        metadata: { query, count: results.length, available: availableCount, has_ionos: hasIonos },
+      });
+    } catch { /* ignore */ }
+
     return new Response(JSON.stringify({ query, results, has_ionos: hasIonos }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e: any) {
     return new Response(JSON.stringify({ error: e?.message ?? "internal" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
