@@ -1047,6 +1047,42 @@ export type Database = {
         }
         Relationships: []
       }
+      skill_imports: {
+        Row: {
+          created_at: string
+          file_name: string
+          id: string
+          notes: string | null
+          size_bytes: number | null
+          status: string
+          storage_path: string
+          updated_at: string
+          uploaded_by: string
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          id?: string
+          notes?: string | null
+          size_bytes?: number | null
+          status?: string
+          storage_path: string
+          updated_at?: string
+          uploaded_by: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          id?: string
+          notes?: string | null
+          size_bytes?: number | null
+          status?: string
+          storage_path?: string
+          updated_at?: string
+          uploaded_by?: string
+        }
+        Relationships: []
+      }
       slide_decks: {
         Row: {
           created_at: string
@@ -1437,6 +1473,7 @@ export type Database = {
         Returns: Json
       }
       is_kubo_admin: { Args: never; Returns: boolean }
+      is_skill_admin: { Args: never; Returns: boolean }
       move_to_dlq: {
         Args: {
           dlq_name: string
