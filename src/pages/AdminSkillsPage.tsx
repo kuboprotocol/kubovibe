@@ -217,24 +217,86 @@ export default function AdminSkillsPage() {
   const removeLocal = (tempId: string) =>
     setLocals((prev) => prev.filter((l) => l.tempId !== tempId));
 
-  const cancelLocal = (tempId: string) => {
-    setLocals((prev) => {
-      const target = prev.find((l) => l.tempId === tempId);
-      if (target?.xhr) {
+  // Retry policy: max 4 attempts, 1s, 2s, 4s, 8s (cap 10s) with jitter
+  const MAX_ATTEMPTS = 4;
+  const backoffMs = (attempt: number) => {
+    const base = Math.min(10_000, 1000 * 2 ** (attempt - 1));
+    return base + Math.floor(Math.random() * 400);
+  };
+
+  const cancelLocal = useCallback(
+    async (tempId: string) => {
+      let storagePath: string | undefined;
+      setLocals((prev) => {
+        const target = prev.find((l) => l.tempId === tempId);
+        if (target?.xhr) {
+          try {
+            target.xhr.abort();
+          } catch {
+            /* noop */
+          }
+        }
+        storagePath = target?.storagePath;
+        return prev.map((l) =>
+          l.tempId === tempId
+            ? { ...l, aborted: true, error: "Cancelado pelo usuário" }
+            : l
+        );
+      });
+      toast.message("Upload cancelado");
+
+      // Best-effort cleanup of any half-uploaded object
+      if (storagePath) {
         try {
-          target.xhr.abort();
+          await supabase.functions.invoke("skill-import-cancel", {
+            body: { action: "cancel-upload", storagePath },
+          });
         } catch {
           /* noop */
         }
       }
-      return prev.map((l) =>
-        l.tempId === tempId
-          ? { ...l, aborted: true, error: "Cancelado pelo usuário" }
-          : l
-      );
-    });
-    toast.message("Upload cancelado");
-    setTimeout(() => removeLocal(tempId), 1500);
+      setTimeout(() => removeLocal(tempId), 1500);
+    },
+    []
+  );
+
+  const performUpload = useCallback(
+    async (tempId: string, file: File, path: string) => {
+      const { data: signed, error: signErr } = await supabase.storage
+        .from(BUCKET)
+        .createSignedUploadUrl(path);
+      if (signErr || !signed) throw signErr ?? new Error("signed_url_failed");
+
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        patchLocal(tempId, { xhr });
+        xhr.open("PUT", signed.signedUrl, true);
+        xhr.setRequestHeader("Content-Type", "application/zip");
+        xhr.setRequestHeader("x-upsert", "true");
+        xhr.upload.onprogress = (e) => {
+          if (!e.lengthComputable) return;
+          const pct = Math.max(
+            1,
+            Math.min(99, Math.round((e.loaded / e.total) * 100))
+          );
+          patchLocal(tempId, { percent: pct });
+        };
+        xhr.onload = () =>
+          xhr.status >= 200 && xhr.status < 300
+            ? resolve()
+            : reject(new Error(`upload_http_${xhr.status}`));
+        xhr.onerror = () => reject(new Error("upload_network_error"));
+        xhr.onabort = () => reject(new Error("aborted"));
+        xhr.send(file);
+      });
+    },
+    []
+  );
+
+  const isRetryableError = (msg: string) => {
+    if (msg === "aborted") return false;
+    if (msg.startsWith("upload_http_4")) return false; // 4xx not retryable
+    return true; // network errors, 5xx, signed-url failures
   };
 
   const uploadOne = useCallback(
@@ -253,64 +315,82 @@ export default function AdminSkillsPage() {
           percent: 0,
           step: "queued",
           file,
+          storagePath: path,
+          attempt: 0,
         },
       ]);
 
-      try {
-        patchLocal(tempId, { step: "uploading", percent: 1 });
-        const { data: signed, error: signErr } = await supabase.storage
-          .from(BUCKET)
-          .createSignedUploadUrl(path);
-        if (signErr || !signed) throw signErr ?? new Error("signed_url_failed");
-
-        await new Promise<void>((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          patchLocal(tempId, { xhr });
-          xhr.open("PUT", signed.signedUrl, true);
-          xhr.setRequestHeader("Content-Type", "application/zip");
-          xhr.setRequestHeader("x-upsert", "false");
-          xhr.upload.onprogress = (e) => {
-            if (!e.lengthComputable) return;
-            const pct = Math.max(
-              1,
-              Math.min(99, Math.round((e.loaded / e.total) * 100))
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        patchLocal(tempId, {
+          step: "uploading",
+          percent: 1,
+          attempt,
+          error: undefined,
+        });
+        try {
+          await performUpload(tempId, file, path);
+          // success → record DB row
+          patchLocal(tempId, { step: "recording", percent: 100 });
+          const { error: insErr } = await supabase.from("skill_imports").insert({
+            uploaded_by: user.id,
+            file_name: file.name,
+            storage_path: path,
+            size_bytes: file.size,
+            status: "pending",
+            notes:
+              attempt > 1
+                ? `Enviado após ${attempt} tentativas. Diga 'registre o ZIP que acabei de enviar'.`
+                : "Aguardando o agente. Diga 'registre o ZIP que acabei de enviar' no chat.",
+            progress: { step: "queued", percent: 0 },
+            logs: [],
+            cancel_requested: false,
+          });
+          if (insErr) throw insErr;
+          toast.success(
+            attempt > 1
+              ? `${file.name} enviado (tentativa ${attempt})`
+              : `${file.name} enviado`
+          );
+          setTimeout(() => removeLocal(tempId), 1200);
+          return;
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : "upload_failed";
+          if (msg === "aborted") return; // user cancelled
+          const canRetry = isRetryableError(msg) && attempt < MAX_ATTEMPTS;
+          if (!canRetry) {
+            patchLocal(tempId, { error: msg, step: "uploading" });
+            toast.error(
+              `Falha em ${file.name} após ${attempt} tentativas: ${msg}`
             );
-            patchLocal(tempId, { percent: pct });
-          };
-          xhr.onload = () =>
-            xhr.status >= 200 && xhr.status < 300
-              ? resolve()
-              : reject(new Error(`upload_http_${xhr.status}`));
-          xhr.onerror = () => reject(new Error("upload_network_error"));
-          xhr.onabort = () => reject(new Error("aborted"));
-          xhr.send(file);
-        });
-
-        patchLocal(tempId, { step: "recording", percent: 100 });
-        const { error: insErr } = await supabase.from("skill_imports").insert({
-          uploaded_by: user.id,
-          file_name: file.name,
-          storage_path: path,
-          size_bytes: file.size,
-          status: "pending",
-          notes:
-            "Aguardando o agente. Diga 'registre o ZIP que acabei de enviar' no chat.",
-          progress: { step: "queued", percent: 0 },
-          logs: [],
-          cancel_requested: false,
-        });
-        if (insErr) throw insErr;
-
-        toast.success(`${file.name} enviado`);
-        setTimeout(() => removeLocal(tempId), 1200);
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : "upload_failed";
-        if (msg === "aborted") return; // cancelLocal already handled UI
-        patchLocal(tempId, { error: msg });
-        toast.error(`Falha em ${file.name}: ${msg}`);
+            return;
+          }
+          const wait = backoffMs(attempt);
+          patchLocal(tempId, {
+            error: `Tentativa ${attempt} falhou (${msg}). Retentando em ${Math.round(
+              wait / 1000
+            )}s…`,
+            percent: 0,
+          });
+          // Cancellable wait: bail out if user aborted during backoff
+          const aborted = await new Promise<boolean>((resolve) => {
+            const t = setTimeout(() => resolve(false), wait);
+            const iv = setInterval(() => {
+              const cur = currentLocalRef.current.find(
+                (l) => l.tempId === tempId
+              );
+              if (cur?.aborted) {
+                clearTimeout(t);
+                clearInterval(iv);
+                resolve(true);
+              }
+            }, 150);
+            setTimeout(() => clearInterval(iv), wait + 50);
+          });
+          if (aborted) return;
+        }
       }
     },
-    [user]
+    [user, performUpload]
   );
 
   const handleFiles = useCallback(
@@ -334,18 +414,14 @@ export default function AdminSkillsPage() {
   };
 
   const requestStop = async (id: string) => {
-    const { error } = await supabase
-      .from("skill_imports")
-      .update({
-        cancel_requested: true,
-        notes: "Cancelamento solicitado pelo admin",
-      })
-      .eq("id", id);
+    const { error } = await supabase.functions.invoke("skill-import-cancel", {
+      body: { action: "cancel-import", importId: id },
+    });
     if (error) {
-      toast.error("Não foi possível solicitar o cancelamento");
+      toast.error("Não foi possível cancelar");
       return;
     }
-    toast.message("Cancelamento solicitado — o agente irá interromper");
+    toast.message("Cancelamento confirmado pelo endpoint");
   };
 
   const retry = async (id: string) => {
