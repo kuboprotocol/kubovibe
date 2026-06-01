@@ -1728,6 +1728,12 @@ As tabelas `profiles` e `smart_economy_ledger` estão na publicação `supabase_
 
 ## CI / Post-Migration Security
 
+[![Post-Migration Security](https://github.com/OWNER/REPO/actions/workflows/post-migration-security.yml/badge.svg?branch=main)](https://github.com/OWNER/REPO/actions/workflows/post-migration-security.yml)
+[![Vitest](https://github.com/OWNER/REPO/actions/workflows/vitest.yml/badge.svg?branch=main)](https://github.com/OWNER/REPO/actions/workflows/vitest.yml)
+[![E2E](https://github.com/OWNER/REPO/actions/workflows/e2e.yml/badge.svg?branch=main)](https://github.com/OWNER/REPO/actions/workflows/e2e.yml)
+
+> Substitua `OWNER/REPO` pelo slug real do repositório (ex.: `kuboprotocol/kubo-vibe-dev`) para os badges renderizarem corretamente no GitHub.
+
 Workflow `.github/workflows/post-migration-security.yml` executa automaticamente a cada push ou PR que altere `supabase/migrations/**` ou `supabase/functions/**`.
 
 ### O que o workflow faz
@@ -1753,11 +1759,13 @@ O job roda três camadas de verificação sequenciais e quebra o build se qualqu
 
 ### Secrets obrigatórios (GitHub Actions)
 
-| Secret | Onde obter | Obrigatório para |
-|---|---|---|
-| `SUPABASE_DB_URL` | Lovable Cloud / Connectors → mostra a connection string do PostgreSQL | Checagens no banco (camada 2) |
-| `SUPABASE_ACCESS_TOKEN` | [Supabase Dashboard](https://app.supabase.com) → Account → Access Tokens → Generate new token | Linter oficial (camada 3) |
-| `SUPABASE_PROJECT_REF` | URL do projeto: `https://supabase.com/dashboard/project/<ref>` | Linter oficial (camada 3) |
+| Secret | Onde obter | Obrigatório para | Exemplo de valor |
+|---|---|---|---|
+| `SUPABASE_DB_URL` | Supabase Dashboard → Project Settings → Database → Connection string (URI, com password) | Checagens no banco (camada 2) | `postgresql://postgres.dlqmmubasyldcylhnqqd:STRONG_PWD@aws-0-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require` |
+| `SUPABASE_ACCESS_TOKEN` | [app.supabase.com](https://app.supabase.com) → Account → Access Tokens → Generate new token | Linter oficial (camada 3) | `sbp_0123456789abcdef0123456789abcdef01234567` |
+| `SUPABASE_PROJECT_REF` | URL do projeto: `https://supabase.com/dashboard/project/<ref>` | Linter oficial (camada 3) | `dlqmmubasyldcylhnqqd` |
+
+> Use sempre a connection string do **pooler** (porta `6543`) com `sslmode=require` para não estourar o limite de conexões diretas. Nunca commitar o valor real — apenas em GitHub Secrets.
 
 ### Como configurar
 
@@ -1772,6 +1780,44 @@ O job roda três camadas de verificação sequenciais e quebra o build se qualqu
 - `pull_request` para as mesmas paths
 - `workflow_dispatch` — execução manual pelo botão "Run workflow" no GitHub Actions
 
+### Execução manual
+
+#### 1) Pelo GitHub UI
+1. Abra a aba **Actions** do repositório
+2. Selecione **Post-Migration Security Scan** no menu lateral
+3. Clique em **Run workflow** → escolha a branch → **Run workflow**
+4. Acompanhe o log em tempo real e veja o summary ao final
+
+#### 2) Pelo GitHub CLI
+```bash
+gh workflow run post-migration-security.yml --ref main
+gh run watch
+gh run list --workflow=post-migration-security.yml --limit 5
+```
+
+#### 3) Reproduzindo as checagens localmente
+```bash
+# Camada 1 — lint estático (sem secrets)
+for f in $(git ls-files "supabase/migrations/*.sql"); do
+  grep -qiE "create[[:space:]]+table[[:space:]]+(if[[:space:]]+not[[:space:]]+exists[[:space:]]+)?public\." "$f" || continue
+  grep -qiE "grant[[:space:]]+.*on[[:space:]]+(table[[:space:]]+)?public\." "$f" || echo "MISSING GRANT: $f"
+  grep -qiE "enable[[:space:]]+row[[:space:]]+level[[:space:]]+security" "$f" || echo "MISSING RLS: $f"
+done
+
+# Camada 2 — checagens no banco (requer psql + SUPABASE_DB_URL)
+export SUPABASE_DB_URL='postgresql://postgres.<ref>:<pwd>@...pooler.supabase.com:6543/postgres?sslmode=require'
+psql "$SUPABASE_DB_URL" -At -c "
+  SELECT n.nspname||'.'||c.relname FROM pg_class c
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+  WHERE n.nspname='public' AND c.relkind='r' AND c.relrowsecurity=false;
+"
+
+# Camada 3 — Supabase linter oficial
+export SUPABASE_ACCESS_TOKEN='sbp_...'
+supabase link --project-ref dlqmmubasyldcylhnqqd
+supabase db lint --linked --level error
+```
+
 ### Resultado esperado
 
 Se todas as camadas passarem, o job exibe um summary com:
@@ -1780,6 +1826,23 @@ Se todas as camadas passarem, o job exibe um summary com:
 - Ícone verde para Supabase linter (ou cinza se token/proj_ref ausente)
 
 Se alguma camada falhar, o job encerra com `exit 1` e impede o merge do PR.
+
+### Troubleshooting
+
+| Sintoma | Causa provável | Resolução |
+|---|---|---|
+| `❌ <file> cria tabela em public sem GRANT` | Migration nova com `CREATE TABLE public.x` sem bloco `GRANT` | Adicionar `GRANT SELECT, INSERT, UPDATE, DELETE ON public.x TO authenticated;` + `GRANT ALL ... TO service_role;` na mesma migration |
+| `❌ <file> cria tabela em public sem ENABLE RLS` | Falta `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` | Adicionar logo após o `CREATE TABLE` e antes do `CREATE POLICY` |
+| `❌ <file> tem SECURITY DEFINER sem SET search_path` | Função `SECURITY DEFINER` sem `SET search_path = public` | Adicionar `SET search_path = public` na assinatura da função |
+| `❌ ALTER DATABASE postgres não é permitido` | Migration tenta mudar parâmetros globais | Remover; usar `ALTER ROLE` ou `SET LOCAL` em transação |
+| `❌ Migration toca schema reservado` | `CREATE/ALTER/DROP` em `auth`/`storage`/`realtime`/`vault`/`supabase_functions` | Mover lógica para `public` ou usar API oficial do Supabase |
+| `❌ SERVICE_ROLE referenciado no frontend` | `SUPABASE_SERVICE_ROLE_KEY` em `src/**` | Mover para edge function; o frontend só usa `VITE_SUPABASE_PUBLISHABLE_KEY` |
+| `❌ Edge function executa SQL arbitrário via execute_sql` | `supabase.rpc('execute_sql', ...)` em edge function | Substituir por RPC tipada ou query via `from('table')` |
+| `psql: error: connection to server ... failed` | `SUPABASE_DB_URL` incorreta, sem `sslmode=require` ou apontando para porta direta (5432) saturada | Usar connection string do pooler na porta `6543` com `?sslmode=require` |
+| `permission denied for schema public` ao validar GRANTs | Role sem privilégio de leitura em `information_schema` | Usar a connection string padrão `postgres` do projeto |
+| Workflow não dispara em push | Push não tocou `supabase/migrations/**` nem `supabase/functions/**` | Rodar via `workflow_dispatch` ou ajustar `paths:` |
+| `supabase db lint` falha com `not linked` | Falta `SUPABASE_PROJECT_REF` ou `supabase link` não executou | Conferir os dois secrets e logs do passo `Supabase DB linter` |
+| Camada 2/3 marcada como `⏭️` no summary | Secret correspondente não configurado | Configurar `SUPABASE_DB_URL` e/ou `SUPABASE_ACCESS_TOKEN` + `SUPABASE_PROJECT_REF` |
 
 ---
 
