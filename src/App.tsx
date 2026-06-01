@@ -34,6 +34,7 @@ import EmailDashboardPage from "./pages/EmailDashboardPage";
 import PlanPage from "./pages/PlanPage";
 import SharedAuditPage from "./pages/SharedAuditPage";
 import GamePage from "./pages/GamePage";
+import AdminSkillsPage from "./pages/AdminSkillsPage";
 
 const queryClient = new QueryClient();
 
@@ -85,6 +86,7 @@ const App = () => (
             <Route path="/app/:projectId/:slug" element={<PublicAppPage />} />
             <Route path="/unsubscribe" element={<UnsubscribePage />} />
             <Route path="/game" element={<ProtectedRoute><GamePage /></ProtectedRoute>} />
+            <Route path="/admin/skills" element={<ProtectedRoute><AdminSkillsPage /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
