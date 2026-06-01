@@ -600,6 +600,208 @@ export type Database = {
         }
         Relationships: []
       }
+      kubo_dns_records: {
+        Row: {
+          created_at: string
+          domain_id: string
+          id: string
+          ionos_record_id: string | null
+          name: string
+          priority: number | null
+          record_type: string
+          ttl: number
+          updated_at: string
+          user_id: string
+          value: string
+        }
+        Insert: {
+          created_at?: string
+          domain_id: string
+          id?: string
+          ionos_record_id?: string | null
+          name: string
+          priority?: number | null
+          record_type: string
+          ttl?: number
+          updated_at?: string
+          user_id: string
+          value: string
+        }
+        Update: {
+          created_at?: string
+          domain_id?: string
+          id?: string
+          ionos_record_id?: string | null
+          name?: string
+          priority?: number | null
+          record_type?: string
+          ttl?: number
+          updated_at?: string
+          user_id?: string
+          value?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kubo_dns_records_domain_id_fkey"
+            columns: ["domain_id"]
+            isOneToOne: false
+            referencedRelation: "kubo_domains"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kubo_domain_transfers: {
+        Row: {
+          auth_code: string
+          completed_at: string | null
+          current_registrar: string | null
+          domain_id: string | null
+          domain_name: string
+          id: string
+          ionos_transfer_id: string | null
+          started_at: string
+          status: string
+          status_message: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auth_code: string
+          completed_at?: string | null
+          current_registrar?: string | null
+          domain_id?: string | null
+          domain_name: string
+          id?: string
+          ionos_transfer_id?: string | null
+          started_at?: string
+          status?: string
+          status_message?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auth_code?: string
+          completed_at?: string | null
+          current_registrar?: string | null
+          domain_id?: string | null
+          domain_name?: string
+          id?: string
+          ionos_transfer_id?: string | null
+          started_at?: string
+          status?: string
+          status_message?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kubo_domain_transfers_domain_id_fkey"
+            columns: ["domain_id"]
+            isOneToOne: false
+            referencedRelation: "kubo_domains"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kubo_domains: {
+        Row: {
+          auto_renew: boolean
+          contract_id: string | null
+          created_at: string
+          credits_spent: number
+          domain_name: string
+          expires_at: string | null
+          id: string
+          ionos_domain_id: string | null
+          metadata: Json
+          nameservers: string[] | null
+          project_id: string | null
+          source: string
+          ssl_status: string
+          status: string
+          tld: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auto_renew?: boolean
+          contract_id?: string | null
+          created_at?: string
+          credits_spent?: number
+          domain_name: string
+          expires_at?: string | null
+          id?: string
+          ionos_domain_id?: string | null
+          metadata?: Json
+          nameservers?: string[] | null
+          project_id?: string | null
+          source: string
+          ssl_status?: string
+          status?: string
+          tld: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auto_renew?: boolean
+          contract_id?: string | null
+          created_at?: string
+          credits_spent?: number
+          domain_name?: string
+          expires_at?: string | null
+          id?: string
+          ionos_domain_id?: string | null
+          metadata?: Json
+          nameservers?: string[] | null
+          project_id?: string | null
+          source?: string
+          ssl_status?: string
+          status?: string
+          tld?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      kubo_ionos_contracts: {
+        Row: {
+          admin_id: string | null
+          contract_id: string
+          created_at: string
+          id: string
+          plan: string
+          reseller_reference: string
+          resource_limits: Json
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          admin_id?: string | null
+          contract_id: string
+          created_at?: string
+          id?: string
+          plan?: string
+          reseller_reference: string
+          resource_limits?: Json
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          admin_id?: string | null
+          contract_id?: string
+          created_at?: string
+          id?: string
+          plan?: string
+          reseller_reference?: string
+          resource_limits?: Json
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       npc_memories: {
         Row: {
           created_at: string
