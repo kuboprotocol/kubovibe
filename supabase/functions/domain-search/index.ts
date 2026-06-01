@@ -76,7 +76,7 @@ Deno.serve(async (req) => {
     const query: string = String(body?.query ?? "").trim().toLowerCase().replace(/[^a-z0-9.-]/g, "");
     if (!query || query.length < 2) return new Response(JSON.stringify({ error: "query too short" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-    const apiKey = Deno.env.get("IONOS_API_KEY") ?? "";
+    const apiKey = buildIonosKey();
     const hasIonos = !!apiKey;
 
     // Build candidate list: direct query + tld variations + AI suggestions
