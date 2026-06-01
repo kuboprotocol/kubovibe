@@ -4,6 +4,15 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 
 const IONOS_API = "https://api.hosting.ionos.com/domains/v1";
 const RESELLER_API = "https://api.ionos.com/reseller/v2";
+
+function buildIonosKey(): string {
+  const key = (Deno.env.get("IONOS_API_KEY") ?? "").trim();
+  const prefix = (Deno.env.get("IONOS_API_PREFIX") ?? "").trim();
+  if (!key) return "";
+  if (key.includes(".")) return key;
+  if (prefix) return `${prefix}.${key}`;
+  return key;
+}
 const PLAN_LIMITS: Record<string, any> = {
   starter: { ramServerMax: 2, cpuServerMax: 1, ips: 1 },
   pro: { ramServerMax: 8, cpuServerMax: 4, ips: 2 },
@@ -106,7 +115,7 @@ Deno.serve(async (req) => {
     }
 
     // 2) Ensure IONOS contract
-    const apiKey = Deno.env.get("IONOS_API_KEY") ?? "";
+    const apiKey = buildIonosKey();
     const contract = await getOrCreateContract(svc, user.id, user.email ?? `${user.id}@kubo.local`, apiKey);
 
     // 3) Place order on IONOS (best effort)

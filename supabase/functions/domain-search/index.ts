@@ -3,6 +3,15 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 
 const IONOS_API = "https://api.hosting.ionos.com/domains/v1";
+
+function buildIonosKey(): string {
+  const key = (Deno.env.get("IONOS_API_KEY") ?? "").trim();
+  const prefix = (Deno.env.get("IONOS_API_PREFIX") ?? "").trim();
+  if (!key) return "";
+  if (key.includes(".")) return key; // already prefix.secret
+  if (prefix) return `${prefix}.${key}`;
+  return key;
+}
 const TLD_PRICES_CREDITS: Record<string, number> = {
   com: 15, "com.br": 25, net: 16, org: 16, dev: 18, app: 22,
   io: 50, ai: 80, co: 30, xyz: 8, tech: 20, store: 25, online: 18,
@@ -67,7 +76,7 @@ Deno.serve(async (req) => {
     const query: string = String(body?.query ?? "").trim().toLowerCase().replace(/[^a-z0-9.-]/g, "");
     if (!query || query.length < 2) return new Response(JSON.stringify({ error: "query too short" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-    const apiKey = Deno.env.get("IONOS_API_KEY") ?? "";
+    const apiKey = buildIonosKey();
     const hasIonos = !!apiKey;
 
     // Build candidate list: direct query + tld variations + AI suggestions

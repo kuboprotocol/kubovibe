@@ -5,6 +5,15 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 const DNS_API = "https://api.hosting.ionos.com/dns/v1";
 const VALID_TYPES = ["A", "AAAA", "CNAME", "TXT", "MX", "SRV", "NS"];
 
+function buildIonosKey(): string {
+  const key = (Deno.env.get("IONOS_API_KEY") ?? "").trim();
+  const prefix = (Deno.env.get("IONOS_API_PREFIX") ?? "").trim();
+  if (!key) return "";
+  if (key.includes(".")) return key;
+  if (prefix) return `${prefix}.${key}`;
+  return key;
+}
+
 async function ionosCreate(apiKey: string, zoneName: string, rec: any) {
   // Best-effort: find zone, push record. Returns ionos record id or null.
   try {
@@ -34,7 +43,7 @@ Deno.serve(async (req) => {
     const { data: userRes, error: ue } = await userClient.auth.getUser();
     if (ue || !userRes?.user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     const userId = userRes.user.id;
-    const apiKey = Deno.env.get("IONOS_API_KEY") ?? "";
+    const apiKey = buildIonosKey();
 
     const body = await req.json().catch(() => ({}));
     const action = String(body?.action ?? "list");

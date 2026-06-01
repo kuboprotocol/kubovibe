@@ -3,6 +3,15 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 
 const IONOS_API = "https://api.hosting.ionos.com/domains/v1";
+
+function buildIonosKey(): string {
+  const key = (Deno.env.get("IONOS_API_KEY") ?? "").trim();
+  const prefix = (Deno.env.get("IONOS_API_PREFIX") ?? "").trim();
+  if (!key) return "";
+  if (key.includes(".")) return key;
+  if (prefix) return `${prefix}.${key}`;
+  return key;
+}
 const TLD_TRANSFER_CREDITS: Record<string, number> = {
   com: 15, "com.br": 25, net: 16, org: 16, dev: 18, app: 22,
   io: 50, ai: 80, co: 30, xyz: 8, tech: 20, store: 25, online: 18,
@@ -26,7 +35,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const action = String(body?.action ?? "start");
-    const apiKey = Deno.env.get("IONOS_API_KEY") ?? "";
+    const apiKey = buildIonosKey();
 
     if (action === "status") {
       const id = String(body?.transfer_id ?? "");
