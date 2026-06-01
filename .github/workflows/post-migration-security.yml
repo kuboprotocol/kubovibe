@@ -224,7 +224,16 @@ jobs:
           chmod +x scripts/verify-security-local.sh
           bash scripts/verify-security-local.sh || echo "::warning::verify-security-local.sh reported failures (see artifact)"
 
-      - name: Upload security reports
+      - name: Bundle reports into ZIP
+        if: always()
+        run: |
+          mkdir -p reports/security
+          cd reports/security
+          zip -q "post-migration-security-${{ github.run_id }}.zip" \
+            static-lint.log db-checks.log supabase-linter.log summary.md 2>/dev/null || true
+          ls -la
+
+      - name: Upload security reports (raw logs + ZIP)
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -234,6 +243,7 @@ jobs:
             reports/security/db-checks.log
             reports/security/supabase-linter.log
             reports/security/summary.md
+            reports/security/post-migration-security-${{ github.run_id }}.zip
           retention-days: 30
           if-no-files-found: warn
 
