@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
     const { data: userRes, error: ue } = await userClient.auth.getUser();
     if (ue || !userRes?.user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     const userId = userRes.user.id;
-    const apiKey = Deno.env.get("IONOS_API_KEY") ?? "";
+    const apiKey = buildIonosKey();
 
     const body = await req.json().catch(() => ({}));
     const action = String(body?.action ?? "list");
