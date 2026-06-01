@@ -88,6 +88,7 @@ const App = () => (
             <Route path="/unsubscribe" element={<UnsubscribePage />} />
             <Route path="/game" element={<ProtectedRoute><GamePage /></ProtectedRoute>} />
             <Route path="/admin/skills" element={<ProtectedRoute><AdminSkillsPage /></ProtectedRoute>} />
+            <Route path="/domains" element={<ProtectedRoute><DomainsPage /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
