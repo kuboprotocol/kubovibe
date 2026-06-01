@@ -115,7 +115,7 @@ Deno.serve(async (req) => {
     }
 
     // 2) Ensure IONOS contract
-    const apiKey = Deno.env.get("IONOS_API_KEY") ?? "";
+    const apiKey = buildIonosKey();
     const contract = await getOrCreateContract(svc, user.id, user.email ?? `${user.id}@kubo.local`, apiKey);
 
     // 3) Place order on IONOS (best effort)
