@@ -128,6 +128,8 @@ type LocalUpload = {
   xhr?: XMLHttpRequest;
   aborted?: boolean;
   file: File;
+  storagePath?: string;
+  attempt?: number;
 };
 
 export default function AdminSkillsPage() {
@@ -141,6 +143,10 @@ export default function AdminSkillsPage() {
   >("all");
   const [openLogs, setOpenLogs] = useState<Record<string, boolean>>({});
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const currentLocalRef = useRef<LocalUpload[]>([]);
+  useEffect(() => {
+    currentLocalRef.current = locals;
+  }, [locals]);
 
   const isAdmin = user?.email?.toLowerCase() === ADMIN_EMAIL;
 
