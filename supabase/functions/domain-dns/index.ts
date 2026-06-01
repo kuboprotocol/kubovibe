@@ -5,6 +5,15 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 const DNS_API = "https://api.hosting.ionos.com/dns/v1";
 const VALID_TYPES = ["A", "AAAA", "CNAME", "TXT", "MX", "SRV", "NS"];
 
+function buildIonosKey(): string {
+  const key = (Deno.env.get("IONOS_API_KEY") ?? "").trim();
+  const prefix = (Deno.env.get("IONOS_API_PREFIX") ?? "").trim();
+  if (!key) return "";
+  if (key.includes(".")) return key;
+  if (prefix) return `${prefix}.${key}`;
+  return key;
+}
+
 async function ionosCreate(apiKey: string, zoneName: string, rec: any) {
   // Best-effort: find zone, push record. Returns ionos record id or null.
   try {
