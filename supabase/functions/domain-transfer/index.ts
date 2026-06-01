@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const action = String(body?.action ?? "start");
-    const apiKey = Deno.env.get("IONOS_API_KEY") ?? "";
+    const apiKey = buildIonosKey();
 
     if (action === "status") {
       const id = String(body?.transfer_id ?? "");
