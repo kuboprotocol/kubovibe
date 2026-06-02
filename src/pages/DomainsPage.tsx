@@ -27,6 +27,7 @@ type Transfer = {
   started_at: string; completed_at: string | null; updated_at: string;
   notify_email: string | null; retry_count: number; next_retry_at: string | null;
   last_error: string | null; cancel_reason: string | null; cancel_requested_at: string | null;
+  last_notified_at: string | null;
 };
 type DebugLog = {
   id: string; event_type: string; status: string; message: string;
@@ -383,9 +384,15 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
         },
       },
     });
+    if (error) {
+      setResendingEmail(null);
+      toast.error(error.message);
+      return;
+    }
+    await supabase.from("kubo_domain_transfers").update({ last_notified_at: new Date().toISOString() }).eq("id", t.id);
     setResendingEmail(null);
-    if (error) { toast.error(error.message); return; }
     toast.success(`E-mail de status reenviado para ${recipient}`);
+    onTransferred();
   };
 
   const canSubmit = !!domain && authCode.length >= 4 && /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(domain);
@@ -442,7 +449,7 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
                     </div>
                   </div>
                   <div className="flex gap-1.5 shrink-0">
-                    <Button size="sm" variant="outline" onClick={() => setConfirmResend(t)} disabled={resendingEmail === t.id} title="Reenviar e-mail de status">
+                    <Button size="sm" variant="outline" onClick={() => setConfirmResend(t)} disabled={resendingEmail === t.id} title={t.last_notified_at ? `Último e-mail: ${new Date(t.last_notified_at).toLocaleString("pt-BR")}` : "Reenviar e-mail de status"}>
                       {resendingEmail === t.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => refresh(t.id)} disabled={refreshing === t.id} title="Atualizar status">
@@ -516,6 +523,9 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
                   <div className="font-mono text-lg text-foreground">{confirmResend?.domain_name}</div>
                   <div className="text-sm text-muted-foreground mt-1">Status atual: <span className="text-primary font-semibold">{confirmResend?.status}</span></div>
                   <div className="text-sm text-muted-foreground mt-1">Destinatário: {confirmResend?.notify_email || "e-mail do usuário logado"}</div>
+                  {confirmResend?.last_notified_at && (
+                    <div className="text-xs text-muted-foreground mt-1">Último e-mail enviado: {new Date(confirmResend.last_notified_at).toLocaleString("pt-BR")}</div>
+                  )}
                 </div>
                 <p className="text-xs text-muted-foreground">O e-mail será enviado imediatamente com o template domain-transfer-status.</p>
               </div>

@@ -78,7 +78,7 @@ async function notifyStatus(svc: any, t: any, status: string, message: string | 
         templateData: { domain: t.domain_name, status, message: message ?? "", registrar: t.current_registrar ?? "" },
       },
     });
-    await svc.from("kubo_domain_transfers").update({ last_notified_status: status }).eq("id", t.id);
+    await svc.from("kubo_domain_transfers").update({ last_notified_status: status, last_notified_at: new Date().toISOString() }).eq("id", t.id);
   } catch (e) {
     await logConn(svc, t.user_id, "transfer.notify_error", "error", `Falha ao enviar email: ${(e as any)?.message ?? e}`, { transfer_id: t.id });
   }

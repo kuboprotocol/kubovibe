@@ -706,6 +706,7 @@ export type Database = {
           id: string
           ionos_transfer_id: string | null
           last_error: string | null
+          last_notified_at: string | null
           last_notified_status: string | null
           last_retry_at: string | null
           next_retry_at: string | null
@@ -728,6 +729,7 @@ export type Database = {
           id?: string
           ionos_transfer_id?: string | null
           last_error?: string | null
+          last_notified_at?: string | null
           last_notified_status?: string | null
           last_retry_at?: string | null
           next_retry_at?: string | null
@@ -750,6 +752,7 @@ export type Database = {
           id?: string
           ionos_transfer_id?: string | null
           last_error?: string | null
+          last_notified_at?: string | null
           last_notified_status?: string | null
           last_retry_at?: string | null
           next_retry_at?: string | null
