@@ -1,0 +1,1 @@
+ALTER TABLE public.kubo_domain_transfers ADD COLUMN IF NOT EXISTS last_notified_at timestamp with time zone DEFAULT NULL;
