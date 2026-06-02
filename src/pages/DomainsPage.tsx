@@ -320,6 +320,7 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
   const [refreshing, setRefreshing] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState<Transfer | null>(null);
   const [cancelReason, setCancelReason] = useState("");
+  const [resendingEmail, setResendingEmail] = useState<string | null>(null);
 
   const tld = domain.includes(".") ? tldOf(domain) : null;
   const price = tld ? (TLD_TRANSFER_CREDITS[tld] ?? 20) : 20;
@@ -357,6 +358,33 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
     if (error || data?.error) { toast.error(error?.message ?? data.error); return; }
     toast.success(`Transferência de ${t.domain_name} cancelada`);
     onTransferred();
+  };
+
+  const resendEmail = async (t: Transfer) => {
+    setResendingEmail(t.id);
+    const { data: userData } = await supabase.auth.getUser();
+    const recipient = t.notify_email || userData.user?.email;
+    if (!recipient) {
+      toast.error("Nenhum e-mail de destino encontrado. Adicione um e-mail de notificação na transferência.");
+      setResendingEmail(null);
+      return;
+    }
+    const { error } = await supabase.functions.invoke("send-transactional-email", {
+      body: {
+        templateName: "domain-transfer-status",
+        recipientEmail: recipient,
+        idempotencyKey: `transfer-resend-${t.id}-${Date.now()}`,
+        templateData: {
+          domain: t.domain_name,
+          status: t.status,
+          message: t.status_message || undefined,
+          registrar: t.current_registrar || undefined,
+        },
+      },
+    });
+    setResendingEmail(null);
+    if (error) { toast.error(error.message); return; }
+    toast.success(`E-mail de status reenviado para ${recipient}`);
   };
 
   const canSubmit = !!domain && authCode.length >= 4 && /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(domain);
@@ -413,11 +441,14 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
                     </div>
                   </div>
                   <div className="flex gap-1.5 shrink-0">
-                    <Button size="sm" variant="outline" onClick={() => refresh(t.id)} disabled={refreshing === t.id}>
+                    <Button size="sm" variant="outline" onClick={() => resendEmail(t)} disabled={resendingEmail === t.id} title="Reenviar e-mail de status">
+                      {resendingEmail === t.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => refresh(t.id)} disabled={refreshing === t.id} title="Atualizar status">
                       {refreshing === t.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
                     </Button>
                     {inProgress && (
-                      <Button size="sm" variant="outline" onClick={() => setCancelling(t)} className="text-red-400 hover:bg-red-500/10 border-red-500/30">
+                      <Button size="sm" variant="outline" onClick={() => setCancelling(t)} className="text-red-400 hover:bg-red-500/10 border-red-500/30" title="Cancelar transferência">
                         <Ban className="w-3.5 h-3.5" />
                       </Button>
                     )}
