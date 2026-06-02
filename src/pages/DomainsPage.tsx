@@ -517,6 +517,9 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
                   <div className="font-mono text-lg text-foreground">{confirmResend?.domain_name}</div>
                   <div className="text-sm text-muted-foreground mt-1">Status atual: <span className="text-primary font-semibold">{confirmResend?.status}</span></div>
                   <div className="text-sm text-muted-foreground mt-1">Destinatário: {confirmResend?.notify_email || "e-mail do usuário logado"}</div>
+                  {confirmResend?.last_notified_at && (
+                    <div className="text-xs text-muted-foreground mt-1">Último e-mail enviado: {new Date(confirmResend.last_notified_at).toLocaleString("pt-BR")}</div>
+                  )}
                 </div>
                 <p className="text-xs text-muted-foreground">O e-mail será enviado imediatamente com o template domain-transfer-status.</p>
               </div>
