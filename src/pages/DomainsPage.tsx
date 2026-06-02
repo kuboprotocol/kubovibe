@@ -321,6 +321,7 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
   const [cancelling, setCancelling] = useState<Transfer | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [resendingEmail, setResendingEmail] = useState<string | null>(null);
+  const [confirmResend, setConfirmResend] = useState<Transfer | null>(null);
 
   const tld = domain.includes(".") ? tldOf(domain) : null;
   const price = tld ? (TLD_TRANSFER_CREDITS[tld] ?? 20) : 20;
@@ -441,7 +442,7 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
                     </div>
                   </div>
                   <div className="flex gap-1.5 shrink-0">
-                    <Button size="sm" variant="outline" onClick={() => resendEmail(t)} disabled={resendingEmail === t.id} title="Reenviar e-mail de status">
+                    <Button size="sm" variant="outline" onClick={() => setConfirmResend(t)} disabled={resendingEmail === t.id} title="Reenviar e-mail de status">
                       {resendingEmail === t.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => refresh(t.id)} disabled={refreshing === t.id} title="Atualizar status">
@@ -500,6 +501,29 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
           <AlertDialogFooter>
             <AlertDialogCancel>Voltar</AlertDialogCancel>
             <AlertDialogAction onClick={cancelNow} className="bg-red-500 hover:bg-red-600">Confirmar cancelamento</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!confirmResend} onOpenChange={(o) => !o && setConfirmResend(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-orbitron">Reenviar e-mail de status</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>Você vai reenviar o e-mail de status da transferência:</p>
+                <div className="p-3 rounded-lg bg-muted/40 border border-border/40">
+                  <div className="font-mono text-lg text-foreground">{confirmResend?.domain_name}</div>
+                  <div className="text-sm text-muted-foreground mt-1">Status atual: <span className="text-primary font-semibold">{confirmResend?.status}</span></div>
+                  <div className="text-sm text-muted-foreground mt-1">Destinatário: {confirmResend?.notify_email || "e-mail do usuário logado"}</div>
+                </div>
+                <p className="text-xs text-muted-foreground">O e-mail será enviado imediatamente com o template domain-transfer-status.</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setConfirmResend(null)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { if (confirmResend) resendEmail(confirmResend); setConfirmResend(null); }} className="bg-gradient-to-r from-primary to-purple-600">Confirmar reenvio</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
