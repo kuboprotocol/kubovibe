@@ -384,9 +384,15 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
         },
       },
     });
+    if (error) {
+      setResendingEmail(null);
+      toast.error(error.message);
+      return;
+    }
+    await supabase.from("kubo_domain_transfers").update({ last_notified_at: new Date().toISOString() }).eq("id", t.id);
     setResendingEmail(null);
-    if (error) { toast.error(error.message); return; }
     toast.success(`E-mail de status reenviado para ${recipient}`);
+    onTransferred();
   };
 
   const canSubmit = !!domain && authCode.length >= 4 && /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(domain);
