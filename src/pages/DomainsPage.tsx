@@ -320,6 +320,7 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
   const [refreshing, setRefreshing] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState<Transfer | null>(null);
   const [cancelReason, setCancelReason] = useState("");
+  const [resendingEmail, setResendingEmail] = useState<string | null>(null);
 
   const tld = domain.includes(".") ? tldOf(domain) : null;
   const price = tld ? (TLD_TRANSFER_CREDITS[tld] ?? 20) : 20;
