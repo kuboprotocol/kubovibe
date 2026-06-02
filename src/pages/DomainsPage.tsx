@@ -441,11 +441,14 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
                     </div>
                   </div>
                   <div className="flex gap-1.5 shrink-0">
-                    <Button size="sm" variant="outline" onClick={() => refresh(t.id)} disabled={refreshing === t.id}>
+                    <Button size="sm" variant="outline" onClick={() => resendEmail(t)} disabled={resendingEmail === t.id} title="Reenviar e-mail de status">
+                      {resendingEmail === t.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => refresh(t.id)} disabled={refreshing === t.id} title="Atualizar status">
                       {refreshing === t.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
                     </Button>
                     {inProgress && (
-                      <Button size="sm" variant="outline" onClick={() => setCancelling(t)} className="text-red-400 hover:bg-red-500/10 border-red-500/30">
+                      <Button size="sm" variant="outline" onClick={() => setCancelling(t)} className="text-red-400 hover:bg-red-500/10 border-red-500/30" title="Cancelar transferência">
                         <Ban className="w-3.5 h-3.5" />
                       </Button>
                     )}
