@@ -360,6 +360,33 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
     onTransferred();
   };
 
+  const resendEmail = async (t: Transfer) => {
+    setResendingEmail(t.id);
+    const { data: userData } = await supabase.auth.getUser();
+    const recipient = t.notify_email || userData.user?.email;
+    if (!recipient) {
+      toast.error("Nenhum e-mail de destino encontrado. Adicione um e-mail de notificação na transferência.");
+      setResendingEmail(null);
+      return;
+    }
+    const { error } = await supabase.functions.invoke("send-transactional-email", {
+      body: {
+        templateName: "domain-transfer-status",
+        recipientEmail: recipient,
+        idempotencyKey: `transfer-resend-${t.id}-${Date.now()}`,
+        templateData: {
+          domain: t.domain_name,
+          status: t.status,
+          message: t.status_message || undefined,
+          registrar: t.current_registrar || undefined,
+        },
+      },
+    });
+    setResendingEmail(null);
+    if (error) { toast.error(error.message); return; }
+    toast.success(`E-mail de status reenviado para ${recipient}`);
+  };
+
   const canSubmit = !!domain && authCode.length >= 4 && /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(domain);
 
   return (
