@@ -27,6 +27,7 @@ type Transfer = {
   started_at: string; completed_at: string | null; updated_at: string;
   notify_email: string | null; retry_count: number; next_retry_at: string | null;
   last_error: string | null; cancel_reason: string | null; cancel_requested_at: string | null;
+  last_notified_at: string | null;
 };
 type DebugLog = {
   id: string; event_type: string; status: string; message: string;
