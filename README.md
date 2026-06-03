@@ -1656,7 +1656,33 @@ Módulo de game engine avançado com:
 
 ---
 
+## Variáveis de Ambiente (Setup Local)
+
+Dois templates ficam versionados no repo — copie e preencha com valores reais (os arquivos `.env` finais não são commitados):
+
+| Template | Para que serve | Copiar como |
+|----------|----------------|-------------|
+| [`.env.example`](.env.example) | Frontend (Vite). Apenas `VITE_*` + URLs/keys publicáveis. **Não** colocar secrets aqui — são bundleados no navegador. | `.env` |
+| [`supabase/functions/.env.example`](supabase/functions/.env.example) | Edge Functions. Documenta **todos** os secrets server-side: Stripe, GitHub, Gmail, Pinata, OpenRouter, DeepSeek, Kimi, Groq, Polar, IONOS, RPC Web3, etc. | `supabase/functions/.env` (apenas para `supabase functions serve` local) |
+| [`.github/rerun-concurrency.local.env.example`](.github/rerun-concurrency.local.env.example) | Específico do teste de idempotência `bun run preflight:rerun`. | `.env.rerun-ci` |
+| [`.github/rerun-concurrency.secrets.example`](.github/rerun-concurrency.secrets.example) | Template para colar em GitHub Secrets do workflow CI. | (não copiar — usar como referência) |
+
+```bash
+# Frontend
+cp .env.example .env
+# preencha VITE_SUPABASE_* — valores estão em Supabase Dashboard → Project Settings → API
+
+# Edge Functions (somente se for rodar `supabase functions serve` localmente)
+cp supabase/functions/.env.example supabase/functions/.env
+# preencha apenas os secrets dos functions que vai testar
+```
+
+> ⚠️ Em produção, **secrets de edge functions vivem em Lovable Cloud Secrets** (Settings → Functions → Secrets). O arquivo `supabase/functions/.env` só é lido pelo CLI em dev local.
+
+---
+
 ## Smart Economy Core
+
 
 Sistema econômico atômico com ledger de créditos e dedução transacional segura.
 
