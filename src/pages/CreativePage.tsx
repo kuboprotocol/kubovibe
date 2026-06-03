@@ -318,13 +318,13 @@ function Dashboard({ editsRemaining, subscription, history, onPick, onOpen, onRe
         </Card>
         <Card className="p-5">
           <div className="text-xs text-muted-foreground uppercase tracking-wider">Gerações totais</div>
-          <div className="text-4xl font-bold mt-2 font-mono">{history.length}</div>
-          <div className="text-xs text-muted-foreground mt-3">Últimos 50 itens</div>
+          <div className="text-4xl font-bold mt-2 font-mono">{totalCount ?? history.length}</div>
+          <div className="text-xs text-muted-foreground mt-3">Página {(page ?? 0) + 1}</div>
         </Card>
         <Card className="p-5">
-          <div className="text-xs text-muted-foreground uppercase tracking-wider">Créditos usados</div>
-          <div className="text-4xl font-bold mt-2 font-mono">{history.reduce((s: number, x: any) => s + (x.credits_spent ?? 0), 0)}</div>
-          <div className="text-xs text-muted-foreground mt-3">No painel criativo</div>
+          <div className="text-xs text-muted-foreground uppercase tracking-wider">Créditos usados (página)</div>
+          <div className="text-4xl font-mono font-bold mt-2">{history.reduce((s: number, x: any) => s + (x.credits_spent ?? 0), 0)}</div>
+          <div className="text-xs text-muted-foreground mt-3">Soma dos itens visíveis</div>
         </Card>
       </div>
 
@@ -345,34 +345,55 @@ function Dashboard({ editsRemaining, subscription, history, onPick, onOpen, onRe
       </div>
 
       <div>
-        <h2 className="text-lg font-bold mb-3">Histórico detalhado</h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-bold">Histórico detalhado</h2>
+          <Badge variant="outline" className="text-[10px]">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5 animate-pulse" />
+            tempo real
+          </Badge>
+        </div>
         <Card className="divide-y divide-border/40">
           {history.length === 0 && (
-            <div className="p-6 text-center text-sm text-muted-foreground">Nenhuma geração ainda. Escolha uma ferramenta acima para começar.</div>
+            <div className="p-6 text-center text-sm text-muted-foreground">Nenhuma geração nesta página.</div>
           )}
-          {history.map((h: any) => (
-            <div key={h.id} className="p-3 flex items-center gap-3 text-sm hover:bg-muted/30 transition-colors">
-              <button onClick={() => onOpen(h)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
-                <Badge variant="outline" className="capitalize shrink-0">{h.tool}</Badge>
-                <div className="flex-1 truncate text-muted-foreground">{h.prompt || h.metadata?.title || h.output_url || "—"}</div>
-                <div className="text-xs text-muted-foreground hidden sm:block whitespace-nowrap">{new Date(h.created_at).toLocaleString("pt-BR")}</div>
-                <Badge variant="secondary" className="text-[10px] shrink-0">{h.credits_spent ?? 0}c</Badge>
-                <Badge variant={h.status === "completed" ? "default" : h.status === "error" ? "destructive" : "secondary"} className="text-[10px] shrink-0">{h.status}</Badge>
-              </button>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="shrink-0 h-8 w-8"
-                disabled={!RERUN_MAP[h.tool] || rerunning}
-                onClick={(e) => { e.stopPropagation(); onRerun(h); }}
-                aria-label="Reexecutar"
-                title="Reexecutar"
-              >
-                {rerunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />}
-              </Button>
-            </div>
-          ))}
+          {history.map((h: any) => {
+            const isRerunning = rerunningId === h.id;
+            return (
+              <div key={h.id} className="p-3 flex items-center gap-3 text-sm hover:bg-muted/30 transition-colors">
+                <button onClick={() => onOpen(h)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
+                  <Badge variant="outline" className="capitalize shrink-0">{h.tool}</Badge>
+                  <div className="flex-1 truncate text-muted-foreground">{h.prompt || h.metadata?.title || h.output_url || "—"}</div>
+                  <div className="text-xs text-muted-foreground hidden sm:block whitespace-nowrap">{new Date(h.created_at).toLocaleString("pt-BR")}</div>
+                  <Badge variant="secondary" className="text-[10px] shrink-0">{h.credits_spent ?? 0}c</Badge>
+                  <Badge variant={h.status === "completed" ? "default" : h.status === "error" ? "destructive" : "secondary"} className="text-[10px] shrink-0">{h.status}</Badge>
+                </button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="shrink-0 h-8 w-8"
+                  disabled={!RERUN_MAP[h.tool] || !!rerunningId}
+                  onClick={(e) => { e.stopPropagation(); onRerun(h); }}
+                  aria-label="Reexecutar"
+                  title="Reexecutar (idempotente)"
+                >
+                  {isRerunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />}
+                </Button>
+              </div>
+            );
+          })}
         </Card>
+
+        {totalCount > pageSize && (
+          <div className="flex items-center justify-between mt-3 text-sm">
+            <div className="text-xs text-muted-foreground">
+              {page * pageSize + 1}–{Math.min((page + 1) * pageSize, totalCount)} de {totalCount}
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" disabled={page <= 0} onClick={() => onPageChange(page - 1)}>Anterior</Button>
+              <Button size="sm" variant="outline" disabled={(page + 1) * pageSize >= totalCount} onClick={() => onPageChange(page + 1)}>Próxima</Button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
