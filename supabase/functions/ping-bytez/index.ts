@@ -10,7 +10,7 @@ Deno.serve(async (req) => {
     if (!key) throw new Error("BYTEZ_API_KEY not configured");
 
     let prompt = "Say 'pong' in one word.";
-    let model = "google/flan-t5-small";
+    let model = "openai-community/gpt2";
     try {
       const body = await req.json();
       if (body?.prompt) prompt = String(body.prompt);
