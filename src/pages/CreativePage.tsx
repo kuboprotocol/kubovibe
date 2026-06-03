@@ -414,7 +414,7 @@ function Dashboard({ editsRemaining, subscription, history, onPick, onOpen, onRe
         <Card className="p-5">
           <div className="text-xs text-muted-foreground uppercase tracking-wider">Gerações totais</div>
           <div className="text-4xl font-bold mt-2 font-mono">{totalCount ?? history.length}</div>
-          <div className="text-xs text-muted-foreground mt-3">Página {(page ?? 0) + 1}</div>
+          <div className="text-xs text-muted-foreground mt-3">Página {(pageIndex ?? 0) + 1}</div>
         </Card>
         <Card className="p-5">
           <div className="text-xs text-muted-foreground uppercase tracking-wider">Créditos usados (página)</div>
