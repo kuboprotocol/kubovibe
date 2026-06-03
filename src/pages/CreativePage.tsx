@@ -76,20 +76,62 @@ export default function CreativePage() {
   const { subscription, editsRemaining, refetch } = useSubscription();
   const [active, setActive] = useState<ToolKey>((tool as ToolKey) || "dashboard");
   const [history, setHistory] = useState<any[]>([]);
+  const [selected, setSelected] = useState<any | null>(null);
+  const [rerunning, setRerunning] = useState(false);
+  const alertedRef = useRef<{ low?: boolean; empty?: boolean }>({});
 
   useEffect(() => {
     if (tool) setActive(tool as ToolKey);
   }, [tool]);
 
-  useEffect(() => {
+  async function loadHistory() {
     if (!user) return;
-    supabase.from("creative_assets")
+    const { data } = await supabase.from("creative_assets")
       .select("*")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
-      .limit(20)
-      .then(({ data }) => setHistory(data ?? []));
-  }, [user, active]);
+      .limit(50);
+    setHistory(data ?? []);
+  }
+
+  useEffect(() => { loadHistory(); }, [user, active]);
+
+  // Balance alerts
+  useEffect(() => {
+    if (editsRemaining === null || editsRemaining === undefined) return;
+    if (editsRemaining <= 0 && !alertedRef.current.empty) {
+      alertedRef.current.empty = true;
+      toast.error("Saldo zerado", { description: "Você ficou sem créditos. Recarregue para continuar." });
+    } else if (editsRemaining > 0 && editsRemaining <= 10 && !alertedRef.current.low) {
+      alertedRef.current.low = true;
+      toast.warning(`Saldo baixo: ${editsRemaining} créditos`, { description: "Considere recarregar antes de gerações pesadas." });
+    }
+    if (editsRemaining > 10) alertedRef.current = {};
+  }, [editsRemaining]);
+
+  const balanceTone =
+    (editsRemaining ?? 0) <= 0 ? "bg-destructive/15 border-destructive/40 text-destructive" :
+    (editsRemaining ?? 0) <= 10 ? "bg-yellow-500/10 border-yellow-500/40 text-yellow-600 dark:text-yellow-400" :
+    "bg-primary/10 border-primary/30";
+
+  async function rerun(asset: any) {
+    const cfg = RERUN_MAP[asset.tool];
+    if (!cfg) { toast.error("Reexecução indisponível para esta ferramenta."); return; }
+    setRerunning(true);
+    try {
+      const r = await authedFetch(cfg.fn, cfg.build(asset));
+      const d = await r.json();
+      if (!r.ok) { handleFnError(d); return; }
+      toast.success("Reexecutado com sucesso");
+      refetch();
+      loadHistory();
+      setSelected(null);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Falha ao reexecutar");
+    } finally {
+      setRerunning(false);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -107,10 +149,10 @@ export default function CreativePage() {
               <p className="text-xs text-muted-foreground">8 ferramentas IA em um só painel</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/30">
-            <Coins className="h-4 w-4 text-primary" />
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border ${balanceTone}`}>
+            {(editsRemaining ?? 0) <= 10 ? <AlertTriangle className="h-4 w-4" /> : <Coins className="h-4 w-4 text-primary" />}
             <span className="font-mono text-sm font-bold">{editsRemaining}</span>
-            <span className="text-xs text-muted-foreground">créditos</span>
+            <span className="text-xs opacity-80">créditos</span>
           </div>
         </div>
       </header>
@@ -128,22 +170,99 @@ export default function CreativePage() {
           </TabsList>
 
           <TabsContent value="dashboard">
-            <Dashboard editsRemaining={editsRemaining} subscription={subscription} history={history} onPick={(k) => { setActive(k); navigate(`/creative/${k}`); }} />
+            <Dashboard
+              editsRemaining={editsRemaining}
+              subscription={subscription}
+              history={history}
+              onPick={(k: ToolKey) => { setActive(k); navigate(`/creative/${k}`); }}
+              onOpen={(a: any) => setSelected(a)}
+              onRerun={rerun}
+              rerunning={rerunning}
+            />
           </TabsContent>
 
-          <TabsContent value="chat"><ChatTool onDone={refetch} /></TabsContent>
-          <TabsContent value="nano_banana"><ImageTool onDone={refetch} /></TabsContent>
-          <TabsContent value="downloader"><DownloaderTool onDone={refetch} /></TabsContent>
-          <TabsContent value="clips"><ClipsTool onDone={refetch} /></TabsContent>
-          <TabsContent value="avatar"><AvatarTool onDone={refetch} /></TabsContent>
-          <TabsContent value="shorts"><ShortsTool onDone={refetch} /></TabsContent>
-          <TabsContent value="music"><MusicTool onDone={refetch} /></TabsContent>
-          <TabsContent value="ebook"><EbookTool onDone={refetch} /></TabsContent>
+          <TabsContent value="chat"><ChatTool onDone={() => { refetch(); loadHistory(); }} /></TabsContent>
+          <TabsContent value="nano_banana"><ImageTool onDone={() => { refetch(); loadHistory(); }} /></TabsContent>
+          <TabsContent value="downloader"><DownloaderTool onDone={() => { refetch(); loadHistory(); }} /></TabsContent>
+          <TabsContent value="clips"><ClipsTool onDone={() => { refetch(); loadHistory(); }} /></TabsContent>
+          <TabsContent value="avatar"><AvatarTool onDone={() => { refetch(); loadHistory(); }} /></TabsContent>
+          <TabsContent value="shorts"><ShortsTool onDone={() => { refetch(); loadHistory(); }} /></TabsContent>
+          <TabsContent value="music"><MusicTool onDone={() => { refetch(); loadHistory(); }} /></TabsContent>
+          <TabsContent value="ebook"><EbookTool onDone={() => { refetch(); loadHistory(); }} /></TabsContent>
         </Tabs>
       </main>
+
+      <AssetDetailDialog asset={selected} onClose={() => setSelected(null)} onRerun={rerun} rerunning={rerunning} />
     </div>
   );
 }
+
+function AssetDetailDialog({ asset, onClose, onRerun, rerunning }: { asset: any; onClose: () => void; onRerun: (a: any) => void; rerunning: boolean }) {
+  const open = !!asset;
+  if (!asset) return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent />
+    </Dialog>
+  );
+  const canRerun = !!RERUN_MAP[asset.tool];
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Badge variant="outline" className="capitalize">{asset.tool}</Badge>
+            <span className="text-sm font-normal text-muted-foreground">
+              {new Date(asset.created_at).toLocaleString("pt-BR")}
+            </span>
+          </DialogTitle>
+          <DialogDescription>
+            Status: <span className="font-mono">{asset.status}</span> · Créditos: <span className="font-mono">{asset.credits_spent ?? 0}</span>
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 text-sm">
+          {asset.prompt && (
+            <div>
+              <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Prompt</div>
+              <Card className="p-3 whitespace-pre-wrap bg-muted/30">{asset.prompt}</Card>
+            </div>
+          )}
+          {asset.output_url && (asset.tool === "nano_banana" ? (
+            <img src={asset.output_url} alt="output" className="rounded-lg border border-border max-w-full" />
+          ) : asset.tool === "music" ? (
+            <audio src={asset.output_url} controls className="w-full" />
+          ) : (
+            <a href={asset.output_url} target="_blank" rel="noreferrer" className="text-primary underline break-all">{asset.output_url}</a>
+          ))}
+          {asset.output_text && (
+            <div>
+              <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Saída</div>
+              <Card className="p-3 max-h-64 overflow-y-auto"><pre className="text-xs whitespace-pre-wrap font-sans">{asset.output_text}</pre></Card>
+            </div>
+          )}
+          {asset.error_message && (
+            <Card className="p-3 border-destructive/40 bg-destructive/10 text-destructive text-xs">{asset.error_message}</Card>
+          )}
+          {asset.metadata && Object.keys(asset.metadata).length > 0 && (
+            <div>
+              <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Metadata</div>
+              <Card className="p-3"><pre className="text-xs whitespace-pre-wrap font-mono">{JSON.stringify(asset.metadata, null, 2)}</pre></Card>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={onClose}>Fechar</Button>
+            <Button onClick={() => onRerun(asset)} disabled={!canRerun || rerunning}>
+              {rerunning ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RotateCw className="h-4 w-4 mr-2" />}
+              Reexecutar
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 
 function Dashboard({ editsRemaining, subscription, history, onPick }: any) {
   return (
