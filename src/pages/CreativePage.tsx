@@ -199,9 +199,14 @@ export default function CreativePage() {
               onPick={(k: ToolKey) => { setActive(k); navigate(`/creative/${k}`); }}
               onOpen={(a: any) => setSelected(a)}
               onRerun={rerun}
-              rerunning={rerunning}
+              rerunningId={rerunning}
+              page={page}
+              totalCount={totalCount}
+              pageSize={PAGE_SIZE}
+              onPageChange={setPage}
             />
           </TabsContent>
+
 
           <TabsContent value="chat"><ChatTool onDone={() => { refetch(); loadHistory(); }} /></TabsContent>
           <TabsContent value="nano_banana"><ImageTool onDone={() => { refetch(); loadHistory(); }} /></TabsContent>
