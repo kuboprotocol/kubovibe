@@ -33,16 +33,14 @@ function fnUrl(name: string) {
   return `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${name}`;
 }
 
-async function authedFetch(name: string, body: unknown) {
+async function authedFetch(name: string, body: unknown, idempotencyKey?: string) {
   const { data: { session } } = await supabase.auth.getSession();
-  const r = await fetch(fnUrl(name), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${session?.access_token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-    },
-    body: JSON.stringify(body),
-  });
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${session?.access_token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+  };
+  if (idempotencyKey) headers["X-Idempotency-Key"] = idempotencyKey;
+  const r = await fetch(fnUrl(name), { method: "POST", headers, body: JSON.stringify(body) });
   return r;
 }
 
