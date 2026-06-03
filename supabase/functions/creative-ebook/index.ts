@@ -10,11 +10,12 @@ Deno.serve(async (req) => {
   const user = await getUser(req.headers.get("Authorization"));
   if (!user) return j(401, { error: "Unauthorized" });
 
+  const idempotencyKey = req.headers.get("X-Idempotency-Key") ?? undefined;
   try {
     const { topic, chapters = 5, language = "pt-BR" } = await req.json();
     if (!topic) return j(400, { error: "topic required" });
 
-    const ded = await deductCredits(user.id, COST, "creative_ebook", { topic, chapters }, user.email);
+    const ded = await deductCredits(user.id, COST, "creative_ebook", { topic, chapters }, user.email, idempotencyKey);
     if (!ded.ok) return j(402, { error: ded.error });
 
     const sys = `Você é um autor profissional. Escreva um eBook em ${language} sobre o tema dado. Gere um título envolvente, um sumário, e ${chapters} capítulos completos, cada um com pelo menos 400 palavras. Use markdown. Comece com # TÍTULO.`;

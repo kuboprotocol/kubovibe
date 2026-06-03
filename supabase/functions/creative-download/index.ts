@@ -10,11 +10,12 @@ Deno.serve(async (req) => {
   const user = await getUser(req.headers.get("Authorization"));
   if (!user) return j(401, { error: "Unauthorized" });
 
+  const idempotencyKey = req.headers.get("X-Idempotency-Key") ?? undefined;
   try {
     const { url, format = "mp4" } = await req.json();
     if (!url) return j(400, { error: "url required" });
 
-    const ded = await deductCredits(user.id, COST, "creative_download", { url, format }, user.email);
+    const ded = await deductCredits(user.id, COST, "creative_download", { url, format }, user.email, idempotencyKey);
     if (!ded.ok) return j(402, { error: ded.error });
 
     const r = await fetch(COBALT, {
