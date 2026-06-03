@@ -291,7 +291,7 @@ function AssetDetailDialog({ asset, onClose, onRerun, rerunning }: { asset: any;
 }
 
 
-function Dashboard({ editsRemaining, subscription, history, onPick, onOpen, onRerun, rerunning }: any) {
+function Dashboard({ editsRemaining, subscription, history, onPick, onOpen, onRerun, rerunningId, page, totalCount, pageSize, onPageChange }: any) {
   const lowBalance = (editsRemaining ?? 0) <= 10;
   return (
     <div className="space-y-6">
