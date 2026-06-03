@@ -1901,6 +1901,100 @@ Se alguma camada falhar, o job encerra com `exit 1` e impede o merge do PR.
 
 ---
 
+## CI / Rerun Concurrency (Idempotência)
+
+[![Rerun Concurrency](https://github.com/OWNER/REPO/actions/workflows/rerun-concurrency.yml/badge.svg?branch=main)](https://github.com/OWNER/REPO/actions/workflows/rerun-concurrency.yml)
+
+> Substitua `OWNER/REPO` pelo slug real do repositório para o badge renderizar corretamente.
+
+Workflow `.github/workflows/rerun-concurrency.yml` garante que reexecutar um asset criativo várias vezes em paralelo só desconta créditos **uma vez**, validando a idempotência da RPC `execute_atomic_credit_deduction`.
+
+### O que o workflow faz
+
+1. Dispara `N` requisições paralelas (padrão: 8) para a edge function criativa (`creative-chat`) com o mesmo `X-Idempotency-Key` (`rerun:<asset_id>`).
+2. Verifica via REST API (`credit_transactions`) que **existe no máximo 1 linha** no ledger para aquela chave de idempotência.
+3. **Falha o build** se encontrar mais de 1 transação (regressão de idempotência) ou se nenhuma requisição for bem-sucedida.
+
+### Secrets obrigatórios (GitHub Actions)
+
+| Secret | Onde obter | Obrigatório para | Exemplo de valor |
+|---|---|---|---|
+| `SUPABASE_URL` | Supabase Dashboard → Project Settings → API → URL | Endpoint das edge functions e REST | `https://dlqmmubasyldcylhnqqd.supabase.co` |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase Dashboard → Project Settings → API → `service_role` key (reveal) | Ler `credit_transactions` via REST para verificação | `eyJhbGciOiJIUzI1NiIs...` |
+| `RERUN_TEST_ACCESS_TOKEN` | Gerar um JWT válido de um usuário de teste (ou usar token de sessão autenticada) | Autenticar nas edge functions | `eyJhbGciOiJIUzI1NiIs...` |
+| `RERUN_TEST_ASSET_ID` | UUID de um `creative_assets` existente pertencente ao usuário de teste | Construir a `X-Idempotency-Key` (`rerun:<asset_id>`) | `a1b2c3d4-e5f6...` |
+
+> Nunca commitar valores reais — adicionar apenas em **GitHub Secrets**.
+
+### Variável de controle (Repository Variable)
+
+| Variable | Valor | Descrição |
+|---|---|---|
+| `RERUN_CONCURRENCY_ENABLED` | `true` | Ativa o workflow em push/PR automático. Se ausente ou diferente de `true`, o workflow pula silenciosamente em push/PR (mas ainda pode rodar via `workflow_dispatch`). Isso previne falhas em PRs de forks sem as credenciais de teste. |
+
+### Como configurar
+
+1. Acesse **Settings → Secrets and variables → Actions** no repositório GitHub
+2. Em **Secrets**, clique em **New repository secret** e adicione os 4 secrets da tabela acima
+3. Mude para a aba **Variables** e crie `RERUN_CONCURRENCY_ENABLED` com valor `true`
+4. O workflow passa a disparar automaticamente em todo push/PR que tocar:
+   - `supabase/functions/_shared/creative.ts`
+   - `supabase/functions/creative-*/**`
+   - `scripts/test-rerun-concurrency.ts`
+   - `.github/workflows/rerun-concurrency.yml`
+
+### Gatilhos
+
+- `push` / `pull_request` para as paths acima (quando `vars.RERUN_CONCURRENCY_ENABLED == 'true'`)
+- `workflow_dispatch` — execução manual sempre permitida
+
+### Execução manual
+
+#### 1) Pelo GitHub UI
+1. Abra a aba **Actions** do repositório
+2. Selecione **rerun-concurrency** no menu lateral
+3. Clique em **Run workflow** → escolha a branch → **Run workflow**
+
+#### 2) Pelo GitHub CLI
+```bash
+gh workflow run rerun-concurrency.yml --ref main
+gh run watch
+gh run list --workflow=rerun-concurrency.yml --limit 5
+```
+
+#### 3) Localmente (Deno)
+```bash
+# Instale o Deno (v2.x)
+curl -fsSL https://deno.land/install.sh | sh
+
+# Exporte os secrets
+export SUPABASE_URL="https://<ref>.supabase.co"
+export SUPABASE_SERVICE_ROLE_KEY="<service_role_key>"
+export ACCESS_TOKEN="<jwt_test_user>"
+export ASSET_ID="<creative_assets_id>"
+export CONCURRENCY=8
+export FN=creative-chat
+
+# Rode o teste
+deno run --allow-net --allow-env scripts/test-rerun-concurrency.ts
+```
+
+Saída esperada em caso de sucesso:
+```
+✅ PASS: idempotent — at most one credit transaction was created.
+```
+
+Saída em caso de regressão:
+```
+❌ FAIL: expected exactly 1 ledger row, found 3. Idempotency broken.
+```
+
+### Como desabilitar para forks
+
+O workflow possui proteção nativa contra forks: se `vars.RERUN_CONCURRENCY_ENABLED` não for exatamente `'true'`, o job `rerun-idempotency` é pulado em triggers automáticos (`push`/`pull_request`). Forks que não copiarem a variável não quebrarão o CI por falta de secrets. A execução manual (`workflow_dispatch`) continua disponível para quem tiver as credenciais.
+
+---
+
 ## Como Executar Localmente
 
 
