@@ -74,25 +74,46 @@ export default function CreativePage() {
   const { subscription, editsRemaining, refetch } = useSubscription();
   const [active, setActive] = useState<ToolKey>((tool as ToolKey) || "dashboard");
   const [history, setHistory] = useState<any[]>([]);
+  const [page, setPage] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
   const [selected, setSelected] = useState<any | null>(null);
-  const [rerunning, setRerunning] = useState(false);
+  const [rerunning, setRerunning] = useState<string | null>(null);
   const alertedRef = useRef<{ low?: boolean; empty?: boolean }>({});
+  const PAGE_SIZE = 20;
 
   useEffect(() => {
     if (tool) setActive(tool as ToolKey);
   }, [tool]);
 
-  async function loadHistory() {
+  async function loadHistory(pageNum = page) {
     if (!user) return;
-    const { data } = await supabase.from("creative_assets")
-      .select("*")
+    const from = pageNum * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+    const { data, count } = await supabase.from("creative_assets")
+      .select("*", { count: "exact" })
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
-      .limit(50);
+      .range(from, to);
     setHistory(data ?? []);
+    setTotalCount(count ?? 0);
   }
 
-  useEffect(() => { loadHistory(); }, [user, active]);
+  useEffect(() => { loadHistory(page); }, [user, active, page]);
+
+  // Realtime: listen for new/updated assets and refresh current page
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel(`creative-assets-${user.id}`)
+      .on("postgres_changes", {
+        event: "*",
+        schema: "public",
+        table: "creative_assets",
+        filter: `user_id=eq.${user.id}`,
+      }, () => { loadHistory(page); })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user, page]);
 
   // Balance alerts
   useEffect(() => {
@@ -115,21 +136,24 @@ export default function CreativePage() {
   async function rerun(asset: any) {
     const cfg = RERUN_MAP[asset.tool];
     if (!cfg) { toast.error("Reexecução indisponível para esta ferramenta."); return; }
-    setRerunning(true);
+    // Stable idempotency key: same asset re-clicked within DB retention reuses tx
+    const idemKey = `rerun:${asset.id}`;
+    setRerunning(asset.id);
     try {
-      const r = await authedFetch(cfg.fn, cfg.build(asset));
-      const d = await r.json();
+      const r = await authedFetch(cfg.fn, cfg.build(asset), idemKey);
+      const d = await r.json().catch(() => ({}));
       if (!r.ok) { handleFnError(d); return; }
-      toast.success("Reexecutado com sucesso");
+      toast.success(d?.replayed ? "Reexecução idempotente (sem débito duplo)" : "Reexecutado com sucesso");
       refetch();
-      loadHistory();
+      loadHistory(page);
       setSelected(null);
     } catch (e: any) {
       toast.error(e?.message ?? "Falha ao reexecutar");
     } finally {
-      setRerunning(false);
+      setRerunning(null);
     }
   }
+
 
   return (
     <div className="min-h-screen bg-background text-foreground">
