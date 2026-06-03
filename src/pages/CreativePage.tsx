@@ -440,12 +440,26 @@ function Dashboard({ editsRemaining, subscription, history, onPick, onOpen, onRe
       </div>
 
       <div>
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
           <h2 className="text-lg font-bold">Histórico detalhado</h2>
-          <Badge variant="outline" className="text-[10px]">
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5 animate-pulse" />
-            tempo real
-          </Badge>
+          <div className="flex items-center gap-2">
+            {globalCooldown > 0 && (
+              <Badge variant="outline" className="text-[10px] border-yellow-500/40 text-yellow-600 dark:text-yellow-400">
+                <AlertTriangle className="h-3 w-3 mr-1" />
+                Rate limit: {globalCooldown}s
+              </Badge>
+            )}
+            <Badge variant="outline" className="text-[10px]">
+              <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1.5 ${
+                realtimeStatus === "live" ? "bg-green-500 animate-pulse" :
+                realtimeStatus === "reconnecting" ? "bg-yellow-500 animate-pulse" :
+                realtimeStatus === "offline" ? "bg-destructive" : "bg-muted-foreground"
+              }`} />
+              {realtimeStatus === "live" ? "tempo real" :
+               realtimeStatus === "reconnecting" ? "reconectando…" :
+               realtimeStatus === "offline" ? "offline" : "conectando…"}
+            </Badge>
+          </div>
         </div>
         <Card className="divide-y divide-border/40">
           {history.length === 0 && (
@@ -478,18 +492,19 @@ function Dashboard({ editsRemaining, subscription, history, onPick, onOpen, onRe
           })}
         </Card>
 
-        {totalCount > pageSize && (
+        {(hasNext || hasPrev) && (
           <div className="flex items-center justify-between mt-3 text-sm">
             <div className="text-xs text-muted-foreground">
-              {page * pageSize + 1}–{Math.min((page + 1) * pageSize, totalCount)} de {totalCount}
+              Página {(pageIndex ?? 0) + 1} · {history.length} itens · {totalCount} no total
             </div>
             <div className="flex gap-2">
-              <Button size="sm" variant="outline" disabled={page <= 0} onClick={() => onPageChange(page - 1)}>Anterior</Button>
-              <Button size="sm" variant="outline" disabled={(page + 1) * pageSize >= totalCount} onClick={() => onPageChange(page + 1)}>Próxima</Button>
+              <Button size="sm" variant="outline" disabled={!hasPrev} onClick={onPrev}>Anterior</Button>
+              <Button size="sm" variant="outline" disabled={!hasNext} onClick={onNext}>Próxima</Button>
             </div>
           </div>
         )}
       </div>
+
     </div>
   );
 }
