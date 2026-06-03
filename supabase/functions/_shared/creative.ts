@@ -58,6 +58,7 @@ export async function deductCredits(
   reason: string,
   metadata: Record<string, unknown> = {},
   userEmail?: string | null,
+  idempotencyKey?: string | null,
 ): Promise<{ ok: true; replayed?: boolean } | { ok: false; error: string; status?: number }> {
   if (amount <= 0) return { ok: true };
   // Admin bypass (rate limit + credits)
@@ -69,18 +70,20 @@ export async function deductCredits(
 
 
   const admin = supaAdmin();
-  const idempotencyKey = `${reason}-${userId}-${Date.now()}-${crypto.randomUUID()}`;
+  const idem = idempotencyKey && idempotencyKey.length > 0
+    ? idempotencyKey
+    : `${reason}-${userId}-${Date.now()}-${crypto.randomUUID()}`;
   const { data, error } = await admin.rpc("execute_atomic_credit_deduction", {
     _user_id: userId,
     _amount: amount,
     _reason: reason,
     _category: "creative_economy",
     _metadata: metadata,
-    _idempotency_key: idempotencyKey,
+    _idempotency_key: idem,
   });
   if (error) return { ok: false, error: error.message };
   if (!(data as any)?.success) return { ok: false, error: "deduction_failed" };
-  return { ok: true };
+  return { ok: true, replayed: !!(data as any)?.replayed };
 }
 
 export async function recordAsset(
