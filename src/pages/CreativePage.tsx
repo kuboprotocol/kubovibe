@@ -264,9 +264,25 @@ function AssetDetailDialog({ asset, onClose, onRerun, rerunning }: { asset: any;
 }
 
 
-function Dashboard({ editsRemaining, subscription, history, onPick }: any) {
+function Dashboard({ editsRemaining, subscription, history, onPick, onOpen, onRerun, rerunning }: any) {
+  const lowBalance = (editsRemaining ?? 0) <= 10;
   return (
     <div className="space-y-6">
+      {lowBalance && (
+        <Card className={`p-4 flex items-start gap-3 border ${(editsRemaining ?? 0) <= 0 ? "border-destructive/40 bg-destructive/10" : "border-yellow-500/40 bg-yellow-500/10"}`}>
+          <AlertTriangle className={`h-5 w-5 mt-0.5 ${(editsRemaining ?? 0) <= 0 ? "text-destructive" : "text-yellow-600 dark:text-yellow-400"}`} />
+          <div className="flex-1">
+            <div className="font-semibold text-sm">
+              {(editsRemaining ?? 0) <= 0 ? "Saldo zerado" : `Saldo baixo: ${editsRemaining} créditos`}
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Ferramentas pesadas (Ebook=10, Shorts=3, Avatar=2–4) podem ficar indisponíveis.
+            </p>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => window.location.assign("/pricing")}>Recarregar</Button>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="p-5 bg-gradient-to-br from-primary/10 to-card border-primary/30">
           <div className="text-xs text-muted-foreground uppercase tracking-wider">Saldo de Créditos</div>
@@ -276,7 +292,7 @@ function Dashboard({ editsRemaining, subscription, history, onPick }: any) {
         <Card className="p-5">
           <div className="text-xs text-muted-foreground uppercase tracking-wider">Gerações totais</div>
           <div className="text-4xl font-bold mt-2 font-mono">{history.length}</div>
-          <div className="text-xs text-muted-foreground mt-3">Últimos 20 itens</div>
+          <div className="text-xs text-muted-foreground mt-3">Últimos 50 itens</div>
         </Card>
         <Card className="p-5">
           <div className="text-xs text-muted-foreground uppercase tracking-wider">Créditos usados</div>
@@ -302,17 +318,31 @@ function Dashboard({ editsRemaining, subscription, history, onPick }: any) {
       </div>
 
       <div>
-        <h2 className="text-lg font-bold mb-3">Histórico recente</h2>
+        <h2 className="text-lg font-bold mb-3">Histórico detalhado</h2>
         <Card className="divide-y divide-border/40">
           {history.length === 0 && (
             <div className="p-6 text-center text-sm text-muted-foreground">Nenhuma geração ainda. Escolha uma ferramenta acima para começar.</div>
           )}
           {history.map((h: any) => (
-            <div key={h.id} className="p-3 flex items-center gap-3 text-sm">
-              <Badge variant="outline" className="capitalize">{h.tool}</Badge>
-              <div className="flex-1 truncate text-muted-foreground">{h.prompt || h.metadata?.title || "—"}</div>
-              <div className="text-xs text-muted-foreground">{new Date(h.created_at).toLocaleString("pt-BR")}</div>
-              <Badge variant={h.status === "completed" ? "default" : "secondary"} className="text-[10px]">{h.status}</Badge>
+            <div key={h.id} className="p-3 flex items-center gap-3 text-sm hover:bg-muted/30 transition-colors">
+              <button onClick={() => onOpen(h)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
+                <Badge variant="outline" className="capitalize shrink-0">{h.tool}</Badge>
+                <div className="flex-1 truncate text-muted-foreground">{h.prompt || h.metadata?.title || h.output_url || "—"}</div>
+                <div className="text-xs text-muted-foreground hidden sm:block whitespace-nowrap">{new Date(h.created_at).toLocaleString("pt-BR")}</div>
+                <Badge variant="secondary" className="text-[10px] shrink-0">{h.credits_spent ?? 0}c</Badge>
+                <Badge variant={h.status === "completed" ? "default" : h.status === "error" ? "destructive" : "secondary"} className="text-[10px] shrink-0">{h.status}</Badge>
+              </button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="shrink-0 h-8 w-8"
+                disabled={!RERUN_MAP[h.tool] || rerunning}
+                onClick={(e) => { e.stopPropagation(); onRerun(h); }}
+                aria-label="Reexecutar"
+                title="Reexecutar"
+              >
+                {rerunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />}
+              </Button>
             </div>
           ))}
         </Card>
