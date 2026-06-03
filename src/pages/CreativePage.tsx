@@ -439,7 +439,7 @@ function ImageTool({ onDone }: { onDone: () => void }) {
     setLoading(true); setUrl(null);
     const r = await authedFetch("creative-image", { prompt });
     const d = await r.json();
-    if (!r.ok) toast.error(d.error || "Erro"); else { setUrl(d.image_url); onDone(); }
+    if (!r.ok) handleFnError(d); else { setUrl(d.image_url); onDone(); }
     setLoading(false);
   }
 
@@ -464,7 +464,7 @@ function DownloaderTool({ onDone }: { onDone: () => void }) {
     setLoading(true); setResult(null);
     const r = await authedFetch("creative-download", { url, format });
     const d = await r.json();
-    if (!r.ok) toast.error(d.error || "Erro"); else { setResult(d.download_url); onDone(); }
+    if (!r.ok) handleFnError(d); else { setResult(d.download_url); onDone(); }
     setLoading(false);
   }
 
@@ -491,7 +491,7 @@ function ClipsTool({ onDone }: { onDone: () => void }) {
     setLoading(true); setClips([]);
     const r = await authedFetch("creative-clips", { transcript, source_url: sourceUrl });
     const d = await r.json();
-    if (!r.ok) toast.error(d.error || "Erro"); else { setClips(d.clips || []); onDone(); }
+    if (!r.ok) handleFnError(d); else { setClips(d.clips || []); onDone(); }
     setLoading(false);
   }
   return (
@@ -522,7 +522,7 @@ function AvatarTool({ onDone }: { onDone: () => void }) {
     setLoading(true); setResult(null);
     const r = await authedFetch("creative-video", { mode: "avatar", prompt, duration });
     const d = await r.json();
-    if (!r.ok) toast.error(d.error || "Erro"); else { setResult(d); onDone(); }
+    if (!r.ok) handleFnError(d); else { setResult(d); onDone(); }
     setLoading(false);
   }
   return (
@@ -547,7 +547,7 @@ function ShortsTool({ onDone }: { onDone: () => void }) {
     setLoading(true); setResult(null);
     const r = await authedFetch("creative-video", { mode: "shorts", prompt, duration: 30 });
     const d = await r.json();
-    if (!r.ok) toast.error(d.error || "Erro"); else { setResult(d); onDone(); }
+    if (!r.ok) handleFnError(d); else { setResult(d); onDone(); }
     setLoading(false);
   }
   return (
@@ -572,7 +572,7 @@ function MusicTool({ onDone }: { onDone: () => void }) {
     setLoading(true); setItems([]); setTask(null);
     const r = await authedFetch("creative-music", { action: "generate", prompt, instrumental });
     const d = await r.json();
-    if (!r.ok) { toast.error(d.error || "Erro"); setLoading(false); return; }
+    if (!r.ok) { handleFnError(d); setLoading(false); return; }
     setTask({ task_id: d.task_id, asset_id: d.asset_id });
     onDone();
     setLoading(false);
@@ -621,7 +621,7 @@ function EbookTool({ onDone }: { onDone: () => void }) {
     setLoading(true); setResult(null);
     const r = await authedFetch("creative-ebook", { topic, chapters });
     const d = await r.json();
-    if (!r.ok) toast.error(d.error || "Erro"); else { setResult(d); onDone(); }
+    if (!r.ok) handleFnError(d); else { setResult(d); onDone(); }
     setLoading(false);
   }
   return (
