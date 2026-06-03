@@ -48,5 +48,8 @@ jobs:
           done
           [ "$missing" = "0" ]
 
+      - name: Preflight (validate token, asset, credits, edge fn)
+        run: deno run --allow-net --allow-env scripts/preflight-rerun.ts
+
       - name: Run rerun concurrency test
         run: deno run --allow-net --allow-env scripts/test-rerun-concurrency.ts

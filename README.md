@@ -2012,9 +2012,15 @@ Templates prontos: [`.github/rerun-concurrency.secrets.example`](.github/rerun-c
   cp .github/rerun-concurrency.local.env.example .env.rerun-ci
   # edite .env.rerun-ci com os valores reais (já está no .gitignore)
   set -a && source .env.rerun-ci && set +a
+
+  # 4a. Preflight — valida secrets, token, asset, créditos e edge function (sem gastar créditos)
+  deno run --allow-net --allow-env scripts/preflight-rerun.ts
+
+  # 4b. Só rode o teste real se o preflight passar
   deno run --allow-net --allow-env scripts/test-rerun-concurrency.ts
   ```
-  Esperado: `✅ PASS: idempotent — at most one credit transaction was created.`
+  Esperado preflight: `✅ Preflight passed — safe to run the concurrency test.`
+  Esperado teste: `✅ PASS: idempotent — at most one credit transaction was created.`
 - [ ] **5. Adicionar no GitHub via CLI** (mais rápido que UI):
   ```bash
   gh secret set SUPABASE_URL               --body "$SUPABASE_URL"
