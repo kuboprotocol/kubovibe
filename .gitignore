@@ -26,3 +26,6 @@ dist-ssr
 # Local security verification reports
 reports/
 
+
+# Rerun concurrency CI — local secrets
+.env.rerun-ci
