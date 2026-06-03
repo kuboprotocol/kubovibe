@@ -110,46 +110,89 @@ export default function CreativePage() {
   const { subscription, editsRemaining, refetch } = useSubscription();
   const [active, setActive] = useState<ToolKey>((tool as ToolKey) || "dashboard");
   const [history, setHistory] = useState<any[]>([]);
-  const [page, setPage] = useState(0);
+  const [cursorStack, setCursorStack] = useState<string[]>([]); // created_at cursors for prev navigation
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
+  const [realtimeStatus, setRealtimeStatus] = useState<"connecting" | "live" | "reconnecting" | "offline">("connecting");
   const [selected, setSelected] = useState<any | null>(null);
   const [rerunning, setRerunning] = useState<string | null>(null);
   const alertedRef = useRef<{ low?: boolean; empty?: boolean }>({});
+  const globalCooldown = useCooldown();
   const PAGE_SIZE = 20;
 
   useEffect(() => {
     if (tool) setActive(tool as ToolKey);
   }, [tool]);
 
-  async function loadHistory(pageNum = page) {
+  // Cursor pagination: pass `before` (created_at) to fetch next page; null = first page.
+  async function loadHistory(before: string | null = null) {
     if (!user) return;
-    const from = pageNum * PAGE_SIZE;
-    const to = from + PAGE_SIZE - 1;
-    const { data, count } = await supabase.from("creative_assets")
+    let q = supabase.from("creative_assets")
       .select("*", { count: "exact" })
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
-      .range(from, to);
-    setHistory(data ?? []);
+      .limit(PAGE_SIZE + 1); // fetch one extra to detect "has next"
+    if (before) q = q.lt("created_at", before);
+    const { data, count } = await q;
+    const rows = data ?? [];
+    const hasMore = rows.length > PAGE_SIZE;
+    const visible = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
+    setHistory(visible);
+    setNextCursor(hasMore ? visible[visible.length - 1].created_at : null);
     setTotalCount(count ?? 0);
   }
 
-  useEffect(() => { loadHistory(page); }, [user, active, page]);
+  // Initial + refresh on user/active change.
+  useEffect(() => {
+    setCursorStack([]);
+    loadHistory(null);
+  }, [user, active]);
 
-  // Realtime: listen for new/updated assets and refresh current page
+  // Realtime with reconnect handling. Channel rebuilt on user change; status reflected in UI.
   useEffect(() => {
     if (!user) return;
-    const channel = supabase
-      .channel(`creative-assets-${user.id}`)
-      .on("postgres_changes", {
-        event: "*",
-        schema: "public",
-        table: "creative_assets",
-        filter: `user_id=eq.${user.id}`,
-      }, () => { loadHistory(page); })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [user, page]);
+    let cancelled = false;
+    let channel = supabase.channel(`creative-assets-${user.id}`);
+    const subscribe = () => {
+      channel
+        .on("postgres_changes", {
+          event: "*",
+          schema: "public",
+          table: "creative_assets",
+          filter: `user_id=eq.${user.id}`,
+        }, () => {
+          // refresh current page (top if no cursor, otherwise the page we're on)
+          const top = cursorStack.length === 0 ? null : cursorStack[cursorStack.length - 1];
+          loadHistory(top);
+        })
+        .subscribe((status) => {
+          if (cancelled) return;
+          if (status === "SUBSCRIBED") {
+            setRealtimeStatus((prev) => {
+              if (prev === "reconnecting") {
+                // resync after reconnect
+                const top = cursorStack.length === 0 ? null : cursorStack[cursorStack.length - 1];
+                loadHistory(top);
+              }
+              return "live";
+            });
+          } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+            setRealtimeStatus("reconnecting");
+            // tear down and retry with backoff
+            supabase.removeChannel(channel);
+            setTimeout(() => {
+              if (cancelled) return;
+              channel = supabase.channel(`creative-assets-${user.id}`);
+              subscribe();
+            }, 2000);
+          } else if (status === "CLOSED") {
+            setRealtimeStatus("offline");
+          }
+        });
+    };
+    subscribe();
+    return () => { cancelled = true; supabase.removeChannel(channel); };
+  }, [user]);
 
   // Balance alerts
   useEffect(() => {
@@ -172,7 +215,6 @@ export default function CreativePage() {
   async function rerun(asset: any) {
     const cfg = RERUN_MAP[asset.tool];
     if (!cfg) { toast.error("Reexecução indisponível para esta ferramenta."); return; }
-    // Stable idempotency key: same asset re-clicked within DB retention reuses tx
     const idemKey = `rerun:${asset.id}`;
     setRerunning(asset.id);
     try {
@@ -181,7 +223,8 @@ export default function CreativePage() {
       if (!r.ok) { handleFnError(d); return; }
       toast.success(d?.replayed ? "Reexecução idempotente (sem débito duplo)" : "Reexecutado com sucesso");
       refetch();
-      loadHistory(page);
+      const top = cursorStack.length === 0 ? null : cursorStack[cursorStack.length - 1];
+      loadHistory(top);
       setSelected(null);
     } catch (e: any) {
       toast.error(e?.message ?? "Falha ao reexecutar");
