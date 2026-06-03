@@ -279,12 +279,28 @@ export default function CreativePage() {
               onOpen={(a: any) => setSelected(a)}
               onRerun={rerun}
               rerunningId={rerunning}
-              page={page}
-              totalCount={totalCount}
+              pageIndex={cursorStack.length}
               pageSize={PAGE_SIZE}
-              onPageChange={setPage}
+              totalCount={totalCount}
+              hasNext={!!nextCursor}
+              hasPrev={cursorStack.length > 0}
+              realtimeStatus={realtimeStatus}
+              globalCooldown={globalCooldown}
+              onNext={() => {
+                if (!nextCursor) return;
+                setCursorStack((s) => [...s, nextCursor]);
+                loadHistory(nextCursor);
+              }}
+              onPrev={() => {
+                setCursorStack((s) => {
+                  const next = s.slice(0, -1);
+                  loadHistory(next[next.length - 1] ?? null);
+                  return next;
+                });
+              }}
             />
           </TabsContent>
+
 
 
           <TabsContent value="chat"><ChatTool onDone={() => { refetch(); loadHistory(); }} /></TabsContent>
