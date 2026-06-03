@@ -46,6 +46,29 @@ async function authedFetch(name: string, body: unknown) {
   return r;
 }
 
+// Dispatch table for re-execution from history
+const RERUN_MAP: Record<string, { fn: string; build: (a: any) => any }> = {
+  chat: { fn: "creative-chat", build: (a) => ({ messages: [{ role: "user", content: a.prompt }] }) },
+  nano_banana: { fn: "creative-image", build: (a) => ({ prompt: a.prompt, size: a.metadata?.size }) },
+  downloader: { fn: "creative-download", build: (a) => ({ url: a.metadata?.url ?? a.prompt, format: a.metadata?.format ?? "mp4" }) },
+  clips: { fn: "creative-clips", build: (a) => ({ transcript: a.prompt, source_url: a.metadata?.source_url }) },
+  avatar: { fn: "creative-video", build: (a) => ({ mode: "avatar", prompt: a.prompt, duration: a.metadata?.duration ?? 30 }) },
+  shorts: { fn: "creative-video", build: (a) => ({ mode: "shorts", prompt: a.prompt, duration: 30 }) },
+  music: { fn: "creative-music", build: (a) => ({ action: "generate", prompt: a.prompt, instrumental: a.metadata?.instrumental ?? false }) },
+  ebook: { fn: "creative-ebook", build: (a) => ({ topic: a.prompt, chapters: a.metadata?.chapters ?? 5 }) },
+};
+
+function handleFnError(d: any, fallback = "Erro") {
+  const msg = d?.error || fallback;
+  if (typeof msg === "string" && msg.includes("rate_limit_exceeded")) {
+    toast.error("Limite de uso atingido. Aguarde 1 minuto e tente novamente.");
+  } else if (typeof msg === "string" && msg.includes("insufficient_credits")) {
+    toast.error("Créditos insuficientes para esta ação.");
+  } else {
+    toast.error(typeof msg === "string" ? msg : fallback);
+  }
+}
+
 export default function CreativePage() {
   const { tool } = useParams<{ tool?: ToolKey }>();
   const navigate = useNavigate();
