@@ -323,6 +323,57 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
   const [cancelReason, setCancelReason] = useState("");
   const [resendingEmail, setResendingEmail] = useState<string | null>(null);
   const [confirmResend, setConfirmResend] = useState<Transfer | null>(null);
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterQuery, setFilterQuery] = useState("");
+  const [modalEvents, setModalEvents] = useState<Array<{ id: string; event_type: string; from_status: string | null; to_status: string | null; message: string | null; created_at: string }>>([]);
+  const [modalEmails, setModalEmails] = useState<Array<{ id: string; status: string; created_at: string; message_id: string | null; error_message: string | null }>>([]);
+  const [modalLoading, setModalLoading] = useState(false);
+
+  const RESEND_COOLDOWN_SEC = 60;
+  const cooldownLeft = (t: Transfer | null) => {
+    if (!t?.last_notified_at) return 0;
+    const elapsed = (Date.now() - new Date(t.last_notified_at).getTime()) / 1000;
+    return Math.max(0, Math.ceil(RESEND_COOLDOWN_SEC - elapsed));
+  };
+
+  const filteredTransfers = useMemo(() => {
+    const q = filterQuery.trim().toLowerCase();
+    return transfers.filter((t) => {
+      if (filterStatus !== "all" && t.status !== filterStatus) return false;
+      if (q && !t.domain_name.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [transfers, filterStatus, filterQuery]);
+
+  const openConfirmResend = async (t: Transfer) => {
+    setConfirmResend(t);
+    setModalLoading(true);
+    setModalEvents([]); setModalEmails([]);
+    const [ev, em] = await Promise.all([
+      supabase.from("kubo_domain_transfer_events").select("id,event_type,from_status,to_status,message,created_at").eq("transfer_id", t.id).order("created_at", { ascending: false }).limit(20),
+      supabase.from("email_send_log").select("id,status,created_at,message_id,error_message").like("message_id", `transfer-%${t.id}%`).order("created_at", { ascending: false }).limit(20),
+    ]);
+    setModalEvents((ev.data as any) ?? []);
+    setModalEmails((em.data as any) ?? []);
+    setModalLoading(false);
+  };
+
+  const exportCsv = () => {
+    const rows = [
+      ["domain", "status", "started_at", "completed_at", "retry_count", "last_notified_at", "last_notified_status", "current_registrar", "notify_email", "status_message", "last_error", "cancel_reason"],
+      ...filteredTransfers.map((t: any) => [
+        t.domain_name, t.status, t.started_at, t.completed_at ?? "", t.retry_count, t.last_notified_at ?? "", t.last_notified_status ?? "",
+        t.current_registrar ?? "", t.notify_email ?? "", (t.status_message ?? "").replace(/\n/g, " "), (t.last_error ?? "").replace(/\n/g, " "), (t.cancel_reason ?? "").replace(/\n/g, " "),
+      ]),
+    ];
+    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `transferencias-auditoria-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+    toast.success(`${filteredTransfers.length} transferências exportadas`);
+  };
 
   const tld = domain.includes(".") ? tldOf(domain) : null;
   const price = tld ? (TLD_TRANSFER_CREDITS[tld] ?? 20) : 20;
