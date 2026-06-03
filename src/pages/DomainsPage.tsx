@@ -414,8 +414,9 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
   };
 
   const resendEmail = async (t: Transfer) => {
+    const left = cooldownLeft(t);
+    if (left > 0) { toast.error(`Aguarde ${left}s antes de reenviar o e-mail.`); return; }
     setResendingEmail(t.id);
-    const { data: userData } = await supabase.auth.getUser();
     const recipient = t.notify_email || userData.user?.email;
     if (!recipient) {
       toast.error("Nenhum e-mail de destino encontrado. Adicione um e-mail de notificação na transferência.");
