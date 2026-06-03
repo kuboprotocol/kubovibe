@@ -56,10 +56,46 @@ const RERUN_MAP: Record<string, { fn: string; build: (a: any) => any }> = {
   ebook: { fn: "creative-ebook", build: (a) => ({ topic: a.prompt, chapters: a.metadata?.chapters ?? 5 }) },
 };
 
+// In-memory cooldown registry (per tool) populated when an edge fn returns 429.
+const cooldowns = new Map<string, number>(); // tool -> epoch ms when usable again
+const cooldownListeners = new Set<() => void>();
+function setCooldown(tool: string, seconds: number) {
+  cooldowns.set(tool, Date.now() + seconds * 1000);
+  cooldownListeners.forEach((cb) => cb());
+}
+function useCooldown(tool?: string) {
+  const [, force] = useState(0);
+  useEffect(() => {
+    const cb = () => force((x) => x + 1);
+    cooldownListeners.add(cb);
+    const t = setInterval(cb, 1000);
+    return () => { cooldownListeners.delete(cb); clearInterval(t); };
+  }, []);
+  if (!tool) {
+    let max = 0;
+    for (const [, until] of cooldowns) max = Math.max(max, until - Date.now());
+    return Math.max(0, Math.ceil(max / 1000));
+  }
+  const until = cooldowns.get(tool) ?? 0;
+  return Math.max(0, Math.ceil((until - Date.now()) / 1000));
+}
+
+function parseRetryAfter(errStr: unknown): { tool?: string; seconds: number } | null {
+  if (typeof errStr !== "string") return null;
+  // shape: "rate_limit_exceeded:<tool>:<max>/<windowSeconds>s"
+  const m = errStr.match(/rate_limit_exceeded:([^:]+):\d+\/(\d+)s/);
+  if (!m) return null;
+  return { tool: m[1], seconds: Number(m[2]) };
+}
+
 function handleFnError(d: any, fallback = "Erro") {
   const msg = d?.error || fallback;
-  if (typeof msg === "string" && msg.includes("rate_limit_exceeded")) {
-    toast.error("Limite de uso atingido. Aguarde 1 minuto e tente novamente.");
+  const rl = parseRetryAfter(msg);
+  if (rl) {
+    setCooldown(rl.tool ?? "global", rl.seconds);
+    toast.error(`Limite atingido — aguarde ${rl.seconds}s`, {
+      description: rl.tool ? `Ferramenta: ${rl.tool}` : undefined,
+    });
   } else if (typeof msg === "string" && msg.includes("insufficient_credits")) {
     toast.error("Créditos insuficientes para esta ação.");
   } else {
