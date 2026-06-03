@@ -948,6 +948,39 @@ export type Database = {
         }
         Relationships: []
       }
+      pending_credits: {
+        Row: {
+          applied_at: string | null
+          applied_user_id: string | null
+          created_at: string
+          credits: number
+          email: string
+          granted_by: string | null
+          id: string
+          reason: string
+        }
+        Insert: {
+          applied_at?: string | null
+          applied_user_id?: string | null
+          created_at?: string
+          credits: number
+          email: string
+          granted_by?: string | null
+          id?: string
+          reason?: string
+        }
+        Update: {
+          applied_at?: string | null
+          applied_user_id?: string | null
+          created_at?: string
+          credits?: number
+          email?: string
+          granted_by?: string | null
+          id?: string
+          reason?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
