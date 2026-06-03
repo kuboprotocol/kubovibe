@@ -594,7 +594,7 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
       </AlertDialog>
 
       <AlertDialog open={!!confirmResend} onOpenChange={(o) => !o && setConfirmResend(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-w-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle className="font-orbitron">Reenviar e-mail de status</AlertDialogTitle>
             <AlertDialogDescription asChild>
@@ -607,17 +607,60 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
                   {confirmResend?.last_notified_at && (
                     <div className="text-xs text-muted-foreground mt-1">Último e-mail enviado: {new Date(confirmResend.last_notified_at).toLocaleString("pt-BR")}</div>
                   )}
+                  {confirmResend && cooldownLeft(confirmResend) > 0 && (
+                    <div className="text-xs text-amber-500 mt-1">⏳ Cooldown: aguarde {cooldownLeft(confirmResend)}s para reenviar.</div>
+                  )}
                 </div>
-                <p className="text-xs text-muted-foreground">O e-mail será enviado imediatamente com o template domain-transfer-status.</p>
+
+                <div>
+                  <div className="text-xs font-semibold uppercase text-muted-foreground mb-1.5 flex items-center gap-1.5"><Mail className="w-3 h-3" /> Histórico de e-mails</div>
+                  <div className="max-h-32 overflow-y-auto rounded border border-border/40 bg-background/40 text-xs divide-y divide-border/30">
+                    {modalLoading && <div className="p-2 text-muted-foreground">Carregando…</div>}
+                    {!modalLoading && modalEmails.length === 0 && <div className="p-2 text-muted-foreground">Nenhum e-mail registrado ainda.</div>}
+                    {modalEmails.map((m) => (
+                      <div key={m.id} className="p-2 flex justify-between gap-2">
+                        <span className="font-mono">{m.status}</span>
+                        <span className="text-muted-foreground">{new Date(m.created_at).toLocaleString("pt-BR")}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xs font-semibold uppercase text-muted-foreground mb-1.5 flex items-center gap-1.5"><Terminal className="w-3 h-3" /> Logs de auditoria</div>
+                  <div className="max-h-40 overflow-y-auto rounded border border-border/40 bg-background/40 text-xs divide-y divide-border/30">
+                    {modalLoading && <div className="p-2 text-muted-foreground">Carregando…</div>}
+                    {!modalLoading && modalEvents.length === 0 && <div className="p-2 text-muted-foreground">Nenhum evento registrado.</div>}
+                    {modalEvents.map((e) => (
+                      <div key={e.id} className="p-2">
+                        <div className="flex justify-between gap-2">
+                          <span className="font-mono text-primary">{e.event_type}</span>
+                          <span className="text-muted-foreground">{new Date(e.created_at).toLocaleString("pt-BR")}</span>
+                        </div>
+                        {(e.from_status || e.to_status) && (
+                          <div className="text-muted-foreground/80 mt-0.5">{e.from_status ?? "—"} → {e.to_status ?? "—"}</div>
+                        )}
+                        {e.message && <div className="text-muted-foreground/70 mt-0.5 truncate">{e.message}</div>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setConfirmResend(null)}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { if (confirmResend) resendEmail(confirmResend); setConfirmResend(null); }} className="bg-gradient-to-r from-primary to-purple-600">Confirmar reenvio</AlertDialogAction>
+            <AlertDialogAction
+              onClick={() => { if (confirmResend) resendEmail(confirmResend); setConfirmResend(null); }}
+              disabled={!!confirmResend && cooldownLeft(confirmResend) > 0}
+              className="bg-gradient-to-r from-primary to-purple-600"
+            >
+              Confirmar reenvio
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
     </div>
   );
 }
