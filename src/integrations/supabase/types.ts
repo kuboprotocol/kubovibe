@@ -283,6 +283,51 @@ export type Database = {
           },
         ]
       }
+      creative_assets: {
+        Row: {
+          created_at: string
+          credits_spent: number
+          error_message: string | null
+          id: string
+          metadata: Json
+          output_text: string | null
+          output_url: string | null
+          prompt: string | null
+          status: string
+          tool: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          credits_spent?: number
+          error_message?: string | null
+          id?: string
+          metadata?: Json
+          output_text?: string | null
+          output_url?: string | null
+          prompt?: string | null
+          status?: string
+          tool: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          credits_spent?: number
+          error_message?: string | null
+          id?: string
+          metadata?: Json
+          output_text?: string | null
+          output_url?: string | null
+          prompt?: string | null
+          status?: string
+          tool?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       credit_transactions: {
         Row: {
           balance_after: number
