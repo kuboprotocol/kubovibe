@@ -214,7 +214,7 @@ export default function CreativePage() {
         </Tabs>
       </main>
 
-      <AssetDetailDialog asset={selected} onClose={() => setSelected(null)} onRerun={rerun} rerunning={rerunning} />
+      <AssetDetailDialog asset={selected} onClose={() => setSelected(null)} onRerun={rerun} rerunning={!!rerunning && rerunning === selected?.id} />
     </div>
   );
 }
