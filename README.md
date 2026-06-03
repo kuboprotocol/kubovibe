@@ -1981,25 +1981,60 @@ gh run list --workflow=rerun-concurrency.yml --limit 5
 ```
 
 #### 3) Localmente (Deno ou bun)
+
+##### Variáveis de ambiente necessárias
+
+Crie um arquivo `.env.rerun-ci` a partir do template (já está no `.gitignore`):
+
 ```bash
-# Instale o Deno (v2.x)
-curl -fsSL https://deno.land/install.sh | sh
+cp .github/rerun-concurrency.local.env.example .env.rerun-ci
+```
 
-# Exporte os secrets
-export SUPABASE_URL="https://<ref>.supabase.co"
-export SUPABASE_SERVICE_ROLE_KEY="<service_role_key>"
-export ACCESS_TOKEN="<jwt_test_user>"
-export ASSET_ID="<creative_assets_id>"
-export CONCURRENCY=8
-export FN=creative-chat
+Exemplo preenchido com placeholders:
 
-# Opção A — via bun (roda o preflight em um comando)
+```bash
+# Endpoint do projeto Supabase (obrigatório)
+# Onde obter: Supabase Dashboard → Project Settings → API → Project URL
+SUPABASE_URL="https://<project-ref>.supabase.co"
+
+# service_role key — nunca exponha no frontend (obrigatório)
+# Onde obter: Supabase Dashboard → Project Settings → API → service_role → Reveal
+SUPABASE_SERVICE_ROLE_KEY="eyJhbGciOiJIUzI1NiIs..."
+
+# JWT do usuário de teste autenticado (obrigatório)
+# Onde obter: DevTools → Application → Local Storage → sb-<ref>-auth-token → access_token
+ACCESS_TOKEN="eyJhbGciOiJIUzI1NiIs..."
+
+# UUID de um creative_assets existente do usuário acima (obrigatório)
+# Onde obter: SQL Editor → select id from public.creative_assets where user_id = '<uuid>' limit 1;
+ASSET_ID="00000000-0000-0000-0000-000000000000"
+
+# Número de requisições paralelas no teste de concorrência (opcional, padrão: 8)
+CONCURRENCY=8
+
+# Nome da edge function a testar (opcional, padrão: creative-chat)
+FN=creative-chat
+```
+
+Carregue as variáveis no shell atual:
+
+```bash
+set -a && source .env.rerun-ci && set +a
+```
+
+##### Rodar o preflight
+
+```bash
+# Opção A — via bun (um comando, herda exit code do script)
 bun run preflight:rerun
 
 # Opção B — via Deno diretamente
 deno run --allow-net --allow-env scripts/preflight-rerun.ts
+```
 
-# Depois que o preflight passar, rode o teste real
+##### Rodar o teste real (só após preflight passar)
+
+```bash
 deno run --allow-net --allow-env scripts/test-rerun-concurrency.ts
 ```
 
