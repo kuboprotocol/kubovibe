@@ -56,10 +56,46 @@ const RERUN_MAP: Record<string, { fn: string; build: (a: any) => any }> = {
   ebook: { fn: "creative-ebook", build: (a) => ({ topic: a.prompt, chapters: a.metadata?.chapters ?? 5 }) },
 };
 
+// In-memory cooldown registry (per tool) populated when an edge fn returns 429.
+const cooldowns = new Map<string, number>(); // tool -> epoch ms when usable again
+const cooldownListeners = new Set<() => void>();
+function setCooldown(tool: string, seconds: number) {
+  cooldowns.set(tool, Date.now() + seconds * 1000);
+  cooldownListeners.forEach((cb) => cb());
+}
+function useCooldown(tool?: string) {
+  const [, force] = useState(0);
+  useEffect(() => {
+    const cb = () => force((x) => x + 1);
+    cooldownListeners.add(cb);
+    const t = setInterval(cb, 1000);
+    return () => { cooldownListeners.delete(cb); clearInterval(t); };
+  }, []);
+  if (!tool) {
+    let max = 0;
+    for (const [, until] of cooldowns) max = Math.max(max, until - Date.now());
+    return Math.max(0, Math.ceil(max / 1000));
+  }
+  const until = cooldowns.get(tool) ?? 0;
+  return Math.max(0, Math.ceil((until - Date.now()) / 1000));
+}
+
+function parseRetryAfter(errStr: unknown): { tool?: string; seconds: number } | null {
+  if (typeof errStr !== "string") return null;
+  // shape: "rate_limit_exceeded:<tool>:<max>/<windowSeconds>s"
+  const m = errStr.match(/rate_limit_exceeded:([^:]+):\d+\/(\d+)s/);
+  if (!m) return null;
+  return { tool: m[1], seconds: Number(m[2]) };
+}
+
 function handleFnError(d: any, fallback = "Erro") {
   const msg = d?.error || fallback;
-  if (typeof msg === "string" && msg.includes("rate_limit_exceeded")) {
-    toast.error("Limite de uso atingido. Aguarde 1 minuto e tente novamente.");
+  const rl = parseRetryAfter(msg);
+  if (rl) {
+    setCooldown(rl.tool ?? "global", rl.seconds);
+    toast.error(`Limite atingido — aguarde ${rl.seconds}s`, {
+      description: rl.tool ? `Ferramenta: ${rl.tool}` : undefined,
+    });
   } else if (typeof msg === "string" && msg.includes("insufficient_credits")) {
     toast.error("Créditos insuficientes para esta ação.");
   } else {
@@ -74,46 +110,89 @@ export default function CreativePage() {
   const { subscription, editsRemaining, refetch } = useSubscription();
   const [active, setActive] = useState<ToolKey>((tool as ToolKey) || "dashboard");
   const [history, setHistory] = useState<any[]>([]);
-  const [page, setPage] = useState(0);
+  const [cursorStack, setCursorStack] = useState<string[]>([]); // created_at cursors for prev navigation
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
+  const [realtimeStatus, setRealtimeStatus] = useState<"connecting" | "live" | "reconnecting" | "offline">("connecting");
   const [selected, setSelected] = useState<any | null>(null);
   const [rerunning, setRerunning] = useState<string | null>(null);
   const alertedRef = useRef<{ low?: boolean; empty?: boolean }>({});
+  const globalCooldown = useCooldown();
   const PAGE_SIZE = 20;
 
   useEffect(() => {
     if (tool) setActive(tool as ToolKey);
   }, [tool]);
 
-  async function loadHistory(pageNum = page) {
+  // Cursor pagination: pass `before` (created_at) to fetch next page; null = first page.
+  async function loadHistory(before: string | null = null) {
     if (!user) return;
-    const from = pageNum * PAGE_SIZE;
-    const to = from + PAGE_SIZE - 1;
-    const { data, count } = await supabase.from("creative_assets")
+    let q = supabase.from("creative_assets")
       .select("*", { count: "exact" })
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
-      .range(from, to);
-    setHistory(data ?? []);
+      .limit(PAGE_SIZE + 1); // fetch one extra to detect "has next"
+    if (before) q = q.lt("created_at", before);
+    const { data, count } = await q;
+    const rows = data ?? [];
+    const hasMore = rows.length > PAGE_SIZE;
+    const visible = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
+    setHistory(visible);
+    setNextCursor(hasMore ? visible[visible.length - 1].created_at : null);
     setTotalCount(count ?? 0);
   }
 
-  useEffect(() => { loadHistory(page); }, [user, active, page]);
+  // Initial + refresh on user/active change.
+  useEffect(() => {
+    setCursorStack([]);
+    loadHistory(null);
+  }, [user, active]);
 
-  // Realtime: listen for new/updated assets and refresh current page
+  // Realtime with reconnect handling. Channel rebuilt on user change; status reflected in UI.
   useEffect(() => {
     if (!user) return;
-    const channel = supabase
-      .channel(`creative-assets-${user.id}`)
-      .on("postgres_changes", {
-        event: "*",
-        schema: "public",
-        table: "creative_assets",
-        filter: `user_id=eq.${user.id}`,
-      }, () => { loadHistory(page); })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [user, page]);
+    let cancelled = false;
+    let channel = supabase.channel(`creative-assets-${user.id}`);
+    const subscribe = () => {
+      channel
+        .on("postgres_changes", {
+          event: "*",
+          schema: "public",
+          table: "creative_assets",
+          filter: `user_id=eq.${user.id}`,
+        }, () => {
+          // refresh current page (top if no cursor, otherwise the page we're on)
+          const top = cursorStack.length === 0 ? null : cursorStack[cursorStack.length - 1];
+          loadHistory(top);
+        })
+        .subscribe((status) => {
+          if (cancelled) return;
+          if (status === "SUBSCRIBED") {
+            setRealtimeStatus((prev) => {
+              if (prev === "reconnecting") {
+                // resync after reconnect
+                const top = cursorStack.length === 0 ? null : cursorStack[cursorStack.length - 1];
+                loadHistory(top);
+              }
+              return "live";
+            });
+          } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+            setRealtimeStatus("reconnecting");
+            // tear down and retry with backoff
+            supabase.removeChannel(channel);
+            setTimeout(() => {
+              if (cancelled) return;
+              channel = supabase.channel(`creative-assets-${user.id}`);
+              subscribe();
+            }, 2000);
+          } else if (status === "CLOSED") {
+            setRealtimeStatus("offline");
+          }
+        });
+    };
+    subscribe();
+    return () => { cancelled = true; supabase.removeChannel(channel); };
+  }, [user]);
 
   // Balance alerts
   useEffect(() => {
@@ -136,7 +215,6 @@ export default function CreativePage() {
   async function rerun(asset: any) {
     const cfg = RERUN_MAP[asset.tool];
     if (!cfg) { toast.error("Reexecução indisponível para esta ferramenta."); return; }
-    // Stable idempotency key: same asset re-clicked within DB retention reuses tx
     const idemKey = `rerun:${asset.id}`;
     setRerunning(asset.id);
     try {
@@ -145,7 +223,8 @@ export default function CreativePage() {
       if (!r.ok) { handleFnError(d); return; }
       toast.success(d?.replayed ? "Reexecução idempotente (sem débito duplo)" : "Reexecutado com sucesso");
       refetch();
-      loadHistory(page);
+      const top = cursorStack.length === 0 ? null : cursorStack[cursorStack.length - 1];
+      loadHistory(top);
       setSelected(null);
     } catch (e: any) {
       toast.error(e?.message ?? "Falha ao reexecutar");
@@ -200,12 +279,28 @@ export default function CreativePage() {
               onOpen={(a: any) => setSelected(a)}
               onRerun={rerun}
               rerunningId={rerunning}
-              page={page}
-              totalCount={totalCount}
+              pageIndex={cursorStack.length}
               pageSize={PAGE_SIZE}
-              onPageChange={setPage}
+              totalCount={totalCount}
+              hasNext={!!nextCursor}
+              hasPrev={cursorStack.length > 0}
+              realtimeStatus={realtimeStatus}
+              globalCooldown={globalCooldown}
+              onNext={() => {
+                if (!nextCursor) return;
+                setCursorStack((s) => [...s, nextCursor]);
+                loadHistory(nextCursor);
+              }}
+              onPrev={() => {
+                setCursorStack((s) => {
+                  const next = s.slice(0, -1);
+                  loadHistory(next[next.length - 1] ?? null);
+                  return next;
+                });
+              }}
             />
           </TabsContent>
+
 
 
           <TabsContent value="chat"><ChatTool onDone={() => { refetch(); loadHistory(); }} /></TabsContent>
@@ -291,7 +386,7 @@ function AssetDetailDialog({ asset, onClose, onRerun, rerunning }: { asset: any;
 }
 
 
-function Dashboard({ editsRemaining, subscription, history, onPick, onOpen, onRerun, rerunningId, page, totalCount, pageSize, onPageChange }: any) {
+function Dashboard({ editsRemaining, subscription, history, onPick, onOpen, onRerun, rerunningId, pageIndex, pageSize, totalCount, hasNext, hasPrev, realtimeStatus, globalCooldown, onNext, onPrev }: any) {
   const lowBalance = (editsRemaining ?? 0) <= 10;
   return (
     <div className="space-y-6">
@@ -319,7 +414,7 @@ function Dashboard({ editsRemaining, subscription, history, onPick, onOpen, onRe
         <Card className="p-5">
           <div className="text-xs text-muted-foreground uppercase tracking-wider">Gerações totais</div>
           <div className="text-4xl font-bold mt-2 font-mono">{totalCount ?? history.length}</div>
-          <div className="text-xs text-muted-foreground mt-3">Página {(page ?? 0) + 1}</div>
+          <div className="text-xs text-muted-foreground mt-3">Página {(pageIndex ?? 0) + 1}</div>
         </Card>
         <Card className="p-5">
           <div className="text-xs text-muted-foreground uppercase tracking-wider">Créditos usados (página)</div>
@@ -345,12 +440,26 @@ function Dashboard({ editsRemaining, subscription, history, onPick, onOpen, onRe
       </div>
 
       <div>
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
           <h2 className="text-lg font-bold">Histórico detalhado</h2>
-          <Badge variant="outline" className="text-[10px]">
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5 animate-pulse" />
-            tempo real
-          </Badge>
+          <div className="flex items-center gap-2">
+            {globalCooldown > 0 && (
+              <Badge variant="outline" className="text-[10px] border-yellow-500/40 text-yellow-600 dark:text-yellow-400">
+                <AlertTriangle className="h-3 w-3 mr-1" />
+                Rate limit: {globalCooldown}s
+              </Badge>
+            )}
+            <Badge variant="outline" className="text-[10px]">
+              <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1.5 ${
+                realtimeStatus === "live" ? "bg-green-500 animate-pulse" :
+                realtimeStatus === "reconnecting" ? "bg-yellow-500 animate-pulse" :
+                realtimeStatus === "offline" ? "bg-destructive" : "bg-muted-foreground"
+              }`} />
+              {realtimeStatus === "live" ? "tempo real" :
+               realtimeStatus === "reconnecting" ? "reconectando…" :
+               realtimeStatus === "offline" ? "offline" : "conectando…"}
+            </Badge>
+          </div>
         </div>
         <Card className="divide-y divide-border/40">
           {history.length === 0 && (
@@ -383,18 +492,19 @@ function Dashboard({ editsRemaining, subscription, history, onPick, onOpen, onRe
           })}
         </Card>
 
-        {totalCount > pageSize && (
+        {(hasNext || hasPrev) && (
           <div className="flex items-center justify-between mt-3 text-sm">
             <div className="text-xs text-muted-foreground">
-              {page * pageSize + 1}–{Math.min((page + 1) * pageSize, totalCount)} de {totalCount}
+              Página {(pageIndex ?? 0) + 1} · {history.length} itens · {totalCount} no total
             </div>
             <div className="flex gap-2">
-              <Button size="sm" variant="outline" disabled={page <= 0} onClick={() => onPageChange(page - 1)}>Anterior</Button>
-              <Button size="sm" variant="outline" disabled={(page + 1) * pageSize >= totalCount} onClick={() => onPageChange(page + 1)}>Próxima</Button>
+              <Button size="sm" variant="outline" disabled={!hasPrev} onClick={onPrev}>Anterior</Button>
+              <Button size="sm" variant="outline" disabled={!hasNext} onClick={onNext}>Próxima</Button>
             </div>
           </div>
         )}
       </div>
+
     </div>
   );
 }
