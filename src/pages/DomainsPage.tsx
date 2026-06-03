@@ -479,12 +479,39 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
       {transfers.length > 0 && (
         <Card className="bg-card/60 backdrop-blur border-border/40">
           <CardHeader>
-            <CardTitle className="font-orbitron text-lg">Transferências</CardTitle>
-            <CardDescription>Atualização automática a cada 5 minutos. Você pode atualizar manualmente ou cancelar a qualquer momento.</CardDescription>
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div>
+                <CardTitle className="font-orbitron text-lg">Transferências</CardTitle>
+                <CardDescription>Atualização automática a cada 5 minutos. Você pode atualizar manualmente ou cancelar a qualquer momento.</CardDescription>
+              </div>
+              <Button size="sm" variant="outline" onClick={exportCsv} title="Exportar auditoria em CSV">
+                <Download className="w-3.5 h-3.5 mr-1.5" /> CSV
+              </Button>
+            </div>
+            <div className="flex gap-2 mt-3 flex-wrap">
+              <Input placeholder="Buscar por domínio…" value={filterQuery} onChange={(e) => setFilterQuery(e.target.value)} className="max-w-xs h-9" />
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="w-48 h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os status</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="validating">Validating</SelectItem>
+                  <SelectItem value="transferring">Transferring</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="failed">Failed</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="text-xs text-muted-foreground self-center">{filteredTransfers.length} de {transfers.length}</span>
+            </div>
           </CardHeader>
           <CardContent className="space-y-2">
-            {transfers.map((t) => {
+            {filteredTransfers.length === 0 && (
+              <div className="text-sm text-muted-foreground text-center py-6">Nenhuma transferência corresponde aos filtros.</div>
+            )}
+            {filteredTransfers.map((t) => {
               const inProgress = ["pending", "validating", "transferring"].includes(t.status);
+              const cdLeft = cooldownLeft(t);
               return (
                 <div key={t.id} className="flex items-center justify-between gap-3 p-3 rounded-lg bg-background/40 border border-border/30">
                   <div className="min-w-0 flex-1">
@@ -502,7 +529,7 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
                     </div>
                   </div>
                   <div className="flex gap-1.5 shrink-0">
-                    <Button size="sm" variant="outline" onClick={() => setConfirmResend(t)} disabled={resendingEmail === t.id} title={t.last_notified_at ? `Último e-mail: ${new Date(t.last_notified_at).toLocaleString("pt-BR")}` : "Reenviar e-mail de status"}>
+                    <Button size="sm" variant="outline" onClick={() => openConfirmResend(t)} disabled={resendingEmail === t.id || cdLeft > 0} title={cdLeft > 0 ? `Aguarde ${cdLeft}s para reenviar` : (t.last_notified_at ? `Último e-mail: ${new Date(t.last_notified_at).toLocaleString("pt-BR")}` : "Reenviar e-mail de status")}>
                       {resendingEmail === t.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => refresh(t.id)} disabled={refreshing === t.id} title="Atualizar status">
@@ -520,6 +547,7 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
           </CardContent>
         </Card>
       )}
+
 
       <AlertDialog open={confirm} onOpenChange={setConfirm}>
         <AlertDialogContent>
