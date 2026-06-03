@@ -10,7 +10,7 @@ Deno.serve(async (req) => {
     if (!key) throw new Error("BYTEZ_API_KEY not configured");
 
     let prompt = "Say 'pong' in one word.";
-    let model = "openai-community/gpt2";
+    let model = "Qwen/Qwen3-4B";
     try {
       const body = await req.json();
       if (body?.prompt) prompt = String(body.prompt);
@@ -20,7 +20,7 @@ Deno.serve(async (req) => {
     const r = await fetch(`https://api.bytez.com/models/v2/${model}`, {
       method: "POST",
       headers: {
-        Authorization: `Key ${key}`,
+        Authorization: key,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ messages: [{ role: "user", content: prompt }] }),
