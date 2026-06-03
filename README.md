@@ -1962,7 +1962,7 @@ gh run watch
 gh run list --workflow=rerun-concurrency.yml --limit 5
 ```
 
-#### 3) Localmente (Deno)
+#### 3) Localmente (Deno ou bun)
 ```bash
 # Instale o Deno (v2.x)
 curl -fsSL https://deno.land/install.sh | sh
@@ -1975,7 +1975,13 @@ export ASSET_ID="<creative_assets_id>"
 export CONCURRENCY=8
 export FN=creative-chat
 
-# Rode o teste
+# Opção A — via bun (roda o preflight em um comando)
+bun run preflight:rerun
+
+# Opção B — via Deno diretamente
+deno run --allow-net --allow-env scripts/preflight-rerun.ts
+
+# Depois que o preflight passar, rode o teste real
 deno run --allow-net --allow-env scripts/test-rerun-concurrency.ts
 ```
 
@@ -2014,6 +2020,9 @@ Templates prontos: [`.github/rerun-concurrency.secrets.example`](.github/rerun-c
   set -a && source .env.rerun-ci && set +a
 
   # 4a. Preflight — valida secrets, token, asset, créditos e edge function (sem gastar créditos)
+  #    Opção rápida (bun):
+  bun run preflight:rerun
+  #    Opção Deno:
   deno run --allow-net --allow-env scripts/preflight-rerun.ts
 
   # 4b. Só rode o teste real se o preflight passar
