@@ -9,12 +9,13 @@ Deno.serve(async (req) => {
   const user = await getUser(req.headers.get("Authorization"));
   if (!user) return j(401, { error: "Unauthorized" });
 
+  const idempotencyKey = req.headers.get("X-Idempotency-Key") ?? undefined;
   try {
     const { transcript, source_url } = await req.json();
     if (!transcript && !source_url) return j(400, { error: "transcript or source_url required" });
 
-    const ded = await deductCredits(user.id, COST_PROCESS, "creative_clips", { source_url }, user.email);
-    if (!ded.ok) return j(402, { error: ded.error });
+    const ded = await deductCredits(user.id, COST_PROCESS, "creative_clips", { source_url }, user.email, idempotencyKey);
+    if (!ded.ok) return j((ded as any).status ?? 402, { error: ded.error });
 
     const DS = Deno.env.get("DEEPSEEK_API_KEY");
     const LK = Deno.env.get("LOVABLE_API_KEY");

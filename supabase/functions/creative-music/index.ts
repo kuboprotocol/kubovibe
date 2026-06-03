@@ -13,6 +13,7 @@ Deno.serve(async (req) => {
   const user = await getUser(req.headers.get("Authorization"));
   if (!user) return j(401, { error: "Unauthorized" });
 
+  const idempotencyKey = req.headers.get("X-Idempotency-Key") ?? undefined;
   try {
     const body = await req.json();
     const action = body.action ?? "generate";
@@ -23,8 +24,8 @@ Deno.serve(async (req) => {
       const { prompt, instrumental = false, style = "" } = body;
       if (!prompt) return j(400, { error: "prompt required" });
 
-      const ded = await deductCredits(user.id, COST_GEN, "creative_music_gen", { prompt }, user.email);
-      if (!ded.ok) return j(402, { error: ded.error });
+      const ded = await deductCredits(user.id, COST_GEN, "creative_music_gen", { prompt }, user.email, idempotencyKey);
+      if (!ded.ok) return j((ded as any).status ?? 402, { error: ded.error });
 
       const r = await fetch(`${SUNO_BASE}/api/v1/generate`, {
         method: "POST",
@@ -75,8 +76,8 @@ Deno.serve(async (req) => {
     if (action === "download") {
       const { format = "mp3", asset_id } = body;
       const cost = format === "wav" ? COST_DOWNLOAD_WAV : COST_DOWNLOAD_MP3;
-      const ded = await deductCredits(user.id, cost, `creative_music_download_${format}`, { asset_id }, user.email);
-      if (!ded.ok) return j(402, { error: ded.error });
+      const ded = await deductCredits(user.id, cost, `creative_music_download_${format}`, { asset_id }, user.email, idempotencyKey);
+      if (!ded.ok) return j((ded as any).status ?? 402, { error: ded.error });
       return j(200, { ok: true });
     }
 

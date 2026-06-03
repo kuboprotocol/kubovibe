@@ -10,6 +10,7 @@ Deno.serve(async (req) => {
   const user = await getUser(req.headers.get("Authorization"));
   if (!user) return j(401, { error: "Unauthorized" });
 
+  const idempotencyKey = req.headers.get("X-Idempotency-Key") ?? undefined;
   try {
     const { mode = "shorts", prompt, duration = 30 } = await req.json();
     if (!prompt) return j(400, { error: "prompt required" });
@@ -21,8 +22,8 @@ Deno.serve(async (req) => {
       cost = duration >= 60 ? 4 : 2;
     }
 
-    const ded = await deductCredits(user.id, cost, `creative_${tool}`, { prompt, duration }, user.email);
-    if (!ded.ok) return j(402, { error: ded.error });
+    const ded = await deductCredits(user.id, cost, `creative_${tool}`, { prompt, duration }, user.email, idempotencyKey);
+    if (!ded.ok) return j((ded as any).status ?? 402, { error: ded.error });
 
     // 1) Generate script using DeepSeek/Lovable AI
     const DS = Deno.env.get("DEEPSEEK_API_KEY");

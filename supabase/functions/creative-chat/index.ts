@@ -14,6 +14,7 @@ Deno.serve(async (req) => {
     });
   }
 
+  const idempotencyKey = req.headers.get("X-Idempotency-Key") ?? undefined;
   try {
     const { messages } = await req.json();
     if (!Array.isArray(messages) || messages.length === 0) {
@@ -22,10 +23,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    const ded = await deductCredits(user.id, COST, "creative_chat", { count: messages.length }, user.email);
+    const ded = await deductCredits(user.id, COST, "creative_chat", { count: messages.length }, user.email, idempotencyKey);
     if (!ded.ok) {
       return new Response(JSON.stringify({ error: ded.error }), {
-        status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: (ded as any).status ?? 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
