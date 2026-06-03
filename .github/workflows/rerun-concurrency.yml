@@ -1,0 +1,52 @@
+name: rerun-concurrency
+
+# Verifies that firing N parallel rerun requests with the same
+# X-Idempotency-Key only creates a single credit_transactions row.
+# Fails the build on regression of the atomic credit deduction RPC.
+
+on:
+  push:
+    paths:
+      - "supabase/functions/_shared/creative.ts"
+      - "supabase/functions/creative-*/**"
+      - "scripts/test-rerun-concurrency.ts"
+      - ".github/workflows/rerun-concurrency.yml"
+  pull_request:
+    paths:
+      - "supabase/functions/_shared/creative.ts"
+      - "supabase/functions/creative-*/**"
+      - "scripts/test-rerun-concurrency.ts"
+      - ".github/workflows/rerun-concurrency.yml"
+  workflow_dispatch:
+
+jobs:
+  rerun-idempotency:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Skip silently if the required secrets aren't configured on the repo —
+    # this prevents PRs from forks from failing for missing test credentials.
+    if: ${{ vars.RERUN_CONCURRENCY_ENABLED == 'true' || github.event_name == 'workflow_dispatch' }}
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      ACCESS_TOKEN: ${{ secrets.RERUN_TEST_ACCESS_TOKEN }}
+      ASSET_ID: ${{ secrets.RERUN_TEST_ASSET_ID }}
+      CONCURRENCY: "8"
+      FN: "creative-chat"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Guard required secrets
+        run: |
+          missing=0
+          for v in SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY ACCESS_TOKEN ASSET_ID; do
+            if [ -z "${!v}" ]; then echo "::error::Missing secret: $v"; missing=1; fi
+          done
+          [ "$missing" = "0" ]
+
+      - name: Run rerun concurrency test
+        run: deno run --allow-net --allow-env scripts/test-rerun-concurrency.ts
