@@ -323,6 +323,57 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
   const [cancelReason, setCancelReason] = useState("");
   const [resendingEmail, setResendingEmail] = useState<string | null>(null);
   const [confirmResend, setConfirmResend] = useState<Transfer | null>(null);
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterQuery, setFilterQuery] = useState("");
+  const [modalEvents, setModalEvents] = useState<Array<{ id: string; event_type: string; from_status: string | null; to_status: string | null; message: string | null; created_at: string }>>([]);
+  const [modalEmails, setModalEmails] = useState<Array<{ id: string; status: string; created_at: string; message_id: string | null; error_message: string | null }>>([]);
+  const [modalLoading, setModalLoading] = useState(false);
+
+  const RESEND_COOLDOWN_SEC = 60;
+  const cooldownLeft = (t: Transfer | null) => {
+    if (!t?.last_notified_at) return 0;
+    const elapsed = (Date.now() - new Date(t.last_notified_at).getTime()) / 1000;
+    return Math.max(0, Math.ceil(RESEND_COOLDOWN_SEC - elapsed));
+  };
+
+  const filteredTransfers = useMemo(() => {
+    const q = filterQuery.trim().toLowerCase();
+    return transfers.filter((t) => {
+      if (filterStatus !== "all" && t.status !== filterStatus) return false;
+      if (q && !t.domain_name.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [transfers, filterStatus, filterQuery]);
+
+  const openConfirmResend = async (t: Transfer) => {
+    setConfirmResend(t);
+    setModalLoading(true);
+    setModalEvents([]); setModalEmails([]);
+    const [ev, em] = await Promise.all([
+      supabase.from("kubo_domain_transfer_events").select("id,event_type,from_status,to_status,message,created_at").eq("transfer_id", t.id).order("created_at", { ascending: false }).limit(20),
+      supabase.from("email_send_log").select("id,status,created_at,message_id,error_message").like("message_id", `transfer-%${t.id}%`).order("created_at", { ascending: false }).limit(20),
+    ]);
+    setModalEvents((ev.data as any) ?? []);
+    setModalEmails((em.data as any) ?? []);
+    setModalLoading(false);
+  };
+
+  const exportCsv = () => {
+    const rows = [
+      ["domain", "status", "started_at", "completed_at", "retry_count", "last_notified_at", "last_notified_status", "current_registrar", "notify_email", "status_message", "last_error", "cancel_reason"],
+      ...filteredTransfers.map((t: any) => [
+        t.domain_name, t.status, t.started_at, t.completed_at ?? "", t.retry_count, t.last_notified_at ?? "", t.last_notified_status ?? "",
+        t.current_registrar ?? "", t.notify_email ?? "", (t.status_message ?? "").replace(/\n/g, " "), (t.last_error ?? "").replace(/\n/g, " "), (t.cancel_reason ?? "").replace(/\n/g, " "),
+      ]),
+    ];
+    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `transferencias-auditoria-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+    toast.success(`${filteredTransfers.length} transferências exportadas`);
+  };
 
   const tld = domain.includes(".") ? tldOf(domain) : null;
   const price = tld ? (TLD_TRANSFER_CREDITS[tld] ?? 20) : 20;
@@ -363,6 +414,8 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
   };
 
   const resendEmail = async (t: Transfer) => {
+    const left = cooldownLeft(t);
+    if (left > 0) { toast.error(`Aguarde ${left}s antes de reenviar o e-mail.`); return; }
     setResendingEmail(t.id);
     const { data: userData } = await supabase.auth.getUser();
     const recipient = t.notify_email || userData.user?.email;
@@ -426,12 +479,39 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
       {transfers.length > 0 && (
         <Card className="bg-card/60 backdrop-blur border-border/40">
           <CardHeader>
-            <CardTitle className="font-orbitron text-lg">Transferências</CardTitle>
-            <CardDescription>Atualização automática a cada 5 minutos. Você pode atualizar manualmente ou cancelar a qualquer momento.</CardDescription>
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div>
+                <CardTitle className="font-orbitron text-lg">Transferências</CardTitle>
+                <CardDescription>Atualização automática a cada 5 minutos. Você pode atualizar manualmente ou cancelar a qualquer momento.</CardDescription>
+              </div>
+              <Button size="sm" variant="outline" onClick={exportCsv} title="Exportar auditoria em CSV">
+                <Download className="w-3.5 h-3.5 mr-1.5" /> CSV
+              </Button>
+            </div>
+            <div className="flex gap-2 mt-3 flex-wrap">
+              <Input placeholder="Buscar por domínio…" value={filterQuery} onChange={(e) => setFilterQuery(e.target.value)} className="max-w-xs h-9" />
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="w-48 h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os status</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="validating">Validating</SelectItem>
+                  <SelectItem value="transferring">Transferring</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="failed">Failed</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="text-xs text-muted-foreground self-center">{filteredTransfers.length} de {transfers.length}</span>
+            </div>
           </CardHeader>
           <CardContent className="space-y-2">
-            {transfers.map((t) => {
+            {filteredTransfers.length === 0 && (
+              <div className="text-sm text-muted-foreground text-center py-6">Nenhuma transferência corresponde aos filtros.</div>
+            )}
+            {filteredTransfers.map((t) => {
               const inProgress = ["pending", "validating", "transferring"].includes(t.status);
+              const cdLeft = cooldownLeft(t);
               return (
                 <div key={t.id} className="flex items-center justify-between gap-3 p-3 rounded-lg bg-background/40 border border-border/30">
                   <div className="min-w-0 flex-1">
@@ -449,7 +529,7 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
                     </div>
                   </div>
                   <div className="flex gap-1.5 shrink-0">
-                    <Button size="sm" variant="outline" onClick={() => setConfirmResend(t)} disabled={resendingEmail === t.id} title={t.last_notified_at ? `Último e-mail: ${new Date(t.last_notified_at).toLocaleString("pt-BR")}` : "Reenviar e-mail de status"}>
+                    <Button size="sm" variant="outline" onClick={() => openConfirmResend(t)} disabled={resendingEmail === t.id || cdLeft > 0} title={cdLeft > 0 ? `Aguarde ${cdLeft}s para reenviar` : (t.last_notified_at ? `Último e-mail: ${new Date(t.last_notified_at).toLocaleString("pt-BR")}` : "Reenviar e-mail de status")}>
                       {resendingEmail === t.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => refresh(t.id)} disabled={refreshing === t.id} title="Atualizar status">
@@ -467,6 +547,7 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
           </CardContent>
         </Card>
       )}
+
 
       <AlertDialog open={confirm} onOpenChange={setConfirm}>
         <AlertDialogContent>
@@ -513,7 +594,7 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
       </AlertDialog>
 
       <AlertDialog open={!!confirmResend} onOpenChange={(o) => !o && setConfirmResend(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-w-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle className="font-orbitron">Reenviar e-mail de status</AlertDialogTitle>
             <AlertDialogDescription asChild>
@@ -526,17 +607,60 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
                   {confirmResend?.last_notified_at && (
                     <div className="text-xs text-muted-foreground mt-1">Último e-mail enviado: {new Date(confirmResend.last_notified_at).toLocaleString("pt-BR")}</div>
                   )}
+                  {confirmResend && cooldownLeft(confirmResend) > 0 && (
+                    <div className="text-xs text-amber-500 mt-1">⏳ Cooldown: aguarde {cooldownLeft(confirmResend)}s para reenviar.</div>
+                  )}
                 </div>
-                <p className="text-xs text-muted-foreground">O e-mail será enviado imediatamente com o template domain-transfer-status.</p>
+
+                <div>
+                  <div className="text-xs font-semibold uppercase text-muted-foreground mb-1.5 flex items-center gap-1.5"><Mail className="w-3 h-3" /> Histórico de e-mails</div>
+                  <div className="max-h-32 overflow-y-auto rounded border border-border/40 bg-background/40 text-xs divide-y divide-border/30">
+                    {modalLoading && <div className="p-2 text-muted-foreground">Carregando…</div>}
+                    {!modalLoading && modalEmails.length === 0 && <div className="p-2 text-muted-foreground">Nenhum e-mail registrado ainda.</div>}
+                    {modalEmails.map((m) => (
+                      <div key={m.id} className="p-2 flex justify-between gap-2">
+                        <span className="font-mono">{m.status}</span>
+                        <span className="text-muted-foreground">{new Date(m.created_at).toLocaleString("pt-BR")}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xs font-semibold uppercase text-muted-foreground mb-1.5 flex items-center gap-1.5"><Terminal className="w-3 h-3" /> Logs de auditoria</div>
+                  <div className="max-h-40 overflow-y-auto rounded border border-border/40 bg-background/40 text-xs divide-y divide-border/30">
+                    {modalLoading && <div className="p-2 text-muted-foreground">Carregando…</div>}
+                    {!modalLoading && modalEvents.length === 0 && <div className="p-2 text-muted-foreground">Nenhum evento registrado.</div>}
+                    {modalEvents.map((e) => (
+                      <div key={e.id} className="p-2">
+                        <div className="flex justify-between gap-2">
+                          <span className="font-mono text-primary">{e.event_type}</span>
+                          <span className="text-muted-foreground">{new Date(e.created_at).toLocaleString("pt-BR")}</span>
+                        </div>
+                        {(e.from_status || e.to_status) && (
+                          <div className="text-muted-foreground/80 mt-0.5">{e.from_status ?? "—"} → {e.to_status ?? "—"}</div>
+                        )}
+                        {e.message && <div className="text-muted-foreground/70 mt-0.5 truncate">{e.message}</div>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setConfirmResend(null)}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { if (confirmResend) resendEmail(confirmResend); setConfirmResend(null); }} className="bg-gradient-to-r from-primary to-purple-600">Confirmar reenvio</AlertDialogAction>
+            <AlertDialogAction
+              onClick={() => { if (confirmResend) resendEmail(confirmResend); setConfirmResend(null); }}
+              disabled={!!confirmResend && cooldownLeft(confirmResend) > 0}
+              className="bg-gradient-to-r from-primary to-purple-600"
+            >
+              Confirmar reenvio
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
     </div>
   );
 }
