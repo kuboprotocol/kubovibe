@@ -10,9 +10,10 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
   MessageSquare, Image as ImageIcon, Download, Scissors, User2,
-  Video, Music, BookOpen, Sparkles, Loader2, Coins, ArrowLeft,
+  Video, Music, BookOpen, Sparkles, Loader2, Coins, ArrowLeft, RotateCw, AlertTriangle,
 } from "lucide-react";
 
 type ToolKey = "dashboard" | "chat" | "nano_banana" | "downloader" | "clips" | "avatar" | "shorts" | "music" | "ebook";
@@ -45,6 +46,29 @@ async function authedFetch(name: string, body: unknown) {
   return r;
 }
 
+// Dispatch table for re-execution from history
+const RERUN_MAP: Record<string, { fn: string; build: (a: any) => any }> = {
+  chat: { fn: "creative-chat", build: (a) => ({ messages: [{ role: "user", content: a.prompt }] }) },
+  nano_banana: { fn: "creative-image", build: (a) => ({ prompt: a.prompt, size: a.metadata?.size }) },
+  downloader: { fn: "creative-download", build: (a) => ({ url: a.metadata?.url ?? a.prompt, format: a.metadata?.format ?? "mp4" }) },
+  clips: { fn: "creative-clips", build: (a) => ({ transcript: a.prompt, source_url: a.metadata?.source_url }) },
+  avatar: { fn: "creative-video", build: (a) => ({ mode: "avatar", prompt: a.prompt, duration: a.metadata?.duration ?? 30 }) },
+  shorts: { fn: "creative-video", build: (a) => ({ mode: "shorts", prompt: a.prompt, duration: 30 }) },
+  music: { fn: "creative-music", build: (a) => ({ action: "generate", prompt: a.prompt, instrumental: a.metadata?.instrumental ?? false }) },
+  ebook: { fn: "creative-ebook", build: (a) => ({ topic: a.prompt, chapters: a.metadata?.chapters ?? 5 }) },
+};
+
+function handleFnError(d: any, fallback = "Erro") {
+  const msg = d?.error || fallback;
+  if (typeof msg === "string" && msg.includes("rate_limit_exceeded")) {
+    toast.error("Limite de uso atingido. Aguarde 1 minuto e tente novamente.");
+  } else if (typeof msg === "string" && msg.includes("insufficient_credits")) {
+    toast.error("Créditos insuficientes para esta ação.");
+  } else {
+    toast.error(typeof msg === "string" ? msg : fallback);
+  }
+}
+
 export default function CreativePage() {
   const { tool } = useParams<{ tool?: ToolKey }>();
   const navigate = useNavigate();
@@ -52,20 +76,62 @@ export default function CreativePage() {
   const { subscription, editsRemaining, refetch } = useSubscription();
   const [active, setActive] = useState<ToolKey>((tool as ToolKey) || "dashboard");
   const [history, setHistory] = useState<any[]>([]);
+  const [selected, setSelected] = useState<any | null>(null);
+  const [rerunning, setRerunning] = useState(false);
+  const alertedRef = useRef<{ low?: boolean; empty?: boolean }>({});
 
   useEffect(() => {
     if (tool) setActive(tool as ToolKey);
   }, [tool]);
 
-  useEffect(() => {
+  async function loadHistory() {
     if (!user) return;
-    supabase.from("creative_assets")
+    const { data } = await supabase.from("creative_assets")
       .select("*")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
-      .limit(20)
-      .then(({ data }) => setHistory(data ?? []));
-  }, [user, active]);
+      .limit(50);
+    setHistory(data ?? []);
+  }
+
+  useEffect(() => { loadHistory(); }, [user, active]);
+
+  // Balance alerts
+  useEffect(() => {
+    if (editsRemaining === null || editsRemaining === undefined) return;
+    if (editsRemaining <= 0 && !alertedRef.current.empty) {
+      alertedRef.current.empty = true;
+      toast.error("Saldo zerado", { description: "Você ficou sem créditos. Recarregue para continuar." });
+    } else if (editsRemaining > 0 && editsRemaining <= 10 && !alertedRef.current.low) {
+      alertedRef.current.low = true;
+      toast.warning(`Saldo baixo: ${editsRemaining} créditos`, { description: "Considere recarregar antes de gerações pesadas." });
+    }
+    if (editsRemaining > 10) alertedRef.current = {};
+  }, [editsRemaining]);
+
+  const balanceTone =
+    (editsRemaining ?? 0) <= 0 ? "bg-destructive/15 border-destructive/40 text-destructive" :
+    (editsRemaining ?? 0) <= 10 ? "bg-yellow-500/10 border-yellow-500/40 text-yellow-600 dark:text-yellow-400" :
+    "bg-primary/10 border-primary/30";
+
+  async function rerun(asset: any) {
+    const cfg = RERUN_MAP[asset.tool];
+    if (!cfg) { toast.error("Reexecução indisponível para esta ferramenta."); return; }
+    setRerunning(true);
+    try {
+      const r = await authedFetch(cfg.fn, cfg.build(asset));
+      const d = await r.json();
+      if (!r.ok) { handleFnError(d); return; }
+      toast.success("Reexecutado com sucesso");
+      refetch();
+      loadHistory();
+      setSelected(null);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Falha ao reexecutar");
+    } finally {
+      setRerunning(false);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -83,10 +149,10 @@ export default function CreativePage() {
               <p className="text-xs text-muted-foreground">8 ferramentas IA em um só painel</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/30">
-            <Coins className="h-4 w-4 text-primary" />
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border ${balanceTone}`}>
+            {(editsRemaining ?? 0) <= 10 ? <AlertTriangle className="h-4 w-4" /> : <Coins className="h-4 w-4 text-primary" />}
             <span className="font-mono text-sm font-bold">{editsRemaining}</span>
-            <span className="text-xs text-muted-foreground">créditos</span>
+            <span className="text-xs opacity-80">créditos</span>
           </div>
         </div>
       </header>
@@ -104,26 +170,119 @@ export default function CreativePage() {
           </TabsList>
 
           <TabsContent value="dashboard">
-            <Dashboard editsRemaining={editsRemaining} subscription={subscription} history={history} onPick={(k) => { setActive(k); navigate(`/creative/${k}`); }} />
+            <Dashboard
+              editsRemaining={editsRemaining}
+              subscription={subscription}
+              history={history}
+              onPick={(k: ToolKey) => { setActive(k); navigate(`/creative/${k}`); }}
+              onOpen={(a: any) => setSelected(a)}
+              onRerun={rerun}
+              rerunning={rerunning}
+            />
           </TabsContent>
 
-          <TabsContent value="chat"><ChatTool onDone={refetch} /></TabsContent>
-          <TabsContent value="nano_banana"><ImageTool onDone={refetch} /></TabsContent>
-          <TabsContent value="downloader"><DownloaderTool onDone={refetch} /></TabsContent>
-          <TabsContent value="clips"><ClipsTool onDone={refetch} /></TabsContent>
-          <TabsContent value="avatar"><AvatarTool onDone={refetch} /></TabsContent>
-          <TabsContent value="shorts"><ShortsTool onDone={refetch} /></TabsContent>
-          <TabsContent value="music"><MusicTool onDone={refetch} /></TabsContent>
-          <TabsContent value="ebook"><EbookTool onDone={refetch} /></TabsContent>
+          <TabsContent value="chat"><ChatTool onDone={() => { refetch(); loadHistory(); }} /></TabsContent>
+          <TabsContent value="nano_banana"><ImageTool onDone={() => { refetch(); loadHistory(); }} /></TabsContent>
+          <TabsContent value="downloader"><DownloaderTool onDone={() => { refetch(); loadHistory(); }} /></TabsContent>
+          <TabsContent value="clips"><ClipsTool onDone={() => { refetch(); loadHistory(); }} /></TabsContent>
+          <TabsContent value="avatar"><AvatarTool onDone={() => { refetch(); loadHistory(); }} /></TabsContent>
+          <TabsContent value="shorts"><ShortsTool onDone={() => { refetch(); loadHistory(); }} /></TabsContent>
+          <TabsContent value="music"><MusicTool onDone={() => { refetch(); loadHistory(); }} /></TabsContent>
+          <TabsContent value="ebook"><EbookTool onDone={() => { refetch(); loadHistory(); }} /></TabsContent>
         </Tabs>
       </main>
+
+      <AssetDetailDialog asset={selected} onClose={() => setSelected(null)} onRerun={rerun} rerunning={rerunning} />
     </div>
   );
 }
 
-function Dashboard({ editsRemaining, subscription, history, onPick }: any) {
+function AssetDetailDialog({ asset, onClose, onRerun, rerunning }: { asset: any; onClose: () => void; onRerun: (a: any) => void; rerunning: boolean }) {
+  const open = !!asset;
+  if (!asset) return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent />
+    </Dialog>
+  );
+  const canRerun = !!RERUN_MAP[asset.tool];
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Badge variant="outline" className="capitalize">{asset.tool}</Badge>
+            <span className="text-sm font-normal text-muted-foreground">
+              {new Date(asset.created_at).toLocaleString("pt-BR")}
+            </span>
+          </DialogTitle>
+          <DialogDescription>
+            Status: <span className="font-mono">{asset.status}</span> · Créditos: <span className="font-mono">{asset.credits_spent ?? 0}</span>
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 text-sm">
+          {asset.prompt && (
+            <div>
+              <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Prompt</div>
+              <Card className="p-3 whitespace-pre-wrap bg-muted/30">{asset.prompt}</Card>
+            </div>
+          )}
+          {asset.output_url && (asset.tool === "nano_banana" ? (
+            <img src={asset.output_url} alt="output" className="rounded-lg border border-border max-w-full" />
+          ) : asset.tool === "music" ? (
+            <audio src={asset.output_url} controls className="w-full" />
+          ) : (
+            <a href={asset.output_url} target="_blank" rel="noreferrer" className="text-primary underline break-all">{asset.output_url}</a>
+          ))}
+          {asset.output_text && (
+            <div>
+              <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Saída</div>
+              <Card className="p-3 max-h-64 overflow-y-auto"><pre className="text-xs whitespace-pre-wrap font-sans">{asset.output_text}</pre></Card>
+            </div>
+          )}
+          {asset.error_message && (
+            <Card className="p-3 border-destructive/40 bg-destructive/10 text-destructive text-xs">{asset.error_message}</Card>
+          )}
+          {asset.metadata && Object.keys(asset.metadata).length > 0 && (
+            <div>
+              <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Metadata</div>
+              <Card className="p-3"><pre className="text-xs whitespace-pre-wrap font-mono">{JSON.stringify(asset.metadata, null, 2)}</pre></Card>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={onClose}>Fechar</Button>
+            <Button onClick={() => onRerun(asset)} disabled={!canRerun || rerunning}>
+              {rerunning ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RotateCw className="h-4 w-4 mr-2" />}
+              Reexecutar
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+
+function Dashboard({ editsRemaining, subscription, history, onPick, onOpen, onRerun, rerunning }: any) {
+  const lowBalance = (editsRemaining ?? 0) <= 10;
   return (
     <div className="space-y-6">
+      {lowBalance && (
+        <Card className={`p-4 flex items-start gap-3 border ${(editsRemaining ?? 0) <= 0 ? "border-destructive/40 bg-destructive/10" : "border-yellow-500/40 bg-yellow-500/10"}`}>
+          <AlertTriangle className={`h-5 w-5 mt-0.5 ${(editsRemaining ?? 0) <= 0 ? "text-destructive" : "text-yellow-600 dark:text-yellow-400"}`} />
+          <div className="flex-1">
+            <div className="font-semibold text-sm">
+              {(editsRemaining ?? 0) <= 0 ? "Saldo zerado" : `Saldo baixo: ${editsRemaining} créditos`}
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Ferramentas pesadas (Ebook=10, Shorts=3, Avatar=2–4) podem ficar indisponíveis.
+            </p>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => window.location.assign("/pricing")}>Recarregar</Button>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="p-5 bg-gradient-to-br from-primary/10 to-card border-primary/30">
           <div className="text-xs text-muted-foreground uppercase tracking-wider">Saldo de Créditos</div>
@@ -133,7 +292,7 @@ function Dashboard({ editsRemaining, subscription, history, onPick }: any) {
         <Card className="p-5">
           <div className="text-xs text-muted-foreground uppercase tracking-wider">Gerações totais</div>
           <div className="text-4xl font-bold mt-2 font-mono">{history.length}</div>
-          <div className="text-xs text-muted-foreground mt-3">Últimos 20 itens</div>
+          <div className="text-xs text-muted-foreground mt-3">Últimos 50 itens</div>
         </Card>
         <Card className="p-5">
           <div className="text-xs text-muted-foreground uppercase tracking-wider">Créditos usados</div>
@@ -159,17 +318,31 @@ function Dashboard({ editsRemaining, subscription, history, onPick }: any) {
       </div>
 
       <div>
-        <h2 className="text-lg font-bold mb-3">Histórico recente</h2>
+        <h2 className="text-lg font-bold mb-3">Histórico detalhado</h2>
         <Card className="divide-y divide-border/40">
           {history.length === 0 && (
             <div className="p-6 text-center text-sm text-muted-foreground">Nenhuma geração ainda. Escolha uma ferramenta acima para começar.</div>
           )}
           {history.map((h: any) => (
-            <div key={h.id} className="p-3 flex items-center gap-3 text-sm">
-              <Badge variant="outline" className="capitalize">{h.tool}</Badge>
-              <div className="flex-1 truncate text-muted-foreground">{h.prompt || h.metadata?.title || "—"}</div>
-              <div className="text-xs text-muted-foreground">{new Date(h.created_at).toLocaleString("pt-BR")}</div>
-              <Badge variant={h.status === "completed" ? "default" : "secondary"} className="text-[10px]">{h.status}</Badge>
+            <div key={h.id} className="p-3 flex items-center gap-3 text-sm hover:bg-muted/30 transition-colors">
+              <button onClick={() => onOpen(h)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
+                <Badge variant="outline" className="capitalize shrink-0">{h.tool}</Badge>
+                <div className="flex-1 truncate text-muted-foreground">{h.prompt || h.metadata?.title || h.output_url || "—"}</div>
+                <div className="text-xs text-muted-foreground hidden sm:block whitespace-nowrap">{new Date(h.created_at).toLocaleString("pt-BR")}</div>
+                <Badge variant="secondary" className="text-[10px] shrink-0">{h.credits_spent ?? 0}c</Badge>
+                <Badge variant={h.status === "completed" ? "default" : h.status === "error" ? "destructive" : "secondary"} className="text-[10px] shrink-0">{h.status}</Badge>
+              </button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="shrink-0 h-8 w-8"
+                disabled={!RERUN_MAP[h.tool] || rerunning}
+                onClick={(e) => { e.stopPropagation(); onRerun(h); }}
+                aria-label="Reexecutar"
+                title="Reexecutar"
+              >
+                {rerunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />}
+              </Button>
             </div>
           ))}
         </Card>
@@ -266,7 +439,7 @@ function ImageTool({ onDone }: { onDone: () => void }) {
     setLoading(true); setUrl(null);
     const r = await authedFetch("creative-image", { prompt });
     const d = await r.json();
-    if (!r.ok) toast.error(d.error || "Erro"); else { setUrl(d.image_url); onDone(); }
+    if (!r.ok) handleFnError(d); else { setUrl(d.image_url); onDone(); }
     setLoading(false);
   }
 
@@ -291,7 +464,7 @@ function DownloaderTool({ onDone }: { onDone: () => void }) {
     setLoading(true); setResult(null);
     const r = await authedFetch("creative-download", { url, format });
     const d = await r.json();
-    if (!r.ok) toast.error(d.error || "Erro"); else { setResult(d.download_url); onDone(); }
+    if (!r.ok) handleFnError(d); else { setResult(d.download_url); onDone(); }
     setLoading(false);
   }
 
@@ -318,7 +491,7 @@ function ClipsTool({ onDone }: { onDone: () => void }) {
     setLoading(true); setClips([]);
     const r = await authedFetch("creative-clips", { transcript, source_url: sourceUrl });
     const d = await r.json();
-    if (!r.ok) toast.error(d.error || "Erro"); else { setClips(d.clips || []); onDone(); }
+    if (!r.ok) handleFnError(d); else { setClips(d.clips || []); onDone(); }
     setLoading(false);
   }
   return (
@@ -349,7 +522,7 @@ function AvatarTool({ onDone }: { onDone: () => void }) {
     setLoading(true); setResult(null);
     const r = await authedFetch("creative-video", { mode: "avatar", prompt, duration });
     const d = await r.json();
-    if (!r.ok) toast.error(d.error || "Erro"); else { setResult(d); onDone(); }
+    if (!r.ok) handleFnError(d); else { setResult(d); onDone(); }
     setLoading(false);
   }
   return (
@@ -374,7 +547,7 @@ function ShortsTool({ onDone }: { onDone: () => void }) {
     setLoading(true); setResult(null);
     const r = await authedFetch("creative-video", { mode: "shorts", prompt, duration: 30 });
     const d = await r.json();
-    if (!r.ok) toast.error(d.error || "Erro"); else { setResult(d); onDone(); }
+    if (!r.ok) handleFnError(d); else { setResult(d); onDone(); }
     setLoading(false);
   }
   return (
@@ -399,7 +572,7 @@ function MusicTool({ onDone }: { onDone: () => void }) {
     setLoading(true); setItems([]); setTask(null);
     const r = await authedFetch("creative-music", { action: "generate", prompt, instrumental });
     const d = await r.json();
-    if (!r.ok) { toast.error(d.error || "Erro"); setLoading(false); return; }
+    if (!r.ok) { handleFnError(d); setLoading(false); return; }
     setTask({ task_id: d.task_id, asset_id: d.asset_id });
     onDone();
     setLoading(false);
@@ -448,7 +621,7 @@ function EbookTool({ onDone }: { onDone: () => void }) {
     setLoading(true); setResult(null);
     const r = await authedFetch("creative-ebook", { topic, chapters });
     const d = await r.json();
-    if (!r.ok) toast.error(d.error || "Erro"); else { setResult(d); onDone(); }
+    if (!r.ok) handleFnError(d); else { setResult(d); onDone(); }
     setLoading(false);
   }
   return (
