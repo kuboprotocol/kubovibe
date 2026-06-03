@@ -1915,6 +1915,24 @@ Workflow `.github/workflows/rerun-concurrency.yml` garante que reexecutar um ass
 2. Verifica via REST API (`credit_transactions`) que **existe no máximo 1 linha** no ledger para aquela chave de idempotência.
 3. **Falha o build** se encontrar mais de 1 transação (regressão de idempotência) ou se nenhuma requisição for bem-sucedida.
 
+### O que o preflight valida (antes de gastar créditos)
+
+O script `scripts/preflight-rerun.ts` (disparável via `bun run preflight:rerun`) executa **7 checks sequenciais** que garantem que o ambiente está saudável **antes** de rodar o teste de concorrência real. Isso evita falhas falsas negativas (ex.: token expirado, asset inexistente, falta de créditos).
+
+| # | Check | Descrição | Falha comum |
+|---|-------|-----------|-------------|
+| 1 | **Env vars presentes** | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ACCESS_TOKEN`, `ASSET_ID` estão preenchidos | Variável não exportada ou arquivo `.env.rerun-ci` não carregado |
+| 2 | **URL HTTPS** | `SUPABASE_URL` usa `https://` e é parseável | URL com trailing slash mal formatada ou `http://` |
+| 3 | **UUID válido** | `ASSET_ID` é um UUID v4 válido | Cópia truncada ou GUID mal formatado |
+| 4 | **Token autenticado** | `ACCESS_TOKEN` consegue chamar `/auth/v1/user` e retorna um `user_id` | JWT expirado (dura ~1h) ou token de anon key |
+| 5 | **Asset existe e pertence ao usuário** | `creative_assets` com o `ASSET_ID` existe e `user_id` bate com o do token | Asset de outro usuário (RLS vai bloquear) ou UUID inexistente |
+| 6 | **Subscription ativa com créditos** | Usuário tem `subscription` ativa e `edits_limit - edits_used >= 5` | Plano Free sem créditos ou subscription inativa |
+| 7 | **Edge function alcançável** | Faz `OPTIONS` na função (`creative-chat` por padrão) e recebe 200/204 | Edge function não deployada ou `FN` incorreto |
+
+Se **qualquer um** dos checks falhar, o script imprime uma mensagem acionável e sai com código `1`, impedindo que o teste de concorrência rode em vão.
+
+> **Dica:** Use `bun run preflight:rerun` como um smoke test rápido antes de rodar o CI ou o teste Deno diretamente.
+
 ### Secrets obrigatórios (GitHub Actions)
 
 | Secret | Onde obter | Obrigatório para | Exemplo de valor |
@@ -1962,7 +1980,7 @@ gh run watch
 gh run list --workflow=rerun-concurrency.yml --limit 5
 ```
 
-#### 3) Localmente (Deno)
+#### 3) Localmente (Deno ou bun)
 ```bash
 # Instale o Deno (v2.x)
 curl -fsSL https://deno.land/install.sh | sh
@@ -1975,7 +1993,13 @@ export ASSET_ID="<creative_assets_id>"
 export CONCURRENCY=8
 export FN=creative-chat
 
-# Rode o teste
+# Opção A — via bun (roda o preflight em um comando)
+bun run preflight:rerun
+
+# Opção B — via Deno diretamente
+deno run --allow-net --allow-env scripts/preflight-rerun.ts
+
+# Depois que o preflight passar, rode o teste real
 deno run --allow-net --allow-env scripts/test-rerun-concurrency.ts
 ```
 
@@ -2014,6 +2038,9 @@ Templates prontos: [`.github/rerun-concurrency.secrets.example`](.github/rerun-c
   set -a && source .env.rerun-ci && set +a
 
   # 4a. Preflight — valida secrets, token, asset, créditos e edge function (sem gastar créditos)
+  #    Opção rápida (bun):
+  bun run preflight:rerun
+  #    Opção Deno:
   deno run --allow-net --allow-env scripts/preflight-rerun.ts
 
   # 4b. Só rode o teste real se o preflight passar
