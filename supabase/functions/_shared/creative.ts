@@ -58,10 +58,15 @@ export async function deductCredits(
   reason: string,
   metadata: Record<string, unknown> = {},
   userEmail?: string | null,
-): Promise<{ ok: true; replayed?: boolean } | { ok: false; error: string }> {
+): Promise<{ ok: true; replayed?: boolean } | { ok: false; error: string; status?: number }> {
   if (amount <= 0) return { ok: true };
-  // Admin bypass
+  // Admin bypass (rate limit + credits)
   if (userEmail && userEmail.toLowerCase() === ADMIN_EMAIL) return { ok: true };
+
+  // Per-tool rate limit (20 req/min)
+  const rl = await enforceRateLimit(userId, reason, { max: 20, windowSeconds: 60, userEmail });
+  if (!rl.ok) return { ok: false, error: rl.error, status: 429 };
+
 
   const admin = supaAdmin();
   const idempotencyKey = `${reason}-${userId}-${Date.now()}-${crypto.randomUUID()}`;
