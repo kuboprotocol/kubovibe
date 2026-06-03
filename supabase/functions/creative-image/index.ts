@@ -15,7 +15,7 @@ Deno.serve(async (req) => {
     if (!prompt || typeof prompt !== "string") return j(400, { error: "prompt required" });
 
     const ded = await deductCredits(user.id, COST, "creative_image", { prompt }, user.email, idempotencyKey);
-    if (!ded.ok) return j(402, { error: ded.error });
+    if (!ded.ok) return j((ded as any).status ?? 402, { error: ded.error });
 
     const key = Deno.env.get("LOVABLE_API_KEY");
     if (!key) return j(500, { error: "LOVABLE_API_KEY missing" });

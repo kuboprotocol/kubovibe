@@ -25,7 +25,7 @@ Deno.serve(async (req) => {
       if (!prompt) return j(400, { error: "prompt required" });
 
       const ded = await deductCredits(user.id, COST_GEN, "creative_music_gen", { prompt }, user.email, idempotencyKey);
-      if (!ded.ok) return j(402, { error: ded.error });
+      if (!ded.ok) return j((ded as any).status ?? 402, { error: ded.error });
 
       const r = await fetch(`${SUNO_BASE}/api/v1/generate`, {
         method: "POST",
@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
       const { format = "mp3", asset_id } = body;
       const cost = format === "wav" ? COST_DOWNLOAD_WAV : COST_DOWNLOAD_MP3;
       const ded = await deductCredits(user.id, cost, `creative_music_download_${format}`, { asset_id }, user.email, idempotencyKey);
-      if (!ded.ok) return j(402, { error: ded.error });
+      if (!ded.ok) return j((ded as any).status ?? 402, { error: ded.error });
       return j(200, { ok: true });
     }
 

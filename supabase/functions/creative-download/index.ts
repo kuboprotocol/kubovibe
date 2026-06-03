@@ -16,7 +16,7 @@ Deno.serve(async (req) => {
     if (!url) return j(400, { error: "url required" });
 
     const ded = await deductCredits(user.id, COST, "creative_download", { url, format }, user.email, idempotencyKey);
-    if (!ded.ok) return j(402, { error: ded.error });
+    if (!ded.ok) return j((ded as any).status ?? 402, { error: ded.error });
 
     const r = await fetch(COBALT, {
       method: "POST",

@@ -16,7 +16,7 @@ Deno.serve(async (req) => {
     if (!topic) return j(400, { error: "topic required" });
 
     const ded = await deductCredits(user.id, COST, "creative_ebook", { topic, chapters }, user.email, idempotencyKey);
-    if (!ded.ok) return j(402, { error: ded.error });
+    if (!ded.ok) return j((ded as any).status ?? 402, { error: ded.error });
 
     const sys = `Você é um autor profissional. Escreva um eBook em ${language} sobre o tema dado. Gere um título envolvente, um sumário, e ${chapters} capítulos completos, cada um com pelo menos 400 palavras. Use markdown. Comece com # TÍTULO.`;
     const messages = [

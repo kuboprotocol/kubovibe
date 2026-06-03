@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
     }
 
     const ded = await deductCredits(user.id, cost, `creative_${tool}`, { prompt, duration }, user.email, idempotencyKey);
-    if (!ded.ok) return j(402, { error: ded.error });
+    if (!ded.ok) return j((ded as any).status ?? 402, { error: ded.error });
 
     // 1) Generate script using DeepSeek/Lovable AI
     const DS = Deno.env.get("DEEPSEEK_API_KEY");

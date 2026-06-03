@@ -15,7 +15,7 @@ Deno.serve(async (req) => {
     if (!transcript && !source_url) return j(400, { error: "transcript or source_url required" });
 
     const ded = await deductCredits(user.id, COST_PROCESS, "creative_clips", { source_url }, user.email, idempotencyKey);
-    if (!ded.ok) return j(402, { error: ded.error });
+    if (!ded.ok) return j((ded as any).status ?? 402, { error: ded.error });
 
     const DS = Deno.env.get("DEEPSEEK_API_KEY");
     const LK = Deno.env.get("LOVABLE_API_KEY");
