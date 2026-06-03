@@ -1993,6 +1993,58 @@ Saída em caso de regressão:
 
 O workflow possui proteção nativa contra forks: se `vars.RERUN_CONCURRENCY_ENABLED` não for exatamente `'true'`, o job `rerun-idempotency` é pulado em triggers automáticos (`push`/`pull_request`). Forks que não copiarem a variável não quebrarão o CI por falta de secrets. A execução manual (`workflow_dispatch`) continua disponível para quem tiver as credenciais.
 
+### ✅ Checklist rápido — habilitar em &lt; 5 minutos
+
+Templates prontos: [`.github/rerun-concurrency.secrets.example`](.github/rerun-concurrency.secrets.example) · [`.github/rerun-concurrency.local.env.example`](.github/rerun-concurrency.local.env.example)
+
+- [ ] **1. Coletar credenciais** (Supabase Dashboard → Project Settings → API)
+  - `SUPABASE_URL` (Project URL)
+  - `SUPABASE_SERVICE_ROLE_KEY` (Reveal em `service_role`)
+- [ ] **2. Gerar `RERUN_TEST_ACCESS_TOKEN`** — logue na app com usuário de teste, copie o `access_token` do localStorage (`sb-<ref>-auth-token`)
+- [ ] **3. Obter `RERUN_TEST_ASSET_ID`** — rode no SQL Editor:
+  ```sql
+  select id from public.creative_assets
+  where user_id = '<uuid-do-usuario-teste>'
+  order by created_at desc limit 1;
+  ```
+- [ ] **4. (Opcional) Validar localmente antes de habilitar o CI:**
+  ```bash
+  cp .github/rerun-concurrency.local.env.example .env.rerun-ci
+  # edite .env.rerun-ci com os valores reais (já está no .gitignore)
+  set -a && source .env.rerun-ci && set +a
+  deno run --allow-net --allow-env scripts/test-rerun-concurrency.ts
+  ```
+  Esperado: `✅ PASS: idempotent — at most one credit transaction was created.`
+- [ ] **5. Adicionar no GitHub via CLI** (mais rápido que UI):
+  ```bash
+  gh secret set SUPABASE_URL               --body "$SUPABASE_URL"
+  gh secret set SUPABASE_SERVICE_ROLE_KEY  --body "$SUPABASE_SERVICE_ROLE_KEY"
+  gh secret set RERUN_TEST_ACCESS_TOKEN    --body "$ACCESS_TOKEN"
+  gh secret set RERUN_TEST_ASSET_ID        --body "$ASSET_ID"
+  gh variable set RERUN_CONCURRENCY_ENABLED --body "true"
+  ```
+- [ ] **6. Disparar uma execução manual para confirmar:**
+  ```bash
+  gh workflow run rerun-concurrency.yml --ref main
+  gh run watch
+  ```
+- [ ] **7. Confirmar badge verde** no topo do README (substitua `OWNER/REPO` pelo slug real).
+
+### 🛠️ Troubleshooting
+
+| Sintoma | Causa provável | Como resolver |
+|---|---|---|
+| Job aparece como **skipped** em push/PR | `RERUN_CONCURRENCY_ENABLED` ausente ou ≠ `true` | `gh variable set RERUN_CONCURRENCY_ENABLED --body "true"` |
+| `401 Unauthorized` / `invalid JWT` | `RERUN_TEST_ACCESS_TOKEN` expirou (JWTs duram ~1h) | Re-logue o usuário de teste e atualize o secret. Para CI estável, considere um service account com refresh automático |
+| `403` ou `row-level security policy violated` | `ASSET_ID` não pertence ao usuário do `ACCESS_TOKEN` | Rode o SQL do passo 3 com o `user_id` correto |
+| `404 Not Found` ao chamar a edge function | `FN` errado ou função não deployada | Confirme `FN=creative-chat` e `supabase functions list` |
+| `expected exactly 1 ledger row, found N` | **Regressão real de idempotência** — a RPC está duplicando débitos | Verifique `execute_atomic_credit_deduction`: `idempotency_key` deve ter `UNIQUE` constraint e `INSERT ... ON CONFLICT DO NOTHING` |
+| `expected exactly 1 ledger row, found 0` | Todas as requisições falharam antes de gravar | Veja `supabase functions logs creative-chat` — geralmente é token inválido ou créditos insuficientes |
+| `CONCURRENCY` ignorado | Variável não exportada | Use `export CONCURRENCY=8` (não apenas `CONCURRENCY=8 deno ...`) ou `set -a` antes do `source` |
+| Permission denied em `deno` | Faltam flags | Sempre rode com `--allow-net --allow-env` |
+| Workflow falha só em PRs de forks | Secrets não são expostos a forks (comportamento padrão e seguro do GitHub) | Deixe como está — a guarda `RERUN_CONCURRENCY_ENABLED` já protege; rode manualmente após merge |
+| Rate limit (`429`) durante o teste | A própria proteção de rate limit das edge functions disparou | Reduza `CONCURRENCY` para 4 ou espere 60s entre execuções |
+
 ---
 
 ## Como Executar Localmente
