@@ -1670,21 +1670,61 @@ Dois templates ficam versionados no repo — copie e preencha com valores reais 
 ### Setup com um comando
 
 ```bash
-# Copia ambos os templates (.env e supabase/functions/.env)
+# 1. Copia ambos os templates (.env e supabase/functions/.env)
 bun run setup:env
 
-# Sobrescreve arquivos existentes
+# 2. Pré-visualiza o que seria feito, sem escrever nada
+bun run setup:env:dry
+
+# 3. Sobrescreve arquivos existentes
 bun run setup:env:force
 
-# Copia E carrega as variáveis na sessão atual do shell (precisa de `source`)
+# 4. Valida se .env e supabase/functions/.env têm todas as vars obrigatórias
+#    e não contêm valores-placeholder (sai com código 3 se inválido)
+bun run setup:env:check
+
+# 5. Copia E carrega as variáveis na sessão atual do shell (precisa de `source`)
 source scripts/setup-env.sh --load
 ```
 
-O script [`scripts/setup-env.sh`](scripts/setup-env.sh):
-1. Copia `.env.example` → `.env` (frontend).
-2. Copia `supabase/functions/.env.example` → `supabase/functions/.env` (edge functions).
-3. Preserva arquivos existentes (use `--force` para sobrescrever).
-4. Com `--load` (via `source`), exporta todas as variáveis para o shell atual — útil antes de rodar `bun run preflight:rerun`, `supabase functions serve`, ou scripts em `scripts/`.
+#### Flags suportadas (`scripts/setup-env.sh`)
+
+| Flag | Efeito |
+|------|--------|
+| _(nenhuma)_ | Copia templates preservando arquivos existentes. |
+| `--force` | Sobrescreve `.env` e `supabase/functions/.env`. |
+| `--dry-run` | Mostra o que faria, sem escrever nada (combina com `--force`). |
+| `--validate` | Apenas valida `.env` files (não copia). Exit 3 se faltar var ou houver placeholder. |
+| `--load` | Após copiar, exporta variáveis para o shell atual (exige `source`). |
+| `-h`, `--help` | Mostra a ajuda inline. |
+
+#### Pré-checagens executadas
+
+Antes de qualquer cópia, o script aborta com mensagem clara (e exit code distinto) se:
+
+1. **Bash < 4** — orienta `brew install bash` no macOS (exit 1).
+2. **Template ausente** — `.env.example` ou `supabase/functions/.env.example` não encontrados; sugere restaurar via git (exit 1).
+3. **Diretório não-gravável** — sem permissão de escrita na raiz ou `supabase/functions/` (exit 1).
+4. **Flag desconhecida** — sai imediatamente com sugestão de `--help` (exit 2).
+5. **`--load` sem `source`** — alerta que `--load` precisa ser sourced para exportar no shell atual.
+
+#### Validação de variáveis (`--validate`)
+
+Lê os arquivos `.env` reais (sem sourcing) e verifica:
+
+- **Frontend (`.env`)** obrigatórias: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_PROJECT_ID`.
+- **Edge Functions (`supabase/functions/.env`)** obrigatórias: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
+- **Detecção de placeholders**: bloqueia valores como `your-project-ref`, `sk_live_...`, `eyJhbGciOiJIUzI1NiIs...`, `0x...`, `GOCSPX-...`, `whsec_...`, etc. (regex em `PLACEHOLDER_REGEX` no próprio script).
+- Reporta linha-a-linha (`✓` ok, `✗` faltando/placeholder) e termina com exit `3` se houver falha — pronto para uso em CI/pre-commit.
+
+#### Códigos de saída
+
+| Code | Significado |
+|------|-------------|
+| `0` | Sucesso. |
+| `1` | Erro de IO ou pré-checagem (template/dir/bash). |
+| `2` | Flag inválida. |
+| `3` | Falha de validação (vars faltando ou placeholders). |
 
 ### Cópia manual (alternativa)
 
@@ -1692,6 +1732,8 @@ O script [`scripts/setup-env.sh`](scripts/setup-env.sh):
 cp .env.example .env
 cp supabase/functions/.env.example supabase/functions/.env
 ```
+
+
 
 > ⚠️ Em produção, **secrets de edge functions vivem em Lovable Cloud Secrets** (Settings → Functions → Secrets). O arquivo `supabase/functions/.env` só é lido pelo CLI em dev local.
 
