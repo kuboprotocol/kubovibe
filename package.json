@@ -14,7 +14,9 @@
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui",
     "e2e:report": "playwright show-report",
-    "preflight:rerun": "deno run --allow-net --allow-env scripts/preflight-rerun.ts"
+    "preflight:rerun": "deno run --allow-net --allow-env scripts/preflight-rerun.ts",
+    "setup:env": "bash scripts/setup-env.sh",
+    "setup:env:force": "bash scripts/setup-env.sh --force"
   },
   "dependencies": {
     "@capacitor/android": "^8.3.0",
