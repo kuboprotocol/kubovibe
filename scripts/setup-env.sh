@@ -30,10 +30,6 @@ done
 
 copy_template() {
   local src="$1" dst="$2"
-  if [[ ! -f "$src" ]]; then
-    echo "⚠️  Template missing: $src (skip)"
-    return 0
-  fi
   if [[ -f "$dst" && $FORCE -eq 0 ]]; then
     echo "✓ Kept existing: $dst (use --force to overwrite)"
     return 0
@@ -42,9 +38,26 @@ copy_template() {
   echo "✅ Wrote: $dst"
 }
 
+# ── Mandatory template checks ──────────────────────────────
+FRONTEND_TEMPLATE="$ROOT_DIR/.env.example"
+FUNCTIONS_TEMPLATE="$ROOT_DIR/supabase/functions/.env.example"
+
+if [[ ! -f "$FRONTEND_TEMPLATE" ]]; then
+  echo "❌ ERROR: Frontend template not found: $FRONTEND_TEMPLATE" >&2
+  echo "   Run this script from the repo root or restore .env.example." >&2
+  exit 1
+fi
+
+if [[ ! -f "$FUNCTIONS_TEMPLATE" ]]; then
+  echo "❌ ERROR: Edge-functions template not found: $FUNCTIONS_TEMPLATE" >&2
+  echo "   Run this script from the repo root or restore supabase/functions/.env.example." >&2
+  exit 1
+fi
+
+# ── Copy ───────────────────────────────────────────────────
 echo "📦 Bootstrapping local env files..."
-copy_template "$ROOT_DIR/.env.example"                       "$ROOT_DIR/.env"
-copy_template "$ROOT_DIR/supabase/functions/.env.example"    "$ROOT_DIR/supabase/functions/.env"
+copy_template "$FRONTEND_TEMPLATE"  "$ROOT_DIR/.env"
+copy_template "$FUNCTIONS_TEMPLATE" "$ROOT_DIR/supabase/functions/.env"
 
 if [[ $LOAD -eq 1 ]]; then
   if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
