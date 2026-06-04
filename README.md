@@ -1667,14 +1667,30 @@ Dois templates ficam versionados no repo — copie e preencha com valores reais 
 | [`.github/rerun-concurrency.local.env.example`](.github/rerun-concurrency.local.env.example) | Específico do teste de idempotência `bun run preflight:rerun`. | `.env.rerun-ci` |
 | [`.github/rerun-concurrency.secrets.example`](.github/rerun-concurrency.secrets.example) | Template para colar em GitHub Secrets do workflow CI. | (não copiar — usar como referência) |
 
-```bash
-# Frontend
-cp .env.example .env
-# preencha VITE_SUPABASE_* — valores estão em Supabase Dashboard → Project Settings → API
+### Setup com um comando
 
-# Edge Functions (somente se for rodar `supabase functions serve` localmente)
+```bash
+# Copia ambos os templates (.env e supabase/functions/.env)
+bun run setup:env
+
+# Sobrescreve arquivos existentes
+bun run setup:env:force
+
+# Copia E carrega as variáveis na sessão atual do shell (precisa de `source`)
+source scripts/setup-env.sh --load
+```
+
+O script [`scripts/setup-env.sh`](scripts/setup-env.sh):
+1. Copia `.env.example` → `.env` (frontend).
+2. Copia `supabase/functions/.env.example` → `supabase/functions/.env` (edge functions).
+3. Preserva arquivos existentes (use `--force` para sobrescrever).
+4. Com `--load` (via `source`), exporta todas as variáveis para o shell atual — útil antes de rodar `bun run preflight:rerun`, `supabase functions serve`, ou scripts em `scripts/`.
+
+### Cópia manual (alternativa)
+
+```bash
+cp .env.example .env
 cp supabase/functions/.env.example supabase/functions/.env
-# preencha apenas os secrets dos functions que vai testar
 ```
 
 > ⚠️ Em produção, **secrets de edge functions vivem em Lovable Cloud Secrets** (Settings → Functions → Secrets). O arquivo `supabase/functions/.env` só é lido pelo CLI em dev local.
