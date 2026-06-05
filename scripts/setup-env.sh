@@ -51,8 +51,9 @@ if (( BASH_VERSINFO[0] < 4 )); then
 fi
 
 # ── Parse args ─────────────────────────────────────────────
-FORCE=0; LOAD=0; DRY=0; VALIDATE_ONLY=0; REPORT=0
+FORCE=0; LOAD=0; DRY=0; VALIDATE_ONLY=0; REPORT=0; REPORT_JSON=0
 REPORT_PATH=""
+REPORT_JSON_PATH=""
 
 for arg in "$@"; do
   case "$arg" in
@@ -62,6 +63,8 @@ for arg in "$@"; do
     --validate) VALIDATE_ONLY=1 ;;
     --report)   REPORT=1 ;;
     --report=*) REPORT=1; REPORT_PATH="${arg#--report=}" ;;
+    --report-json)   REPORT_JSON=1 ;;
+    --report-json=*) REPORT_JSON=1; REPORT_JSON_PATH="${arg#--report-json=}" ;;
     -h|--help)
       sed -n '2,22p' "${BASH_SOURCE[0]}"
       return 0 2>/dev/null || exit 0
