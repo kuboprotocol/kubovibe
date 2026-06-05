@@ -3,6 +3,13 @@
 > Plataforma autônoma de criação, execução e monetização de software baseada em IA.
 > Transforma ideias em produtos digitais completos — SaaS, metaversos, jogos AAA e aplicações Web3.
 
+<!-- CI badges -->
+[![env-check](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/env-check.yml/badge.svg)](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/env-check.yml)
+[![vitest](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/vitest.yml/badge.svg)](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/vitest.yml)
+[![e2e](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/e2e.yml/badge.svg)](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/e2e.yml)
+[![wgsl-sanitizer](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/wgsl-sanitizer.yml/badge.svg)](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/wgsl-sanitizer.yml)
+[![post-migration-security](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/post-migration-security.yml/badge.svg)](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/post-migration-security.yml)
+
 ---
 
 ## Visão Geral
