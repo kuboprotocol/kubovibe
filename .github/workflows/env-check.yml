@@ -1,0 +1,87 @@
+name: env-check
+
+# Validates that .env.example templates stay in sync and that the
+# setup-env.sh script behaves correctly (copy, dry-run, validate).
+#
+# Exit codes from scripts/setup-env.sh (kept in sync with README §"Códigos de saída"):
+#   0 success | 1 IO/precheck | 2 invalid flag | 3 validation failure
+
+on:
+  push:
+    paths:
+      - ".env.example"
+      - "supabase/functions/.env.example"
+      - "scripts/setup-env.sh"
+      - "scripts/setup-env.test.sh"
+      - ".github/workflows/env-check.yml"
+  pull_request:
+    paths:
+      - ".env.example"
+      - "supabase/functions/.env.example"
+      - "scripts/setup-env.sh"
+      - "scripts/setup-env.test.sh"
+      - ".github/workflows/env-check.yml"
+  workflow_dispatch:
+
+jobs:
+  env-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Bash version (need >= 4)
+        run: bash --version
+
+      - name: Templates present
+        run: |
+          test -f .env.example
+          test -f supabase/functions/.env.example
+
+      - name: setup-env.sh --help (exit 0)
+        run: bash scripts/setup-env.sh --help
+
+      - name: setup-env.sh --dry-run (exit 0, no files written)
+        run: |
+          rm -f .env supabase/functions/.env
+          bash scripts/setup-env.sh --dry-run
+          test ! -f .env
+          test ! -f supabase/functions/.env
+
+      - name: Unknown flag → exit 2
+        run: |
+          set +e
+          bash scripts/setup-env.sh --bogus
+          code=$?
+          set -e
+          test "$code" -eq 2
+
+      - name: Copy templates → exit 0, files exist
+        run: |
+          bash scripts/setup-env.sh
+          test -f .env
+          test -f supabase/functions/.env
+
+      - name: --validate on freshly copied templates → exit 3 (placeholders)
+        run: |
+          set +e
+          bash scripts/setup-env.sh --validate
+          code=$?
+          set -e
+          test "$code" -eq 3
+
+      - name: --validate after filling required vars → exit 0
+        run: |
+          cat > .env <<'EOF'
+          VITE_SUPABASE_URL="https://abcdefgh.supabase.co"
+          VITE_SUPABASE_PUBLISHABLE_KEY="eyJrealtokenvalueforci.signedpayload.signature"
+          VITE_SUPABASE_PROJECT_ID="abcdefgh"
+          EOF
+          cat > supabase/functions/.env <<'EOF'
+          SUPABASE_URL="https://abcdefgh.supabase.co"
+          SUPABASE_ANON_KEY="eyJrealanonkeyforci.signedpayload.signature"
+          SUPABASE_SERVICE_ROLE_KEY="eyJrealsrkeyforci.signedpayload.signature"
+          EOF
+          bash scripts/setup-env.sh --validate
+
+      - name: Unit tests for setup-env.sh
+        run: bash scripts/setup-env.test.sh

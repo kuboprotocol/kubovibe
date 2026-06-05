@@ -1719,12 +1719,41 @@ Lê os arquivos `.env` reais (sem sourcing) e verifica:
 
 #### Códigos de saída
 
-| Code | Significado |
-|------|-------------|
-| `0` | Sucesso. |
-| `1` | Erro de IO ou pré-checagem (template/dir/bash). |
-| `2` | Flag inválida. |
-| `3` | Falha de validação (vars faltando ou placeholders). |
+| Code | Significado | Quando |
+|------|-------------|--------|
+| `0`  | Sucesso. | Cópia/validação OK, ou `--help`. |
+| `1`  | Erro de IO ou pré-checagem. | Bash < 4, template ausente, diretório não-gravável, falha de cópia. |
+| `2`  | Flag inválida. | Argumento desconhecido (sugere `--help`). |
+| `3`  | Falha de validação. | Variável obrigatória faltando ou ainda com valor-placeholder. |
+
+Os mesmos códigos são consumidos pelo CI (`.github/workflows/env-check.yml`) e pelos testes unitários (`scripts/setup-env.test.sh`).
+
+#### Runtime check (frontend)
+
+`src/lib/envCheck.ts` valida no boot da aplicação (chamado em `src/main.tsx`) as mesmas vars obrigatórias do `--validate`:
+
+- **DEV**: lança `Error` no console/overlay com instrução de rodar `bun run setup:env`.
+- **PROD**: apenas `console.error` (nunca bloqueia o render do usuário final).
+
+Cobertura: `src/lib/envCheck.test.ts` (vitest) — placeholders, missing, múltiplas falhas.
+
+#### Testes & CI
+
+```bash
+# Testes unitários do script (sandbox isolado, ~11 casos)
+bun run setup:env:test
+```
+
+CI (`.github/workflows/env-check.yml`) executa em cada push/PR que toca templates ou o script:
+
+1. Templates existem.
+2. `--help` retorna 0.
+3. `--dry-run` não escreve arquivos.
+4. Flag desconhecida retorna 2.
+5. Cópia padrão cria os dois `.env`.
+6. `--validate` sobre placeholders retorna 3.
+7. `--validate` com valores reais retorna 0.
+8. Suite completa de unit tests (`setup-env.test.sh`).
 
 ### Cópia manual (alternativa)
 
@@ -1732,8 +1761,6 @@ Lê os arquivos `.env` reais (sem sourcing) e verifica:
 cp .env.example .env
 cp supabase/functions/.env.example supabase/functions/.env
 ```
-
-
 
 > ⚠️ Em produção, **secrets de edge functions vivem em Lovable Cloud Secrets** (Settings → Functions → Secrets). O arquivo `supabase/functions/.env` só é lido pelo CLI em dev local.
 
