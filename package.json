@@ -19,7 +19,8 @@
     "setup:env:force": "bash scripts/setup-env.sh --force",
     "setup:env:dry": "bash scripts/setup-env.sh --dry-run",
     "setup:env:check": "bash scripts/setup-env.sh --validate",
-    "setup:env:test": "bash scripts/setup-env.test.sh"
+    "setup:env:test": "bash scripts/setup-env.test.sh",
+    "setup:env:report": "bash scripts/setup-env.sh --validate --report"
   },
   "dependencies": {
     "@capacitor/android": "^8.3.0",

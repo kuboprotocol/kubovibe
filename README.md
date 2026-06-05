@@ -1702,6 +1702,7 @@ source scripts/setup-env.sh --load
 | `--force` | Sobrescreve `.env` e `supabase/functions/.env`. |
 | `--dry-run` | Mostra o que faria, sem escrever nada (combina com `--force`). |
 | `--validate` | Apenas valida `.env` files (não copia). Exit 3 se faltar var ou houver placeholder. |
+| `--report` | Junto com `--validate`, grava relatório Markdown em `reports/env-check.md`. Aceita `--report=<path>`. |
 | `--load` | Após copiar, exporta variáveis para o shell atual (exige `source`). |
 | `-h`, `--help` | Mostra a ajuda inline. |
 
@@ -1724,16 +1725,37 @@ Lê os arquivos `.env` reais (sem sourcing) e verifica:
 - **Detecção de placeholders**: bloqueia valores como `your-project-ref`, `sk_live_...`, `eyJhbGciOiJIUzI1NiIs...`, `0x...`, `GOCSPX-...`, `whsec_...`, etc. (regex em `PLACEHOLDER_REGEX` no próprio script).
 - Reporta linha-a-linha (`✓` ok, `✗` faltando/placeholder) e termina com exit `3` se houver falha — pronto para uso em CI/pre-commit.
 
+#### Relatório (`--report`)
+
+```bash
+bun run setup:env:report            # grava em reports/env-check.md
+bash scripts/setup-env.sh --validate --report=reports/custom.md
+```
+
+Tabela Markdown por escopo (frontend/functions) × variável × status (`✅ ok` / `⚠️ placeholder` / `❌ missing`) com timestamp UTC. Útil em CI — o workflow `env-check.yml` faz upload como artifact (`env-check-report`).
+
 #### Códigos de saída
 
-| Code | Significado | Quando |
-|------|-------------|--------|
-| `0`  | Sucesso. | Cópia/validação OK, ou `--help`. |
-| `1`  | Erro de IO ou pré-checagem. | Bash < 4, template ausente, diretório não-gravável, falha de cópia. |
-| `2`  | Flag inválida. | Argumento desconhecido (sugere `--help`). |
-| `3`  | Falha de validação. | Variável obrigatória faltando ou ainda com valor-placeholder. |
+Códigos centralizados — válidos para CLI, CI, testes e build.
+
+| Code | Origem | Significado | Quando |
+|------|--------|-------------|--------|
+| `0`  | script · vite · vitest | Sucesso. | Cópia/validação OK, `--help`, ou build limpo. |
+| `1`  | script · vite build | Erro de IO / pré-check / build env inválido. | Bash < 4, template ausente, dir não-gravável, falha de cópia, **`vite build` aborta quando env-check falha**. |
+| `2`  | script | Flag inválida. | Argumento desconhecido (sugere `--help`). |
+| `3`  | script · CI | Falha de validação. | Variável obrigatória faltando ou ainda com valor-placeholder. |
 
 Os mesmos códigos são consumidos pelo CI (`.github/workflows/env-check.yml`) e pelos testes unitários (`scripts/setup-env.test.sh`).
+
+#### Validação em build-time (Vite)
+
+`vite-plugins/env-check.ts` roda as mesmas regras durante `vite build`:
+
+- **`vite build`** → lança erro e aborta com exit code `1` se faltar var ou houver placeholder.
+- **`vite` (dev)** → apenas warning no console, não bloqueia HMR.
+- **Bypass de emergência:** `SKIP_ENV_CHECK=1 bun run build` (logs aviso).
+
+Isso garante que nenhum bundle de produção seja gerado com `.env` quebrado.
 
 #### Runtime check (frontend)
 
