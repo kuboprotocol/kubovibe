@@ -1705,6 +1705,7 @@ source scripts/setup-env.sh --load
 | `--dry-run` | Mostra o que faria, sem escrever nada (combina com `--force`). |
 | `--validate` | Apenas valida `.env` files (não copia). Exit 3 se faltar var ou houver placeholder. |
 | `--report` | Junto com `--validate`, grava relatório Markdown em `reports/env-check.md`. Aceita `--report=<path>`. |
+| `--report-json` | Junto com `--validate`, grava relatório JSON em `reports/env-check.json`. Aceita `--report-json=<path>`. |
 | `--load` | Após copiar, exporta variáveis para o shell atual (exige `source`). |
 | `-h`, `--help` | Mostra a ajuda inline. |
 
