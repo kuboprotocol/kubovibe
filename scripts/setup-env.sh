@@ -80,7 +80,7 @@ for arg in "$@"; do
     --print-effective) PRINT_EFFECTIVE=1 ;;
     --no-annotate)     CI_ANNOTATE=0 ;;
     -h|--help)
-      sed -n '2,22p' "${BASH_SOURCE[0]}"
+      sed -n '2,21p' "${BASH_SOURCE[0]}"
       return 0 2>/dev/null || exit 0
       ;;
     *)
