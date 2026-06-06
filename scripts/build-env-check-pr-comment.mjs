@@ -32,15 +32,48 @@ const MARKER = "<!-- kubo:env-check -->";
 const ARTIFACTS_PAGE = RUN_URL ? `${RUN_URL}#artifacts` : "";
 
 // Raw file in the commit tree (lets reviewers click straight to the JSON).
+// `/raw/` returns the literal bytes; `/blob/` is the rendered view.
 const RAW_JSON_URL = REPO_URL && SHA_FULL
-  ? `${REPO_URL}/blob/${SHA_FULL}/reports/env-check.json`
+  ? `${REPO_URL}/raw/${SHA_FULL}/reports/env-check.json`
   : "";
 const RAW_MD_URL = REPO_URL && SHA_FULL
-  ? `${REPO_URL}/blob/${SHA_FULL}/reports/env-check.md`
+  ? `${REPO_URL}/raw/${SHA_FULL}/reports/env-check.md`
+  : "";
+const BLOB_JSON_URL = REPO_URL && SHA_FULL
+  ? `${REPO_URL}/blob/${SHA_FULL}/reports/env-check.json`
   : "";
 
 const EMOJI = { ok: "✅", placeholder: "⚠️", missing: "❌", missing_file: "🚫" };
 const emoji = (s) => EMOJI[s] ?? "•";
+
+/**
+ * Sanitize untrusted Markdown before embedding it inside the PR comment.
+ * - Strips HTML comments so they can't collide with our `kubo:env-check`
+ *   marker and trick the "find prior comment" step into rewriting the wrong
+ *   block on re-runs.
+ * - Removes <script>/<style>/<iframe> tags (GitHub already filters these,
+ *   but defense in depth keeps lint clean).
+ * - Neutralises stray `</details>` that would prematurely close our
+ *   collapsible wrapper around the embedded report.
+ * - Caps length to stay well under GitHub's 65 536-char comment limit.
+ */
+function sanitizeMarkdown(src, { maxLen = 40000 } = {}) {
+  let s = String(src ?? "");
+  s = s.replace(/<!--[\s\S]*?-->/g, "");
+  s = s.replace(/<\/?(script|style|iframe|object|embed)\b[^>]*>/gi, "");
+  s = s.replace(/<\/details>/gi, "&lt;/details&gt;");
+  if (s.length > maxLen) s = s.slice(0, maxLen) + "\n\n_…truncated…_";
+  return s;
+}
+
+/** Validate the shape of the JSON we depend on below. */
+function assertReportShape(j) {
+  const errs = [];
+  if (!j || typeof j !== "object") errs.push("report is not an object");
+  if (j && !["pass", "fail"].includes(j.status)) errs.push(`bad status: ${j?.status}`);
+  if (j && !Array.isArray(j.entries)) errs.push("entries is not an array");
+  if (errs.length) throw new Error(`invalid env-check.json — ${errs.join("; ")}`);
+}
 
 function writeOut(body) {
   mkdirSync(dirname(resolve(OUT)), { recursive: true });
@@ -59,6 +92,7 @@ if (!existsSync(REPORT)) {
 }
 
 const j = JSON.parse(readFileSync(REPORT, "utf8"));
+assertReportShape(j);
 const passed = j.status === "pass";
 const total  = j.entries.length;
 const failingEntries = j.entries.filter((e) => e.status !== "ok");
@@ -112,9 +146,9 @@ for (const [scope, entries] of Object.entries(byScope)) {
   out.push("");
 }
 
-// ── Full Markdown report (collapsed by default) ──
+// ── Full Markdown report (collapsed, sanitized) ──
 if (existsSync(REPORT_MD)) {
-  const md = readFileSync(REPORT_MD, "utf8").trim();
+  const md = sanitizeMarkdown(readFileSync(REPORT_MD, "utf8").trim());
   out.push(`<details><summary>📄 Full Markdown report (<code>reports/env-check.md</code>)</summary>`);
   out.push("");
   out.push(md);
@@ -135,11 +169,11 @@ out.push("");
 
 // ── Artifacts & links ──
 out.push("**Artifacts & links**");
-if (ARTIFACT_URL) out.push(`- 📦 [Download \`env-check-report.zip\`](${ARTIFACT_URL}) — md + json + schema`);
+if (ARTIFACT_URL)   out.push(`- 📦 [Download \`env-check-report.zip\`](${ARTIFACT_URL}) — md + json + schema`);
 if (ARTIFACTS_PAGE) out.push(`- 🗂️ [All artifacts for this run](${ARTIFACTS_PAGE})`);
-if (RAW_JSON_URL)  out.push(`- 🧾 [\`reports/env-check.json\`](${RAW_JSON_URL}) (raw, this commit)`);
-if (RAW_MD_URL)    out.push(`- 📄 [\`reports/env-check.md\`](${RAW_MD_URL}) (raw, this commit)`);
-if (RUN_URL)       out.push(`- 🔁 [Workflow run](${RUN_URL})`);
+if (RAW_JSON_URL)   out.push(`- 🧾 [Raw \`env-check.json\`](${RAW_JSON_URL})${BLOB_JSON_URL ? ` · [view on GitHub](${BLOB_JSON_URL})` : ""}`);
+if (RAW_MD_URL)     out.push(`- 📄 [Raw \`env-check.md\`](${RAW_MD_URL})`);
+if (RUN_URL)        out.push(`- 🔁 [Workflow run](${RUN_URL})${RUN_ID ? ` \`#${RUN_ID}\`` : ""}`);
 if (!ARTIFACT_URL && !ARTIFACTS_PAGE && !RUN_URL)
   out.push(`- Download \`env-check-report\` from the run page (no link captured).`);
 out.push("");
