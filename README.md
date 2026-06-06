@@ -1737,6 +1737,40 @@ bash scripts/setup-env.sh --validate --report=reports/custom.md
 bash scripts/setup-env.sh --validate --report-json=reports/custom.json
 ```
 
+#### Visualizar env efetiva (com mascaramento)
+
+```bash
+bun run setup:env:effective
+# imprime, por escopo, KEY = first4…last4 (N chars)  — nunca expõe o valor completo
+```
+
+Útil para verificar rapidamente _qual_ valor o app está enxergando sem vazar o segredo nos logs/screenshots.
+
+#### Validar JSON contra schema
+
+O relatório JSON tem schema em `reports/env-check.schema.json` (JSON Schema 2020-12). A CI valida cada relatório gerado:
+
+```bash
+bun run setup:env:report:json       # gera reports/env-check.json
+bun run setup:env:schema             # falha (exit 2) se o JSON não bater com o schema
+```
+
+Saída de exemplo: `✓ reports/env-check.json matches schema (6 entries, status=pass)`.
+
+#### Anotações no PR (GitHub Actions)
+
+Quando `GITHUB_ACTIONS=true`, o script emite linhas `::error file=<path>::<msg>` que o GitHub renderiza como anotações inline no diff do PR — apontando o **arquivo exato** (`.env` ou `supabase/functions/.env`), a **variável** que falhou e o **motivo** (`missing` / `placeholder`). Desligue com `--no-annotate`.
+
+#### Health check de produção
+
+```bash
+bun run prod:health
+# probes: kubovibe.dev, kubovibe.lovable.app, REST /rest/v1/, auth /auth/v1/health
+# exit 0 quando todos respondem; emite ::error:: por endpoint quando falha
+```
+
+Override via env vars: `PROD_APP_URL`, `PROD_PREVIEW_URL`, `PROD_SUPABASE_URL`, `PROD_SUPABASE_KEY`. Executado automaticamente em `push` para `main` (com `continue-on-error: true` para não bloquear merges quando há manutenção upstream).
+
 **Markdown** — tabela por escopo (frontend/functions) × variável × status (`✅ ok` / `⚠️ placeholder` / `❌ missing`) com timestamp UTC.
 
 **JSON** — shape estável para parsing em CI / dashboards:
