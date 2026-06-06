@@ -127,7 +127,19 @@ out.push(`| Generated | \`${j.generated_at}\` |`);
 if (SHA) out.push(`| Commit | \`${SHA}\` |`);
 out.push(`| Frontend env | \`${j.frontend_env}\` |`);
 out.push(`| Functions env | \`${j.functions_env}\` |`);
+out.push(`| Scopes | ${Object.keys(byScope).length} |`);
 out.push("");
+
+// ── Per-scope counters (quick triage) ──
+out.push(`| Scope | ✅ ok | ⚠️ placeholder | ❌ missing | 🚫 file | Total |`);
+out.push(`|-------|------:|---------------:|----------:|--------:|------:|`);
+for (const [scope, entries] of Object.entries(byScope)) {
+  const c = { ok: 0, placeholder: 0, missing: 0, missing_file: 0 };
+  for (const e of entries) c[e.status] = (c[e.status] ?? 0) + 1;
+  out.push(`| \`${scope}\` | ${c.ok} | ${c.placeholder} | ${c.missing} | ${c.missing_file} | ${entries.length} |`);
+}
+out.push("");
+
 
 // ── Per-scope collapsibles (failing scopes auto-open) ──
 for (const [scope, entries] of Object.entries(byScope)) {
