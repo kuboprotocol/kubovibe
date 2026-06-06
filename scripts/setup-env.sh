@@ -186,16 +186,19 @@ validate_file() {
 
   log "Validating $label → $file"
 
+  local relfile="${file#$ROOT_DIR/}"
   for key in "${required[@]}"; do
     local val status note jstatus
     val="$(get_value "$file" "$key" || true)"
     if [[ -z "$val" ]]; then
       err "[$label] $key is missing or empty"
+      annotate error "$relfile" "[$label] env var '$key' is missing or empty"
       status="❌ missing"; note="empty / unset"; jstatus="missing"
       fails=$((fails+1))
     elif [[ "$val" =~ $PLACEHOLDER_REGEX ]]; then
       err "[$label] $key still has placeholder value: $val"
       hint "Edit $file and replace with a real value."
+      annotate error "$relfile" "[$label] env var '$key' still has placeholder value ($val)"
       status="⚠️ placeholder"; note="value: \`$val\`"; jstatus="placeholder"
       fails=$((fails+1))
     else
@@ -207,6 +210,43 @@ validate_file() {
   done
 
   return $fails
+}
+
+# mask_value <value> — show first 4 + last 4 chars, mask the middle.
+mask_value() {
+  local v="$1" n=${#1}
+  if (( n <= 8 )); then
+    printf '%s' "$(printf '%*s' "$n" '' | tr ' ' '*')"
+  else
+    printf '%s…%s (%d chars)' "${v:0:4}" "${v: -4}" "$n"
+  fi
+}
+
+# print_effective: dump resolved env values (masked) for both scopes.
+print_effective() {
+  echo ""
+  log "Effective env (values masked — first 4 + last 4 chars):"
+  local scope file keys key val
+  for scope in frontend functions; do
+    if [[ "$scope" == frontend ]]; then file="$FRONTEND_ENV"; keys=( "${REQUIRED_FRONTEND[@]}" )
+    else                                 file="$FUNCTIONS_ENV"; keys=( "${REQUIRED_FUNCTIONS[@]}" )
+    fi
+    echo ""
+    echo "  ${C_BLU}# $scope${C_RST} (${file#$ROOT_DIR/})"
+    if [[ ! -f "$file" ]]; then
+      echo "    (file not found)"
+      continue
+    fi
+    for key in "${keys[@]}"; do
+      val="$(get_value "$file" "$key" || true)"
+      if [[ -z "$val" ]]; then
+        printf '    %-32s = %s\n' "$key" "${C_RED}<unset>${C_RST}"
+      else
+        printf '    %-32s = %s\n' "$key" "$(mask_value "$val")"
+      fi
+    done
+  done
+  echo ""
 }
 
 write_report() {
