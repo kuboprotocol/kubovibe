@@ -40,11 +40,35 @@ export default function RunwayDialog({ open, onOpenChange, defaultImageUrl, onRe
   const [vidPrompt, setVidPrompt] = useState("");
   const [vidImage, setVidImage] = useState(defaultImageUrl ?? "");
   const [vidDuration, setVidDuration] = useState<5 | 10>(5);
+  const [vidPhotoreal, setVidPhotoreal] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement | null>(null);
   // video_upscale
   const [upscaleUrl, setUpscaleUrl] = useState("");
   // character_performance
   const [charRefVideo, setCharRefVideo] = useState("");
   const [charCharacterImg, setCharCharacterImg] = useState("");
+
+  const handleUpload = async (file: File) => {
+    try {
+      setUploading(true);
+      const { data: u } = await supabase.auth.getUser();
+      const uid = u.user?.id ?? "anon";
+      const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+      const path = `runway/${uid}/${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from("uploads").upload(path, file, {
+        cacheControl: "3600", upsert: false, contentType: file.type,
+      });
+      if (error) throw error;
+      const { data } = supabase.storage.from("uploads").getPublicUrl(path);
+      setVidImage(data.publicUrl);
+      toast({ title: "Foto enviada", description: "Pronta para virar vídeo." });
+    } catch (e) {
+      toast({ title: "Falha no upload", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const busy = state.status === "starting" || state.status === "polling";
 
