@@ -81,7 +81,17 @@ function writeOut(body) {
   process.stdout.write(body);
 }
 
-if (!existsSync(REPORT)) {
+// Re-exported helpers so tests can fuzz the sanitizer without spawning a process.
+export { sanitizeMarkdown, assertReportShape };
+
+// Skip rendering when imported as a module (e.g. from the test runner).
+const invokedDirectly =
+  import.meta.url === `file://${process.argv[1]}` ||
+  import.meta.url.endsWith(process.argv[1] ?? "");
+if (!invokedDirectly) {
+  // eslint-disable-next-line no-restricted-syntax
+  // (intentional early return at module top-level via dynamic guard)
+} else if (!existsSync(REPORT)) {
   writeOut(
 `${MARKER}
 ### env-check — no report
