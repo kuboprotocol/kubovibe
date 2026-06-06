@@ -1324,6 +1324,57 @@ export type Database = {
           },
         ]
       }
+      security_audit_logs: {
+        Row: {
+          action: string
+          actor_role: string
+          actor_user_id: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          ip_address: unknown
+          job_id: string | null
+          metadata: Json
+          request_id: string | null
+          resource_id: string | null
+          resource_type: string
+          success: boolean
+          user_agent: string | null
+        }
+        Insert: {
+          action: string
+          actor_role?: string
+          actor_user_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          ip_address?: unknown
+          job_id?: string | null
+          metadata?: Json
+          request_id?: string | null
+          resource_id?: string | null
+          resource_type: string
+          success?: boolean
+          user_agent?: string | null
+        }
+        Update: {
+          action?: string
+          actor_role?: string
+          actor_user_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          ip_address?: unknown
+          job_id?: string | null
+          metadata?: Json
+          request_id?: string | null
+          resource_id?: string | null
+          resource_type?: string
+          success?: boolean
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
       shortlink_clicks: {
         Row: {
           clicked_at: string
@@ -1837,6 +1888,23 @@ export type Database = {
       }
       is_kubo_admin: { Args: never; Returns: boolean }
       is_skill_admin: { Args: never; Returns: boolean }
+      log_security_audit: {
+        Args: {
+          _action: string
+          _actor_role?: string
+          _actor_user_id?: string
+          _error_message?: string
+          _ip?: unknown
+          _job_id?: string
+          _metadata?: Json
+          _request_id?: string
+          _resource_id?: string
+          _resource_type: string
+          _success?: boolean
+          _user_agent?: string
+        }
+        Returns: string
+      }
       move_to_dlq: {
         Args: {
           dlq_name: string

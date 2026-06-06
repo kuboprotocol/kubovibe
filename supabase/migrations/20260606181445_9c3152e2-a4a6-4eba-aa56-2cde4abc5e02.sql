@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "Users can update own clicks" ON public.shortlink_clicks;
