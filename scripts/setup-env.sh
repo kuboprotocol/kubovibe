@@ -7,12 +7,11 @@
 #   bash scripts/setup-env.sh --force        # overwrite existing .env files
 #   bash scripts/setup-env.sh --dry-run      # show what would happen, write nothing
 #   bash scripts/setup-env.sh --validate     # only validate existing .env files
+#   bash scripts/setup-env.sh --validate --report --report-json   # write reports
+#   bash scripts/setup-env.sh --print-effective                   # show resolved env (masked)
+#   bash scripts/setup-env.sh --no-annotate                       # disable GH Actions ::error:: lines
 #   source scripts/setup-env.sh --load       # copy + export vars in current shell
 #   bash scripts/setup-env.sh --help
-#
-# Flags can be combined, e.g.:
-#   bash scripts/setup-env.sh --force --validate
-#   source scripts/setup-env.sh --force --load
 #
 # Exit codes:
 #   0  success
