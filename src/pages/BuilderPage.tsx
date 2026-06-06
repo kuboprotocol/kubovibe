@@ -57,6 +57,7 @@ export default function BuilderPage() {
   const [saving, setSaving] = useState(false)
   const [showTemplates, setShowTemplates] = useState(false)
   const [showCloneDialog, setShowCloneDialog] = useState(false)
+  const [showRunway, setShowRunway] = useState(false)
   const [isCloning, setIsCloning] = useState(false)
   const _devicePref = loadDevicePref()
   const [deviceFrame, setDeviceFrame] = useState<DeviceFrame>(_devicePref.frame)
