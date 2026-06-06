@@ -2,12 +2,13 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { ArrowLeft, Save, Download, Share2, Loader2 } from 'lucide-react'
+import { ArrowLeft, Save, Download, Share2, Loader2, Film } from 'lucide-react'
 import { getSnapshot } from 'tldraw'
 import { motion, AnimatePresence } from 'framer-motion'
 import TLDrawEditor from '@/components/canvas/TLDrawEditor'
 import TemplateSelector from '@/components/canvas/TemplateSelector'
 import CanvasInfoPanel from '@/components/canvas/CanvasInfoPanel'
+import RunwayDialog from '@/components/runway/RunwayDialog'
 import { toast } from 'sonner'
 
 export default function CanvasPage() {
@@ -18,6 +19,7 @@ export default function CanvasPage() {
   const [saving, setSaving] = useState(false)
   const [showTemplates, setShowTemplates] = useState(!canvasId)
   const [showInfo, setShowInfo] = useState(true)
+  const [showRunway, setShowRunway] = useState(false)
 
   useEffect(() => {
     if (canvasId) {
@@ -136,6 +138,16 @@ export default function CanvasPage() {
           <Button
             variant="ghost"
             size="sm"
+            onClick={() => setShowRunway(true)}
+            className="text-primary hover:text-primary"
+            title="RunwayML — Gerar vídeo/imagem (28 créditos)"
+          >
+            <Film className="h-4 w-4 mr-1.5" />
+            <span className="hidden sm:inline">Runway</span>
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={handleShare}
             className="text-muted-foreground"
           >
@@ -179,6 +191,12 @@ export default function CanvasPage() {
           )}
         </AnimatePresence>
       </div>
+
+      <RunwayDialog
+        open={showRunway}
+        onOpenChange={setShowRunway}
+        onResult={(url) => toast.success(`Runway pronto — ${url}`)}
+      />
     </div>
   )
 }

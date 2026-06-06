@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import { Send, Eye, Loader2, Copy, Check, Code } from 'lucide-react'
+import { Send, Eye, Loader2, Copy, Check, Code, Film } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { streamChat, streamClone, type Msg } from '@/lib/streamChat'
 import { supabase } from '@/integrations/supabase/client'
@@ -22,6 +22,9 @@ import logoImg from '@/assets/logo-kubovibe.png'
 import { subscribePreviewLogs, type PreviewLogEntry } from '@/lib/iframePreview'
 import PreviewAuditPanel from '@/components/builder/PreviewAuditPanel'
 import PreviewFrame from '@/components/builder/PreviewFrame'
+import RunwayDialog from '@/components/runway/RunwayDialog'
+
+
 
 const DEVICE_LS_KEY = 'kubo:previewDevice:v1'
 function loadDevicePref(): { frame: DeviceFrame; landscape: boolean } {
@@ -54,6 +57,7 @@ export default function BuilderPage() {
   const [saving, setSaving] = useState(false)
   const [showTemplates, setShowTemplates] = useState(false)
   const [showCloneDialog, setShowCloneDialog] = useState(false)
+  const [showRunway, setShowRunway] = useState(false)
   const [isCloning, setIsCloning] = useState(false)
   const _devicePref = loadDevicePref()
   const [deviceFrame, setDeviceFrame] = useState<DeviceFrame>(_devicePref.frame)
@@ -579,6 +583,15 @@ export default function BuilderPage() {
                       if (file) handleFileUpload(file)
                     }
                   }} />
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="absolute right-12 bottom-2 h-8 w-8 rounded-lg text-primary hover:text-primary"
+                  onClick={() => setShowRunway(true)}
+                  title="RunwayML — Gerar vídeo/imagem (28 créditos)"
+                >
+                  <Film className="h-3.5 w-3.5" />
+                </Button>
                 <Button size="icon" variant="hero" className="absolute right-2 bottom-2 h-8 w-8 rounded-lg" onClick={send} disabled={isLoading || !input.trim()}>
                   {isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
                 </Button>
@@ -669,6 +682,15 @@ export default function BuilderPage() {
         onOpenChange={setShowCloneDialog}
         onClone={handleClone}
         isCloning={isCloning}
+      />
+
+      <RunwayDialog
+        open={showRunway}
+        onOpenChange={setShowRunway}
+        onResult={(url) => {
+          // Insert the generated asset URL into the prompt for the AI to consume.
+          setInput((prev) => `${prev}${prev ? "\n" : ""}[runway asset]: ${url}`)
+        }}
       />
     </div>
   )
