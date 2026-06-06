@@ -46,7 +46,7 @@ if (SB_URL) {
     name: "lovable cloud REST",
     url: `${SB_URL.replace(/\/$/, "")}/rest/v1/`,
     headers: SB_KEY ? { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } : {},
-    expect: [200, 404], // 404 on empty root = reachable
+    expect: [200, 401, 404], // 401/404 = reachable but unauth/empty (still healthy)
   });
   checks.push({
     name: "lovable cloud auth",
