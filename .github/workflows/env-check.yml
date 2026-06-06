@@ -99,7 +99,13 @@ jobs:
           test -f reports/env-check.json
           node -e "const j=require('./reports/env-check.json'); if(j.status!=='pass')process.exit(1); if(!Array.isArray(j.entries)||j.entries.length<6)process.exit(2);"
 
-      - name: Upload env-check report (Markdown + JSON)
+      - name: Validate JSON report against schema
+        run: |
+          test -f reports/env-check.json
+          test -f reports/env-check.schema.json
+          node scripts/validate-env-report.mjs reports/env-check.json reports/env-check.schema.json
+
+      - name: Upload env-check report (Markdown + JSON + schema)
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -107,7 +113,23 @@ jobs:
           path: |
             reports/env-check.md
             reports/env-check.json
+            reports/env-check.schema.json
           if-no-files-found: ignore
+
+      - name: Print effective env (masked)
+        run: bash scripts/setup-env.sh --print-effective --no-annotate
+
+      - name: Unit tests for setup-env.sh
+        run: bash scripts/setup-env.test.sh
+
+      - name: Prod health check (best-effort, non-blocking on forks)
+        # Only run on main branch / push; PRs from forks lack secrets.
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        continue-on-error: true
+        env:
+          PROD_SUPABASE_URL: ${{ secrets.PROD_SUPABASE_URL }}
+          PROD_SUPABASE_KEY: ${{ secrets.PROD_SUPABASE_KEY }}
+        run: node scripts/prod-health-check.mjs
 
       - name: Unit tests for setup-env.sh
         run: bash scripts/setup-env.test.sh
