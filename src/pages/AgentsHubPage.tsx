@@ -110,8 +110,7 @@ export default function AgentsHubPage() {
                   {agents.filter(a => a.category === cat).map(a => (
                     <Card
                       key={a.slug}
-                      className={`cursor-pointer transition-all hover:border-primary/50 ${selected?.slug === a.slug ? "border-primary" : ""}`}
-                      onClick={() => setSelected(a)}
+                      className={`transition-all hover:border-primary/50 ${selected?.slug === a.slug ? "border-primary" : ""}`}
                     >
                       <CardHeader>
                         <div className="flex items-start justify-between">
@@ -125,11 +124,17 @@ export default function AgentsHubPage() {
                         </div>
                         <CardDescription className="text-xs">{a.description}</CardDescription>
                       </CardHeader>
-                      <CardContent className="pt-0">
+                      <CardContent className="pt-0 space-y-2">
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <Zap className="w-3 h-3" />
                           {a.credit_cost} créditos
                           <span className="ml-auto font-mono opacity-60">{a.edge_function}</span>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="outline" className="flex-1" onClick={() => setSelected(a)}>Quick run</Button>
+                          <Link to={`/agents/${a.slug}`} className="flex-1">
+                            <Button size="sm" className="w-full">Abrir</Button>
+                          </Link>
                         </div>
                       </CardContent>
                     </Card>
