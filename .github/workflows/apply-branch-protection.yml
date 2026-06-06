@@ -1,0 +1,109 @@
+name: Apply Branch Protection
+
+# Configura automaticamente as regras de proteção do branch `main`,
+# exigindo que `Integration Tests` (Playwright) e `Fuzz Tests` (Preflight CORS Fuzz)
+# passem antes de qualquer merge.
+#
+# Requer secret: ADMIN_GITHUB_TOKEN (PAT clássico com escopo `repo`
+# OU GitHub App token com permissão Administration:Write).
+# Sem o token, o job apenas alerta — não falha o pipeline.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-branch-protection.yml'
+      - '.github/workflows/e2e.yml'
+      - '.github/workflows/preflight-fuzz.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  apply:
+    name: Apply required status checks to main
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Validate token availability
+        id: token
+        env:
+          ADMIN_GITHUB_TOKEN: ${{ secrets.ADMIN_GITHUB_TOKEN }}
+        run: |
+          if [ -z "${ADMIN_GITHUB_TOKEN:-}" ]; then
+            echo "::warning::ADMIN_GITHUB_TOKEN não configurado — pulando aplicação automática."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Apply branch protection (Integration + Fuzz tests required)
+        if: steps.token.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.ADMIN_GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # Status checks que DEVEM passar antes do merge em main.
+          # Os nomes precisam casar exatamente com `name:` dos jobs.
+          CONTEXTS='[
+            "Playwright (chromium, main suite)",
+            "Preflight Fuzz — Origin",
+            "Preflight Fuzz — Request Method",
+            "Preflight Fuzz — Request Headers",
+            "Vitest (RTL redirect-flow + unit tests)",
+            "Security scan + permission checks"
+          ]'
+
+          PAYLOAD=$(jq -n --argjson contexts "$CONTEXTS" '{
+            required_status_checks: {
+              strict: true,
+              contexts: $contexts
+            },
+            enforce_admins: true,
+            required_pull_request_reviews: {
+              required_approving_review_count: 1,
+              dismiss_stale_reviews: true,
+              require_code_owner_reviews: false
+            },
+            restrictions: null,
+            required_linear_history: true,
+            allow_force_pushes: false,
+            allow_deletions: false,
+            required_conversation_resolution: true,
+            block_creations: false
+          }')
+
+          echo "🔒 Aplicando branch protection em $REPO/main"
+          echo "$PAYLOAD" | jq .
+
+          curl -fsSL -X PUT \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$REPO/branches/main/protection" \
+            -d "$PAYLOAD"
+
+          echo ""
+          echo "✅ Branch protection aplicada com sucesso."
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Branch Protection — main"
+            if [ "${{ steps.token.outputs.skip }}" = "true" ]; then
+              echo "⏭️  Pulado: defina o secret \`ADMIN_GITHUB_TOKEN\` (PAT com escopo \`repo\` ou GitHub App com \`Administration:Write\`) para aplicar automaticamente."
+            else
+              echo "✅ Regras aplicadas. Status checks obrigatórios:"
+              echo "- Playwright (chromium, main suite)"
+              echo "- Preflight Fuzz — Origin / Request Method / Request Headers"
+              echo "- Vitest"
+              echo "- Security scan + permission checks"
+              echo ""
+              echo "Outras regras: 1 review aprovador, dismiss stale reviews, linear history,"
+              echo "sem force-push, sem delete, conversation resolution obrigatória, enforce admins."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
