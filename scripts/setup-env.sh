@@ -51,8 +51,9 @@ if (( BASH_VERSINFO[0] < 4 )); then
 fi
 
 # ── Parse args ─────────────────────────────────────────────
-FORCE=0; LOAD=0; DRY=0; VALIDATE_ONLY=0; REPORT=0
+FORCE=0; LOAD=0; DRY=0; VALIDATE_ONLY=0; REPORT=0; REPORT_JSON=0
 REPORT_PATH=""
+REPORT_JSON_PATH=""
 
 for arg in "$@"; do
   case "$arg" in
@@ -62,6 +63,8 @@ for arg in "$@"; do
     --validate) VALIDATE_ONLY=1 ;;
     --report)   REPORT=1 ;;
     --report=*) REPORT=1; REPORT_PATH="${arg#--report=}" ;;
+    --report-json)   REPORT_JSON=1 ;;
+    --report-json=*) REPORT_JSON=1; REPORT_JSON_PATH="${arg#--report-json=}" ;;
     -h|--help)
       sed -n '2,22p' "${BASH_SOURCE[0]}"
       return 0 2>/dev/null || exit 0
@@ -138,8 +141,21 @@ get_value() {
 }
 
 # validate_file <label> <file> <required_var...>
-# Populates REPORT_LINES (global) with per-key status when REPORT=1.
+# Populates REPORT_LINES (markdown) and REPORT_JSON_ENTRIES (json fragments).
 REPORT_LINES=()
+REPORT_JSON_ENTRIES=()
+
+# json_escape <string>
+json_escape() {
+  local s="$1"
+  s="${s//\\/\\\\}"
+  s="${s//\"/\\\"}"
+  s="${s//$'\n'/\\n}"
+  s="${s//$'\r'/\\r}"
+  s="${s//$'\t'/\\t}"
+  printf '%s' "$s"
+}
+
 validate_file() {
   local label="$1" file="$2"; shift 2
   local required=( "$@" )
@@ -149,28 +165,30 @@ validate_file() {
     err "[$label] missing: $file"
     hint "Run: bash scripts/setup-env.sh   (without --validate)"
     REPORT_LINES+=( "| $label | _file_ | ❌ missing | $file |" )
+    REPORT_JSON_ENTRIES+=( "{\"scope\":\"$(json_escape "$label")\",\"variable\":null,\"status\":\"missing_file\",\"detail\":\"$(json_escape "$file")\"}" )
     return 1
   fi
 
   log "Validating $label → $file"
 
   for key in "${required[@]}"; do
-    local val status note
+    local val status note jstatus
     val="$(get_value "$file" "$key" || true)"
     if [[ -z "$val" ]]; then
       err "[$label] $key is missing or empty"
-      status="❌ missing"; note="empty / unset"
+      status="❌ missing"; note="empty / unset"; jstatus="missing"
       fails=$((fails+1))
     elif [[ "$val" =~ $PLACEHOLDER_REGEX ]]; then
       err "[$label] $key still has placeholder value: $val"
       hint "Edit $file and replace with a real value."
-      status="⚠️ placeholder"; note="value: \`$val\`"
+      status="⚠️ placeholder"; note="value: \`$val\`"; jstatus="placeholder"
       fails=$((fails+1))
     else
       ok "[$label] $key set (${#val} chars)"
-      status="✅ ok"; note="${#val} chars"
+      status="✅ ok"; note="${#val} chars"; jstatus="ok"
     fi
     REPORT_LINES+=( "| $label | \`$key\` | $status | $note |" )
+    REPORT_JSON_ENTRIES+=( "{\"scope\":\"$(json_escape "$label")\",\"variable\":\"$(json_escape "$key")\",\"status\":\"$jstatus\",\"detail\":\"$(json_escape "$note")\"}" )
   done
 
   return $fails
@@ -198,6 +216,33 @@ write_report() {
   ok "Report written: ${abs#$ROOT_DIR/}"
 }
 
+write_report_json() {
+  local total="$1" path="${REPORT_JSON_PATH:-reports/env-check.json}"
+  local abs="$ROOT_DIR/$path"
+  [[ "$path" = /* ]] && abs="$path"
+  mkdir -p "$(dirname "$abs")"
+  local status="pass"
+  (( total > 0 )) && status="fail"
+  {
+    printf '{\n'
+    printf '  "generated_at": "%s",\n' "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+    printf '  "status": "%s",\n' "$status"
+    printf '  "failures": %s,\n' "$total"
+    printf '  "frontend_env": "%s",\n' "$(json_escape "${FRONTEND_ENV#$ROOT_DIR/}")"
+    printf '  "functions_env": "%s",\n' "$(json_escape "${FUNCTIONS_ENV#$ROOT_DIR/}")"
+    printf '  "entries": [\n'
+    local i=0 n=${#REPORT_JSON_ENTRIES[@]}
+    for entry in "${REPORT_JSON_ENTRIES[@]}"; do
+      i=$((i+1))
+      if (( i < n )); then printf '    %s,\n' "$entry"
+      else                  printf '    %s\n'  "$entry"
+      fi
+    done
+    printf '  ]\n}\n'
+  } > "$abs"
+  ok "JSON report written: ${abs#$ROOT_DIR/}"
+}
+
 # ── Validate-only mode ─────────────────────────────────────
 if (( VALIDATE_ONLY )); then
   total_fails=0
@@ -205,6 +250,7 @@ if (( VALIDATE_ONLY )); then
   validate_file "functions" "$FUNCTIONS_ENV" "${REQUIRED_FUNCTIONS[@]}" || total_fails=$((total_fails + $?))
   echo ""
   (( REPORT )) && write_report "$total_fails"
+  (( REPORT_JSON )) && write_report_json "$total_fails"
   if (( total_fails == 0 )); then
     ok "All required variables present and filled."
     return 0 2>/dev/null || exit 0
