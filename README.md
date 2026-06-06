@@ -1728,14 +1728,34 @@ Lê os arquivos `.env` reais (sem sourcing) e verifica:
 - **Detecção de placeholders**: bloqueia valores como `your-project-ref`, `sk_live_...`, `eyJhbGciOiJIUzI1NiIs...`, `0x...`, `GOCSPX-...`, `whsec_...`, etc. (regex em `PLACEHOLDER_REGEX` no próprio script).
 - Reporta linha-a-linha (`✓` ok, `✗` faltando/placeholder) e termina com exit `3` se houver falha — pronto para uso em CI/pre-commit.
 
-#### Relatório (`--report`)
+#### Relatórios (`--report` / `--report-json`)
 
 ```bash
-bun run setup:env:report            # grava em reports/env-check.md
+bun run setup:env:report            # reports/env-check.md  (humano, GitHub-friendly)
+bun run setup:env:report:json       # reports/env-check.json (machine-readable, CI)
 bash scripts/setup-env.sh --validate --report=reports/custom.md
+bash scripts/setup-env.sh --validate --report-json=reports/custom.json
 ```
 
-Tabela Markdown por escopo (frontend/functions) × variável × status (`✅ ok` / `⚠️ placeholder` / `❌ missing`) com timestamp UTC. Útil em CI — o workflow `env-check.yml` faz upload como artifact (`env-check-report`).
+**Markdown** — tabela por escopo (frontend/functions) × variável × status (`✅ ok` / `⚠️ placeholder` / `❌ missing`) com timestamp UTC.
+
+**JSON** — shape estável para parsing em CI / dashboards:
+
+```json
+{
+  "generated_at": "2026-06-05T10:00:00Z",
+  "status": "pass",
+  "failures": 0,
+  "frontend_env": ".env",
+  "functions_env": "supabase/functions/.env",
+  "entries": [
+    { "scope": "frontend",  "variable": "VITE_SUPABASE_URL",          "status": "ok",          "detail": "37 chars" },
+    { "scope": "functions", "variable": "SUPABASE_SERVICE_ROLE_KEY",  "status": "placeholder", "detail": "value: `eyJhbGciOiJIUzI1NiIs...`" }
+  ]
+}
+```
+
+`status` ∈ `ok` · `missing` · `placeholder` · `missing_file`. O workflow `env-check.yml` faz upload de ambos os arquivos como artifact `env-check-report` e valida o shape JSON antes do upload.
 
 #### Códigos de saída
 
@@ -1769,14 +1789,20 @@ Isso garante que nenhum bundle de produção seja gerado com `.env` quebrado.
 
 Cobertura: `src/lib/envCheck.test.ts` (vitest) — placeholders, missing, múltiplas falhas.
 
-#### Testes & CI
+#### Testes & CI (fail-fast)
 
 ```bash
 # Testes unitários do script (sandbox isolado, ~11 casos)
 bun run setup:env:test
 ```
 
-CI (`.github/workflows/env-check.yml`) executa em cada push/PR que toca templates ou o script:
+O workflow `.github/workflows/env-check.yml` é **fail-fast** em três níveis:
+
+1. **Concurrency** — `cancel-in-progress: true` cancela runs antigas do mesmo branch assim que um novo commit chega (economiza minutos de CI e evita merges sobre builds obsoletos).
+2. **Shell** — `defaults.run.shell: bash -euo pipefail {0}` aborta cada step na primeira linha com erro, variável não definida ou falha em pipe.
+3. **Steps sequenciais** — qualquer step que falhar interrompe o job imediatamente (sem `continue-on-error`).
+
+Executa em cada push/PR que toca templates ou o script:
 
 1. Templates existem.
 2. `--help` retorna 0.
@@ -1784,8 +1810,10 @@ CI (`.github/workflows/env-check.yml`) executa em cada push/PR que toca template
 4. Flag desconhecida retorna 2.
 5. Cópia padrão cria os dois `.env`.
 6. `--validate` sobre placeholders retorna 3.
-7. `--validate` com valores reais retorna 0.
-8. Suite completa de unit tests (`setup-env.test.sh`).
+7. `--validate` com valores reais retorna 0 (gera Markdown + JSON).
+8. Shape do JSON é validado (`status=pass`, `entries.length ≥ 6`).
+9. Upload de `reports/env-check.{md,json}` como artifact `env-check-report`.
+10. Suite completa de unit tests (`setup-env.test.sh`).
 
 ### Cópia manual (alternativa)
 
@@ -1793,6 +1821,38 @@ CI (`.github/workflows/env-check.yml`) executa em cada push/PR que toca template
 cp .env.example .env
 cp supabase/functions/.env.example supabase/functions/.env
 ```
+
+### Variáveis em produção (Vercel / Render / Lovable Cloud)
+
+`.env` e `supabase/functions/.env` **NUNCA** vão para produção — eles existem só para dev local e são ignorados pelo `.gitignore`. Em produção cada plataforma tem seu próprio cofre:
+
+| Camada | Onde configurar | Variáveis | Lido por |
+|--------|-----------------|-----------|----------|
+| **Frontend (build estático)** | Vercel → Project Settings → Environment Variables · Render → Environment Group · Lovable → Publish | `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_PROJECT_ID` | `vite build` (embute no bundle) + `src/lib/envCheck.ts` (runtime) |
+| **Edge Functions** | Lovable Cloud → Settings → Functions → Secrets (não usa `.env`) | `SUPABASE_SERVICE_ROLE_KEY`, `STRIPE_SECRET_KEY`, `OPENROUTER_API_KEY`, etc. | `Deno.env.get(...)` dentro de cada function |
+| **Banco (Postgres)** | Lovable Cloud → DB · Vault | Roles, RLS, extensões | Server-side, nunca exposto |
+
+**Regras:**
+
+- ⚠️ Só vars com prefixo `VITE_*` viram parte do bundle público — **nunca** coloque `SERVICE_ROLE_KEY`, `STRIPE_SECRET_KEY`, etc. em variável `VITE_*`.
+- O `vite build` no CI/Vercel roda o mesmo `vite-plugins/env-check.ts` e aborta com exit 1 se a env de produção tiver placeholder. Não há como publicar bundle quebrado.
+- Para emergências (ex.: smoke deploy sem backend), use `SKIP_ENV_CHECK=1` no build command da plataforma — mas o runtime check ainda vai logar `console.error` no browser.
+- Para rotacionar uma secret de edge function: Settings → Functions → Secrets → edit → re-deploy (o `.env` local NÃO precisa ser tocado).
+
+### Troubleshooting
+
+| Sintoma | Causa provável | Como resolver |
+|---------|----------------|---------------|
+| `Bash 4+ required` | macOS vem com bash 3.2. | `brew install bash && bash scripts/setup-env.sh` (não use `sh`). |
+| `Frontend template not found` | Executou de outro diretório que não a raiz do repo. | `cd` para a raiz; ou restore via `git checkout .env.example`. |
+| `Directory not writable` | Permissões wrong, ou rodando em sandbox read-only. | `ls -ld . supabase/functions` e ajuste com `chmod`/`chown`. |
+| `validation failed (exit 3)` mesmo após editar `.env` | Aspas extras, espaço antes do `=`, ou valor ainda contém `...`. | Confira `bun run setup:env:check`; o output mostra qual key falhou e por quê. |
+| `vite build` falha com `env-check failed` | Plataforma de hosting não tem `VITE_SUPABASE_*` definidas. | Adicione no painel da Vercel/Render (ver tabela acima) e re-deploy. |
+| Bundle de prod buildou mas app fica branco | Bypass com `SKIP_ENV_CHECK=1` foi usado e env de fato está vazia. | Configure as vars no painel, remova o bypass, re-deploy. |
+| `--load` exporta nada | Rodou com `bash` em vez de `source`. | `source scripts/setup-env.sh --load` (não `bash ...`). |
+| CI `env-check` vermelho mas local passa | Branch tem `.env.example` desatualizado (faltou var nova). | Pull main, rode `bun run setup:env:check`, commit `.env.example` atualizado. |
+| Edge function retorna `SUPABASE_SERVICE_ROLE_KEY is not defined` | Secret não está em Lovable Cloud (só no `.env` local). | Settings → Functions → Secrets → adicionar → re-deploy a function. |
+| Runtime overlay `[envCheck] Frontend env misconfigured` em DEV | `.env` foi apagado ou tem placeholder. | `bun run setup:env && bun run setup:env:check`, reinicie `bun run dev`. |
 
 > ⚠️ Em produção, **secrets de edge functions vivem em Lovable Cloud Secrets** (Settings → Functions → Secrets). O arquivo `supabase/functions/.env` só é lido pelo CLI em dev local.
 
