@@ -24,7 +24,8 @@
     "setup:env:report:json": "bash scripts/setup-env.sh --validate --report-json",
     "setup:env:effective": "bash scripts/setup-env.sh --print-effective",
     "setup:env:schema": "node scripts/validate-env-report.mjs",
-    "prod:health": "node scripts/prod-health-check.mjs"
+    "prod:health": "node scripts/prod-health-check.mjs",
+    "test:pr-comment": "node scripts/build-env-check-pr-comment.test.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.3.0",

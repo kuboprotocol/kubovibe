@@ -161,8 +161,32 @@ jobs:
               core.info('Created new env-check comment');
             }
 
+      - name: Publish env-check summary to GitHub Step Summary
+        # Always run so the rendered comment body is visible directly on the
+        # workflow run page (not just on PRs). Same content as the PR comment.
+        if: always()
+        run: |
+          if [ -f reports/pr-comment.md ]; then
+            {
+              echo "## env-check"
+              echo ""
+              cat reports/pr-comment.md
+            } >> "$GITHUB_STEP_SUMMARY"
+          elif [ -f reports/env-check.md ]; then
+            {
+              echo "## env-check"
+              echo ""
+              cat reports/env-check.md
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "## env-check — no report produced" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Unit tests for setup-env.sh
         run: bash scripts/setup-env.test.sh
+
+      - name: E2E + fuzz tests for PR-comment builder
+        run: node scripts/build-env-check-pr-comment.test.mjs
 
       - name: Prod health check (best-effort, non-blocking on forks)
         # Only run on main branch / push; PRs from forks lack secrets.

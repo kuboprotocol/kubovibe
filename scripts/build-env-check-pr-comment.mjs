@@ -61,7 +61,9 @@ function sanitizeMarkdown(src, { maxLen = 40000 } = {}) {
   let s = String(src ?? "");
   s = s.replace(/<!--[\s\S]*?-->/g, "");
   s = s.replace(/<\/?(script|style|iframe|object|embed)\b[^>]*>/gi, "");
+  // Neutralise both halves of <details> so embedded MD can't open/close ours.
   s = s.replace(/<\/details>/gi, "&lt;/details&gt;");
+  s = s.replace(/<details(\s[^>]*)?>/gi, "&lt;details$1&gt;");
   if (s.length > maxLen) s = s.slice(0, maxLen) + "\n\n_…truncated…_";
   return s;
 }
@@ -127,7 +129,19 @@ out.push(`| Generated | \`${j.generated_at}\` |`);
 if (SHA) out.push(`| Commit | \`${SHA}\` |`);
 out.push(`| Frontend env | \`${j.frontend_env}\` |`);
 out.push(`| Functions env | \`${j.functions_env}\` |`);
+out.push(`| Scopes | ${Object.keys(byScope).length} |`);
 out.push("");
+
+// ── Per-scope counters (quick triage) ──
+out.push(`| Scope | ✅ ok | ⚠️ placeholder | ❌ missing | 🚫 file | Total |`);
+out.push(`|-------|------:|---------------:|----------:|--------:|------:|`);
+for (const [scope, entries] of Object.entries(byScope)) {
+  const c = { ok: 0, placeholder: 0, missing: 0, missing_file: 0 };
+  for (const e of entries) c[e.status] = (c[e.status] ?? 0) + 1;
+  out.push(`| \`${scope}\` | ${c.ok} | ${c.placeholder} | ${c.missing} | ${c.missing_file} | ${entries.length} |`);
+}
+out.push("");
+
 
 // ── Per-scope collapsibles (failing scopes auto-open) ──
 for (const [scope, entries] of Object.entries(byScope)) {
@@ -167,12 +181,14 @@ out.push("");
 out.push(`</details>`);
 out.push("");
 
-// ── Artifacts & links ──
+// ── Artifacts & links (raw links always shown when commit is known) ──
 out.push("**Artifacts & links**");
 if (ARTIFACT_URL)   out.push(`- 📦 [Download \`env-check-report.zip\`](${ARTIFACT_URL}) — md + json + schema`);
 if (ARTIFACTS_PAGE) out.push(`- 🗂️ [All artifacts for this run](${ARTIFACTS_PAGE})`);
 if (RAW_JSON_URL)   out.push(`- 🧾 [Raw \`env-check.json\`](${RAW_JSON_URL})${BLOB_JSON_URL ? ` · [view on GitHub](${BLOB_JSON_URL})` : ""}`);
+else                out.push(`- 🧾 \`reports/env-check.json\` — raw link unavailable (commit SHA not exposed to workflow).`);
 if (RAW_MD_URL)     out.push(`- 📄 [Raw \`env-check.md\`](${RAW_MD_URL})`);
+else                out.push(`- 📄 \`reports/env-check.md\` — raw link unavailable (commit SHA not exposed to workflow).`);
 if (RUN_URL)        out.push(`- 🔁 [Workflow run](${RUN_URL})${RUN_ID ? ` \`#${RUN_ID}\`` : ""}`);
 if (!ARTIFACT_URL && !ARTIFACTS_PAGE && !RUN_URL)
   out.push(`- Download \`env-check-report\` from the run page (no link captured).`);
