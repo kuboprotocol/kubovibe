@@ -92,6 +92,7 @@ if (!existsSync(REPORT)) {
 }
 
 const j = JSON.parse(readFileSync(REPORT, "utf8"));
+assertReportShape(j);
 const passed = j.status === "pass";
 const total  = j.entries.length;
 const failingEntries = j.entries.filter((e) => e.status !== "ok");
