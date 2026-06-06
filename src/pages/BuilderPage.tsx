@@ -683,6 +683,15 @@ export default function BuilderPage() {
         onClone={handleClone}
         isCloning={isCloning}
       />
+
+      <RunwayDialog
+        open={showRunway}
+        onOpenChange={setShowRunway}
+        onResult={(url) => {
+          // Insert the generated asset URL into the prompt for the AI to consume.
+          setInput((prev) => `${prev}${prev ? "\n" : ""}[runway asset]: ${url}`)
+        }}
+      />
     </div>
   )
 }
