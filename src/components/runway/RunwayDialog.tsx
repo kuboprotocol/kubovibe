@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Loader2, Sparkles, Video, ImageIcon, Wand2, X, Download } from "lucide-react";
+import { Loader2, Sparkles, Video, ImageIcon, Wand2, X, Download, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +10,11 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useRunway, type RunwayEndpoint } from "@/hooks/useRunway";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
+
+const PHOTOREAL_SUFFIX =
+  ", photorealistic, cinematic lighting, shallow depth of field, natural motion, 35mm film, ultra detailed, 4k";
 
 interface Props {
   open: boolean;
@@ -35,11 +40,35 @@ export default function RunwayDialog({ open, onOpenChange, defaultImageUrl, onRe
   const [vidPrompt, setVidPrompt] = useState("");
   const [vidImage, setVidImage] = useState(defaultImageUrl ?? "");
   const [vidDuration, setVidDuration] = useState<5 | 10>(5);
+  const [vidPhotoreal, setVidPhotoreal] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement | null>(null);
   // video_upscale
   const [upscaleUrl, setUpscaleUrl] = useState("");
   // character_performance
   const [charRefVideo, setCharRefVideo] = useState("");
   const [charCharacterImg, setCharCharacterImg] = useState("");
+
+  const handleUpload = async (file: File) => {
+    try {
+      setUploading(true);
+      const { data: u } = await supabase.auth.getUser();
+      const uid = u.user?.id ?? "anon";
+      const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+      const path = `runway/${uid}/${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from("uploads").upload(path, file, {
+        cacheControl: "3600", upsert: false, contentType: file.type,
+      });
+      if (error) throw error;
+      const { data } = supabase.storage.from("uploads").getPublicUrl(path);
+      setVidImage(data.publicUrl);
+      toast({ title: "Foto enviada", description: "Pronta para virar vídeo." });
+    } catch (e) {
+      toast({ title: "Falha no upload", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const busy = state.status === "starting" || state.status === "polling";
 
@@ -77,20 +106,57 @@ export default function RunwayDialog({ open, onOpenChange, defaultImageUrl, onRe
           </TabsList>
 
           <TabsContent value="image_to_video" className="space-y-3 pt-4">
-            <Label>Imagem de origem (URL pública)</Label>
-            <Input value={vidImage} onChange={(e) => setVidImage(e.target.value)} placeholder="https://…" />
-            <Label>Prompt</Label>
-            <Textarea value={vidPrompt} onChange={(e) => setVidPrompt(e.target.value)} placeholder="Cinematic dolly zoom, golden hour…" rows={3} />
-            <div className="flex items-center gap-3">
-              <Label>Duração</Label>
-              <Button type="button" size="sm" variant={vidDuration === 5 ? "default" : "outline"} onClick={() => setVidDuration(5)}>5s</Button>
-              <Button type="button" size="sm" variant={vidDuration === 10 ? "default" : "outline"} onClick={() => setVidDuration(10)}>10s</Button>
+            <Label>Foto de origem</Label>
+            <div className="flex gap-2">
+              <Input
+                value={vidImage}
+                onChange={(e) => setVidImage(e.target.value)}
+                placeholder="Cole uma URL pública ou envie um arquivo"
+              />
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleUpload(f); }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => fileRef.current?.click()}
+                disabled={uploading}
+                title="Enviar foto"
+              >
+                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              </Button>
+            </div>
+            {vidImage && (
+              <img src={vidImage} alt="Foto de origem" className="max-h-40 rounded-md border border-border/60 object-contain bg-background/40" />
+            )}
+            <Label>Prompt de movimento</Label>
+            <Textarea value={vidPrompt} onChange={(e) => setVidPrompt(e.target.value)} placeholder="Subtle head turn, soft breeze in hair, cinematic dolly-in…" rows={3} />
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div className="flex items-center gap-2">
+                <Label>Duração</Label>
+                <Button type="button" size="sm" variant={vidDuration === 5 ? "default" : "outline"} onClick={() => setVidDuration(5)}>5s</Button>
+                <Button type="button" size="sm" variant={vidDuration === 10 ? "default" : "outline"} onClick={() => setVidDuration(10)}>10s</Button>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant={vidPhotoreal ? "default" : "outline"}
+                onClick={() => setVidPhotoreal((v) => !v)}
+                title="Aplica modificadores fotorrealistas no prompt"
+              >
+                <Sparkles className="h-3.5 w-3.5 mr-1" />
+                Foto-realismo
+              </Button>
             </div>
             <Button
               disabled={busy || !vidImage.trim() || !vidPrompt.trim()}
               onClick={() => generate("image_to_video", {
                 model: "gen4_turbo",
-                promptText: vidPrompt,
+                promptText: vidPhotoreal ? `${vidPrompt}${PHOTOREAL_SUFFIX}` : vidPrompt,
                 promptImage: vidImage,
                 ratio: "1280:720",
                 duration: vidDuration,
@@ -98,7 +164,7 @@ export default function RunwayDialog({ open, onOpenChange, defaultImageUrl, onRe
               className="w-full"
             >
               {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
-              Gerar vídeo (28 créditos)
+              Gerar vídeo realista (28 créditos)
             </Button>
           </TabsContent>
 
