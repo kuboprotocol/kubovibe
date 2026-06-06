@@ -302,9 +302,16 @@ export default function ConnectorSetupPage() {
 
         {/* Form */}
         <Card className="p-6 space-y-5">
-          <div className="flex items-center gap-2">
-            <KeyRound className="h-5 w-5 text-primary" />
-            <h2 className="font-semibold">Conectar à KUBO</h2>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <KeyRound className="h-5 w-5 text-primary" />
+              <h2 className="font-semibold">Conectar à KUBO</h2>
+            </div>
+            {connector.slug === 'github' && (
+              <Badge variant="outline" className="text-[10px] uppercase font-bold text-primary border-primary/40">
+                Token PAT Requerido
+              </Badge>
+            )}
           </div>
 
           <div className="space-y-2">
