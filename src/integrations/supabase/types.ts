@@ -38,6 +38,104 @@ export type Database = {
         }
         Relationships: []
       }
+      agent_jobs: {
+        Row: {
+          agent_slug: string
+          completed_at: string | null
+          created_at: string
+          credits_charged: number
+          duration_ms: number | null
+          error_message: string | null
+          id: string
+          input: Json
+          output: Json | null
+          request_id: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          agent_slug: string
+          completed_at?: string | null
+          created_at?: string
+          credits_charged?: number
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          input?: Json
+          output?: Json | null
+          request_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          agent_slug?: string
+          completed_at?: string | null
+          created_at?: string
+          credits_charged?: number
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          input?: Json
+          output?: Json | null
+          request_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_jobs_agent_slug_fkey"
+            columns: ["agent_slug"]
+            isOneToOne: false
+            referencedRelation: "agent_registry"
+            referencedColumns: ["slug"]
+          },
+        ]
+      }
+      agent_registry: {
+        Row: {
+          category: string
+          created_at: string
+          credit_cost: number
+          description: string
+          edge_function: string
+          icon: string | null
+          metadata: Json
+          name: string
+          slug: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          credit_cost?: number
+          description: string
+          edge_function: string
+          icon?: string | null
+          metadata?: Json
+          name: string
+          slug: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          credit_cost?: number
+          description?: string
+          edge_function?: string
+          icon?: string | null
+          metadata?: Json
+          name?: string
+          slug?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       api_credentials: {
         Row: {
           ciphertext: string
