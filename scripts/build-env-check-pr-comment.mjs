@@ -146,9 +146,9 @@ for (const [scope, entries] of Object.entries(byScope)) {
   out.push("");
 }
 
-// ── Full Markdown report (collapsed by default) ──
+// ── Full Markdown report (collapsed, sanitized) ──
 if (existsSync(REPORT_MD)) {
-  const md = readFileSync(REPORT_MD, "utf8").trim();
+  const md = sanitizeMarkdown(readFileSync(REPORT_MD, "utf8").trim());
   out.push(`<details><summary>📄 Full Markdown report (<code>reports/env-check.md</code>)</summary>`);
   out.push("");
   out.push(md);
@@ -169,11 +169,11 @@ out.push("");
 
 // ── Artifacts & links ──
 out.push("**Artifacts & links**");
-if (ARTIFACT_URL) out.push(`- 📦 [Download \`env-check-report.zip\`](${ARTIFACT_URL}) — md + json + schema`);
+if (ARTIFACT_URL)   out.push(`- 📦 [Download \`env-check-report.zip\`](${ARTIFACT_URL}) — md + json + schema`);
 if (ARTIFACTS_PAGE) out.push(`- 🗂️ [All artifacts for this run](${ARTIFACTS_PAGE})`);
-if (RAW_JSON_URL)  out.push(`- 🧾 [\`reports/env-check.json\`](${RAW_JSON_URL}) (raw, this commit)`);
-if (RAW_MD_URL)    out.push(`- 📄 [\`reports/env-check.md\`](${RAW_MD_URL}) (raw, this commit)`);
-if (RUN_URL)       out.push(`- 🔁 [Workflow run](${RUN_URL})`);
+if (RAW_JSON_URL)   out.push(`- 🧾 [Raw \`env-check.json\`](${RAW_JSON_URL})${BLOB_JSON_URL ? ` · [view on GitHub](${BLOB_JSON_URL})` : ""}`);
+if (RAW_MD_URL)     out.push(`- 📄 [Raw \`env-check.md\`](${RAW_MD_URL})`);
+if (RUN_URL)        out.push(`- 🔁 [Workflow run](${RUN_URL})${RUN_ID ? ` \`#${RUN_ID}\`` : ""}`);
 if (!ARTIFACT_URL && !ARTIFACTS_PAGE && !RUN_URL)
   out.push(`- Download \`env-check-report\` from the run page (no link captured).`);
 out.push("");
