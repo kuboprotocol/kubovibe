@@ -179,6 +179,7 @@ validate_file() {
   if [[ ! -f "$file" ]]; then
     err "[$label] missing: $file"
     hint "Run: bash scripts/setup-env.sh   (without --validate)"
+    annotate error "${file#$ROOT_DIR/}" "[$label] env file is missing — run: bash scripts/setup-env.sh"
     REPORT_LINES+=( "| $label | _file_ | ❌ missing | $file |" )
     REPORT_JSON_ENTRIES+=( "{\"scope\":\"$(json_escape "$label")\",\"variable\":null,\"status\":\"missing_file\",\"detail\":\"$(json_escape "$file")\"}" )
     return 1
