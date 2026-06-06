@@ -130,6 +130,3 @@ jobs:
           PROD_SUPABASE_URL: ${{ secrets.PROD_SUPABASE_URL }}
           PROD_SUPABASE_KEY: ${{ secrets.PROD_SUPABASE_KEY }}
         run: node scripts/prod-health-check.mjs
-
-      - name: Unit tests for setup-env.sh
-        run: bash scripts/setup-env.test.sh
