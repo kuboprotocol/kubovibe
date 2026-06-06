@@ -250,6 +250,7 @@ if (( VALIDATE_ONLY )); then
   validate_file "functions" "$FUNCTIONS_ENV" "${REQUIRED_FUNCTIONS[@]}" || total_fails=$((total_fails + $?))
   echo ""
   (( REPORT )) && write_report "$total_fails"
+  (( REPORT_JSON )) && write_report_json "$total_fails"
   if (( total_fails == 0 )); then
     ok "All required variables present and filled."
     return 0 2>/dev/null || exit 0
