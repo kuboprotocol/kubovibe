@@ -308,6 +308,7 @@ if (( VALIDATE_ONLY )); then
   echo ""
   (( REPORT )) && write_report "$total_fails"
   (( REPORT_JSON )) && write_report_json "$total_fails"
+  (( PRINT_EFFECTIVE )) && print_effective
   if (( total_fails == 0 )); then
     ok "All required variables present and filled."
     return 0 2>/dev/null || exit 0
@@ -315,6 +316,12 @@ if (( VALIDATE_ONLY )); then
     err "$total_fails validation failure(s)."
     return 3 2>/dev/null || exit 3
   fi
+fi
+
+# Standalone --print-effective (no --validate)
+if (( PRINT_EFFECTIVE )); then
+  print_effective
+  return 0 2>/dev/null || exit 0
 fi
 
 # ── Copy step ──────────────────────────────────────────────
