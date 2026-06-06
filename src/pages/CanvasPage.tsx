@@ -191,6 +191,12 @@ export default function CanvasPage() {
           )}
         </AnimatePresence>
       </div>
+
+      <RunwayDialog
+        open={showRunway}
+        onOpenChange={setShowRunway}
+        onResult={(url) => toast.success(`Runway pronto — ${url}`)}
+      />
     </div>
   )
 }
