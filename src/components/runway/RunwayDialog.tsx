@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Loader2, Sparkles, Video, ImageIcon, Wand2, X, Download } from "lucide-react";
+import { Loader2, Sparkles, Video, ImageIcon, Wand2, X, Download, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +10,11 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useRunway, type RunwayEndpoint } from "@/hooks/useRunway";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
+
+const PHOTOREAL_SUFFIX =
+  ", photorealistic, cinematic lighting, shallow depth of field, natural motion, 35mm film, ultra detailed, 4k";
 
 interface Props {
   open: boolean;
