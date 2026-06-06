@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import { Send, Eye, Loader2, Copy, Check, Code } from 'lucide-react'
+import { Send, Eye, Loader2, Copy, Check, Code, Film } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { streamChat, streamClone, type Msg } from '@/lib/streamChat'
 import { supabase } from '@/integrations/supabase/client'
