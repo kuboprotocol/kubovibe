@@ -52,8 +52,21 @@ fi
 
 # ── Parse args ─────────────────────────────────────────────
 FORCE=0; LOAD=0; DRY=0; VALIDATE_ONLY=0; REPORT=0; REPORT_JSON=0
+PRINT_EFFECTIVE=0
 REPORT_PATH=""
 REPORT_JSON_PATH=""
+
+# CI annotation mode: emit ::error:: lines when running on GitHub Actions.
+CI_ANNOTATE=0
+[[ "${GITHUB_ACTIONS:-}" == "true" ]] && CI_ANNOTATE=1
+
+# annotate <level> <file> <message>   (level=error|warning|notice)
+annotate() {
+  (( CI_ANNOTATE )) || return 0
+  local level="$1" file="$2" msg="$3"
+  msg="${msg//$'\n'/%0A}"
+  printf '::%s file=%s::%s\n' "$level" "$file" "$msg"
+}
 
 for arg in "$@"; do
   case "$arg" in
@@ -65,6 +78,8 @@ for arg in "$@"; do
     --report=*) REPORT=1; REPORT_PATH="${arg#--report=}" ;;
     --report-json)   REPORT_JSON=1 ;;
     --report-json=*) REPORT_JSON=1; REPORT_JSON_PATH="${arg#--report-json=}" ;;
+    --print-effective) PRINT_EFFECTIVE=1 ;;
+    --no-annotate)     CI_ANNOTATE=0 ;;
     -h|--help)
       sed -n '2,22p' "${BASH_SOURCE[0]}"
       return 0 2>/dev/null || exit 0
