@@ -23,9 +23,20 @@ on:
       - ".github/workflows/env-check.yml"
   workflow_dispatch:
 
+# Fail-fast: cancel in-flight runs on the same branch when a new commit lands.
+concurrency:
+  group: env-check-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    # -e exits on first error, -u catches unset vars, pipefail surfaces piped failures.
+    shell: bash -euo pipefail {0}
+
 jobs:
   env-check:
     runs-on: ubuntu-latest
+    # Stop the whole job on the first failing step (fail-fast at workflow level).
     steps:
       - uses: actions/checkout@v4
 
