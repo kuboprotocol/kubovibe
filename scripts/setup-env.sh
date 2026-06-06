@@ -281,6 +281,7 @@ write_report_json() {
   (( total > 0 )) && status="fail"
   {
     printf '{\n'
+    printf '  "$schema": "./env-check.schema.json",\n'
     printf '  "generated_at": "%s",\n' "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
     printf '  "status": "%s",\n' "$status"
     printf '  "failures": %s,\n' "$total"
