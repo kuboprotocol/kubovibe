@@ -7,12 +7,11 @@
 #   bash scripts/setup-env.sh --force        # overwrite existing .env files
 #   bash scripts/setup-env.sh --dry-run      # show what would happen, write nothing
 #   bash scripts/setup-env.sh --validate     # only validate existing .env files
+#   bash scripts/setup-env.sh --validate --report --report-json   # write reports
+#   bash scripts/setup-env.sh --print-effective                   # show resolved env (masked)
+#   bash scripts/setup-env.sh --no-annotate                       # disable GH Actions ::error:: lines
 #   source scripts/setup-env.sh --load       # copy + export vars in current shell
 #   bash scripts/setup-env.sh --help
-#
-# Flags can be combined, e.g.:
-#   bash scripts/setup-env.sh --force --validate
-#   source scripts/setup-env.sh --force --load
 #
 # Exit codes:
 #   0  success
@@ -52,8 +51,21 @@ fi
 
 # ── Parse args ─────────────────────────────────────────────
 FORCE=0; LOAD=0; DRY=0; VALIDATE_ONLY=0; REPORT=0; REPORT_JSON=0
+PRINT_EFFECTIVE=0
 REPORT_PATH=""
 REPORT_JSON_PATH=""
+
+# CI annotation mode: emit ::error:: lines when running on GitHub Actions.
+CI_ANNOTATE=0
+[[ "${GITHUB_ACTIONS:-}" == "true" ]] && CI_ANNOTATE=1
+
+# annotate <level> <file> <message>   (level=error|warning|notice)
+annotate() {
+  (( CI_ANNOTATE )) || return 0
+  local level="$1" file="$2" msg="$3"
+  msg="${msg//$'\n'/%0A}"
+  printf '::%s file=%s::%s\n' "$level" "$file" "$msg"
+}
 
 for arg in "$@"; do
   case "$arg" in
@@ -65,8 +77,10 @@ for arg in "$@"; do
     --report=*) REPORT=1; REPORT_PATH="${arg#--report=}" ;;
     --report-json)   REPORT_JSON=1 ;;
     --report-json=*) REPORT_JSON=1; REPORT_JSON_PATH="${arg#--report-json=}" ;;
+    --print-effective) PRINT_EFFECTIVE=1 ;;
+    --no-annotate)     CI_ANNOTATE=0 ;;
     -h|--help)
-      sed -n '2,22p' "${BASH_SOURCE[0]}"
+      sed -n '2,21p' "${BASH_SOURCE[0]}"
       return 0 2>/dev/null || exit 0
       ;;
     *)
@@ -164,6 +178,7 @@ validate_file() {
   if [[ ! -f "$file" ]]; then
     err "[$label] missing: $file"
     hint "Run: bash scripts/setup-env.sh   (without --validate)"
+    annotate error "${file#$ROOT_DIR/}" "[$label] env file is missing — run: bash scripts/setup-env.sh"
     REPORT_LINES+=( "| $label | _file_ | ❌ missing | $file |" )
     REPORT_JSON_ENTRIES+=( "{\"scope\":\"$(json_escape "$label")\",\"variable\":null,\"status\":\"missing_file\",\"detail\":\"$(json_escape "$file")\"}" )
     return 1
@@ -171,16 +186,19 @@ validate_file() {
 
   log "Validating $label → $file"
 
+  local relfile="${file#$ROOT_DIR/}"
   for key in "${required[@]}"; do
     local val status note jstatus
     val="$(get_value "$file" "$key" || true)"
     if [[ -z "$val" ]]; then
       err "[$label] $key is missing or empty"
+      annotate error "$relfile" "[$label] env var '$key' is missing or empty"
       status="❌ missing"; note="empty / unset"; jstatus="missing"
       fails=$((fails+1))
     elif [[ "$val" =~ $PLACEHOLDER_REGEX ]]; then
       err "[$label] $key still has placeholder value: $val"
       hint "Edit $file and replace with a real value."
+      annotate error "$relfile" "[$label] env var '$key' still has placeholder value ($val)"
       status="⚠️ placeholder"; note="value: \`$val\`"; jstatus="placeholder"
       fails=$((fails+1))
     else
@@ -192,6 +210,43 @@ validate_file() {
   done
 
   return $fails
+}
+
+# mask_value <value> — show first 4 + last 4 chars, mask the middle.
+mask_value() {
+  local v="$1" n=${#1}
+  if (( n <= 8 )); then
+    printf '%s' "$(printf '%*s' "$n" '' | tr ' ' '*')"
+  else
+    printf '%s…%s (%d chars)' "${v:0:4}" "${v: -4}" "$n"
+  fi
+}
+
+# print_effective: dump resolved env values (masked) for both scopes.
+print_effective() {
+  echo ""
+  log "Effective env (values masked — first 4 + last 4 chars):"
+  local scope file keys key val
+  for scope in frontend functions; do
+    if [[ "$scope" == frontend ]]; then file="$FRONTEND_ENV"; keys=( "${REQUIRED_FRONTEND[@]}" )
+    else                                 file="$FUNCTIONS_ENV"; keys=( "${REQUIRED_FUNCTIONS[@]}" )
+    fi
+    echo ""
+    echo "  ${C_BLU}# $scope${C_RST} (${file#$ROOT_DIR/})"
+    if [[ ! -f "$file" ]]; then
+      echo "    (file not found)"
+      continue
+    fi
+    for key in "${keys[@]}"; do
+      val="$(get_value "$file" "$key" || true)"
+      if [[ -z "$val" ]]; then
+        printf '    %-32s = %s\n' "$key" "${C_RED}<unset>${C_RST}"
+      else
+        printf '    %-32s = %s\n' "$key" "$(mask_value "$val")"
+      fi
+    done
+  done
+  echo ""
 }
 
 write_report() {
@@ -225,6 +280,7 @@ write_report_json() {
   (( total > 0 )) && status="fail"
   {
     printf '{\n'
+    printf '  "$schema": "./env-check.schema.json",\n'
     printf '  "generated_at": "%s",\n' "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
     printf '  "status": "%s",\n' "$status"
     printf '  "failures": %s,\n' "$total"
@@ -251,6 +307,7 @@ if (( VALIDATE_ONLY )); then
   echo ""
   (( REPORT )) && write_report "$total_fails"
   (( REPORT_JSON )) && write_report_json "$total_fails"
+  (( PRINT_EFFECTIVE )) && print_effective
   if (( total_fails == 0 )); then
     ok "All required variables present and filled."
     return 0 2>/dev/null || exit 0
@@ -258,6 +315,12 @@ if (( VALIDATE_ONLY )); then
     err "$total_fails validation failure(s)."
     return 3 2>/dev/null || exit 3
   fi
+fi
+
+# Standalone --print-effective (no --validate)
+if (( PRINT_EFFECTIVE )); then
+  print_effective
+  return 0 2>/dev/null || exit 0
 fi
 
 # ── Copy step ──────────────────────────────────────────────
