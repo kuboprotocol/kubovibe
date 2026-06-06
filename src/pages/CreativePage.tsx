@@ -313,6 +313,7 @@ export default function CreativePage() {
           <TabsContent value="shorts"><ShortsTool onDone={() => { refetch(); loadHistory(); }} /></TabsContent>
           <TabsContent value="music"><MusicTool onDone={() => { refetch(); loadHistory(); }} /></TabsContent>
           <TabsContent value="ebook"><EbookTool onDone={() => { refetch(); loadHistory(); }} /></TabsContent>
+          <TabsContent value="emo"><EmoTool onDone={() => { refetch(); loadHistory(); }} /></TabsContent>
         </Tabs>
       </main>
 
