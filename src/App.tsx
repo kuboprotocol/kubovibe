@@ -37,6 +37,7 @@ import GamePage from "./pages/GamePage";
 import AdminSkillsPage from "./pages/AdminSkillsPage";
 import DomainsPage from "./pages/DomainsPage";
 import CreativePage from "./pages/CreativePage";
+import AgentsHubPage from "./pages/AgentsHubPage";
 
 const queryClient = new QueryClient();
 
@@ -92,6 +93,7 @@ const App = () => (
             <Route path="/domains" element={<ProtectedRoute><DomainsPage /></ProtectedRoute>} />
             <Route path="/creative" element={<ProtectedRoute><CreativePage /></ProtectedRoute>} />
             <Route path="/creative/:tool" element={<ProtectedRoute><CreativePage /></ProtectedRoute>} />
+            <Route path="/agents" element={<ProtectedRoute><AgentsHubPage /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
