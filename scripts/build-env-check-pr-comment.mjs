@@ -179,12 +179,14 @@ out.push("");
 out.push(`</details>`);
 out.push("");
 
-// ── Artifacts & links ──
+// ── Artifacts & links (raw links always shown when commit is known) ──
 out.push("**Artifacts & links**");
 if (ARTIFACT_URL)   out.push(`- 📦 [Download \`env-check-report.zip\`](${ARTIFACT_URL}) — md + json + schema`);
 if (ARTIFACTS_PAGE) out.push(`- 🗂️ [All artifacts for this run](${ARTIFACTS_PAGE})`);
 if (RAW_JSON_URL)   out.push(`- 🧾 [Raw \`env-check.json\`](${RAW_JSON_URL})${BLOB_JSON_URL ? ` · [view on GitHub](${BLOB_JSON_URL})` : ""}`);
+else                out.push(`- 🧾 \`reports/env-check.json\` — raw link unavailable (commit SHA not exposed to workflow).`);
 if (RAW_MD_URL)     out.push(`- 📄 [Raw \`env-check.md\`](${RAW_MD_URL})`);
+else                out.push(`- 📄 \`reports/env-check.md\` — raw link unavailable (commit SHA not exposed to workflow).`);
 if (RUN_URL)        out.push(`- 🔁 [Workflow run](${RUN_URL})${RUN_ID ? ` \`#${RUN_ID}\`` : ""}`);
 if (!ARTIFACT_URL && !ARTIFACTS_PAGE && !RUN_URL)
   out.push(`- Download \`env-check-report\` from the run page (no link captured).`);
