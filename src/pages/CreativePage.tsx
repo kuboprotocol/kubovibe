@@ -13,10 +13,10 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
   MessageSquare, Image as ImageIcon, Download, Scissors, User2,
-  Video, Music, BookOpen, Sparkles, Loader2, Coins, ArrowLeft, RotateCw, AlertTriangle,
+  Video, Music, BookOpen, Sparkles, Loader2, Coins, ArrowLeft, RotateCw, AlertTriangle, Upload
 } from "lucide-react";
 
-type ToolKey = "dashboard" | "chat" | "nano_banana" | "downloader" | "clips" | "avatar" | "shorts" | "music" | "ebook";
+type ToolKey = "dashboard" | "chat" | "nano_banana" | "downloader" | "clips" | "avatar" | "shorts" | "music" | "ebook" | "emo";
 
 const TOOLS: { key: ToolKey; title: string; desc: string; icon: any; cost: string }[] = [
   { key: "chat", title: "Kubo Chat", desc: "Conversas, resumos, traduções, geração de textos", icon: MessageSquare, cost: "1 crédito/msg" },
@@ -27,6 +27,7 @@ const TOOLS: { key: ToolKey; title: string; desc: string; icon: any; cost: strin
   { key: "shorts", title: "Kubo Shorts", desc: "Vídeos curtos verticais a partir de texto", icon: Video, cost: "3 créditos" },
   { key: "music", title: "Kubo Music AI", desc: "Música original via Suno", icon: Music, cost: "1 crédito" },
   { key: "ebook", title: "Kubo Ebook AI", desc: "eBooks completos com capa e capítulos", icon: BookOpen, cost: "10 créditos" },
+  { key: "emo", title: "Kubo EMO AI", desc: "Animação realista de fotos a partir de vídeo", icon: Sparkles, cost: "5 créditos" },
 ];
 
 function fnUrl(name: string) {
@@ -54,6 +55,7 @@ const RERUN_MAP: Record<string, { fn: string; build: (a: any) => any }> = {
   shorts: { fn: "creative-video", build: (a) => ({ mode: "shorts", prompt: a.prompt, duration: 30 }) },
   music: { fn: "creative-music", build: (a) => ({ action: "generate", prompt: a.prompt, instrumental: a.metadata?.instrumental ?? false }) },
   ebook: { fn: "creative-ebook", build: (a) => ({ topic: a.prompt, chapters: a.metadata?.chapters ?? 5 }) },
+  emo: { fn: "emo-animate", build: (a) => ({ source_image: a.metadata?.source_image, driving_video: a.metadata?.driving_video }) },
 };
 
 // In-memory cooldown registry (per tool) populated when an edge fn returns 429.
@@ -311,6 +313,7 @@ export default function CreativePage() {
           <TabsContent value="shorts"><ShortsTool onDone={() => { refetch(); loadHistory(); }} /></TabsContent>
           <TabsContent value="music"><MusicTool onDone={() => { refetch(); loadHistory(); }} /></TabsContent>
           <TabsContent value="ebook"><EbookTool onDone={() => { refetch(); loadHistory(); }} /></TabsContent>
+          <TabsContent value="emo"><EmoTool onDone={() => { refetch(); loadHistory(); }} /></TabsContent>
         </Tabs>
       </main>
 
@@ -812,6 +815,109 @@ function RenderResult({ r }: { r: any }) {
         </>
       )}
       {r.note && <p className="text-xs text-muted-foreground italic">{r.note}</p>}
+    </Card>
+  );
+}
+
+function EmoTool({ onDone }: { onDone: () => void }) {
+  const [sourceImage, setSourceImage] = useState("");
+  const [drivingVideo, setDrivingVideo] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+  const fileImgRef = useRef<HTMLInputElement>(null);
+  const fileVidRef = useRef<HTMLInputElement>(null);
+
+  const handleUpload = async (file: File, type: "image" | "video") => {
+    try {
+      const ext = file.name.split(".").pop()?.toLowerCase() || (type === "image" ? "jpg" : "mp4");
+      const path = `uploads/emo/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+      const { error } = await supabase.storage.from("uploads").upload(path, file);
+      if (error) throw error;
+      const { data } = supabase.storage.from("uploads").getPublicUrl(path);
+      if (type === "image") setSourceImage(data.publicUrl);
+      else setDrivingVideo(data.publicUrl);
+      toast.success(`${type === "image" ? "Foto" : "Vídeo"} enviado com sucesso!`);
+    } catch (e: any) {
+      toast.error(`Falha no upload: ${e.message}`);
+    }
+  };
+
+  async function run() {
+    if (!sourceImage || !drivingVideo) {
+      toast.error("Selecione uma foto e um vídeo de referência.");
+      return;
+    }
+    setLoading(true); setResult(null);
+    try {
+      const r = await authedFetch("emo-animate", { source_image: sourceImage, driving_video: drivingVideo });
+      const d = await r.json();
+      if (!r.ok) handleFnError(d);
+      else {
+        setResult(d.video.startsWith("http") ? d.video : d.video); // The function should return a public URL
+        onDone();
+        toast.success("Animação concluída!");
+      }
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Card className="p-5 space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="font-bold flex items-center gap-2">
+          <Sparkles className="h-5 w-5 text-primary" />
+          Kubo EMO AI — Emotive Portrait Alive
+        </h3>
+        <Badge variant="secondary">5 créditos</Badge>
+      </div>
+      <p className="text-sm text-muted-foreground">
+        Gera animações extremamente realistas a partir de uma foto de rosto e um vídeo de referência.
+      </p>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Foto do Rosto (Source)</label>
+          <div className="flex gap-2">
+            <Input value={sourceImage} onChange={(e) => setSourceImage(e.target.value)} placeholder="URL da foto..." />
+            <Button variant="outline" size="icon" onClick={() => fileImgRef.current?.click()}>
+              <Upload className="h-4 w-4" />
+            </Button>
+            <input type="file" ref={fileImgRef} hidden accept="image/*" onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0], "image")} />
+          </div>
+          {sourceImage && <img src={sourceImage} className="w-full h-32 object-cover rounded-lg border border-border" alt="Source" />}
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Vídeo de Referência (Driving)</label>
+          <div className="flex gap-2">
+            <Input value={drivingVideo} onChange={(e) => setDrivingVideo(e.target.value)} placeholder="URL do vídeo..." />
+            <Button variant="outline" size="icon" onClick={() => fileVidRef.current?.click()}>
+              <Upload className="h-4 w-4" />
+            </Button>
+            <input type="file" ref={fileVidRef} hidden accept="video/*" onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0], "video")} />
+          </div>
+          {drivingVideo && <video src={drivingVideo} className="w-full h-32 object-cover rounded-lg border border-border" controls />}
+        </div>
+      </div>
+
+      <Button onClick={run} disabled={loading || !sourceImage || !drivingVideo} className="w-full">
+        {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Video className="h-4 w-4 mr-2" />}
+        Gerar Animação Realista
+      </Button>
+
+      {result && (
+        <div className="mt-4 space-y-2">
+          <label className="text-xs font-semibold uppercase tracking-wider text-primary">Resultado Final</label>
+          <video src={result} controls className="w-full rounded-lg border-2 border-primary/20 shadow-lg shadow-primary/5" />
+          <Button variant="outline" className="w-full" onClick={() => window.open(result, "_blank")}>
+            <Download className="h-4 w-4 mr-2" />
+            Baixar Vídeo
+          </Button>
+        </div>
+      )}
     </Card>
   );
 }
