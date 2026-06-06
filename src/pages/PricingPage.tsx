@@ -10,12 +10,12 @@ import logoImg from '@/assets/logo-kubovibe.png'
 
 const allPackages = [
   { id: 'free', name: 'Free', price: '$0', priceNum: 0, credits: 5, description: 'Comece grátis com 5 créditos', icon: Gift, badge: '🎁', color: 'from-muted to-secondary', borderColor: 'border-border', isFree: true, visible: true },
-  { id: 'shortlinks', name: 'Shortlinks', price: 'Grátis', priceNum: 0, credits: 5, description: 'Assista 10 links por dia e ganhe +5 créditos', icon: Zap, badge: '⚡', color: 'from-primary/20 to-accent', borderColor: 'border-primary/50', isShortlinks: true, popular: true, visible: true },
-  { id: 'starter', name: 'Starter', price: '$4.99', priceNum: 4.99, credits: 35, description: 'Ideal to get started', icon: Zap, badge: '⚡', color: 'from-secondary to-muted', borderColor: 'border-border', visible: false },
-  { id: 'basic', name: 'Basic', price: '$19.99', priceNum: 19.99, credits: 80, description: 'Great cost-benefit ratio', icon: Star, badge: '⭐', color: 'from-secondary to-muted', borderColor: 'border-border', visible: false },
-  { id: 'pro', name: 'Pro', price: '$39.99', priceNum: 39.99, credits: 120, description: 'For active users', icon: Crown, badge: '👑', color: 'from-secondary to-muted', borderColor: 'border-primary/30', visible: false },
-  { id: 'advanced', name: 'Advanced', price: '$59.99', priceNum: 59.99, credits: 200, description: 'Balance between volume and savings', icon: Sparkles, badge: '⭐', popular: true, color: 'from-primary/20 to-accent', borderColor: 'border-primary/50', visible: false },
-  { id: 'elite', name: 'Elite', price: '$99.99', priceNum: 99.99, credits: 350, description: 'Maximum performance, lowest cost per credit', icon: Rocket, badge: '🚀', bestValue: true, color: 'from-primary/15 to-accent/50', borderColor: 'border-primary/40', visible: false },
+  { id: 'shortlinks', name: 'Shortlinks', price: 'Grátis', priceNum: 0, credits: 5, description: 'Assista 10 links por dia e ganhe +5 créditos', icon: Zap, badge: '⚡', color: 'from-primary/20 to-accent', borderColor: 'border-primary/50', isShortlinks: true, popular: false, visible: true },
+  { id: 'starter', name: 'Starter', price: '$4.99', priceNum: 4.99, credits: 35, description: 'Ideal to get started', icon: Zap, badge: '⚡', color: 'from-secondary to-muted', borderColor: 'border-border', visible: true },
+  { id: 'basic', name: 'Basic', price: '$19.99', priceNum: 19.99, credits: 80, description: 'Great cost-benefit ratio', icon: Star, badge: '⭐', color: 'from-secondary to-muted', borderColor: 'border-border', visible: true },
+  { id: 'pro', name: 'Pro', price: '$39.99', priceNum: 39.99, credits: 120, description: 'For active users', icon: Crown, badge: '👑', color: 'from-secondary to-muted', borderColor: 'border-primary/30', visible: true },
+  { id: 'advanced', name: 'Advanced', price: '$59.99', priceNum: 59.99, credits: 200, description: 'Balance between volume and savings', icon: Sparkles, badge: '⭐', popular: true, color: 'from-primary/20 to-accent', borderColor: 'border-primary/50', visible: true },
+  { id: 'elite', name: 'Elite', price: '$99.99', priceNum: 99.99, credits: 350, description: 'Maximum performance, lowest cost per credit', icon: Rocket, badge: '🚀', bestValue: true, color: 'from-primary/15 to-accent/50', borderColor: 'border-primary/40', visible: true },
 ] as Array<{ id: string; name: string; price: string; priceNum: number; credits: number; description: string; icon: any; badge: string; color: string; borderColor: string; isFree?: boolean; isShortlinks?: boolean; popular?: boolean; bestValue?: boolean; visible: boolean }>
 
 const packages = allPackages.filter(p => p.visible)
