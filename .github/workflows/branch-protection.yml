@@ -1,0 +1,19 @@
+name: Branch Protection and Mandatory Status Checks
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify-status:
+    name: Verify Required Status Checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for Integration Tests and Fuzz Tests
+        uses: lewagon/wait-on-check-action@v1.3.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          check-regexp: '(Playwright|Preflight Fuzz).*'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 30
+          allowed-conclusions: success
