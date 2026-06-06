@@ -128,11 +128,14 @@ jobs:
         if: always() && github.event_name == 'pull_request'
         env:
           REPORT_JSON_PATH: reports/env-check.json
-          # upload-artifact@v4 exposes `artifact-url` (direct download link).
+          REPORT_MD_PATH:   reports/env-check.md
+          # upload-artifact@v4 exposes `artifact-url` (direct .zip download link).
           ARTIFACT_URL: ${{ steps.upload_report.outputs.artifact-url }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-          OUT_PATH: reports/pr-comment.md
+          RUN_URL:      ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          REPO_URL:     ${{ github.server_url }}/${{ github.repository }}
+          RUN_ID:       ${{ github.run_id }}
+          COMMIT_SHA:   ${{ github.event.pull_request.head.sha || github.sha }}
+          OUT_PATH:     reports/pr-comment.md
         run: node scripts/build-env-check-pr-comment.mjs
 
       - name: Post / update PR comment
