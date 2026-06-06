@@ -19,6 +19,7 @@ export default function CanvasPage() {
   const [saving, setSaving] = useState(false)
   const [showTemplates, setShowTemplates] = useState(!canvasId)
   const [showInfo, setShowInfo] = useState(true)
+  const [showRunway, setShowRunway] = useState(false)
 
   useEffect(() => {
     if (canvasId) {
