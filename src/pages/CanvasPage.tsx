@@ -138,6 +138,16 @@ export default function CanvasPage() {
           <Button
             variant="ghost"
             size="sm"
+            onClick={() => setShowRunway(true)}
+            className="text-primary hover:text-primary"
+            title="RunwayML — Gerar vídeo/imagem (28 créditos)"
+          >
+            <Film className="h-4 w-4 mr-1.5" />
+            <span className="hidden sm:inline">Runway</span>
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={handleShare}
             className="text-muted-foreground"
           >
