@@ -583,6 +583,15 @@ export default function BuilderPage() {
                       if (file) handleFileUpload(file)
                     }
                   }} />
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="absolute right-12 bottom-2 h-8 w-8 rounded-lg text-primary hover:text-primary"
+                  onClick={() => setShowRunway(true)}
+                  title="RunwayML — Gerar vídeo/imagem (28 créditos)"
+                >
+                  <Film className="h-3.5 w-3.5" />
+                </Button>
                 <Button size="icon" variant="hero" className="absolute right-2 bottom-2 h-8 w-8 rounded-lg" onClick={send} disabled={isLoading || !input.trim()}>
                   {isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
                 </Button>
