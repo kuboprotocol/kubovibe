@@ -92,14 +92,21 @@ jobs:
           SUPABASE_ANON_KEY="eyJrealanonkeyforci.signedpayload.signature"
           SUPABASE_SERVICE_ROLE_KEY="eyJrealsrkeyforci.signedpayload.signature"
           EOF
-          bash scripts/setup-env.sh --validate --report
+          bash scripts/setup-env.sh --validate --report --report-json
 
-      - name: Upload env-check report
+      - name: Validate JSON report shape
+        run: |
+          test -f reports/env-check.json
+          node -e "const j=require('./reports/env-check.json'); if(j.status!=='pass')process.exit(1); if(!Array.isArray(j.entries)||j.entries.length<6)process.exit(2);"
+
+      - name: Upload env-check report (Markdown + JSON)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: env-check-report
-          path: reports/env-check.md
+          path: |
+            reports/env-check.md
+            reports/env-check.json
           if-no-files-found: ignore
 
       - name: Unit tests for setup-env.sh
