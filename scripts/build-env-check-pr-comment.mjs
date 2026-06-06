@@ -32,15 +32,48 @@ const MARKER = "<!-- kubo:env-check -->";
 const ARTIFACTS_PAGE = RUN_URL ? `${RUN_URL}#artifacts` : "";
 
 // Raw file in the commit tree (lets reviewers click straight to the JSON).
+// `/raw/` returns the literal bytes; `/blob/` is the rendered view.
 const RAW_JSON_URL = REPO_URL && SHA_FULL
-  ? `${REPO_URL}/blob/${SHA_FULL}/reports/env-check.json`
+  ? `${REPO_URL}/raw/${SHA_FULL}/reports/env-check.json`
   : "";
 const RAW_MD_URL = REPO_URL && SHA_FULL
-  ? `${REPO_URL}/blob/${SHA_FULL}/reports/env-check.md`
+  ? `${REPO_URL}/raw/${SHA_FULL}/reports/env-check.md`
+  : "";
+const BLOB_JSON_URL = REPO_URL && SHA_FULL
+  ? `${REPO_URL}/blob/${SHA_FULL}/reports/env-check.json`
   : "";
 
 const EMOJI = { ok: "✅", placeholder: "⚠️", missing: "❌", missing_file: "🚫" };
 const emoji = (s) => EMOJI[s] ?? "•";
+
+/**
+ * Sanitize untrusted Markdown before embedding it inside the PR comment.
+ * - Strips HTML comments so they can't collide with our `kubo:env-check`
+ *   marker and trick the "find prior comment" step into rewriting the wrong
+ *   block on re-runs.
+ * - Removes <script>/<style>/<iframe> tags (GitHub already filters these,
+ *   but defense in depth keeps lint clean).
+ * - Neutralises stray `</details>` that would prematurely close our
+ *   collapsible wrapper around the embedded report.
+ * - Caps length to stay well under GitHub's 65 536-char comment limit.
+ */
+function sanitizeMarkdown(src, { maxLen = 40000 } = {}) {
+  let s = String(src ?? "");
+  s = s.replace(/<!--[\s\S]*?-->/g, "");
+  s = s.replace(/<\/?(script|style|iframe|object|embed)\b[^>]*>/gi, "");
+  s = s.replace(/<\/details>/gi, "&lt;/details&gt;");
+  if (s.length > maxLen) s = s.slice(0, maxLen) + "\n\n_…truncated…_";
+  return s;
+}
+
+/** Validate the shape of the JSON we depend on below. */
+function assertReportShape(j) {
+  const errs = [];
+  if (!j || typeof j !== "object") errs.push("report is not an object");
+  if (j && !["pass", "fail"].includes(j.status)) errs.push(`bad status: ${j?.status}`);
+  if (j && !Array.isArray(j.entries)) errs.push("entries is not an array");
+  if (errs.length) throw new Error(`invalid env-check.json — ${errs.join("; ")}`);
+}
 
 function writeOut(body) {
   mkdirSync(dirname(resolve(OUT)), { recursive: true });
