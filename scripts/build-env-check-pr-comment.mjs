@@ -61,7 +61,9 @@ function sanitizeMarkdown(src, { maxLen = 40000 } = {}) {
   let s = String(src ?? "");
   s = s.replace(/<!--[\s\S]*?-->/g, "");
   s = s.replace(/<\/?(script|style|iframe|object|embed)\b[^>]*>/gi, "");
+  // Neutralise both halves of <details> so embedded MD can't open/close ours.
   s = s.replace(/<\/details>/gi, "&lt;/details&gt;");
+  s = s.replace(/<details(\s[^>]*)?>/gi, "&lt;details$1&gt;");
   if (s.length > maxLen) s = s.slice(0, maxLen) + "\n\n_…truncated…_";
   return s;
 }
