@@ -149,7 +149,7 @@ Deno.serve(async (req) => {
 </head>
 <body>
   <h1>${repo_full_name}</h1>
-  <pre>${readmeContent.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>
+  <pre>${readmeContent.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>
   <footer style="margin-top:2rem;color:#8b949e;font-size:0.8rem;">Deployed via Kubo Vibe IPFS</footer>
 </body>
 </html>`
