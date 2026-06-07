@@ -43,19 +43,38 @@ test.describe('Orchestrator Performance Auditing and PDF Export', () => {
     await page.keyboard.press('Escape');
     
     // Trigger PDF Export and verify filename
-    const [download] = await Promise.all([
+    const [pdfDownload] = await Promise.all([
       page.waitForEvent('download'),
       page.locator('button:has-text("Alertas PDF")').click(),
     ]);
     
-    const fileName = download.suggestedFilename();
+    const pdfFileName = pdfDownload.suggestedFilename();
     // Format should be audit-{id}-{timestamp}.pdf
-    expect(fileName).toMatch(/^audit-.*-\d+\.pdf$/);
+    expect(pdfFileName).toMatch(/^audit-.*-\d+\.pdf$/);
     if (correlationId) {
-      expect(fileName).toContain(correlationId);
+      expect(pdfFileName).toContain(correlationId);
     } else {
-      expect(fileName).toContain(traceId);
+      expect(pdfFileName).toContain(traceId);
     }
+
+    // Trigger CSV Export and verify filename
+    const [csvDownload] = await Promise.all([
+      page.waitForEvent('download'),
+      page.locator('button:has-text("Alertas CSV")').click(),
+    ]);
+    
+    const csvFileName = csvDownload.suggestedFilename();
+    // Format should be alerts-audit-{id}-{timestamp}.csv
+    expect(csvFileName).toMatch(/^alerts-audit-.*-\d+\.csv$/);
+    if (correlationId) {
+      expect(csvFileName).toContain(correlationId);
+    } else {
+      expect(csvFileName).toContain(traceId);
+    }
+
+    // Test TimeZone Selector presence
+    await expect(page.locator('select')).toBeVisible();
+    await page.locator('select').selectOption('America/Sao_Paulo');
 
     // Verification of ISO format in any exported metadata or logs (if we could read PDF)
     // For now we assume system/browser timezone is handled by JS Date
