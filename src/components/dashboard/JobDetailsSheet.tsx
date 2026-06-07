@@ -709,12 +709,24 @@ export function JobDetailsSheet({
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
                   <p className="text-[9px] text-muted-foreground ml-1 flex items-center gap-1">
-                    <Calendar className="h-2 w-2" /> Intervalo de Datas (Opcional)
+                    <Calendar className="h-2 w-2" /> Intervalo & Fuso Horário
                   </p>
                   {dateError && <p className="text-[9px] text-destructive font-bold animate-pulse">{dateError}</p>}
                 </div>
-                <div className="flex gap-2">
-                  <Popover>
+                <div className="flex flex-wrap gap-2">
+                  <div className="flex-1 min-w-[120px]">
+                    <select 
+                      className="w-full h-7 text-[10px] bg-background border rounded px-2"
+                      value={timeZone}
+                      onChange={(e) => setTimeZone(e.target.value)}
+                    >
+                      {timeZones.map(tz => (
+                        <option key={tz.value} value={tz.value}>{tz.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex gap-2 flex-1 min-w-[200px]">
+                    <Popover>
                     <PopoverTrigger asChild>
                       <Button variant="outline" size="sm" className="h-7 text-[10px] flex-1 justify-start">
                         {dateRange.from ? format(dateRange.from, "dd/MM/yy") : "Início"}
@@ -743,7 +755,10 @@ export function JobDetailsSheet({
                         initialFocus
                       />
                     </PopoverContent>
-                  </Popover>
+                    </Popover>
+                  </div>
+                </div>
+              </div>
                   {(dateRange.from || dateRange.to) && (
                     <Button 
                       variant="ghost" 
