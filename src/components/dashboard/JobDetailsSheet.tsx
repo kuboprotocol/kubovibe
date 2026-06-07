@@ -196,6 +196,10 @@ export function JobDetailsSheet({
     }
   };
 
+  const clearFilters = () => {
+    setTimelineSearch("");
+  };
+
   useEffect(() => {
     if (activeTab === "timeline" && timelineSearch) {
       const match = filteredLogs.find(log => 
@@ -209,6 +213,12 @@ export function JobDetailsSheet({
       }
     }
   }, [activeTab, timelineSearch, filteredLogs.length]);
+
+  const hasEventsForCorrelation = (corrId: string) => {
+    return auditLogs.some(log => log.correlation_id === corrId);
+  };
+
+  const isSearchingCorrelation = timelineSearch && timelineSearch.length > 10;
 
   return (
     <>
@@ -447,17 +457,35 @@ export function JobDetailsSheet({
                       <History className="h-10 w-10 mx-auto mb-3 opacity-20" />
                       <p className="text-sm font-medium">Nenhum evento encontrado</p>
                       {timelineSearch ? (
-                        <div className="mt-2 space-y-1">
-                          <p className="text-[10px]">Não há eventos correspondentes a "{timelineSearch}"</p>
-                          <Button 
-                            variant="link" 
-                            size="sm" 
-                            className="h-auto p-0 text-[10px]" 
-                            onClick={() => setTimelineSearch("")}
-                          >
-                            Limpar filtro
-                          </Button>
+                        <div className="mt-2 space-y-2">
+                          <p className="text-[10px]">
+                            {isSearchingCorrelation && !hasEventsForCorrelation(timelineSearch) 
+                              ? `Não foram encontrados eventos específicos para o CorrelationID "${timelineSearch}" neste job.`
+                              : `Não há eventos correspondentes a "${timelineSearch}"`}
+                          </p>
+                          <div className="flex justify-center gap-2">
+                            <Button 
+                              variant="link" 
+                              size="sm" 
+                              className="h-auto p-0 text-[10px]" 
+                              onClick={clearFilters}
+                            >
+                              Limpar filtro
+                            </Button>
+                          </div>
                         </div>
+                      ) : (
+                        <p className="text-[10px] mt-1">Aguardando processamento ou novos logs do job.</p>
+                      )}
+                      <div className="mt-4 pt-4 border-t border-dashed border-border/50">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider mb-2">Sugestões de Investigação:</p>
+                        <ul className="text-[9px] text-left list-disc list-inside space-y-1 max-w-[240px] mx-auto">
+                          <li>O CorrelationID pode estar em outro Job (verifique a busca global)</li>
+                          <li>Certifique-se que o evento não foi filtrado por erro de rede</li>
+                          <li>Tente reexecutar o job para gerar novos logs</li>
+                        </ul>
+                      </div>
+                    </div>
                       ) : (
                         <p className="text-[10px] mt-1">Aguardando processamento ou novos logs do job.</p>
                       )}
