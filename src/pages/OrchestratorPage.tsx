@@ -106,6 +106,21 @@ export default function OrchestratorPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState(searchParams.get("q") || "");
 
+  useEffect(() => {
+    const q = searchParams.get("q");
+    if (q !== null && q !== searchTerm) {
+      setSearchTerm(q);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    setSearchParams(prev => {
+      if (searchTerm) prev.set("q", searchTerm);
+      else prev.delete("q");
+      return prev;
+    }, { replace: true });
+  }, [searchTerm, setSearchParams]);
+
   // Config
   const [disabledAgents, setDisabledAgents] = useState<string[]>([]);
   const [disabledCategories, setDisabledCategories] = useState<string[]>([]);
@@ -284,7 +299,7 @@ export default function OrchestratorPage() {
       return prev;
     });
     loadAuditLogs(job.id, job.correlation_id);
-  }, [setSearchParams]);
+  }, [setSearchParams, searchParams]);
 
   const handleJobAction = async (jobId: string, action: "cancel" | "pause" | "resume" | "retry") => {
     setActionLoading(true);
@@ -475,12 +490,23 @@ export default function OrchestratorPage() {
     <div className="min-h-screen bg-background text-foreground pb-12">
       <div className="container mx-auto max-w-6xl px-4 py-8 space-y-8">
         <div className="flex items-center justify-between">
-          <div>
+          <div className="flex-1">
             <Link to="/" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
               <ArrowLeft className="mr-2 h-4 w-4" /> Voltar
             </Link>
             <h1 className="mt-2 text-3xl font-bold tracking-tight">Orquestrador KUBO</h1>
             <p className="text-muted-foreground">Orquestração full-stack com filas, retries e roteamento dinâmico.</p>
+          </div>
+          <div className="flex-1 max-w-sm mx-4">
+            <div className="relative">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Busca rápida (CorrelationID)..." 
+                className="pl-8" 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
           </div>
           <div className="flex flex-col items-end gap-2">
             <div className="flex items-center gap-3">
