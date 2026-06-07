@@ -742,6 +742,25 @@ export default function OrchestratorPage() {
                             <span className="capitalize text-xs font-medium">{job.status}</span>
                           </div>
                         </TableCell>
+                        <TableCell className="font-mono text-[10px]">
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-1 group">
+                              <span className="truncate max-w-[120px]" title={job.id}>{job.id}</span>
+                              <Button variant="ghost" size="icon" className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); copyToClipboard(job.id, "TraceID"); }}>
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                            </div>
+                            {job.correlation_id && (
+                              <div className="flex items-center gap-1 text-emerald-600 group">
+                                <Hash className="h-3 w-3 shrink-0" />
+                                <span className="truncate max-w-[120px]" title={job.correlation_id}>{job.correlation_id}</span>
+                                <Button variant="ghost" size="icon" className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); copyToClipboard(job.correlation_id, "CorrelationID"); }}>
+                                  <Copy className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell className="font-mono text-xs">{job.agent_slug}</TableCell>
                         <TableCell className="text-xs">{job.execution_time_ms || job.duration_ms ? `${job.execution_time_ms || job.duration_ms}ms` : '-'}</TableCell>
                         <TableCell className="text-xs">{job.retry_count || 0}</TableCell>
