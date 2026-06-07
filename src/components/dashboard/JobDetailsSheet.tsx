@@ -82,6 +82,14 @@ export function JobDetailsSheet({ job, auditLogs, onClose, onAction, loading }: 
     a.click();
     URL.revokeObjectURL(url);
   };
+  
+  const getExportPreview = (format: 'json' | 'csv') => {
+    return {
+      totalEntries: auditLogs.length,
+      format,
+      estimatedSize: format === 'json' ? `${(JSON.stringify(auditLogs).length / 1024).toFixed(1)} KB` : `${(auditLogs.length * 100 / 1024).toFixed(1)} KB`
+    };
+  };
 
   const handleConfirmedAction = async () => {
     if (confirmAction) {
