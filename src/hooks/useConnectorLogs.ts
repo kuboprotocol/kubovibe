@@ -83,5 +83,11 @@ export async function logConnectorEvent(params: {
     status: params.status ?? 'success',
     metadata: (params.metadata ?? null) as never,
   }
-  await supabase.from('connector_activity_logs').insert(row)
+  await supabase.rpc('log_connector_activity', {
+    _connector_slug: params.connectorSlug,
+    _event_type: params.eventType,
+    _message: params.message,
+    _status: params.status ?? 'success',
+    _metadata: (params.metadata || {}) as any,
+  })
 }
