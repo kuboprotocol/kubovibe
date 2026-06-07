@@ -11,7 +11,7 @@ import {
   Loader2, Sparkles, Activity, ArrowLeft, CheckCircle2, 
   XCircle, Send, History, Settings, Filter, RefreshCcw, 
   ToggleLeft, ToggleRight, Clock, AlertCircle, Info, MoreVertical,
-  Pause, Play, Search, BarChart3, AlertTriangle
+  Pause, Play, Search, BarChart3, AlertTriangle, Copy, Hash
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { 
@@ -104,7 +104,7 @@ export default function OrchestratorPage() {
   const [jobsLoading, setJobsLoading] = useState(false);
   const [agentFilter, setAgentFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [searchTerm, setSearchTerm] = useState(searchParams.get("q") || "");
+  const [searchTerm, setSearchTerm] = useState(searchParams.get("q") || localStorage.getItem('kubo_last_search') || "");
 
   useEffect(() => {
     const q = searchParams.get("q");
@@ -114,6 +114,9 @@ export default function OrchestratorPage() {
   }, [searchParams]);
 
   useEffect(() => {
+    if (searchTerm) {
+      localStorage.setItem('kubo_last_search', searchTerm);
+    }
     setSearchParams(prev => {
       if (searchTerm) prev.set("q", searchTerm);
       else prev.delete("q");
@@ -140,6 +143,15 @@ export default function OrchestratorPage() {
     return saved ? parseInt(saved, 10) : 500;
   }); // ms
   const [maxRetryLimit] = useState(20);
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast({
+      title: `${label} copiado!`,
+      description: "Valor salvo na área de transferência.",
+    });
+  };
+
 
 
 
@@ -710,6 +722,7 @@ export default function OrchestratorPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Status</TableHead>
+                      <TableHead>Identificadores</TableHead>
                       <TableHead>Agente</TableHead>
                       <TableHead>Duração</TableHead>
                       <TableHead>Retries</TableHead>
@@ -727,6 +740,25 @@ export default function OrchestratorPage() {
                             {job.status === "processing" && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
                             {job.status === "paused" && <Pause className="h-4 w-4 text-amber-500" />}
                             <span className="capitalize text-xs font-medium">{job.status}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-mono text-[10px]">
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-1 group">
+                              <span className="truncate max-w-[120px]" title={job.id}>{job.id}</span>
+                              <Button variant="ghost" size="icon" className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); copyToClipboard(job.id, "TraceID"); }}>
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                            </div>
+                            {job.correlation_id && (
+                              <div className="flex items-center gap-1 text-emerald-600 group">
+                                <Hash className="h-3 w-3 shrink-0" />
+                                <span className="truncate max-w-[120px]" title={job.correlation_id}>{job.correlation_id}</span>
+                                <Button variant="ghost" size="icon" className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); copyToClipboard(job.correlation_id, "CorrelationID"); }}>
+                                  <Copy className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell className="font-mono text-xs">{job.agent_slug}</TableCell>

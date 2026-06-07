@@ -10,7 +10,7 @@ import {
   Download, Play, Pause, XCircle, History,
   FileJson, FileSpreadsheet, AlertCircle, Info,
   Search, ChevronLeft, ChevronRight, RefreshCw,
-  BarChart3
+  BarChart3, FileText, Copy, Check
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -27,6 +27,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "@/hooks/use-toast";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 interface AuditLog {
   id: string;
@@ -161,6 +163,52 @@ export function JobDetailsSheet({
     URL.revokeObjectURL(url);
     toast({ title: "Relatório de Alertas CSV concluído" });
   };
+
+  const exportAlertsPDF = () => {
+    const alertLogs = auditLogs.filter(log => 
+      log.action.includes('error') || 
+      log.action.includes('failed') || 
+      (log.details && log.details.latency_p95 > 0)
+    );
+
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text("Relatório de Auditoria de Alertas", 14, 22);
+    
+    doc.setFontSize(11);
+    doc.setTextColor(100);
+    doc.text(`Job ID (TraceID): ${job.id}`, 14, 30);
+    doc.text(`Agente: ${job.agent_slug}`, 14, 35);
+    doc.text(`Exportado em: ${new Date().toLocaleString()}`, 14, 40);
+
+    const tableRows = alertLogs.map(log => [
+      log.action,
+      log.correlation_id || job.correlation_id || "N/A",
+      log.details?.latency_p95 ? `${log.details.latency_p95}ms` : "N/A",
+      log.details?.attempt || "N/A",
+      new Date(log.created_at).toLocaleString()
+    ]);
+
+    autoTable(doc, {
+      startY: 45,
+      head: [["Ação", "CorrelationID", "p95", "Retries", "Data/Hora"]],
+      body: tableRows,
+      theme: 'grid',
+      headStyles: { fillColor: [79, 70, 229] }
+    });
+
+    doc.save(`alerts-audit-${job.id}.pdf`);
+    toast({ title: "Relatório de Alertas PDF concluído" });
+  };
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast({
+      title: `${label} copiado!`,
+      description: "Valor salvo na área de transferência.",
+    });
+  };
+  
   
   const getExportPreview = () => {
     const pagedLogs = auditLogs.slice(exportOffset, exportOffset + exportLimit);
@@ -235,14 +283,40 @@ export function JobDetailsSheet({
               </Badge>
             </div>
             <div className="flex flex-col gap-1">
-              <SheetDescription className="font-mono text-[10px] break-all flex items-center gap-2">
+              <SheetDescription className="font-mono text-[10px] break-all flex items-center gap-2 group">
                 ID: {job.id}
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" 
+                  onClick={() => copyToClipboard(job.id, "TraceID")}
+                >
+                  <Copy className="h-3 w-3" />
+                </Button>
               </SheetDescription>
               <SheetDescription className="font-mono text-[10px] text-primary flex flex-col gap-1">
-                <span className="flex items-center gap-1"><Shield className="h-3 w-3" /> TraceID: {job.id}</span>
+                <span className="flex items-center gap-1 group">
+                  <Shield className="h-3 w-3" /> TraceID: {job.id}
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" 
+                    onClick={() => copyToClipboard(job.id, "TraceID")}
+                  >
+                    <Copy className="h-2 w-2" />
+                  </Button>
+                </span>
                 {job.correlation_id && (
-                  <span className="flex items-center gap-1 text-emerald-600">
+                  <span className="flex items-center gap-1 text-emerald-600 group">
                     <Hash className="h-3 w-3" /> CorrelationID: {job.correlation_id}
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" 
+                      onClick={() => copyToClipboard(job.correlation_id, "CorrelationID")}
+                    >
+                      <Copy className="h-2 w-2" />
+                    </Button>
                   </span>
                 )}
               </SheetDescription>
@@ -550,7 +624,10 @@ export function JobDetailsSheet({
                   <FileSpreadsheet className="h-3 w-3 mr-1" /> CSV ({preview.estimatedSizeCSV})
                 </Button>
                 <Button variant="outline" size="sm" className="h-8 text-[10px] flex-1 bg-amber-50 text-amber-700 border-amber-200" onClick={exportAlertsCSV}>
-                  <AlertCircle className="h-3 w-3 mr-1" /> Relatório Alertas
+                  <FileSpreadsheet className="h-3 w-3 mr-1" /> Alertas CSV
+                </Button>
+                <Button variant="outline" size="sm" className="h-8 text-[10px] flex-1 bg-rose-50 text-rose-700 border-rose-200" onClick={exportAlertsPDF}>
+                  <FileText className="h-3 w-3 mr-1" /> Alertas PDF
                 </Button>
               </div>
             </div>
