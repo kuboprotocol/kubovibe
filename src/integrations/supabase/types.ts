@@ -628,7 +628,6 @@ export type Database = {
       }
       github_connections: {
         Row: {
-          access_token: string
           access_token_ciphertext: string | null
           access_token_iv: string | null
           access_token_tag: string | null
@@ -641,7 +640,6 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          access_token: string
           access_token_ciphertext?: string | null
           access_token_iv?: string | null
           access_token_tag?: string | null
@@ -654,7 +652,6 @@ export type Database = {
           user_id: string
         }
         Update: {
-          access_token?: string
           access_token_ciphertext?: string | null
           access_token_iv?: string | null
           access_token_tag?: string | null
