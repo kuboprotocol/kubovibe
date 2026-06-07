@@ -287,14 +287,20 @@ export function JobDetailsSheet({ job, auditLogs, onClose, onAction, loading }: 
 
           <div className="pt-6 border-t mt-auto">
             <div className="flex flex-col gap-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-muted-foreground">Exportar Dados</span>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-muted-foreground">Exportar Dados</span>
+                  <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                    <Info className="h-3 w-3" />
+                    <span>{auditLogs.length} entradas selecionadas</span>
+                  </div>
+                </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={exportJSON}>
-                    <FileJson className="h-3 w-3 mr-1" /> JSON
+                  <Button variant="outline" size="sm" className="h-7 text-[10px] flex-1" onClick={exportJSON}>
+                    <FileJson className="h-3 w-3 mr-1" /> JSON ({getExportPreview('json').estimatedSize})
                   </Button>
-                  <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={exportCSV}>
-                    <FileSpreadsheet className="h-3 w-3 mr-1" /> CSV (Audit)
+                  <Button variant="outline" size="sm" className="h-7 text-[10px] flex-1" onClick={exportCSV}>
+                    <FileSpreadsheet className="h-3 w-3 mr-1" /> CSV ({getExportPreview('csv').estimatedSize})
                   </Button>
                 </div>
               </div>
