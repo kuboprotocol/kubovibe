@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState, useCallback } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -92,6 +92,7 @@ interface RunResult {
 
 
 export default function OrchestratorPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [prompt, setPrompt] = useState("");
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<RunResult | null>(null);
@@ -103,7 +104,7 @@ export default function OrchestratorPage() {
   const [jobsLoading, setJobsLoading] = useState(false);
   const [agentFilter, setAgentFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState(searchParams.get("q") || "");
 
   // Config
   const [disabledAgents, setDisabledAgents] = useState<string[]>([]);
@@ -140,7 +141,7 @@ export default function OrchestratorPage() {
     }
   };
 
-  const loadJobs = async () => {
+  const loadJobs = useCallback(async () => {
     setJobsLoading(true);
     const start = performance.now();
     try {
@@ -219,7 +220,7 @@ export default function OrchestratorPage() {
     } finally {
       setJobsLoading(false);
     }
-  };
+  }, [agentFilter, statusFilter, searchTerm, latencyThreshold]);
 
   const loadConfig = async () => {
     setConfigLoading(true);
@@ -276,10 +277,14 @@ export default function OrchestratorPage() {
     }
   };
 
-  const openJobDetails = (job: AgentJob) => {
+  const openJobDetails = useCallback((job: AgentJob) => {
     setSelectedJob(job);
+    setSearchParams(prev => {
+      prev.set("jobId", job.id);
+      return prev;
+    });
     loadAuditLogs(job.id, job.correlation_id);
-  };
+  }, [setSearchParams]);
 
   const handleJobAction = async (jobId: string, action: "cancel" | "pause" | "resume" | "retry") => {
     setActionLoading(true);
@@ -319,6 +324,18 @@ export default function OrchestratorPage() {
     void loadHealth(); 
     void loadJobs();
     void loadConfig();
+
+    // Check for jobId in URL
+    const jobIdFromUrl = searchParams.get("jobId");
+    if (jobIdFromUrl && !selectedJob) {
+      const loadInitialJob = async () => {
+        const { data } = await supabase.from("agent_jobs").select("*").eq("id", jobIdFromUrl).maybeSingle();
+        if (data) {
+          openJobDetails(data as any as AgentJob);
+        }
+      };
+      loadInitialJob();
+    }
 
     const setupRealtime = () => {
       setConnectionStatus("connecting");
@@ -371,7 +388,7 @@ export default function OrchestratorPage() {
       supabase.removeChannel(channel);
       clearInterval(interval);
     };
-  }, [agentFilter, statusFilter, searchTerm, connectionStatus]);
+  }, [agentFilter, statusFilter, searchTerm, connectionStatus, loadJobs]);
 
   // Efeito separado para o Job selecionado (Timeline Realtime)
   useEffect(() => {
