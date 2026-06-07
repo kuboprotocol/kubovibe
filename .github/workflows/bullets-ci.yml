@@ -8,6 +8,7 @@ on:
 
 jobs:
   test:
+    name: "Bullet Extraction Tests"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,12 +18,21 @@ jobs:
         run: bun install
         
       - name: Run Tests with Coverage
-        run: bunx vitest run src/test/markdown-bullets.test.ts --coverage --reporter=verbose --outputFile=test-results.json
+        run: bunx vitest run src/test/markdown-bullets.test.ts --coverage
         
-      - name: Upload Test Results
+      - name: Upload Test Coverage Artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results
-          path: |
-            test-results.json
-            coverage/
+          name: bullets-coverage-${{ github.event.pull_request.number || github.sha }}
+          path: coverage/bullets/
+          retention-days: 14
+
+      - name: Upload JSON Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bullets-json-results-${{ github.event.pull_request.number || github.sha }}
+          path: test-results/
+          retention-days: 14
+
