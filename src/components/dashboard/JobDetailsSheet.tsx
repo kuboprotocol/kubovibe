@@ -45,7 +45,9 @@ interface JobDetailsSheetProps {
   connectionStatus?: "connecting" | "live" | "polling";
   onReconnect?: () => void;
   nextPollIn?: number;
+  pollingRetryCount?: number;
 }
+
 
 export function JobDetailsSheet({ 
   job, 
@@ -55,8 +57,10 @@ export function JobDetailsSheet({
   loading,
   connectionStatus = "live",
   onReconnect,
-  nextPollIn
+  nextPollIn,
+  pollingRetryCount
 }: JobDetailsSheetProps) {
+
   const [activeTab, setActiveTab] = useState("overview");
   const [confirmAction, setConfirmAction] = useState<"cancel" | "pause" | "resume" | "retry" | null>(null);
   const [timelineSearch, setTimelineSearch] = useState("");
@@ -184,7 +188,7 @@ export function JobDetailsSheet({
               <RefreshCw className="h-4 w-4 text-amber-600 animate-spin" />
               <AlertTitle className="text-xs font-bold text-amber-800">Polling Ativo</AlertTitle>
               <AlertDescription className="text-[10px] text-amber-700 flex items-center justify-between">
-                WebSocket falhou. Próxima atualização em {nextPollIn || 5}s.
+                WebSocket falhou. Próxima atualização em {nextPollIn || 5}s (Tentativa #{pollingRetryCount || 1}).
                 <Button variant="link" size="sm" className="h-auto p-0 text-[10px]" onClick={onReconnect}>
                   Tentar reconectar
                 </Button>
