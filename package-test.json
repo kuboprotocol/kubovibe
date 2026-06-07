@@ -1,0 +1,6 @@
+{
+  "scripts": {
+    "test": "vitest run",
+    "test:bullets": "vitest run src/test/markdown-bullets.test.ts --reporter=verbose --outputFile=test-results.json"
+  }
+}

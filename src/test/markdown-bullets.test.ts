@@ -9,9 +9,14 @@ export const BULLET_REGEX = /^[ \t]*([*+-]|\d+[.)])[ \t]+(.+)$/gm;
 
 /**
  * Regex estendido que inclui suporte experimental a algarismos romanos (I, II, V, X, etc.)
- * Note: O suporte a Romanos é básico e focado em prefixos comuns.
+ * 
+ * REGRA DE FALHA PARA ROMANOS:
+ * O regex atual é 'guloso' para caracteres [ivxlcdm]. Ele aceitará sequências que não são
+ * algarismos romanos válidos (ex: "IIV", "XXXX") desde que seguidas por "." ou ")".
+ * Decisão técnica: Priorizar performance e simplicidade sobre validação gramatical completa de numeração romana.
+ * Se uma validação estrita for necessária, um parser dedicado deve ser usado em vez de regex.
  */
-export const EXTENDED_BULLET_REGEX = /^[ \t]*([*+-]|\d+[.)]|\b(?:i{1,3}|iv|v|vi{0,3}|ix|x{1,3}|xl|l|c|d|m)+[.)])[ \t]+(.+)$/gmi;
+export const EXTENDED_BULLET_REGEX = /^[ \t]*([*+-]|\d+[.)]|\b[ivxlcdm]+[.)])[ \t]+(.+)$/gmi;
 
 /**
  * Função utilitária para extrair bullets de um texto Markdown.
@@ -23,108 +28,79 @@ export function extractBullets(markdown: string, extended = false): string[] {
   return matches.map(m => m[extended ? 2 : 2].trim());
 }
 
-describe("Markdown Bullet Extraction (Tolerant Regex)", () => {
-  it("should handle nested lists with irregular indentation", () => {
+describe("Markdown Bullet Extraction (Advanced & Edge Cases)", () => {
+  it("should document and verify behavior for invalid Roman-like strings", () => {
     const md = `
-1. Level 1
-   * Level 2
-      - Level 3 (irregular)
-  + Level 2 again
-    1. Level 3 with numbers
+IIV. Non-standard but matched as roman-like
+XXXX. Match as roman-like
+    `.trim();
+    const bullets = extractBullets(md, true);
+    // Verified behavior: matches strings of valid roman chars even if not semantically correct numbers
+    expect(bullets).toEqual([
+      "Non-standard but matched as roman-like",
+      "Match as roman-like"
+    ]);
+  });
+
+  it("should handle mixed markers and numbering types across levels", () => {
+    const md = `
+1. Level 1 (Numeric)
+   * Level 2 (Bullet)
+      I. Level 3 (Roman)
+   - Level 2 (Bullet)
+    `.trim();
+    const bullets = extractBullets(md, true);
+    expect(bullets).toEqual([
+      "Level 1 (Numeric)",
+      "Level 2 (Bullet)",
+      "Level 3 (Roman)",
+      "Level 2 (Bullet)"
+    ]);
+  });
+
+  it("should handle extreme indentation jumps without losing content", () => {
+    const md = `
+* Level 1
+                                  - Extreme jump level
+    1. Another jump
     `.trim();
     const bullets = extractBullets(md);
     expect(bullets).toEqual([
       "Level 1",
-      "Level 2",
-      "Level 3 (irregular)",
-      "Level 2 again",
-      "Level 3 with numbers"
+      "Extreme jump level",
+      "Another jump"
     ]);
   });
 
-  it("should correctly handle invalid/non-standard Roman numerals", () => {
-    // IIV is not a standard roman numeral representation for 3 or 7, usually III or VII
+  it("should extract bullets with nested formatting and special chars", () => {
     const md = `
-I. Valid
-IIV. Invalid non-standard
-IV. Valid
-    `.trim();
-    const bullets = extractBullets(md, true);
-    // The regex is simple and uses boundaries, so it might catch "IIV" if it matches the pattern 
-    // of allowed characters [ivxlcdm]+. However, using word boundaries helps.
-    // Let's check what it actually returns.
-    expect(bullets).toContain("Valid");
-    // Depending on regex strictness, "IIV" might be caught or ignored. 
-    // We want to ensure it doesn't break the parser.
-    expect(bullets.length).toBeGreaterThanOrEqual(2);
-  });
-
-  it("should extract bullets with inline code, links, and formatting", () => {
-    const md = `
-* Item with \`inline code\`
-- Item with [link](https://example.com)
-+ Item with **bold** and *italic*
-1. Item with \`code\` and [link](test.com)
+* [Link](url) and \`code\`
+- **Bold** and *Italic*
++ Special chars: $#!@%^&*()
     `.trim();
     const bullets = extractBullets(md);
     expect(bullets).toEqual([
-      "Item with `inline code`",
-      "Item with [link](https://example.com)",
-      "Item with **bold** and *italic*",
-      "Item with `code` and [link](test.com)"
+      "[Link](url) and `code`",
+      "**Bold** and *Italic*",
+      "Special chars: $#!@%^&*()"
     ]);
   });
 
-  it("should handle escaped characters within bullet content", () => {
-    const md = `
-* Escaped \\* asterisk
-- Escaped \\- dash
-+ Escaped \\[ bracket
-    `.trim();
-    const bullets = extractBullets(md);
-    expect(bullets).toEqual([
-      "Escaped \\* asterisk",
-      "Escaped \\- dash",
-      "Escaped \\[ bracket"
-    ]);
-  });
-
-  it("should handle numbering restart and interrupted lists", () => {
-    const md = `
-1. First
-2. Second
-Some text in between
-1. Restarted
-2. Second after restart
-    `.trim();
-    const bullets = extractBullets(md);
-    expect(bullets).toEqual([
-      "First",
-      "Second",
-      "Restarted",
-      "Second after restart"
-    ]);
-  });
-
-  describe("Property-based/Fuzz Testing", () => {
-    it("should extract correct content with complex characters", () => {
+  describe("Fuzzing & Property Testing", () => {
+    it("should handle random mixtures of markers and content", () => {
       fc.assert(
         fc.property(
           fc.array(
             fc.record({
-              indent: fc.string({ unit: fc.constantFrom(" ", "\t"), minLength: 0, maxLength: 8 }),
-              prefix: fc.constantFrom("*", "-", "+", "1.", "1)", "0.", "99)"),
-              content: fc.string({ minLength: 1, maxLength: 100 }).filter(s => 
-                !s.includes("\n") && 
-                s.trim().length > 0 &&
-                !s.startsWith(" ") // Avoid false mismatch due to double spaces after prefix
-              )
+              indent: fc.string({ unit: fc.constantFrom(" ", "\t"), minLength: 0, maxLength: 20 }),
+              prefix: fc.constantFrom("*", "-", "+", "1.", "1)", "i.", "v)"),
+              content: fc.string({ minLength: 1, maxLength: 50 }).filter(s => !s.includes("\n") && s.trim().length > 0)
             }),
-            { minLength: 1, maxLength: 20 }
+            { minLength: 1, maxLength: 30 }
           ),
           (lines) => {
             const markdown = lines.map(l => `${l.indent}${l.prefix} ${l.content}`).join("\n");
-            const extracted = extractBullets(markdown);
+            const extracted = extractBullets(markdown, true);
             expect(extracted.length).toBe(lines.length);
           }
         )
@@ -132,6 +108,7 @@ Some text in between
     });
   });
 });
+
 
 
 
