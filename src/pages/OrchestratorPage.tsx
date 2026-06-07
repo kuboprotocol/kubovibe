@@ -115,6 +115,8 @@ export default function OrchestratorPage() {
   const [auditLogs, setAuditLogs] = useState<JobAuditLog[]>([]);
   const [actionLoading, setActionLoading] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<"connecting" | "live" | "polling">("connecting");
+  const [nextPollIn, setNextPollIn] = useState(15);
+  const [metrics, setMetrics] = useState<{ query_time_ms: number } | null>(null);
 
   const loadHealth = async () => {
     setHealthLoading(true);
