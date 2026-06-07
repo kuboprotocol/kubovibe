@@ -31,6 +31,13 @@ XXXX. Match as roman-like
     
     expect(() => validateMarkdownBullets(md)).toThrow(expectedError);
     
+    // Exact message comparison for consistency
+    try {
+      validateMarkdownBullets(md);
+    } catch (e: any) {
+      expect(e.message).toBe(expectedError);
+    }
+
     // Categorized failure validation
     const categories = {
       invalid_roman: ["IIV.", "XXXX.", "VV.", "IL."]

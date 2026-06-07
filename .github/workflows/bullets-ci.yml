@@ -60,20 +60,13 @@ jobs:
           fs.writeFileSync('test-results/summary-report.json', JSON.stringify(summary, null, 2));
           "
 
-      - name: Upload Test Coverage (HTML)
+      - name: Upload Test Artifacts (HTML, JSON, Summary)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: bullets-html-PR${{ github.event.number || '0' }}-SHA-${{ github.sha }}
-          path: coverage/bullets/
-          retention-days: 7
-
-      - name: Upload JSON and Summary Results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: bullets-results-PR${{ github.event.number || '0' }}-SHA-${{ github.sha }}
+          name: bullets-reports-PR${{ github.event.number || '0' }}-SHA-${{ github.sha }}
           path: |
+            coverage/bullets/
             test-results/bullets-results.json
             test-results/summary-report.json
           retention-days: 7
