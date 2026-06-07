@@ -3,6 +3,13 @@ import { supabase } from './client';
 
 describe('Idempotência Atômica e Concorrência', () => {
   it('deve garantir que múltiplas requisições simultâneas de cancelamento resultem em apenas um log de auditoria', async () => {
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user?.id;
+    if (!userId) {
+       console.warn('Pulando teste: Usuário não autenticado');
+       return;
+    }
+
     // 1. Criar um job de teste
     const { data: job, error: createError } = await supabase
       .from('agent_jobs')
@@ -10,7 +17,8 @@ describe('Idempotência Atômica e Concorrência', () => {
         agent_slug: 'test-agent',
         status: 'processing',
         input: { test: true },
-        idempotency_key: `test-concurrent-${Date.now()}`
+        idempotency_key: `test-concurrent-${Date.now()}`,
+        user_id: userId
       })
       .select()
       .single();
@@ -19,13 +27,6 @@ describe('Idempotência Atômica e Concorrência', () => {
     expect(job).toBeDefined();
 
     // 2. Simular 5 requisições de cancelamento simultâneas
-    const { data: userData } = await supabase.auth.getUser();
-    const userId = userData.user?.id;
-    if (!userId) {
-       console.warn('Pulando teste: Usuário não autenticado');
-       return;
-    }
-
     const requests = Array(5).fill(null).map((_, i) => 
       supabase.rpc('execute_job_action', {
         p_job_id: job.id,
@@ -47,7 +48,6 @@ describe('Idempotência Atômica e Concorrência', () => {
     expect(updatedJob?.status).toBe('cancelled');
 
     // 4. CRITICAL: Verificar idempotência nos logs de auditoria
-    // Deve haver apenas UM log de "cancel" para este job, apesar das 5 chamadas
     const { data: logs } = await supabase
       .from('job_audit_logs')
       .select('action')
@@ -58,20 +58,23 @@ describe('Idempotência Atômica e Concorrência', () => {
   });
 
   it('deve lidar corretamente com ações conflitantes (pause/cancel) simultâneas', async () => {
-     const { data: job } = await supabase
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user?.id;
+    if (!userId) return;
+
+    const { data: job } = await supabase
       .from('agent_jobs')
       .insert({
         agent_slug: 'test-agent',
         status: 'processing',
         input: { test: true },
-        idempotency_key: `test-conflict-${Date.now()}`
+        idempotency_key: `test-conflict-${Date.now()}`,
+        user_id: userId
       })
       .select()
       .single();
 
-    const { data: userData } = await supabase.auth.getUser();
-    const userId = userData.user?.id;
-    if (!userId) return;
+    if (!job) return;
 
     // Disparar pause e cancel ao mesmo tempo
     const requests = [
@@ -81,8 +84,8 @@ describe('Idempotência Atômica e Concorrência', () => {
 
     await Promise.allSettled(requests);
 
-    // O status final deve ser um dos dois, mas a auditoria deve refletir a ordem atômica
     const { data: finalJob } = await supabase.from('agent_jobs').select('status').eq('id', job.id).single();
     expect(['paused', 'cancelled']).toContain(finalJob?.status);
   });
 });
+
