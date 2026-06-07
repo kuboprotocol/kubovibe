@@ -1,4 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { decryptSecret } from '../_shared/connectorCrypto.ts'
+
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -49,7 +51,7 @@ Deno.serve(async (req) => {
 
     const { data: connection, error: connError } = await serviceClient
       .from('github_connections')
-      .select('access_token')
+      .select('access_token_ciphertext, access_token_iv, access_token_tag')
       .eq('user_id', user.id)
       .maybeSingle()
 
@@ -65,11 +67,18 @@ Deno.serve(async (req) => {
     const perPage = url.searchParams.get('per_page') || '30'
     const sort = url.searchParams.get('sort') || 'updated'
 
+    const accessToken = await decryptSecret({
+      ciphertext: connection.access_token_ciphertext,
+      iv: connection.access_token_iv,
+      tag: connection.access_token_tag,
+    })
+
     const ghRes = await fetch(
       `https://api.github.com/user/repos?sort=${sort}&per_page=${perPage}&page=${page}&affiliation=owner`,
       {
         headers: {
-          Authorization: `Bearer ${connection.access_token}`,
+          Authorization: `Bearer ${accessToken}`,
+
           Accept: 'application/vnd.github+json',
           'User-Agent': 'KuboVibe',
         },

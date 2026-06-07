@@ -1,4 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { encryptSecret } from '../_shared/connectorCrypto.ts'
+
 
 Deno.serve(async (req) => {
   const url = new URL(req.url)
@@ -72,9 +74,13 @@ Deno.serve(async (req) => {
 
     // Persist token server-side via service role — never trafega pelo client
     // (admin client already created above for state validation)
+    const enc = await encryptSecret(accessToken)
     await admin.from('github_connections').upsert({
       user_id: uid,
-      access_token: accessToken,
+      access_token_ciphertext: enc.ciphertext,
+      access_token_iv: enc.iv,
+      access_token_tag: enc.tag,
+
       github_username: ghUser.login || null,
       github_avatar_url: ghUser.avatar_url || null,
       scope,
