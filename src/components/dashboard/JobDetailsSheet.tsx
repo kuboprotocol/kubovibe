@@ -81,7 +81,7 @@ export function JobDetailsSheet({ job, auditLogs, onClose, onAction, loading }: 
 
   const exportCSV = () => {
     const headers = ["ID", "Action", "Correlation ID", "Created At", "Details"];
-    const pagedLogs = auditLogs.slice(exportOffset, exportOffset + exportLimit);
+    const pagedLogs = auditLogs.slice(exportOffset, Math.min(exportOffset + exportLimit, auditLogs.length));
     const rows = pagedLogs.map(log => [
       log.id,
       log.action,
@@ -99,7 +99,7 @@ export function JobDetailsSheet({ job, auditLogs, onClose, onAction, loading }: 
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `job-audit-${job.id}.csv`;
+    a.download = `job-audit-${job.id}-p${Math.floor(exportOffset/exportLimit)+1}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -340,16 +340,24 @@ export function JobDetailsSheet({ job, auditLogs, onClose, onAction, loading }: 
                       <Button variant="ghost" size="icon" className="h-6 w-6" disabled={exportOffset <= 0} onClick={() => setExportOffset(Math.max(0, exportOffset - exportLimit))}>
                         <ChevronLeft className="h-3 w-3" />
                       </Button>
-                      <span className="text-[10px] font-mono flex-1 text-center">Offset: {exportOffset}</span>
+                      <div className="flex-1 text-center">
+                        <span className="text-[10px] font-mono block">Pág {Math.floor(exportOffset/exportLimit)+1}</span>
+                        <span className="text-[9px] text-muted-foreground">Offset: {exportOffset}</span>
+                      </div>
                       <Button variant="ghost" size="icon" className="h-6 w-6" disabled={exportOffset + exportLimit >= auditLogs.length} onClick={() => setExportOffset(exportOffset + exportLimit)}>
                         <ChevronRight className="h-3 w-3" />
                       </Button>
                    </div>
-                   <div className="w-24">
+                   <div className="w-24 space-y-1">
+                      <p className="text-[9px] text-muted-foreground px-1">Registros/pág</p>
                       <Input 
                         type="number" 
                         value={exportLimit} 
-                        onChange={(e) => setExportLimit(parseInt(e.target.value) || 10)}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value) || 10;
+                          setExportLimit(val);
+                          setExportOffset(0); // Reset offset on limit change
+                        }}
                         className="h-8 text-[10px]"
                         placeholder="Limite"
                       />
