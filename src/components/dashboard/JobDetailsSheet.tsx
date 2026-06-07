@@ -143,11 +143,19 @@ export function JobDetailsSheet({ job, auditLogs, onClose, onAction, loading }: 
               </Badge>
             </div>
             <div className="flex flex-col gap-1">
-              <SheetDescription className="font-mono text-[10px] break-all">
+              <SheetDescription className="font-mono text-[10px] break-all flex items-center gap-2">
                 ID: {job.id}
+                <Button variant="ghost" size="icon" className="h-4 w-4" onClick={() => navigator.clipboard.writeText(job.id)}>
+                   <Hash className="h-2 w-2" />
+                </Button>
               </SheetDescription>
               <SheetDescription className="font-mono text-[10px] text-primary flex items-center gap-1">
                 <Shield className="h-3 w-3" /> TraceID: {job.correlation_id || "N/A"}
+                {job.correlation_id && (
+                  <Button variant="ghost" size="icon" className="h-4 w-4" onClick={() => navigator.clipboard.writeText(job.correlation_id)}>
+                    <Info className="h-2 w-2" />
+                  </Button>
+                )}
               </SheetDescription>
             </div>
           </SheetHeader>

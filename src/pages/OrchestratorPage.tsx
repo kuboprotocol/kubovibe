@@ -137,7 +137,12 @@ export default function OrchestratorPage() {
       if (agentFilter !== "all") query = query.eq("agent_slug", agentFilter);
       if (statusFilter !== "all") query = query.eq("status", statusFilter);
       if (searchTerm) {
-        query = query.or(`id.ilike.%${searchTerm}%,correlation_id.ilike.%${searchTerm}%,idempotency_key.ilike.%${searchTerm}%`);
+        if (searchTerm.match(/^[0-9a-fA-F-]{36}$/)) {
+          // It's a UUID, search exact
+          query = query.or(`id.eq.${searchTerm},correlation_id.eq.${searchTerm}`);
+        } else {
+          query = query.or(`id.ilike.%${searchTerm}%,correlation_id.ilike.%${searchTerm}%,idempotency_key.ilike.%${searchTerm}%`);
+        }
       }
       
       const { data, error } = await query;
