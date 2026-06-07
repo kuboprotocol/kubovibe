@@ -157,7 +157,7 @@ export function JobDetailsSheet({
       log.id,
       log.action,
       log.correlation_id || "",
-      new Date(log.created_at).toISOString(),
+      formatWithTZ(log.created_at),
       JSON.stringify(log.details).replace(/"/g, '""')
     ]);
     
@@ -166,14 +166,17 @@ export function JobDetailsSheet({
       ...rows.map(e => e.map(cell => `"${cell}"`).join(","))
     ].join("\n");
 
+    const timestamp = new Date().getTime();
+    const fileName = `job-audit-${job.correlation_id || job.id}-${timestamp}-p${Math.floor(exportOffset/exportLimit)+1}.csv`;
+
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `job-audit-${job.id}-p${Math.floor(exportOffset/exportLimit)+1}.csv`;
+    a.download = fileName;
     a.click();
     URL.revokeObjectURL(url);
-    toast({ title: "Exportação CSV concluída" });
+    toast({ title: "Exportação CSV concluída", description: `Arquivo: ${fileName}` });
   };
 
   const exportAlertsCSV = () => {
