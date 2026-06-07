@@ -172,8 +172,24 @@ export default function OrchestratorPage() {
       if (p95 && p95 > latencyThreshold) {
         toast({ 
           title: "Alerta de Performance", 
-          description: `Latência p95 (${p95}ms) acima do limite (${latencyThreshold}ms)`, 
-          variant: "destructive" 
+          description: (
+            <div className="flex flex-col gap-2">
+              <p>Latência p95 ({p95}ms) acima do limite ({latencyThreshold}ms)</p>
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="h-7 text-[10px] w-fit"
+                onClick={() => {
+                  const slowJob = (data as any[]).find(j => (j.execution_time_ms || j.duration_ms || 0) >= p95);
+                  if (slowJob) openJobDetails(slowJob);
+                }}
+              >
+                Ver Detalhes do Job
+              </Button>
+            </div>
+          ), 
+          variant: "destructive",
+          duration: 6000
         });
       }
 
@@ -515,7 +531,7 @@ export default function OrchestratorPage() {
                         </p>
                       </div>
                       <div className="bg-background p-3 rounded border">
-                        <p className-[10px] text-muted-foreground uppercase">Tempo de Query</p>
+                        <p className="text-[10px] text-muted-foreground uppercase">Tempo de Query</p>
                         <p className="text-2xl font-bold font-mono text-primary">
                           {metrics?.query_time_ms ? `${metrics.query_time_ms}ms` : 'N/A'}
                         </p>
