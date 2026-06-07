@@ -696,6 +696,12 @@ export default function OrchestratorPage() {
         onClose={() => setSelectedJob(null)}
         onAction={(action) => handleJobAction(selectedJob?.id || "", action)}
         loading={actionLoading}
+        connectionStatus={connectionStatus}
+        nextPollIn={nextPollIn}
+        onReconnect={() => {
+          setConnectionStatus("connecting");
+          loadJobs();
+        }}
       />
     </div>
   );
