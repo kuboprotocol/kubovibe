@@ -56,6 +56,9 @@ test.describe('Orchestrator Performance Auditing and PDF Export', () => {
     } else {
       expect(fileName).toContain(traceId);
     }
+
+    // Verification of ISO format in any exported metadata or logs (if we could read PDF)
+    // For now we assume system/browser timezone is handled by JS Date
   });
 
   test('should validate date range inputs', async ({ page }) => {
