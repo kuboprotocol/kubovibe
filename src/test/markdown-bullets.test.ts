@@ -11,10 +11,14 @@ export const BULLET_REGEX = /^[ \t]*([*+-]|\d+[.)])[ \t]+(.+)$/gm;
  * Regex estendido que inclui suporte experimental a algarismos romanos (I, II, V, X, etc.)
  * 
  * REGRA DE FALHA PARA ROMANOS:
- * O regex atual é 'guloso' para caracteres [ivxlcdm]. Ele aceitará sequências que não são
- * algarismos romanos válidos (ex: "IIV", "XXXX") desde que seguidas por "." ou ")".
- * Decisão técnica: Priorizar performance e simplicidade sobre validação gramatical completa de numeração romana.
- * Se uma validação estrita for necessária, um parser dedicado deve ser usado em vez de regex.
+ * O sistema utiliza o padrão \b[ivxlcdm]+[.)] para capturar numeração romana.
+ * Decisão técnica: Priorizar performance sobre validação gramatical completa.
+ * 
+ * - COMPORTAMENTO PREVISTO: Sequências que utilizam apenas caracteres romanos válidos
+ *   (i, v, x, l, c, d, m) serão aceitas mesmo se semanticamente inválidas (ex: IIV, XXXX).
+ * - COMPORTAMENTO DE FALHA: Qualquer caractere fora do conjunto [ivxlcdm] (ex: IA., V1.)
+ *   dentro do marcador fará com que a linha NÃO seja capturada como bullet romano,
+ *   garantindo previsibilidade.
  */
 export const EXTENDED_BULLET_REGEX = /^[ \t]*([*+-]|\d+[.)]|\b[ivxlcdm]+[.)])[ \t]+(.+)$/gmi;
 
@@ -24,9 +28,17 @@ export const EXTENDED_BULLET_REGEX = /^[ \t]*([*+-]|\d+[.)]|\b[ivxlcdm]+[.)])[ \
 export function extractBullets(markdown: string, extended = false): string[] {
   const regex = extended ? EXTENDED_BULLET_REGEX : BULLET_REGEX;
   regex.lastIndex = 0;
-  const matches = [...markdown.matchAll(regex)];
-  return matches.map(m => m[extended ? 2 : 2].trim());
+  const matches = Array.from(markdown.matchAll(regex));
+  return matches.map(m => m[2].trim());
 }
+
+/**
+ * Validador estrito para algarismos romanos (opcional, para testes de falha clara).
+ */
+export function isValidRoman(s: string): boolean {
+  return /^M{0,4}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$/i.test(s);
+}
+
 
 describe("Markdown Bullet Extraction (Advanced & Edge Cases)", () => {
   it("should document and verify behavior for invalid Roman-like strings", () => {
@@ -35,12 +47,31 @@ IIV. Non-standard but matched as roman-like
 XXXX. Match as roman-like
     `.trim();
     const bullets = extractBullets(md, true);
-    // Verified behavior: matches strings of valid roman chars even if not semantically correct numbers
+    
+    // Verificamos que o regex captura o que prometemos (caracteres romanos válidos, mesmo sem ordem)
     expect(bullets).toEqual([
       "Non-standard but matched as roman-like",
       "Match as roman-like"
     ]);
+
+    // Teste de falha explícita: Caractere não-romano invalida o bullet romano
+    const invalidMd = "IA. Not a bullet\nV1. Not a bullet";
+    expect(extractBullets(invalidMd, true)).toEqual([]);
   });
+
+  it("should fail build or validation if strict roman rule is requested (Demonstration)", () => {
+    const nonStrictMatches = ["IIV", "XXXX", "IX"];
+    
+    // Simulação de lógica que o CI usaria para falhar se encontrasse romanos inválidos
+    const invalidOnes = nonStrictMatches.filter(s => !isValidRoman(s));
+    
+    // Se estivéssemos em um modo estrito, isso falharia o build
+    // Aqui apenas validamos que conseguimos detectar para erro claro
+    expect(invalidOnes).toContain("IIV");
+    expect(invalidOnes).toContain("XXXX");
+    expect(isValidRoman("IX")).toBe(true);
+  });
+
 
   it("should handle mixed markers and numbering types across levels", () => {
     const md = `
