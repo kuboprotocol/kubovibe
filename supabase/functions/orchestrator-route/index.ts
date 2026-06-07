@@ -117,18 +117,56 @@ Deno.serve(async (req) => {
   const mode = body.mode ?? "classify";
 
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
+
+  // Idempotency check
+  const idempotencyKey = req.headers.get("x-idempotency-key") || body.input?.idempotency_key;
+  if (idempotencyKey) {
+    const { data: existingJob } = await admin
+      .from("agent_jobs")
+      .select("status, result")
+      .eq("idempotency_key", idempotencyKey)
+      .maybeSingle();
+    
+    if (existingJob && (existingJob.status === "completed" || existingJob.status === "processing")) {
+      return new Response(JSON.stringify({ 
+        ok: true, 
+        status: existingJob.status, 
+        result: existingJob.result,
+        cached: true 
+      }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+  }
+
+  // Load config (disabled agents/categories)
+  const { data: configRows } = await admin.from("orchestrator_config").select("key, value");
+  const disabledAgents = (configRows?.find(r => r.key === 'disabled_agents')?.value as string[]) || [];
+  const disabledCategories = (configRows?.find(r => r.key === 'disabled_categories')?.value as string[]) || [];
+
   const { data: registry } = await admin
     .from("agent_registry")
-    .select("slug, name, edge_function, credit_cost, status")
+    .select("slug, name, category, edge_function, credit_cost, status")
     .neq("status", "disabled");
-  const activeSlugs = (registry ?? []).map((r) => r.slug as string);
+  
+  const filteredRegistry = (registry ?? []).filter(r => 
+    !disabledAgents.includes(r.slug) && 
+    !disabledCategories.includes(r.category)
+  );
+  
+  const activeSlugs = filteredRegistry.map((r) => r.slug as string);
 
   // 1) regras
   let outcome = classifyByRules(prompt);
   // 2) IA fallback
-  if (!outcome) outcome = await classifyByAI(prompt, activeSlugs);
+  if (!outcome || !activeSlugs.includes(outcome.agent)) {
+    outcome = await classifyByAI(prompt, activeSlugs);
+  }
   // 3) fallback final: chat-agent
-  if (!outcome) outcome = { agent: "chat-agent", confidence: 0.3, source: "fallback", reason: "no_match" };
+  if (!outcome || !activeSlugs.includes(outcome.agent)) {
+    outcome = { agent: "chat-agent", confidence: 0.3, source: "fallback", reason: "no_match_or_disabled" };
+  }
+
 
   // log de roteamento (best-effort)
   try {
@@ -152,24 +190,59 @@ Deno.serve(async (req) => {
   }
 
   // executa via agent-route (mantém débito atômico + audit trail do runtime existente)
-  const upstream = await fetch(`${FUNCTIONS_URL}/agent-route`, {
-    method: "POST",
-    headers: {
-      Authorization: auth,
-      "Content-Type": "application/json",
-      "x-request-id": req.headers.get("x-request-id") ?? crypto.randomUUID(),
-    },
-    body: JSON.stringify({
-      agent: outcome.agent,
-      input: { prompt, ...(body.input ?? {}) },
-    }),
-  });
-  const text = await upstream.text();
+  // retry logic
+  let upstreamResponse;
+  let lastError;
+  const maxRetries = mode === "execute" ? 3 : 1;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      if (attempt > 0) {
+        const backoff = Math.pow(2, attempt) * 1000;
+        await new Promise(resolve => setTimeout(resolve, backoff));
+      }
+
+      upstreamResponse = await fetch(`${FUNCTIONS_URL}/agent-route`, {
+        method: "POST",
+        headers: {
+          Authorization: auth,
+          "Content-Type": "application/json",
+          "x-request-id": req.headers.get("x-request-id") ?? crypto.randomUUID(),
+          ...(idempotencyKey ? { "x-idempotency-key": idempotencyKey } : {}),
+        },
+        body: JSON.stringify({
+          agent: outcome.agent,
+          input: { prompt, ...(body.input ?? {}) },
+        }),
+      });
+
+      if (upstreamResponse.ok) break;
+      
+      const errText = await upstreamResponse.text();
+      lastError = `Attempt ${attempt + 1} failed: ${errText}`;
+    } catch (e) {
+      lastError = `Attempt ${attempt + 1} exception: ${e.message}`;
+    }
+  }
+
+  if (!upstreamResponse || !upstreamResponse.ok) {
+    return new Response(JSON.stringify({ 
+      ok: false, 
+      routing: outcome, 
+      error: lastError || "upstream_failed" 
+    }), {
+      status: upstreamResponse?.status || 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const text = await upstreamResponse.text();
   let parsed: unknown;
   try { parsed = JSON.parse(text); } catch { parsed = { raw: text }; }
 
-  return new Response(JSON.stringify({ ok: upstream.ok, routing: outcome, result: parsed }), {
-    status: upstream.status,
+  return new Response(JSON.stringify({ ok: true, routing: outcome, result: parsed }), {
+    status: 200,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+
 });
