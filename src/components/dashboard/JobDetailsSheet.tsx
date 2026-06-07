@@ -80,6 +80,24 @@ export function JobDetailsSheet({
   });
   const [exportLimit, setExportLimit] = useState(100);
   const [exportOffset, setExportOffset] = useState(0);
+  const [dateError, setDateError] = useState<string | null>(null);
+
+  const validateDateRange = () => {
+    setDateError(null);
+    const now = new Date();
+    
+    if (dateRange.from && dateRange.to && dateRange.from > dateRange.to) {
+      setDateError("A data inicial não pode ser maior que a final.");
+      return false;
+    }
+    
+    if ((dateRange.from && dateRange.from > now) || (dateRange.to && dateRange.to > now)) {
+      setDateError("Datas futuras não são permitidas.");
+      return false;
+    }
+    
+    return true;
+  };
 
   if (!job) return null;
 
