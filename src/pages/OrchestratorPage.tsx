@@ -241,7 +241,7 @@ export default function OrchestratorPage() {
       
       if (selectedJob?.id === jobId) {
         const { data } = await supabase.from("agent_jobs").select("*").eq("id", jobId).single();
-        if (data) setSelectedJob(data as AgentJob);
+        if (data) setSelectedJob(data as any as AgentJob);
         loadAuditLogs(jobId);
       }
     } catch (e) {
