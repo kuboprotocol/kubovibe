@@ -5,6 +5,9 @@ test.describe('Orchestrator Performance Auditing and PDF Export', () => {
     // Navigate to orchestrator
     await page.goto('/orchestrator');
     
+    // Switch to jobs tab
+    await page.locator('button:has-text("Jobs")').click();
+    
     // Wait for jobs to load
     await page.waitForSelector('table tbody tr');
     
@@ -15,7 +18,7 @@ test.describe('Orchestrator Performance Auditing and PDF Export', () => {
     await expect(page.locator('text=Detalhes do Job')).toBeVisible();
     
     // Get TraceID and CorrelationID for verification
-    const traceId = await page.locator('p:has-text("ID:")').innerText();
+    const traceId = await page.locator('span:has-text("TraceID:")').first().innerText();
     const correlationIdElement = page.locator('span:has-text("CorrelationID:")');
     let correlationId = "";
     if (await correlationIdElement.isVisible()) {
@@ -34,20 +37,18 @@ test.describe('Orchestrator Performance Auditing and PDF Export', () => {
     
     // Test Date Selector (Open popovers)
     await page.locator('button:has-text("Início")').click();
-    await expect(page.locator('.rdp')).toBeVisible(); // Shadcn calendar class
+    await expect(page.locator('.rdp')).toBeVisible(); // react-day-picker/shadcn calendar class
     await page.keyboard.press('Escape');
     
     // Trigger PDF Export (Mocking the download since we can't easily check PDF content in simple E2E without heavy libs)
     // But we can check if the button exists and triggers the toast
     const pdfBtn = page.locator('button:has-text("Alertas PDF")');
     await expect(pdfBtn).toBeVisible();
-    
-    // We expect the filename to include the ID and timestamp based on logic
-    // Implementation uses: doc.save(`audit-${job.correlation_id || job.id}-${timestamp}.pdf`);
   });
 
   test('should show informative empty states with investigation tips', async ({ page }) => {
     await page.goto('/orchestrator');
+    await page.locator('button:has-text("Jobs")').click();
     await page.waitForSelector('table tbody tr');
     await page.locator('table tbody tr:first-child').click();
     await page.locator('button:has-text("Timeline & Retries")').click();
@@ -61,10 +62,9 @@ test.describe('Orchestrator Performance Auditing and PDF Export', () => {
     await expect(page.locator('text=O CorrelationID pode estar em outro Job')).toBeVisible();
   });
 
-  test('should verify PDF audit row content structure', async ({ page }) => {
-    // This test conceptually validates that the UI elements used for PDF generation are present
-    // and correctly mapped to the data fields (CorrelationID, TraceID, p95, Retries)
+  test('should verify PDF audit row content structure and aggregation area', async ({ page }) => {
     await page.goto('/orchestrator');
+    await page.locator('button:has-text("Jobs")').click();
     await page.waitForSelector('table tbody tr');
     await page.locator('table tbody tr:first-child').click();
     
