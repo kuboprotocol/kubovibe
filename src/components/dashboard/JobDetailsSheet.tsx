@@ -282,10 +282,10 @@ export function JobDetailsSheet({ job, auditLogs, onClose, onAction, loading }: 
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-muted-foreground">Exportar Dados</span>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="xs" className="h-7 text-[10px]" onClick={exportJSON}>
+                  <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={exportJSON}>
                     <FileJson className="h-3 w-3 mr-1" /> JSON
                   </Button>
-                  <Button variant="outline" size="xs" className="h-7 text-[10px]" onClick={exportCSV}>
+                  <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={exportCSV}>
                     <FileSpreadsheet className="h-3 w-3 mr-1" /> CSV (Audit)
                   </Button>
                 </div>
