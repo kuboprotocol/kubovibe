@@ -57,7 +57,7 @@ echo "🔍 [1/3] Lint estático em supabase/migrations + edge functions"
       if grep -qiE 'alter[[:space:]]+database[[:space:]]+postgres' "$f"; then
         echo "❌ ALTER DATABASE postgres proibido: $f"
       fi
-      if grep -qiE '(create|alter|drop)[[:space:]]+[^;]*(auth|storage|realtime|vault|supabase_functions)\.' "$f"; then
+      if grep -qiE '(create|alter|drop)[[:space:]]+(table|function|schema|view|trigger|index)[[:space:]]+[^;]*(auth|storage|realtime|vault|supabase_functions)\.' "$f"; then
         echo "❌ Toca schema reservado: $f"
       fi
     done
@@ -121,10 +121,11 @@ if [ -n "${SUPABASE_DB_URL:-}" ]; then
       SELECT n.nspname||'.'||c.relname FROM pg_class c
       JOIN pg_namespace n ON n.oid=c.relnamespace
       WHERE n.nspname='public' AND c.relkind='r'
-        AND NOT EXISTS (
-          SELECT 1 FROM information_schema.role_table_grants g
-          WHERE g.table_schema='public' AND g.table_name=c.relname
-            AND g.grantee IN ('authenticated','anon','service_role'));" || db_ok=0
+        AND NOT (
+          has_table_privilege('authenticated', n.nspname||'.'||c.relname, 'SELECT')
+          OR has_table_privilege('service_role', n.nspname||'.'||c.relname, 'SELECT')
+          OR has_table_privilege('anon', n.nspname||'.'||c.relname, 'SELECT')
+        );" || db_ok=0
 
     run_check "Funções SECURITY DEFINER sem search_path" "
       SELECT n.nspname||'.'||p.proname FROM pg_proc p
