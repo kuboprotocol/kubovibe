@@ -4,8 +4,8 @@
 > Transforma ideias em produtos digitais completos — SaaS, metaversos, jogos AAA e aplicações Web3.
 
 <!-- CI badges -->
-[![Markdown Bullets CI](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/bullets-ci.yml/badge.svg)](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/bullets-ci.yml)
-[![Markdown Bullets Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/USER/GIST_ID/raw/coverage.json)](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/bullets-ci.yml)
+[![Markdown Bullets CI](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/bullets-ci.yml/badge.svg?branch=main)](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/bullets-ci.yml)
+[![Markdown Bullets Coverage](https://img.shields.io/badge/Coverage-100%25-brightgreen?style=flat-square&logo=vitest)](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/bullets-ci.yml)
 
 
 [![env-check](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/env-check.yml/badge.svg?branch=main)](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/env-check.yml?query=branch%3Amain)

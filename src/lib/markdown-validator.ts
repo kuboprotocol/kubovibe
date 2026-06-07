@@ -27,7 +27,7 @@ export function validateMarkdownBullets(markdown: string): void {
     // Se o marcador é composto apenas por caracteres que parecem romanos
     if (/^[ivxlcdm]+$/i.test(marker)) {
       if (!isValidRoman(marker)) {
-        throw new Error(`[ROMAN_VALIDATION_ERROR]: O marcador '${marker}' não é um algarismo romano válido. Exemplos válidos: IV, IX, XII. Entrada inválida: ${marker}`);
+        throw new Error(`[ROMAN_VALIDATION_ERROR]: Invalid Roman numeral syntax. Rule violated: Standard additive/subtractive Roman notation (e.g., no 'IIV'). Received: '${marker}'. Valid examples: IV, IX, XII.`);
       }
     }
   }
