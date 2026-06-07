@@ -14,6 +14,35 @@
 
 ---
 
+## Markdown Bullet Extraction Rules
+
+O sistema implementa um utilitário robusto de extração de bullets Markdown, projetado para ser tolerante a múltiplos níveis de indentação e estilos de lista.
+
+### Regras Formais de Falha (Algarismos Romanos)
+Ao usar o modo `extended` para suporte a numeração romana, aplicam-se as seguintes regras:
+
+- **Regra de Regex:** É utilizado o padrão `\b[ivxlcdm]+[.)]` para máxima performance.
+- **Validação Semântica:** Não é realizada validação gramatical estrita. Qualquer combinação válida dos caracteres `i, v, x, l, c, d, m` seguida de um separador (`.` ou `)`) será extraída.
+- **Exemplo 1 (Não-padrão mas aceito):**
+  - **Entrada:** `IIV. Meu Item`
+  - **Saída:** `Meu Item`
+- **Exemplo 2 (Caracteres repetidos inválidos):**
+  - **Entrada:** `XXXX) Item Multi-X`
+  - **Saída:** `Item Multi-X`
+- **Exemplo 3 (Correto):**
+  - **Entrada:** `IV. Item Correto`
+  - **Saída:** `Item Correto`
+
+### Integração Contínua e Relatórios
+Um workflow dedicado do GitHub Actions garante que a lógica de extração mantenha **100% de cobertura**. Os relatórios são gerados em:
+- **HTML:** Disponível como artefato `bullets-coverage` no CI.
+- **JSON:** Disponível como artefato `bullets-json-results` no CI.
+
+Os artefatos são versionados por commit/PR e retidos por 14 dias para facilitar a análise de regressões.
+
+---
+
+
 ## Visão Geral
 
 O **Kubo VibeDev** é uma plataforma SaaS com inteligência artificial que permite a criação automática de aplicações digitais, incluindo sistemas Web2 e Web3.
