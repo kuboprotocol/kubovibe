@@ -25,10 +25,14 @@ XXXX. Match as roman-like
     expect(extractBullets(invalidMd, true)).toEqual([]);
   });
 
-  it("should throw explicit error for invalid Roman numerals when validated", () => {
+  it("should throw explicit and consistent error for invalid Roman numerals (e.g., IIV)", () => {
     const md = "IIV. Invalid";
-    expect(() => validateMarkdownBullets(md)).toThrow("[ROMAN_VALIDATION_ERROR]");
-    expect(() => validateMarkdownBullets(md)).toThrow("IIV");
+    const expectedError = "[ROMAN_VALIDATION_ERROR]: Invalid Roman numeral syntax. Rule violated: Standard additive/subtractive Roman notation (e.g., no 'IIV'). Received: 'IIV'. Valid examples: IV, IX, XII.";
+    
+    expect(() => validateMarkdownBullets(md)).toThrow(expectedError);
+    
+    // Additional validation for other invalid forms
+    expect(() => validateMarkdownBullets("XXXX. Invalid")).toThrow("Rule violated");
   });
 
   it("should pass validation for valid Roman numerals", () => {
