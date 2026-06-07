@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # 1. Create a job
-JOB_ID=$(psql -Atc "INSERT INTO agent_jobs (agent_slug, status, input) VALUES ('test-agent', 'processing', '{\"test\":true}') RETURNING id;")
+USER_ID="00419379-1b5d-4be6-a2d0-c3a21a2f8cfd"
+JOB_ID=$(psql -Atc "INSERT INTO agent_jobs (user_id, agent_slug, status, input) VALUES ('$USER_ID', 'test-agent', 'processing', '{\"test\":true}') RETURNING id;")
 echo "Created job: $JOB_ID"
 
 # 2. Call RPC concurrently using psql in background
