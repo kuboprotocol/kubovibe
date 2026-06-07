@@ -118,7 +118,10 @@ export default function OrchestratorPage() {
   const [nextPollIn, setNextPollIn] = useState(15);
   const [pollingRetryCount, setPollingRetryCount] = useState(0);
   const [metrics, setMetrics] = useState<{ query_time_ms: number; latency_p95?: number } | null>(null);
-  const [latencyThreshold, setLatencyThreshold] = useState(500); // ms
+  const [latencyThreshold, setLatencyThreshold] = useState(() => {
+    const saved = localStorage.getItem('kubo_latency_threshold');
+    return saved ? parseInt(saved, 10) : 500;
+  }); // ms
   const [maxRetryLimit] = useState(20);
 
 
@@ -169,8 +172,24 @@ export default function OrchestratorPage() {
       if (p95 && p95 > latencyThreshold) {
         toast({ 
           title: "Alerta de Performance", 
-          description: `Latência p95 (${p95}ms) acima do limite (${latencyThreshold}ms)`, 
-          variant: "destructive" 
+          description: (
+            <div className="flex flex-col gap-2">
+              <p>Latência p95 ({p95}ms) acima do limite ({latencyThreshold}ms)</p>
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="h-7 text-[10px] w-fit"
+                onClick={() => {
+                  const slowJob = (data as any[]).find(j => (j.execution_time_ms || j.duration_ms || 0) >= p95);
+                  if (slowJob) openJobDetails(slowJob);
+                }}
+              >
+                Ver Detalhes do Job
+              </Button>
+            </div>
+          ), 
+          variant: "destructive",
+          duration: 6000
         });
       }
 
@@ -464,12 +483,65 @@ export default function OrchestratorPage() {
         </div>
 
         <Tabs defaultValue="composer" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 lg:w-[600px]">
+          <TabsList className="grid w-full grid-cols-5 lg:w-[750px]">
             <TabsTrigger value="composer"><Sparkles className="mr-2 h-4 w-4" /> Composer</TabsTrigger>
             <TabsTrigger value="jobs"><History className="mr-2 h-4 w-4" /> Jobs</TabsTrigger>
             <TabsTrigger value="health"><Activity className="mr-2 h-4 w-4" /> Saúde</TabsTrigger>
             <TabsTrigger value="settings"><Settings className="mr-2 h-4 w-4" /> Config</TabsTrigger>
+            <TabsTrigger value="perf"><BarChart3 className="mr-2 h-4 w-4" /> Performance</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="perf" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><BarChart3 className="h-5 w-5" /> Configurações de Monitoramento</CardTitle>
+                <CardDescription>Ajuste os limites de latência para alertas em tempo real.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <h4 className="text-sm font-medium text-foreground">Limite p95 (ms)</h4>
+                      <p className="text-xs text-muted-foreground">Dispara um alerta quando a latência p95 dos últimos 50 jobs ultrapassar este valor.</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Input 
+                        type="number" 
+                        value={latencyThreshold} 
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value, 10);
+                          setLatencyThreshold(val);
+                          localStorage.setItem('kubo_latency_threshold', val.toString());
+                        }}
+                        className="w-24 font-mono text-center"
+                      />
+                      <span className="text-xs text-muted-foreground font-mono">ms</span>
+                    </div>
+                  </div>
+                  
+                  <div className="p-4 rounded-lg bg-muted/30 border border-border space-y-3">
+                    <h4 className="text-xs font-semibold flex items-center gap-2 uppercase tracking-wider">
+                      <AlertTriangle className="h-3 w-3 text-amber-500" /> Métricas Atuais
+                    </h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-background p-3 rounded border">
+                        <p className="text-[10px] text-muted-foreground uppercase">Latência p95</p>
+                        <p className={`text-2xl font-bold font-mono ${metrics?.latency_p95 && metrics.latency_p95 > latencyThreshold ? 'text-destructive' : 'text-emerald-500'}`}>
+                          {metrics?.latency_p95 ? `${metrics.latency_p95}ms` : 'N/A'}
+                        </p>
+                      </div>
+                      <div className="bg-background p-3 rounded border">
+                        <p className="text-[10px] text-muted-foreground uppercase">Tempo de Query</p>
+                        <p className="text-2xl font-bold font-mono text-primary">
+                          {metrics?.query_time_ms ? `${metrics.query_time_ms}ms` : 'N/A'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           <TabsContent value="composer" className="space-y-6">
             <Card>
@@ -700,7 +772,11 @@ export default function OrchestratorPage() {
                       <Input 
                         type="number" 
                         value={latencyThreshold} 
-                        onChange={(e) => setLatencyThreshold(Number(e.target.value))}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setLatencyThreshold(val);
+                          localStorage.setItem('kubo_latency_threshold', val.toString());
+                        }}
                         className="w-24"
                       />
                       <span className="text-xs text-muted-foreground">Jobs acima deste valor dispararão alertas na UI.</span>
