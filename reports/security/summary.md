@@ -1,11 +1,11 @@
 # Post-Migration Security — Relatório Local
 
-_Gerado em 2026-06-07T15:59:12Z_
+_Gerado em 2026-06-07T16:00:15Z_
 
 | Camada | Status |
 |---|---|
 | 1. Lint estático        | ❌ |
-| 2. Checagens no banco   | ❌ |
+| 2. Checagens no banco   | ✅ |
 | 3. Supabase linter      | ⏭️ |
 
 Logs: `reports/security/static-lint.log`, `reports/security/db-checks.log`, `reports/security/supabase-linter.log`
