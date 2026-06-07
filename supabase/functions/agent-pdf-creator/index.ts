@@ -51,9 +51,9 @@ listas, callouts e uma conclusão final acionável. Use Markdown puro.`;
     const data = await resp.json();
     const markdown = data?.choices?.[0]?.message?.content ?? "";
 
-    // Regex tolerante para garantir captura de bullets em listas aninhadas
-    const bulletRegex = /^[ \t]*[*+-][ \t]+(.+)$/gm;
-    const bullets = [...markdown.matchAll(bulletRegex)].map(m => m[1].trim());
+    // Regex tolerante para garantir captura de bullets e listas numeradas em listas aninhadas
+    const bulletRegex = /^[ \t]*([*+-]|\d+[.)])[ \t]+(.+)$/gm;
+    const bullets = [...markdown.matchAll(bulletRegex)].map(m => m[2].trim());
 
     return {
       output: {
