@@ -47,9 +47,13 @@ export type Database = {
           duration_ms: number | null
           error_message: string | null
           id: string
+          idempotency_key: string | null
           input: Json
+          last_error: string | null
+          next_retry_at: string | null
           output: Json | null
           request_id: string | null
+          retry_count: number | null
           status: string
           updated_at: string
           user_id: string
@@ -62,9 +66,13 @@ export type Database = {
           duration_ms?: number | null
           error_message?: string | null
           id?: string
+          idempotency_key?: string | null
           input?: Json
+          last_error?: string | null
+          next_retry_at?: string | null
           output?: Json | null
           request_id?: string | null
+          retry_count?: number | null
           status?: string
           updated_at?: string
           user_id: string
@@ -77,9 +85,13 @@ export type Database = {
           duration_ms?: number | null
           error_message?: string | null
           id?: string
+          idempotency_key?: string | null
           input?: Json
+          last_error?: string | null
+          next_retry_at?: string | null
           output?: Json | null
           request_id?: string | null
+          retry_count?: number | null
           status?: string
           updated_at?: string
           user_id?: string
@@ -1097,6 +1109,27 @@ export type Database = {
           tasks?: Json
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      orchestrator_config: {
+        Row: {
+          id: string
+          key: string
+          updated_at: string | null
+          value: Json
+        }
+        Insert: {
+          id?: string
+          key: string
+          updated_at?: string | null
+          value?: Json
+        }
+        Update: {
+          id?: string
+          key?: string
+          updated_at?: string | null
+          value?: Json
         }
         Relationships: []
       }
