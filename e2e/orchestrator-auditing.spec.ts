@@ -49,8 +49,8 @@ test.describe('Orchestrator Performance Auditing and PDF Export', () => {
     ]);
     
     const pdfFileName = pdfDownload.suggestedFilename();
-    // Format should be audit-{id}-{timestamp}.pdf
-    expect(pdfFileName).toMatch(/^audit-.*-\d+\.pdf$/);
+    // Format should be audit-{id}-{timestamp}.pdf where timestamp is 14 digits
+    expect(pdfFileName).toMatch(/^audit-.*-\d{14}\.pdf$/);
     if (correlationId) {
       expect(pdfFileName).toContain(correlationId);
     } else {
@@ -65,7 +65,7 @@ test.describe('Orchestrator Performance Auditing and PDF Export', () => {
     
     const csvFileName = csvDownload.suggestedFilename();
     // Format should be job-audit-{id}-{timestamp}-p1.csv
-    expect(csvFileName).toMatch(/^job-audit-.*-\d+-p\d+\.csv$/);
+    expect(csvFileName).toMatch(/^job-audit-.*-\d{14}-p\d+\.csv$/);
     if (correlationId) {
       expect(csvFileName).toContain(correlationId);
     } else {
@@ -76,8 +76,10 @@ test.describe('Orchestrator Performance Auditing and PDF Export', () => {
     await expect(page.locator('select')).toBeVisible();
     await page.locator('select').selectOption('America/Sao_Paulo');
 
-    // Verification of ISO format in any exported metadata or logs (if we could read PDF)
-    // For now we assume system/browser timezone is handled by JS Date
+    // Refresh page to check persistence
+    await page.reload();
+    await page.locator('table tbody tr:first-child').click();
+    await expect(page.locator('select')).toHaveValue('America/Sao_Paulo');
   });
 
   test('should validate date range inputs', async ({ page }) => {
