@@ -70,7 +70,7 @@ Just some text.
         fc.property(
           fc.array(
             fc.record({
-              indent: fc.stringOf(fc.constantFrom(" ", "\t"), { minLength: 0, maxLength: 10 }),
+              indent: fc.string({ unit: fc.constantFrom(" ", "\t"), minLength: 0, maxLength: 10 }),
               prefix: fc.constantFrom("*", "-", "+", "1.", "1)", "99.", "0)"),
               content: fc.string({ minLength: 1, maxLength: 50 }).filter(s => !s.includes("\n") && s.trim().length > 0)
             }),
