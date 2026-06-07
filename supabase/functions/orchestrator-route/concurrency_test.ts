@@ -6,6 +6,10 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 Deno.test("execute_job_action atomic idempotency under concurrency", async () => {
+  if (!SERVICE_ROLE_KEY) {
+    console.warn("Skipping test: SUPABASE_SERVICE_ROLE_KEY not found");
+    return;
+  }
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
   
   // 1. Create a dummy job
