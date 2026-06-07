@@ -172,14 +172,16 @@ export default function OrchestratorPage() {
       
       if (p95 && p95 > latencyThreshold) {
         const slowJob = (data as any[]).find(j => (j.execution_time_ms || j.duration_ms || 0) >= p95);
-        const traceId = slowJob?.correlation_id || slowJob?.id;
+        const traceId = slowJob?.id;
+        const correlationId = slowJob?.correlation_id;
 
         toast({ 
           title: "Alerta de Performance", 
           description: (
             <div className="flex flex-col gap-2">
               <p>Latência p95 ({p95}ms) acima do limite ({latencyThreshold}ms)</p>
-              {traceId && <p className="text-[10px] font-mono text-muted-foreground break-all">Trace: {traceId}</p>}
+              {correlationId && <p className="text-[10px] font-mono text-muted-foreground break-all">Correlation: {correlationId}</p>}
+              {!correlationId && traceId && <p className="text-[10px] font-mono text-muted-foreground break-all">Trace: {traceId}</p>}
               <div className="flex gap-2">
                 <Button 
                   size="sm" 
@@ -187,9 +189,8 @@ export default function OrchestratorPage() {
                   className="h-7 text-[10px] w-fit"
                   onClick={() => {
                     if (slowJob) {
-                      setSearchTerm(traceId);
+                      setSearchTerm(correlationId || traceId);
                       openJobDetails(slowJob);
-                      // Destaque visual será tratado no JobDetailsSheet ou via scroll
                     }
                   }}
                 >
