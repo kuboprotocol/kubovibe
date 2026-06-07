@@ -178,6 +178,7 @@ Deno.serve(async (req) => {
       capabilities: [outcome.agent],
       tasks: [{ agent: outcome.agent, source: outcome.source, reason: outcome.reason }],
       stack: { confidence: outcome.confidence, mode },
+      correlation_id: correlationId,
     });
   } catch (e) {
     console.error("[orchestrator] plan_log_failed", e);
