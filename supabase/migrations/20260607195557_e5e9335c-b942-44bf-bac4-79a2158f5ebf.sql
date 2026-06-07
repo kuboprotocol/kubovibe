@@ -1,0 +1,1 @@
+ALTER TABLE public.job_audit_logs ALTER COLUMN job_id DROP NOT NULL;

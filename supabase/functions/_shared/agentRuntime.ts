@@ -96,6 +96,7 @@ export async function runAgent(
   }
 
   // 4) Cria job em status queued
+  const correlationId = req.headers.get("x-correlation-id") ?? requestId;
   const { data: job, error: jobErr } = await admin
     .from("agent_jobs")
     .insert({
@@ -104,6 +105,7 @@ export async function runAgent(
       status: "queued",
       input,
       request_id: requestId,
+      correlation_id: correlationId,
     })
     .select("id")
     .single();

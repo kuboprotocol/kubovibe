@@ -781,7 +781,7 @@ export type Database = {
           created_at: string
           details: Json | null
           id: string
-          job_id: string
+          job_id: string | null
         }
         Insert: {
           action: string
@@ -790,7 +790,7 @@ export type Database = {
           created_at?: string
           details?: Json | null
           id?: string
-          job_id: string
+          job_id?: string | null
         }
         Update: {
           action?: string
@@ -799,7 +799,7 @@ export type Database = {
           created_at?: string
           details?: Json | null
           id?: string
-          job_id?: string
+          job_id?: string | null
         }
         Relationships: [
           {
@@ -1120,6 +1120,7 @@ export type Database = {
       orchestration_plans: {
         Row: {
           capabilities: string[]
+          correlation_id: string | null
           created_at: string
           id: string
           intent: string
@@ -1133,6 +1134,7 @@ export type Database = {
         }
         Insert: {
           capabilities?: string[]
+          correlation_id?: string | null
           created_at?: string
           id?: string
           intent: string
@@ -1146,6 +1148,7 @@ export type Database = {
         }
         Update: {
           capabilities?: string[]
+          correlation_id?: string | null
           created_at?: string
           id?: string
           intent?: string
