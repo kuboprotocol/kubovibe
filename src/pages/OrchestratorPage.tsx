@@ -875,11 +875,12 @@ export default function OrchestratorPage() {
         connectionStatus={connectionStatus}
         nextPollIn={nextPollIn}
         pollingRetryCount={pollingRetryCount}
+        websocketError={websocketError}
         onReconnect={() => {
           setPollingRetryCount(0);
           setConnectionStatus("connecting");
-
-          loadJobs();
+          setWebsocketError(null);
+          void loadJobs();
         }}
       />
     </div>
