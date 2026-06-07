@@ -53,24 +53,35 @@ export function JobDetailsSheet({ job, auditLogs, onClose, onAction, loading }: 
   if (!job) return null;
 
   const exportJSON = () => {
-    const pagedLogs = auditLogs.slice(exportOffset, exportOffset + exportLimit);
+    const pagedLogs = auditLogs.slice(exportOffset, Math.min(exportOffset + exportLimit, auditLogs.length));
     const data = {
-      job,
+      job: {
+        id: job.id,
+        agent: job.agent_slug,
+        status: job.status,
+        correlation_id: job.correlation_id,
+        created_at: job.created_at
+      },
       audit_logs: pagedLogs,
-      export_info: { limit: exportLimit, offset: exportOffset, total_available: auditLogs.length }
+      export_metadata: {
+        limit: exportLimit,
+        offset: exportOffset,
+        total_records: auditLogs.length,
+        exported_at: new Date().toISOString()
+      }
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `job-${job.id}.json`;
+    a.download = `job-${job.id}-p${Math.floor(exportOffset/exportLimit)+1}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
   const exportCSV = () => {
     const headers = ["ID", "Action", "Correlation ID", "Created At", "Details"];
-    const pagedLogs = auditLogs.slice(exportOffset, exportOffset + exportLimit);
+    const pagedLogs = auditLogs.slice(exportOffset, Math.min(exportOffset + exportLimit, auditLogs.length));
     const rows = pagedLogs.map(log => [
       log.id,
       log.action,
@@ -88,7 +99,7 @@ export function JobDetailsSheet({ job, auditLogs, onClose, onAction, loading }: 
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `job-audit-${job.id}.csv`;
+    a.download = `job-audit-${job.id}-p${Math.floor(exportOffset/exportLimit)+1}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -132,11 +143,19 @@ export function JobDetailsSheet({ job, auditLogs, onClose, onAction, loading }: 
               </Badge>
             </div>
             <div className="flex flex-col gap-1">
-              <SheetDescription className="font-mono text-[10px] break-all">
+              <SheetDescription className="font-mono text-[10px] break-all flex items-center gap-2">
                 ID: {job.id}
+                <Button variant="ghost" size="icon" className="h-4 w-4" onClick={() => navigator.clipboard.writeText(job.id)}>
+                   <Hash className="h-2 w-2" />
+                </Button>
               </SheetDescription>
               <SheetDescription className="font-mono text-[10px] text-primary flex items-center gap-1">
                 <Shield className="h-3 w-3" /> TraceID: {job.correlation_id || "N/A"}
+                {job.correlation_id && (
+                  <Button variant="ghost" size="icon" className="h-4 w-4" onClick={() => navigator.clipboard.writeText(job.correlation_id)}>
+                    <Info className="h-2 w-2" />
+                  </Button>
+                )}
               </SheetDescription>
             </div>
           </SheetHeader>
@@ -329,16 +348,24 @@ export function JobDetailsSheet({ job, auditLogs, onClose, onAction, loading }: 
                       <Button variant="ghost" size="icon" className="h-6 w-6" disabled={exportOffset <= 0} onClick={() => setExportOffset(Math.max(0, exportOffset - exportLimit))}>
                         <ChevronLeft className="h-3 w-3" />
                       </Button>
-                      <span className="text-[10px] font-mono flex-1 text-center">Offset: {exportOffset}</span>
+                      <div className="flex-1 text-center">
+                        <span className="text-[10px] font-mono block">Pág {Math.floor(exportOffset/exportLimit)+1}</span>
+                        <span className="text-[9px] text-muted-foreground">Offset: {exportOffset}</span>
+                      </div>
                       <Button variant="ghost" size="icon" className="h-6 w-6" disabled={exportOffset + exportLimit >= auditLogs.length} onClick={() => setExportOffset(exportOffset + exportLimit)}>
                         <ChevronRight className="h-3 w-3" />
                       </Button>
                    </div>
-                   <div className="w-24">
+                   <div className="w-24 space-y-1">
+                      <p className="text-[9px] text-muted-foreground px-1">Registros/pág</p>
                       <Input 
                         type="number" 
                         value={exportLimit} 
-                        onChange={(e) => setExportLimit(parseInt(e.target.value) || 10)}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value) || 10;
+                          setExportLimit(val);
+                          setExportOffset(0); // Reset offset on limit change
+                        }}
                         className="h-8 text-[10px]"
                         placeholder="Limite"
                       />

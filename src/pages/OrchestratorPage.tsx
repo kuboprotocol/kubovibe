@@ -114,6 +114,7 @@ export default function OrchestratorPage() {
   const [selectedJob, setSelectedJob] = useState<AgentJob | null>(null);
   const [auditLogs, setAuditLogs] = useState<JobAuditLog[]>([]);
   const [actionLoading, setActionLoading] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<"connecting" | "live" | "polling">("connecting");
 
   const loadHealth = async () => {
     setHealthLoading(true);
@@ -136,7 +137,12 @@ export default function OrchestratorPage() {
       if (agentFilter !== "all") query = query.eq("agent_slug", agentFilter);
       if (statusFilter !== "all") query = query.eq("status", statusFilter);
       if (searchTerm) {
-        query = query.or(`id.ilike.%${searchTerm}%,correlation_id.ilike.%${searchTerm}%,idempotency_key.ilike.%${searchTerm}%`);
+        if (searchTerm.match(/^[0-9a-fA-F-]{36}$/)) {
+          // It's a UUID, search exact
+          query = query.or(`id.eq.${searchTerm},correlation_id.eq.${searchTerm}`);
+        } else {
+          query = query.or(`id.ilike.%${searchTerm}%,correlation_id.ilike.%${searchTerm}%,idempotency_key.ilike.%${searchTerm}%`);
+        }
       }
       
       const { data, error } = await query;
@@ -253,24 +259,29 @@ export default function OrchestratorPage() {
       .channel('public:agent_jobs')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'agent_jobs' }, (payload) => {
         console.log('Realtime update:', payload);
-        // Atualiza a lista local de forma otimista ou recarrega se necessário
-        // Para simplificar e garantir consistência com filtros, recarregamos
         void loadJobs();
       })
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          setConnectionStatus("live");
+        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+          setConnectionStatus("polling");
+        }
+      });
 
-    // Polling de fallback (menos frequente se realtime estiver ativo)
+    // Polling de fallback (mais frequente se realtime estiver offline)
     const interval = setInterval(() => {
-      if (jobs.some(j => ['processing', 'running', 'queued'].includes(j.status))) {
+      const needsUpdate = jobs.some(j => ['processing', 'running', 'queued'].includes(j.status));
+      if (connectionStatus === "polling" || needsUpdate) {
         loadJobs();
       }
-    }, 15000);
+    }, connectionStatus === "polling" ? 5000 : 15000);
 
     return () => {
       supabase.removeChannel(channel);
       clearInterval(interval);
     };
-  }, [agentFilter, statusFilter, searchTerm]); // Recarrega ao mudar filtros
+  }, [agentFilter, statusFilter, searchTerm, connectionStatus]); // Recarrega ao mudar filtros ou status de conexão
 
   // Efeito separado para o Job selecionado (Timeline Realtime)
   useEffect(() => {
@@ -364,7 +375,14 @@ export default function OrchestratorPage() {
             <h1 className="mt-2 text-3xl font-bold tracking-tight">Orquestrador KUBO</h1>
             <p className="text-muted-foreground">Orquestração full-stack com filas, retries e roteamento dinâmico.</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-muted/50 text-[10px] font-medium">
+              <div className={`h-1.5 w-1.5 rounded-full ${
+                connectionStatus === 'live' ? 'bg-emerald-500 animate-pulse' : 
+                connectionStatus === 'connecting' ? 'bg-amber-500' : 'bg-blue-500'
+              }`} />
+              {connectionStatus === 'live' ? 'LIVE' : connectionStatus === 'connecting' ? 'CONECTANDO...' : 'POLLING'}
+            </div>
             <Button variant="outline" size="sm" onClick={() => { loadHealth(); loadJobs(); loadConfig(); }}>
               <RefreshCcw className="mr-2 h-4 w-4" /> Atualizar
             </Button>
