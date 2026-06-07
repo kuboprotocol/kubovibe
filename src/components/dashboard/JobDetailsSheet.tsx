@@ -821,7 +821,7 @@ export function JobDetailsSheet({
                   <FileJson className="h-3 w-3 mr-1" /> JSON ({preview.estimatedSizeJSON})
                 </Button>
                 <Button variant="outline" size="sm" className="h-8 text-[10px] flex-1 bg-background" onClick={exportCSV}>
-                  <FileSpreadsheet className="h-3 w-3 mr-1" /> CSV ({preview.estimatedSizeCSV})
+                  <FileSpreadsheet className="h-3 w-3 mr-1" /> Exportar CSV ({preview.estimatedSizeCSV})
                 </Button>
                 <Button variant="outline" size="sm" className="h-8 text-[10px] flex-1 bg-amber-50 text-amber-700 border-amber-200" onClick={exportAlertsCSV}>
                   <FileSpreadsheet className="h-3 w-3 mr-1" /> Alertas CSV
