@@ -23,7 +23,18 @@ Deno.serve(async (req) => {
       .maybeSingle()
     if (stateRow && !stateRow.consumed_at && new Date(stateRow.expires_at).getTime() > Date.now()) {
       uid = String(stateRow.user_id)
-      try { if (stateRow.return_url) appBaseUrl = new URL(stateRow.return_url).origin } catch { /* ignore */ }
+      try { 
+        if (stateRow.return_url) {
+          const u = new URL(stateRow.return_url)
+          // Security: Only allow redirects to kubovibe.dev and its subdomains, or localhost for dev
+          const allowedHost = u.hostname === 'kubovibe.dev' || u.hostname.endsWith('.kubovibe.dev') || u.hostname === 'localhost'
+          if (allowedHost) {
+            appBaseUrl = u.origin 
+          } else {
+            console.warn(`Untrusted returnUrl origin: ${u.origin}`)
+          }
+        }
+      } catch { /* ignore */ }
       // One-shot consume
       await admin.from('github_oauth_states').update({ consumed_at: new Date().toISOString() }).eq('nonce', stateParam)
     }

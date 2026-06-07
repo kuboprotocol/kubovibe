@@ -99,21 +99,23 @@ serve(async (req) => {
             throw new Error('unsupported protocol')
           }
           const host = parsed.hostname.toLowerCase()
+          
+          // SSRF guard: block all private/reserved IPv4 and IPv6 ranges
           const isIPv4 = /^\d{1,3}(\.\d{1,3}){3}$/.test(host)
-          const isPrivateIPv4 = isIPv4 && (() => {
+          const isIPv6 = host.startsWith('[') && host.endsWith(']')
+          
+          const isPrivateIP = (isIPv4 && (() => {
             const p = host.split('.').map(Number)
             return (
-              p[0] === 10 ||
-              p[0] === 127 ||
+              p[0] === 10 || p[0] === 127 || p[0] === 0 || p[0] >= 224 ||
               (p[0] === 169 && p[1] === 254) ||
-              (p[0] === 172 && p[1] >= 16 && p[1] <= 31) ||
-              (p[0] === 192 && p[1] === 168) ||
-              p[0] === 0 ||
-              p[0] >= 224
+              (p[0] === 172 && (p[1] >= 16 && p[1] <= 31)) ||
+              (p[0] === 192 && p[1] === 168)
             )
-          })()
-          const blockedHosts = new Set(['localhost', '0.0.0.0', '::1', 'metadata.google.internal'])
-          if (blockedHosts.has(host) || host.endsWith('.local') || host.endsWith('.internal') || isPrivateIPv4 || host.includes(':')) {
+          })()) || (isIPv6 || host.includes(':')) // Block all IPv6 or anything with a port (to be safe)
+          
+          const blockedHosts = new Set(['localhost', '0.0.0.0', '::1', 'metadata.google.internal', 'instance-data'])
+          if (blockedHosts.has(host) || host.endsWith('.local') || host.endsWith('.internal') || isPrivateIP) {
             throw new Error('host not allowed')
           }
           const start = performance.now()
