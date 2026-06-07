@@ -50,6 +50,7 @@ export type Database = {
           id: string
           idempotency_key: string | null
           input: Json
+          last_action_id: string | null
           last_error: string | null
           metadata: Json | null
           next_retry_at: string | null
@@ -72,6 +73,7 @@ export type Database = {
           id?: string
           idempotency_key?: string | null
           input?: Json
+          last_action_id?: string | null
           last_error?: string | null
           metadata?: Json | null
           next_retry_at?: string | null
@@ -94,6 +96,7 @@ export type Database = {
           id?: string
           idempotency_key?: string | null
           input?: Json
+          last_action_id?: string | null
           last_error?: string | null
           metadata?: Json | null
           next_retry_at?: string | null
@@ -2094,6 +2097,15 @@ export type Database = {
           _metadata?: Json
           _reason: string
           _user_id: string
+        }
+        Returns: Json
+      }
+      execute_job_action: {
+        Args: {
+          p_action: string
+          p_actor_id: string
+          p_correlation_id?: string
+          p_job_id: string
         }
         Returns: Json
       }
