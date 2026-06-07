@@ -53,17 +53,28 @@ export function JobDetailsSheet({ job, auditLogs, onClose, onAction, loading }: 
   if (!job) return null;
 
   const exportJSON = () => {
-    const pagedLogs = auditLogs.slice(exportOffset, exportOffset + exportLimit);
+    const pagedLogs = auditLogs.slice(exportOffset, Math.min(exportOffset + exportLimit, auditLogs.length));
     const data = {
-      job,
+      job: {
+        id: job.id,
+        agent: job.agent_slug,
+        status: job.status,
+        correlation_id: job.correlation_id,
+        created_at: job.created_at
+      },
       audit_logs: pagedLogs,
-      export_info: { limit: exportLimit, offset: exportOffset, total_available: auditLogs.length }
+      export_metadata: {
+        limit: exportLimit,
+        offset: exportOffset,
+        total_records: auditLogs.length,
+        exported_at: new Date().toISOString()
+      }
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `job-${job.id}.json`;
+    a.download = `job-${job.id}-p${Math.floor(exportOffset/exportLimit)+1}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
