@@ -40,17 +40,22 @@ XXXX. Match as roman-like
 
     // Categorized failure validation with exact message checks (Test Matrix)
     const invalidScenarios = [
-      { marker: "XXXX.", expected: "Standard additive/subtractive Roman notation (e.g., no 'IIV'). Received: 'XXXX'." },
-      { marker: "VV.", expected: "Standard additive/subtractive Roman notation (e.g., no 'IIV'). Received: 'VV'." },
-      { marker: "IL.", expected: "Standard additive/subtractive Roman notation (e.g., no 'IIV'). Received: 'IL'." },
-      { marker: "IC.", expected: "Standard additive/subtractive Roman notation (e.g., no 'IIV'). Received: 'IC'." },
-      { marker: "XM.", expected: "Standard additive/subtractive Roman notation (e.g., no 'IIV'). Received: 'XM'." },
-      { marker: "IIII.", expected: "Standard additive/subtractive Roman notation (e.g., no 'IIV'). Received: 'IIII'." }
+      { marker: "IIV.", rule: "Standard additive/subtractive Roman notation (e.g., no 'IIV')" },
+      { marker: "XXXX.", rule: "Standard additive/subtractive Roman notation (e.g., no 'IIV')" },
+      { marker: "VV.", rule: "Standard additive/subtractive Roman notation (e.g., no 'IIV')" },
+      { marker: "IL.", rule: "Standard additive/subtractive Roman notation (e.g., no 'IIV')" },
+      { marker: "IC.", rule: "Standard additive/subtractive Roman notation (e.g., no 'IIV')" },
+      { marker: "XM.", rule: "Standard additive/subtractive Roman notation (e.g., no 'IIV')" },
+      { marker: "IIII.", rule: "Standard additive/subtractive Roman notation (e.g., no 'IIV')" },
+      { marker: "VX.", rule: "Standard additive/subtractive Roman notation (e.g., no 'IIV')" },
+      { marker: "VL.", rule: "Standard additive/subtractive Roman notation (e.g., no 'IIV')" },
+      { marker: "LC.", rule: "Standard additive/subtractive Roman notation (e.g., no 'IIV')" }
     ];
     
-    invalidScenarios.forEach(({ marker, expected }) => {
+    invalidScenarios.forEach(({ marker, rule }) => {
       const md = `${marker} Item`;
-      const expectedFull = `[ROMAN_VALIDATION_ERROR]: Invalid Roman numeral syntax. Rule violated: ${expected} Valid examples: IV, IX, XII.`;
+      const cleanMarker = marker.replace(".", "");
+      const expectedFull = `[ROMAN_VALIDATION_ERROR]: Invalid Roman numeral syntax. Rule violated: ${rule}. Received: '${cleanMarker}'. Valid examples: IV, IX, XII.`;
       
       try {
         validateMarkdownBullets(md);
