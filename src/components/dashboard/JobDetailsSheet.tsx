@@ -81,7 +81,7 @@ export function JobDetailsSheet({
   const [exportLimit, setExportLimit] = useState(100);
   const [exportOffset, setExportOffset] = useState(0);
   const [dateError, setDateError] = useState<string | null>(null);
-  const [timeZone, setTimeZone] = useState("UTC");
+  const [timeZone, setTimeZone] = useState(() => localStorage.getItem("audit-timezone") || "UTC");
 
   const timeZones = [
     { label: "UTC", value: "UTC" },
@@ -89,6 +89,10 @@ export function JobDetailsSheet({
     { label: "New York (EST)", value: "America/New_York" },
     { label: "London (GMT)", value: "Europe/London" },
   ];
+
+  useEffect(() => {
+    localStorage.setItem("audit-timezone", timeZone);
+  }, [timeZone]);
 
   const formatWithTZ = (date: string | Date, formatStr: string = "yyyy-MM-dd HH:mm:ss") => {
     return new Intl.DateTimeFormat('pt-BR', {
@@ -151,22 +155,34 @@ export function JobDetailsSheet({
   };
 
   const exportCSV = () => {
-    const headers = ["ID", "Action", "Correlation ID", "Created At", "Details"];
+    const headers = ["ID", "Action", "Correlation ID", "Created At", "Details", "TimeZone"];
     const pagedLogs = auditLogs.slice(exportOffset, Math.min(exportOffset + exportLimit, auditLogs.length));
     const rows = pagedLogs.map(log => [
       log.id,
       log.action,
       log.correlation_id || "",
       formatWithTZ(log.created_at),
-      JSON.stringify(log.details).replace(/"/g, '""')
+      JSON.stringify(log.details).replace(/"/g, '""'),
+      timeZone
     ]);
     
     const csvContent = [
+      `"Job Audit Report","Fuso Horário: ${timeZone}"`,
       headers.join(","),
       ...rows.map(e => e.map(cell => `"${cell}"`).join(","))
     ].join("\n");
 
-    const timestamp = new Date().getTime();
+    const timestamp = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    }).format(new Date()).replace(/[/, :]/g, '');
+
     const fileName = `job-audit-${job.correlation_id || job.id}-${timestamp}-p${Math.floor(exportOffset/exportLimit)+1}.csv`;
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -221,11 +237,22 @@ export function JobDetailsSheet({
     ]);
 
     const csvContent = [
+      `"Alerts Audit Report","Fuso Horário: ${timeZone}","Período: ${dateRange.from ? format(dateRange.from, "dd/MM/yyyy") : "Início"} - ${dateRange.to ? format(dateRange.to, "dd/MM/yyyy") : "Fim"}"`,
       headers.join(","),
       ...rows.map(e => e.map(cell => `"${cell}"`).join(","))
     ].join("\n");
 
-    const timestamp = new Date().getTime();
+    const timestamp = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    }).format(new Date()).replace(/[/, :]/g, '');
+
     const fileName = `alerts-audit-${job.correlation_id || job.id}-${timestamp}.csv`;
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -258,11 +285,23 @@ export function JobDetailsSheet({
     });
 
     const doc = new jsPDF();
-    const timestamp = new Date().getTime();
+    const timestamp = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    }).format(new Date()).replace(/[/, :]/g, '');
+
     const fileName = `audit-${job.correlation_id || job.id}-${timestamp}.pdf`;
 
     doc.setFontSize(18);
     doc.text("Relatório de Auditoria de Alertas", 14, 22);
+    doc.setFontSize(10);
+    doc.text(`Fuso Horário: ${timeZone}`, 14, 28);
     
     if (alertLogs.length > 0) {
       // Summary Section
