@@ -11,7 +11,7 @@ import {
   Loader2, Sparkles, Activity, ArrowLeft, CheckCircle2, 
   XCircle, Send, History, Settings, Filter, RefreshCcw, 
   ToggleLeft, ToggleRight, Clock, AlertCircle, Info, MoreVertical,
-  Pause, Play, Search, BarChart3
+  Pause, Play, Search, BarChart3, AlertTriangle
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { 
@@ -119,6 +119,8 @@ export default function OrchestratorPage() {
   const [pollingRetryCount, setPollingRetryCount] = useState(0);
   const [metrics, setMetrics] = useState<{ query_time_ms: number; latency_p95?: number } | null>(null);
   const [latencyThreshold, setLatencyThreshold] = useState(500); // ms
+  const [maxRetryLimit] = useState(20);
+
 
 
   const loadHealth = async () => {
@@ -288,17 +290,21 @@ export default function OrchestratorPage() {
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
             setConnectionStatus("live");
+            setPollingRetryCount(0);
           } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
             setConnectionStatus("polling");
-            setPollingRetryCount(prev => prev + 1);
-            // Retry com backoff exponencial + jitter limitado a 60s
-            const backoff = Math.min(60, Math.pow(2, pollingRetryCount) + Math.random() * 5);
-            setNextPollIn(Math.round(backoff));
+            setPollingRetryCount(prev => {
+              const nextCount = Math.min(prev + 1, maxRetryLimit);
+              // Retry com backoff exponencial + jitter limitado a 60s
+              const backoff = Math.min(60, Math.pow(2, nextCount) + Math.random() * 5);
+              setNextPollIn(Math.round(backoff));
+              return nextCount;
+            });
           }
-
         });
       return channel;
     };
+
 
     let channel = setupRealtime();
 
@@ -306,16 +312,18 @@ export default function OrchestratorPage() {
       setNextPollIn(prev => {
         if (prev <= 1) {
           loadJobs();
-          // Reset retry count se a carga for bem sucedida (ou manter se o status for polling)
-          const backoff = connectionStatus === "polling" 
-            ? Math.min(60, Math.pow(2, pollingRetryCount) + Math.random() * 5)
-            : 15;
-          return Math.round(backoff);
-
+          if (connectionStatus === "polling") {
+            const nextCount = Math.min(pollingRetryCount + 1, maxRetryLimit);
+            setPollingRetryCount(nextCount);
+            const backoff = Math.min(60, Math.pow(2, nextCount) + Math.random() * 5);
+            return Math.round(backoff);
+          }
+          return 15;
         }
         return prev - 1;
       });
     }, 1000);
+
 
     return () => {
       supabase.removeChannel(channel);
@@ -435,15 +443,21 @@ export default function OrchestratorPage() {
               <Badge variant="secondary" className="h-8">V2.1</Badge>
             </div>
             {metrics && (
-              <div className="flex items-center gap-2 text-[9px] text-muted-foreground font-mono bg-muted/30 px-2 py-0.5 rounded border border-border/50">
+              <div className={`flex items-center gap-2 text-[9px] font-mono px-2 py-0.5 rounded border transition-colors ${
+                metrics.latency_p95 && metrics.latency_p95 > latencyThreshold 
+                  ? 'bg-destructive/10 text-destructive border-destructive/30 animate-pulse' 
+                  : 'text-muted-foreground bg-muted/30 border-border/50'
+              }`}>
                 <BarChart3 className="h-3 w-3" />
                 Query: {metrics.query_time_ms}ms | Trace Match: INDEXED
                 {metrics.latency_p95 && (
-                  <span className={`ml-2 px-1 rounded ${metrics.latency_p95 > latencyThreshold ? 'bg-destructive/20 text-destructive' : 'text-emerald-500'}`}>
+                  <span className={`ml-2 px-1 rounded flex items-center gap-1 ${metrics.latency_p95 > latencyThreshold ? 'bg-destructive text-white font-bold' : 'text-emerald-500'}`}>
+                    {metrics.latency_p95 > latencyThreshold && <AlertTriangle className="h-2.5 w-2.5" />}
                     p95: {metrics.latency_p95}ms
                   </span>
                 )}
               </div>
+
 
             )}
           </div>
@@ -676,9 +690,31 @@ export default function OrchestratorPage() {
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               <Card>
                 <CardHeader>
+                  <CardTitle>Performance & Latência</CardTitle>
+                  <CardDescription>Configure limites para alertas automáticos de regressão.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Limite p95 (ms)</label>
+                    <div className="flex items-center gap-4">
+                      <Input 
+                        type="number" 
+                        value={latencyThreshold} 
+                        onChange={(e) => setLatencyThreshold(Number(e.target.value))}
+                        className="w-24"
+                      />
+                      <span className="text-xs text-muted-foreground">Jobs acima deste valor dispararão alertas na UI.</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
                   <CardTitle>Controle por Categoria</CardTitle>
                   <CardDescription>Habilite ou desabilite grupos inteiros de agentes instantaneamente.</CardDescription>
                 </CardHeader>
+
                 <CardContent className="space-y-4">
                   {categories.map(cat => (
                     <div key={cat} className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50">
