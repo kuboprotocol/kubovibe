@@ -35,12 +35,31 @@ IIV. Non-standard but matched as roman-like
 XXXX. Match as roman-like
     `.trim();
     const bullets = extractBullets(md, true);
-    // Verified behavior: matches strings of valid roman chars even if not semantically correct numbers
+    
+    // Verificamos que o regex captura o que prometemos (caracteres romanos válidos, mesmo sem ordem)
     expect(bullets).toEqual([
       "Non-standard but matched as roman-like",
       "Match as roman-like"
     ]);
+
+    // Teste de falha explícita: Caractere não-romano invalida o bullet romano
+    const invalidMd = "IA. Not a bullet\nV1. Not a bullet";
+    expect(extractBullets(invalidMd, true)).toEqual([]);
   });
+
+  it("should fail build or validation if strict roman rule is requested (Demonstration)", () => {
+    const nonStrictMatches = ["IIV", "XXXX", "IX"];
+    
+    // Simulação de lógica que o CI usaria para falhar se encontrasse romanos inválidos
+    const invalidOnes = nonStrictMatches.filter(s => !isValidRoman(s));
+    
+    // Se estivéssemos em um modo estrito, isso falharia o build
+    // Aqui apenas validamos que conseguimos detectar para erro claro
+    expect(invalidOnes).toContain("IIV");
+    expect(invalidOnes).toContain("XXXX");
+    expect(isValidRoman("IX")).toBe(true);
+  });
+
 
   it("should handle mixed markers and numbering types across levels", () => {
     const md = `

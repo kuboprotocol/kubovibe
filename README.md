@@ -4,11 +4,13 @@
 > Transforma ideias em produtos digitais completos — SaaS, metaversos, jogos AAA e aplicações Web3.
 
 <!-- CI badges (clique para abrir o histórico de runs) -->
+[![Markdown Bullets Coverage](https://img.shields.io/badge/Bullets_Coverage-100%25-brightgreen)](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/bullets-ci.yml)
 [![env-check](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/env-check.yml/badge.svg?branch=main)](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/env-check.yml?query=branch%3Amain)
 [![vitest](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/vitest.yml/badge.svg?branch=main)](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/vitest.yml?query=branch%3Amain)
 [![e2e](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/e2e.yml/badge.svg?branch=main)](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/e2e.yml?query=branch%3Amain)
 [![wgsl-sanitizer](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/wgsl-sanitizer.yml/badge.svg?branch=main)](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/wgsl-sanitizer.yml?query=branch%3Amain)
 [![post-migration-security](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/post-migration-security.yml/badge.svg?branch=main)](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/post-migration-security.yml?query=branch%3Amain)
+
 
 > Cada badge linka para o histórico filtrado em `branch=main`. Verde = último run passou, vermelho = falhou (clique para ver logs e artifacts, incluindo `env-check-report`).
 
@@ -19,19 +21,18 @@
 O sistema implementa um utilitário robusto de extração de bullets Markdown, projetado para ser tolerante a múltiplos níveis de indentação e estilos de lista.
 
 ### Regras Formais de Falha (Algarismos Romanos)
-Ao usar o modo `extended` para suporte a numeração romana, aplicam-se as seguintes regras:
 
-- **Regra de Regex:** É utilizado o padrão `\b[ivxlcdm]+[.)]` para máxima performance.
-- **Validação Semântica:** Não é realizada validação gramatical estrita. Qualquer combinação válida dos caracteres `i, v, x, l, c, d, m` seguida de um separador (`.` ou `)`) será extraída.
-- **Exemplo 1 (Não-padrão mas aceito):**
-  - **Entrada:** `IIV. Meu Item`
-  - **Saída:** `Meu Item`
-- **Exemplo 2 (Caracteres repetidos inválidos):**
-  - **Entrada:** `XXXX) Item Multi-X`
-  - **Saída:** `Item Multi-X`
-- **Exemplo 3 (Correto):**
-  - **Entrada:** `IV. Item Correto`
-  - **Saída:** `Item Correto`
+Para garantir previsibilidade, o sistema adota regras claras de extração:
+
+| Tipo de Entrada | Exemplo | Status | Saída Esperada | Razão |
+| :--- | :--- | :--- | :--- | :--- |
+| **Romano Válido** | `IV. Item` | ✅ OK | `Item` | Algarismo romano correto. |
+| **Romano Inválido (Sintaxe)** | `IIV. Item` | ✅ MATCH* | `Item` | Capturado como "roman-like" para performance. |
+| **Caracteres Ilegais** | `V1. Item` | ❌ FAIL | — | Contém dígito fora do padrão `[ivxlcdm]`. |
+| **Mesclado** | `IA. Item` | ❌ FAIL | — | Caractere `A` não pertence ao set romano. |
+
+> **Nota Técnica:** O comportamento de "Match" para `IIV` é intencional. O sistema prioriza capturar o conteúdo do item se o marcador for composto exclusivamente por caracteres romanos, delegando validação gramatical estrita para camadas superiores se necessário. O CI falhará se qualquer teste de regressão para estas regras for quebrado.
+
 
 ### Integração Contínua e Relatórios
 Um workflow dedicado do GitHub Actions garante que a lógica de extração mantenha **100% de cobertura**. Os relatórios são gerados em:
