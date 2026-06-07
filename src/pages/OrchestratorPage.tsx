@@ -220,7 +220,8 @@ export default function OrchestratorPage() {
       });
 
       if (error) throw error;
-      if (data && !data.ok) throw new Error(data.error);
+      const result = data as any;
+      if (result && !result.ok) throw new Error(result.error);
 
       toast({ title: `Ação ${action} concluída` });
       void loadJobs();
