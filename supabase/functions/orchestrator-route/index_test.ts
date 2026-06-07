@@ -4,6 +4,7 @@ import { assertEquals, assert } from "https://deno.land/std@0.224.0/assert/mod.t
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
+const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
 Deno.test("orchestrator rejects unauthenticated requests", async () => {
   if (!SUPABASE_URL) return;
