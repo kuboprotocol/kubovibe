@@ -262,7 +262,24 @@ export default function OrchestratorPage() {
     void loadHealth(); 
     void loadJobs();
     void loadConfig();
-  }, []);
+
+    // Polling em tempo real para jobs ativos
+    const interval = setInterval(() => {
+      // Se houver jobs processando ou se o modal de detalhes estiver aberto (para atualizar a timeline)
+      if (jobs.some(j => ['processing', 'running', 'queued'].includes(j.status)) || selectedJob) {
+        loadJobs();
+        if (selectedJob) {
+          loadAuditLogs(selectedJob.id, selectedJob.correlation_id);
+          // Atualiza o job selecionado se mudou
+          supabase.from("agent_jobs").select("*").eq("id", selectedJob.id).maybeSingle().then(({ data }) => {
+            if (data) setSelectedJob(data as any as AgentJob);
+          });
+        }
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [jobs, selectedJob]);
 
   const run = async (mode: "classify" | "execute") => {
     if (!prompt.trim()) {
