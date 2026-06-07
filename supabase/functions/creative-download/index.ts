@@ -1,6 +1,7 @@
 // Downloader Universal — usa a API pública do cobalt.tools.
 import { corsHeaders } from "../_shared/cors.ts";
 import { getUser, deductCredits, recordAsset } from "../_shared/creative.ts";
+import { validatePublicUrl } from "../_shared/security.ts";
 
 const COST = 2;
 const COBALT = Deno.env.get("COBALT_API_URL") ?? "https://api.cobalt.tools/api/json";
@@ -12,8 +13,9 @@ Deno.serve(async (req) => {
 
   const idempotencyKey = req.headers.get("X-Idempotency-Key") ?? undefined;
   try {
-    const { url, format = "mp4" } = await req.json();
-    if (!url) return j(400, { error: "url required" });
+    const { url: rawUrl, format = "mp4" } = await req.json();
+    if (!rawUrl) return j(400, { error: "url required" });
+    const url = validatePublicUrl(rawUrl).toString();
 
     const ded = await deductCredits(user.id, COST, "creative_download", { url, format }, user.email, idempotencyKey);
     if (!ded.ok) return j((ded as any).status ?? 402, { error: ded.error });

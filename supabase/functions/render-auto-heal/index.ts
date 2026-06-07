@@ -7,6 +7,7 @@
 //   5. Log every action in render_heal_events.
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts'
 import { admin, authUser, corsHeaders, decryptSecret, json, logHeal, renderFetch } from '../_shared/render.ts'
+import { validatePublicUrl } from '../_shared/security.ts'
 
 const FAIL_STATES = new Set(['build_failed', 'update_failed', 'canceled', 'deactivated'])
 
@@ -59,7 +60,10 @@ async function healOne(policy: any, conn: any, apiKey: string, trigger: string) 
 
   // 2) probe health
   let health: any = null
-  if (policy.health_url) health = await probe(policy.health_url)
+  if (policy.health_url) {
+    validatePublicUrl(policy.health_url)
+    health = await probe(policy.health_url)
+  }
   decisions.push({ lastStatus, health })
 
   let didAction = false
@@ -97,6 +101,7 @@ async function healOne(policy: any, conn: any, apiKey: string, trigger: string) 
   // 3) optional E2E webhook after deploy success
   if (policy.e2e_run_on_deploy && policy.e2e_webhook_url && lastStatus === 'live' && !didAction) {
     try {
+      validatePublicUrl(policy.e2e_webhook_url)
       const r = await fetch(policy.e2e_webhook_url, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ service_id: sid, deploy_id: last?.id, trigger }),
