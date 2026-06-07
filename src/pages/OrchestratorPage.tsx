@@ -115,6 +115,7 @@ export default function OrchestratorPage() {
   const [auditLogs, setAuditLogs] = useState<JobAuditLog[]>([]);
   const [actionLoading, setActionLoading] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<"connecting" | "live" | "polling">("connecting");
+  const [websocketError, setWebsocketError] = useState<string | null>(null);
   const [nextPollIn, setNextPollIn] = useState(15);
   const [pollingRetryCount, setPollingRetryCount] = useState(0);
   const [metrics, setMetrics] = useState<{ query_time_ms: number; latency_p95?: number } | null>(null);
@@ -175,17 +176,33 @@ export default function OrchestratorPage() {
           description: (
             <div className="flex flex-col gap-2">
               <p>Latência p95 ({p95}ms) acima do limite ({latencyThreshold}ms)</p>
-              <Button 
-                size="sm" 
-                variant="outline" 
-                className="h-7 text-[10px] w-fit"
-                onClick={() => {
-                  const slowJob = (data as any[]).find(j => (j.execution_time_ms || j.duration_ms || 0) >= p95);
-                  if (slowJob) openJobDetails(slowJob);
-                }}
-              >
-                Ver Detalhes do Job
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="h-7 text-[10px] w-fit"
+                  onClick={() => {
+                    const slowJob = (data as any[]).find(j => (j.execution_time_ms || j.duration_ms || 0) >= p95);
+                    if (slowJob) {
+                      setSearchTerm(slowJob.correlation_id || slowJob.id);
+                      openJobDetails(slowJob);
+                    }
+                  }}
+                >
+                  Filtrar e Ver Detalhes
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-[10px] w-fit"
+                  onClick={() => {
+                    const slowJob = (data as any[]).find(j => (j.execution_time_ms || j.duration_ms || 0) >= p95);
+                    if (slowJob) openJobDetails(slowJob);
+                  }}
+                >
+                  Apenas Abrir
+                </Button>
+              </div>
             </div>
           ), 
           variant: "destructive",
@@ -301,20 +318,22 @@ export default function OrchestratorPage() {
 
     const setupRealtime = () => {
       setConnectionStatus("connecting");
+      setWebsocketError(null);
       const channel = supabase
         .channel('public:agent_jobs')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'agent_jobs' }, (payload) => {
           void loadJobs();
         })
-        .subscribe((status) => {
+        .subscribe((status, err) => {
           if (status === 'SUBSCRIBED') {
             setConnectionStatus("live");
             setPollingRetryCount(0);
+            setWebsocketError(null);
           } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
             setConnectionStatus("polling");
+            setWebsocketError(err?.message || "Erro desconhecido no WebSocket");
             setPollingRetryCount(prev => {
               const nextCount = Math.min(prev + 1, maxRetryLimit);
-              // Retry com backoff exponencial + jitter limitado a 60s
               const backoff = Math.min(60, Math.pow(2, nextCount) + Math.random() * 5);
               setNextPollIn(Math.round(backoff));
               return nextCount;
@@ -782,6 +801,17 @@ export default function OrchestratorPage() {
                       <span className="text-xs text-muted-foreground">Jobs acima deste valor dispararão alertas na UI.</span>
                     </div>
                   </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => {
+                      setLatencyThreshold(500);
+                      localStorage.setItem('kubo_latency_threshold', '500');
+                      toast({ title: "Limites restaurados", description: "O limite p95 voltou ao padrão de 500ms." });
+                    }}
+                  >
+                    Restaurar Padrões
+                  </Button>
                 </CardContent>
               </Card>
 
@@ -845,11 +875,12 @@ export default function OrchestratorPage() {
         connectionStatus={connectionStatus}
         nextPollIn={nextPollIn}
         pollingRetryCount={pollingRetryCount}
+        websocketError={websocketError}
         onReconnect={() => {
           setPollingRetryCount(0);
           setConnectionStatus("connecting");
-
-          loadJobs();
+          setWebsocketError(null);
+          void loadJobs();
         }}
       />
     </div>
