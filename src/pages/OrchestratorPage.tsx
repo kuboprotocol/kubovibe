@@ -171,21 +171,25 @@ export default function OrchestratorPage() {
       setMetrics({ query_time_ms: queryTime, latency_p95: p95 });
       
       if (p95 && p95 > latencyThreshold) {
+        const slowJob = (data as any[]).find(j => (j.execution_time_ms || j.duration_ms || 0) >= p95);
+        const traceId = slowJob?.correlation_id || slowJob?.id;
+
         toast({ 
           title: "Alerta de Performance", 
           description: (
             <div className="flex flex-col gap-2">
               <p>Latência p95 ({p95}ms) acima do limite ({latencyThreshold}ms)</p>
+              {traceId && <p className="text-[10px] font-mono text-muted-foreground break-all">Trace: {traceId}</p>}
               <div className="flex gap-2">
                 <Button 
                   size="sm" 
                   variant="outline" 
                   className="h-7 text-[10px] w-fit"
                   onClick={() => {
-                    const slowJob = (data as any[]).find(j => (j.execution_time_ms || j.duration_ms || 0) >= p95);
                     if (slowJob) {
-                      setSearchTerm(slowJob.correlation_id || slowJob.id);
+                      setSearchTerm(traceId);
                       openJobDetails(slowJob);
+                      // Destaque visual será tratado no JobDetailsSheet ou via scroll
                     }
                   }}
                 >
@@ -196,7 +200,6 @@ export default function OrchestratorPage() {
                   variant="ghost"
                   className="h-7 text-[10px] w-fit"
                   onClick={() => {
-                    const slowJob = (data as any[]).find(j => (j.execution_time_ms || j.duration_ms || 0) >= p95);
                     if (slowJob) openJobDetails(slowJob);
                   }}
                 >

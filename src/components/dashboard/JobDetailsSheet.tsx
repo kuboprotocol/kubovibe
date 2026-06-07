@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { 
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
 } from "@/components/ui/sheet";
@@ -66,6 +66,7 @@ export function JobDetailsSheet({
   const [activeTab, setActiveTab] = useState("overview");
   const [confirmAction, setConfirmAction] = useState<"cancel" | "pause" | "resume" | "retry" | null>(null);
   const [timelineSearch, setTimelineSearch] = useState("");
+  const timelineRefs = useRef<Record<string, HTMLDivElement | null>>({});
   
   // Export pagination
   const [exportLimit, setExportLimit] = useState(100);
@@ -160,6 +161,20 @@ export function JobDetailsSheet({
       setConfirmAction(null);
     }
   };
+
+  useEffect(() => {
+    if (activeTab === "timeline" && timelineSearch) {
+      const match = filteredLogs.find(log => 
+        log.correlation_id === timelineSearch || 
+        log.id === timelineSearch ||
+        (log.details && JSON.stringify(log.details).includes(timelineSearch))
+      );
+      
+      if (match && timelineRefs.current[match.id]) {
+        timelineRefs.current[match.id]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+  }, [activeTab, timelineSearch, filteredLogs.length]);
 
   return (
     <>
@@ -338,11 +353,26 @@ export function JobDetailsSheet({
                       const isSuccess = log.action.includes('success') || log.action.includes('succeeded');
                       
                       return (
-                        <div key={log.id} className="relative pl-7 pb-4">
+                        <div 
+                          key={log.id} 
+                          ref={el => timelineRefs.current[log.id] = el}
+                          className={`relative pl-7 pb-4 transition-all duration-500 ${
+                            timelineSearch && (
+                              log.correlation_id === timelineSearch || 
+                              log.id === timelineSearch || 
+                              (log.details && JSON.stringify(log.details).includes(timelineSearch))
+                            ) ? 'scale-[1.02] bg-primary/5 rounded-r-md -ml-2 pl-9' : ''
+                          }`}
+                        >
                           <div className={`absolute left-0 top-1 w-4 h-4 rounded-full bg-background border-2 z-10 ${
                             isError ? 'border-destructive' : isSuccess ? 'border-emerald-500' : 'border-primary'
                           }`} />
-                          <div className="flex flex-col bg-muted/30 p-2 rounded-md border border-transparent hover:border-border transition-colors">
+                          <div className={`flex flex-col bg-muted/30 p-2 rounded-md border border-transparent hover:border-border transition-colors ${
+                            timelineSearch && (
+                              log.correlation_id === timelineSearch || 
+                              log.id === timelineSearch
+                            ) ? 'border-primary shadow-sm' : ''
+                          }`}>
                             <div className="flex items-center justify-between">
                               <span className={`text-[10px] font-bold uppercase tracking-tight ${
                                 isError ? 'text-destructive' : isSuccess ? 'text-emerald-500' : 'text-foreground'
