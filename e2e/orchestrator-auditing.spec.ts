@@ -60,12 +60,12 @@ test.describe('Orchestrator Performance Auditing and PDF Export', () => {
     // Trigger CSV Export and verify filename
     const [csvDownload] = await Promise.all([
       page.waitForEvent('download'),
-      page.locator('button:has-text("Alertas CSV")').click(),
+      page.locator('button:has-text("Exportar CSV")').click(),
     ]);
     
     const csvFileName = csvDownload.suggestedFilename();
-    // Format should be alerts-audit-{id}-{timestamp}.csv
-    expect(csvFileName).toMatch(/^alerts-audit-.*-\d+\.csv$/);
+    // Format should be job-audit-{id}-{timestamp}-p1.csv
+    expect(csvFileName).toMatch(/^job-audit-.*-\d+-p\d+\.csv$/);
     if (correlationId) {
       expect(csvFileName).toContain(correlationId);
     } else {

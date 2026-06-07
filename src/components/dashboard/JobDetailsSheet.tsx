@@ -157,7 +157,7 @@ export function JobDetailsSheet({
       log.id,
       log.action,
       log.correlation_id || "",
-      new Date(log.created_at).toISOString(),
+      formatWithTZ(log.created_at),
       JSON.stringify(log.details).replace(/"/g, '""')
     ]);
     
@@ -166,14 +166,17 @@ export function JobDetailsSheet({
       ...rows.map(e => e.map(cell => `"${cell}"`).join(","))
     ].join("\n");
 
+    const timestamp = new Date().getTime();
+    const fileName = `job-audit-${job.correlation_id || job.id}-${timestamp}-p${Math.floor(exportOffset/exportLimit)+1}.csv`;
+
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `job-audit-${job.id}-p${Math.floor(exportOffset/exportLimit)+1}.csv`;
+    a.download = fileName;
     a.click();
     URL.revokeObjectURL(url);
-    toast({ title: "Exportação CSV concluída" });
+    toast({ title: "Exportação CSV concluída", description: `Arquivo: ${fileName}` });
   };
 
   const exportAlertsCSV = () => {
@@ -818,7 +821,7 @@ export function JobDetailsSheet({
                   <FileJson className="h-3 w-3 mr-1" /> JSON ({preview.estimatedSizeJSON})
                 </Button>
                 <Button variant="outline" size="sm" className="h-8 text-[10px] flex-1 bg-background" onClick={exportCSV}>
-                  <FileSpreadsheet className="h-3 w-3 mr-1" /> CSV ({preview.estimatedSizeCSV})
+                  <FileSpreadsheet className="h-3 w-3 mr-1" /> Exportar CSV ({preview.estimatedSizeCSV})
                 </Button>
                 <Button variant="outline" size="sm" className="h-8 text-[10px] flex-1 bg-amber-50 text-amber-700 border-amber-200" onClick={exportAlertsCSV}>
                   <FileSpreadsheet className="h-3 w-3 mr-1" /> Alertas CSV
