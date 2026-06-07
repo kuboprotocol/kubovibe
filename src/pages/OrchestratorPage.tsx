@@ -259,34 +259,41 @@ export default function OrchestratorPage() {
     void loadJobs();
     void loadConfig();
 
-    // Inscrição Realtime para a lista de Jobs
-    const channel = supabase
-      .channel('public:agent_jobs')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'agent_jobs' }, (payload) => {
-        console.log('Realtime update:', payload);
-        void loadJobs();
-      })
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          setConnectionStatus("live");
-        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-          setConnectionStatus("polling");
-        }
-      });
+    const setupRealtime = () => {
+      setConnectionStatus("connecting");
+      const channel = supabase
+        .channel('public:agent_jobs')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'agent_jobs' }, (payload) => {
+          void loadJobs();
+        })
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            setConnectionStatus("live");
+          } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+            setConnectionStatus("polling");
+            setNextPollIn(5);
+          }
+        });
+      return channel;
+    };
 
-    // Polling de fallback (mais frequente se realtime estiver offline)
+    let channel = setupRealtime();
+
     const interval = setInterval(() => {
-      const needsUpdate = jobs.some(j => ['processing', 'running', 'queued'].includes(j.status));
-      if (connectionStatus === "polling" || needsUpdate) {
-        loadJobs();
-      }
-    }, connectionStatus === "polling" ? 5000 : 15000);
+      setNextPollIn(prev => {
+        if (prev <= 1) {
+          loadJobs();
+          return connectionStatus === "polling" ? 5 : 15;
+        }
+        return prev - 1;
+      });
+    }, 1000);
 
     return () => {
       supabase.removeChannel(channel);
       clearInterval(interval);
     };
-  }, [agentFilter, statusFilter, searchTerm, connectionStatus]); // Recarrega ao mudar filtros ou status de conexão
+  }, [agentFilter, statusFilter, searchTerm, connectionStatus]);
 
   // Efeito separado para o Job selecionado (Timeline Realtime)
   useEffect(() => {
