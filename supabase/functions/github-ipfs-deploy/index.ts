@@ -32,8 +32,8 @@ Deno.serve(async (req) => {
     }
 
     const { repo_full_name, branch } = await req.json()
-    if (!repo_full_name) {
-      return new Response(JSON.stringify({ error: 'repo_full_name is required' }), {
+    if (!repo_full_name || typeof repo_full_name !== 'string' || !/^[a-zA-Z0-9-._]+\/[a-zA-Z0-9-._]+$/.test(repo_full_name)) {
+      return new Response(JSON.stringify({ error: 'Valid repo_full_name (owner/repo) is required' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }

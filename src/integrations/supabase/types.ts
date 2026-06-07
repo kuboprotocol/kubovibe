@@ -1984,6 +1984,10 @@ export type Database = {
         }
         Returns: Json
       }
+      grant_credits: {
+        Args: { p_amount: number; p_user_id: string }
+        Returns: undefined
+      }
       is_kubo_admin: { Args: never; Returns: boolean }
       is_skill_admin: { Args: never; Returns: boolean }
       log_security_audit: {

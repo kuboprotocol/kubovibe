@@ -118,29 +118,16 @@ Deno.serve(async (req: Request) => {
       })
       .eq("id", click_id);
 
-    // ── Add credits to subscription ──
-    const { data: sub } = await supabaseAdmin
-      .from("subscriptions")
-      .select("id, edits_limit")
-      .eq("user_id", userId)
-      .maybeSingle();
+    // ── Add credits to subscription (Atomic via RPC) ──
+    const { error: rpcErr } = await supabaseAdmin.rpc("grant_credits", {
+      p_user_id: userId,
+      p_amount: reward,
+    });
 
-    if (sub) {
-      await supabaseAdmin
-        .from("subscriptions")
-        .update({
-          edits_limit: sub.edits_limit + reward,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", sub.id);
-    } else {
-      await supabaseAdmin.from("subscriptions").insert({
-        user_id: userId,
-        plan: "free",
-        edits_used: 0,
-        edits_limit: 5 + reward,
-        is_active: true,
-      });
+    if (rpcErr) {
+      console.error("Failed to grant credits:", rpcErr);
+      // We don't fail the request because the click was already marked completed,
+      // but we log it for manual correction if needed.
     }
 
     console.log(`✅ User ${userId} earned ${reward} credits from link ${click.shortlink_id} (IP: ${clientIp}, elapsed: ${elapsedSeconds.toFixed(1)}s)`);
