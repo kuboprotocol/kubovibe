@@ -34,10 +34,16 @@ jobs:
           const fs = require('fs');
           const results = JSON.parse(fs.readFileSync('test-results/bullets-results.json', 'utf8'));
           
-          // Aggregate by category
           const assertions = results.testResults.flatMap(tr => tr.assertionResults);
-          const romanTests = assertions.filter(a => a.title.toLowerCase().includes('roman'));
-          
+          const getCategoryStatus = (keyword) => {
+            const matches = assertions.filter(a => a.title.toLowerCase().includes(keyword.toLowerCase()));
+            return {
+              status: matches.length > 0 && matches.every(a => a.status === 'passed') ? 'PASS' : 'FAIL',
+              count: matches.length,
+              failed: matches.filter(a => a.status !== 'passed').length
+            };
+          };
+
           const summary = {
             status: results.success ? 'PASS' : 'FAIL',
             total_tests: results.numTotalTests,
@@ -45,11 +51,9 @@ jobs:
             failed_tests: results.numFailedTests,
             coverage: '100%',
             categories: {
-              invalid_roman: {
-                status: romanTests.every(a => a.status === 'passed') ? 'PASS' : 'FAIL',
-                count: romanTests.length,
-                failed: romanTests.filter(a => a.status !== 'passed').length
-              }
+              invalid_roman: getCategoryStatus('Roman'),
+              extraction: getCategoryStatus('extract'),
+              formatting: getCategoryStatus('formatting')
             },
             metadata: {
               pr: process.env.GITHUB_EVENT_NUMBER || '0',
