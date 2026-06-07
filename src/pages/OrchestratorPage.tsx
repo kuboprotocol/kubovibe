@@ -177,13 +177,20 @@ export default function OrchestratorPage() {
     }
   };
 
-  const loadAuditLogs = async (jobId: string) => {
+  const loadAuditLogs = async (jobId: string, correlationId?: string) => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from("job_audit_logs")
         .select("*")
-        .eq("job_id", jobId)
         .order("created_at", { ascending: false });
+      
+      if (correlationId) {
+        query = query.or(`job_id.eq.${jobId},correlation_id.eq.${correlationId}`);
+      } else {
+        query = query.eq("job_id", jobId);
+      }
+      
+      const { data, error } = await query;
       
       if (error) throw error;
       setAuditLogs(data || []);
@@ -194,7 +201,7 @@ export default function OrchestratorPage() {
 
   const openJobDetails = (job: AgentJob) => {
     setSelectedJob(job);
-    loadAuditLogs(job.id);
+    loadAuditLogs(job.id, job.correlation_id);
   };
 
   const handleJobAction = async (jobId: string, action: "cancel" | "pause" | "resume" | "retry") => {
