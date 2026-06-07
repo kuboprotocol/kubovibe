@@ -80,6 +80,24 @@ export function JobDetailsSheet({
   });
   const [exportLimit, setExportLimit] = useState(100);
   const [exportOffset, setExportOffset] = useState(0);
+  const [dateError, setDateError] = useState<string | null>(null);
+
+  const validateDateRange = () => {
+    setDateError(null);
+    const now = new Date();
+    
+    if (dateRange.from && dateRange.to && dateRange.from > dateRange.to) {
+      setDateError("A data inicial não pode ser maior que a final.");
+      return false;
+    }
+    
+    if ((dateRange.from && dateRange.from > now) || (dateRange.to && dateRange.to > now)) {
+      setDateError("Datas futuras não são permitidas.");
+      return false;
+    }
+    
+    return true;
+  };
 
   if (!job) return null;
 
@@ -138,12 +156,33 @@ export function JobDetailsSheet({
   };
 
   const exportAlertsCSV = () => {
-    // Collect specific alerts info
-    const alertLogs = auditLogs.filter(log => 
-      log.action.includes('error') || 
-      log.action.includes('failed') || 
-      (log.details && log.details.latency_p95 > 0)
-    );
+    if (!validateDateRange()) return;
+
+    // Collect specific alerts info with date filter
+    const alertLogs = auditLogs.filter(log => {
+      const isAlert = log.action.includes('error') || 
+                      log.action.includes('failed') || 
+                      (log.details && log.details.latency_p95 > 0);
+      
+      if (!isAlert) return false;
+      
+      if (dateRange.from || dateRange.to) {
+        const logDate = new Date(log.created_at);
+        if (dateRange.from && logDate < dateRange.from) return false;
+        if (dateRange.to && logDate > dateRange.to) return false;
+      }
+      
+      return true;
+    });
+
+    if (alertLogs.length === 0) {
+      toast({ 
+        title: "Nenhum alerta encontrado", 
+        description: "Não há dados para exportar no período selecionado.",
+        variant: "destructive"
+      });
+      return;
+    }
 
     const headers = ["ID", "Action", "TraceID", "CorrelationID", "Latency p95", "Retries", "Created At"];
     const rows = alertLogs.map(log => [
@@ -161,17 +200,22 @@ export function JobDetailsSheet({
       ...rows.map(e => e.map(cell => `"${cell}"`).join(","))
     ].join("\n");
 
+    const timestamp = new Date().getTime();
+    const fileName = `alerts-audit-${job.correlation_id || job.id}-${timestamp}.csv`;
+
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `alerts-audit-${job.id}.csv`;
+    a.download = fileName;
     a.click();
     URL.revokeObjectURL(url);
-    toast({ title: "Relatório de Alertas CSV concluído" });
+    toast({ title: "Relatório de Alertas CSV concluído", description: `Arquivo: ${fileName}` });
   };
 
   const exportAlertsPDF = () => {
+    if (!validateDateRange()) return;
+
     const alertLogs = auditLogs.filter(log => {
       const isAlert = log.action.includes('error') || 
                       log.action.includes('failed') || 
@@ -195,62 +239,74 @@ export function JobDetailsSheet({
     doc.setFontSize(18);
     doc.text("Relatório de Auditoria de Alertas", 14, 22);
     
-    // Summary Section
-    doc.setFontSize(12);
-    doc.text("Resumo Agregado (CorrelationID)", 14, 32);
-    
-    const aggregation = alertLogs.reduce((acc: any, log) => {
-      const cid = log.correlation_id || job.correlation_id || "N/A";
-      if (!acc[cid]) {
-        acc[cid] = { count: 0, maxP95: 0, totalRetries: 0 };
-      }
-      acc[cid].count += 1;
-      const p95 = log.details?.latency_p95 || 0;
-      if (p95 > acc[cid].maxP95) acc[cid].maxP95 = p95;
-      acc[cid].totalRetries += (log.details?.attempt || 0);
-      return acc;
-    }, {});
+    if (alertLogs.length > 0) {
+      // Summary Section
+      doc.setFontSize(12);
+      doc.text("Resumo Agregado (CorrelationID)", 14, 32);
+      
+      const aggregation = alertLogs.reduce((acc: any, log) => {
+        const cid = log.correlation_id || job.correlation_id || "N/A";
+        if (!acc[cid]) {
+          acc[cid] = { count: 0, maxP95: 0, totalRetries: 0 };
+        }
+        acc[cid].count += 1;
+        const p95 = log.details?.latency_p95 || 0;
+        if (p95 > acc[cid].maxP95) acc[cid].maxP95 = p95;
+        acc[cid].totalRetries += (log.details?.attempt || 0);
+        return acc;
+      }, {});
 
-    const summaryRows = Object.entries(aggregation).map(([cid, data]: [string, any]) => [
-      cid,
-      data.count,
-      `${data.maxP95}ms`,
-      data.totalRetries
-    ]);
+      const summaryRows = Object.entries(aggregation).map(([cid, data]: [string, any]) => [
+        cid,
+        data.count,
+        `${data.maxP95}ms`,
+        data.totalRetries
+      ]);
 
-    autoTable(doc, {
-      startY: 35,
-      head: [["CorrelationID", "Qtd Alertas", "Maior p95", "Total Retries"]],
-      body: summaryRows,
-      theme: 'striped',
-      headStyles: { fillColor: [50, 50, 50] }
-    });
+      autoTable(doc, {
+        startY: 35,
+        head: [["CorrelationID", "Qtd Alertas", "Maior p95", "Total Retries"]],
+        body: summaryRows,
+        theme: 'striped',
+        headStyles: { fillColor: [50, 50, 50] }
+      });
 
-    const finalY = (doc as any).lastAutoTable.finalY + 15;
+      const finalY = (doc as any).lastAutoTable.finalY + 15;
 
-    doc.setFontSize(12);
-    doc.text("Detalhes dos Alertas", 14, finalY);
-    
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text(`TraceID: ${job.id}`, 14, finalY + 7);
-    doc.text(`Filtro Período: ${dateRange.from ? format(dateRange.from, "dd/MM/yyyy") : "Início"} - ${dateRange.to ? format(dateRange.to, "dd/MM/yyyy") : "Fim"}`, 14, finalY + 12);
+      doc.setFontSize(12);
+      doc.text("Detalhes dos Alertas", 14, finalY);
+      
+      doc.setFontSize(10);
+      doc.setTextColor(100);
+      doc.text(`TraceID: ${job.id}`, 14, finalY + 7);
+      doc.text(`Filtro Período: ${dateRange.from ? format(dateRange.from, "dd/MM/yyyy") : "Início"} - ${dateRange.to ? format(dateRange.to, "dd/MM/yyyy") : "Fim"}`, 14, finalY + 12);
 
-    const tableRows = alertLogs.map(log => [
-      log.action,
-      log.correlation_id || job.correlation_id || "N/A",
-      log.details?.latency_p95 ? `${log.details.latency_p95}ms` : "N/A",
-      log.details?.attempt || "N/A",
-      new Date(log.created_at).toLocaleString()
-    ]);
+      const tableRows = alertLogs.map(log => [
+        log.action,
+        log.correlation_id || job.correlation_id || "N/A",
+        log.details?.latency_p95 ? `${log.details.latency_p95}ms` : "N/A",
+        log.details?.attempt || "N/A",
+        new Date(log.created_at).toLocaleString()
+      ]);
 
-    autoTable(doc, {
-      startY: finalY + 15,
-      head: [["Ação", "CorrelationID", "p95", "Retries", "Data/Hora"]],
-      body: tableRows,
-      theme: 'grid',
-      headStyles: { fillColor: [79, 70, 229] }
-    });
+      autoTable(doc, {
+        startY: finalY + 15,
+        head: [["Ação", "CorrelationID", "p95", "Retries", "Data/Hora"]],
+        body: tableRows,
+        theme: 'grid',
+        headStyles: { fillColor: [79, 70, 229] }
+      });
+    } else {
+      doc.setFontSize(12);
+      doc.setTextColor(150);
+      doc.text("Nenhum alerta encontrado para o período selecionado.", 14, 40);
+      doc.setFontSize(10);
+      doc.text("Tente expandir o intervalo de datas ou verificar outro TraceID.", 14, 50);
+      
+      doc.setTextColor(100);
+      doc.text(`TraceID consultado: ${job.id}`, 14, 70);
+      doc.text(`Período: ${dateRange.from ? format(dateRange.from, "dd/MM/yyyy") : "Início"} - ${dateRange.to ? format(dateRange.to, "dd/MM/yyyy") : "Fim"}`, 14, 75);
+    }
 
     doc.save(fileName);
     toast({ title: "Relatório de Alertas PDF concluído", description: `Arquivo: ${fileName}` });
@@ -629,9 +685,12 @@ export function JobDetailsSheet({
               </div>
 
               <div className="space-y-1">
-                <p className="text-[9px] text-muted-foreground ml-1 flex items-center gap-1">
-                  <Calendar className="h-2 w-2" /> Intervalo de Datas (Opcional)
-                </p>
+                <div className="flex items-center justify-between">
+                  <p className="text-[9px] text-muted-foreground ml-1 flex items-center gap-1">
+                    <Calendar className="h-2 w-2" /> Intervalo de Datas (Opcional)
+                  </p>
+                  {dateError && <p className="text-[9px] text-destructive font-bold animate-pulse">{dateError}</p>}
+                </div>
                 <div className="flex gap-2">
                   <Popover>
                     <PopoverTrigger asChild>
