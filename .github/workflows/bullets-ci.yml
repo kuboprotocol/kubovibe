@@ -96,6 +96,10 @@ jobs:
           test -f test-results/summary-report.json || (echo "Error: Aggregated Summary file missing" && exit 1)
           echo "All artifacts verified in standardized locations."
 
+      - name: Verify Artifact Schema (HTML/JSON/Summary)
+        if: always()
+        run: bunx vitest run src/test/ci-artifacts-schema.test.ts --coverage=false
+
       - name: Enforce Test Success
         if: always()
         run: |
