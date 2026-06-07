@@ -88,6 +88,6 @@ export async function logConnectorEvent(params: {
     _event_type: params.eventType,
     _message: params.message,
     _status: params.status ?? 'success',
-    _metadata: params.metadata ?? {},
+    _metadata: (params.metadata || {}) as any,
   })
 }
