@@ -11,8 +11,9 @@ import {
   Loader2, Sparkles, Activity, ArrowLeft, CheckCircle2, 
   XCircle, Send, History, Settings, Filter, RefreshCcw, 
   ToggleLeft, ToggleRight, Clock, AlertCircle, Info, MoreVertical,
-  Pause, Play
+  Pause, Play, Search
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { 
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
 } from "@/components/ui/table";
@@ -102,6 +103,7 @@ export default function OrchestratorPage() {
   const [jobsLoading, setJobsLoading] = useState(false);
   const [agentFilter, setAgentFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [searchTerm, setSearchTerm] = useState("");
 
   // Config
   const [disabledAgents, setDisabledAgents] = useState<string[]>([]);
@@ -129,10 +131,13 @@ export default function OrchestratorPage() {
   const loadJobs = async () => {
     setJobsLoading(true);
     try {
-      let query = supabase.from("agent_jobs").select("*").order("created_at", { ascending: false }).limit(20);
+      let query = supabase.from("agent_jobs").select("*").order("created_at", { ascending: false }).limit(50);
       
       if (agentFilter !== "all") query = query.eq("agent_slug", agentFilter);
       if (statusFilter !== "all") query = query.eq("status", statusFilter);
+      if (searchTerm) {
+        query = query.or(`id.ilike.%${searchTerm}%,correlation_id.ilike.%${searchTerm}%,idempotency_key.ilike.%${searchTerm}%`);
+      }
       
       const { data, error } = await query;
       if (error) throw error;
@@ -243,23 +248,58 @@ export default function OrchestratorPage() {
     void loadJobs();
     void loadConfig();
 
-    // Polling em tempo real para jobs ativos
-    const interval = setInterval(() => {
-      // Se houver jobs processando ou se o modal de detalhes estiver aberto (para atualizar a timeline)
-      if (jobs.some(j => ['processing', 'running', 'queued'].includes(j.status)) || selectedJob) {
-        loadJobs();
-        if (selectedJob) {
-          loadAuditLogs(selectedJob.id, selectedJob.correlation_id);
-          // Atualiza o job selecionado se mudou
-          supabase.from("agent_jobs").select("*").eq("id", selectedJob.id).maybeSingle().then(({ data }) => {
-            if (data) setSelectedJob(data as any as AgentJob);
-          });
-        }
-      }
-    }, 5000);
+    // Inscrição Realtime para a lista de Jobs
+    const channel = supabase
+      .channel('public:agent_jobs')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'agent_jobs' }, (payload) => {
+        console.log('Realtime update:', payload);
+        // Atualiza a lista local de forma otimista ou recarrega se necessário
+        // Para simplificar e garantir consistência com filtros, recarregamos
+        void loadJobs();
+      })
+      .subscribe();
 
-    return () => clearInterval(interval);
-  }, [jobs, selectedJob]);
+    // Polling de fallback (menos frequente se realtime estiver ativo)
+    const interval = setInterval(() => {
+      if (jobs.some(j => ['processing', 'running', 'queued'].includes(j.status))) {
+        loadJobs();
+      }
+    }, 15000);
+
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(interval);
+    };
+  }, [agentFilter, statusFilter, searchTerm]); // Recarrega ao mudar filtros
+
+  // Efeito separado para o Job selecionado (Timeline Realtime)
+  useEffect(() => {
+    if (!selectedJob) return;
+
+    const channel = supabase
+      .channel(`job_details:${selectedJob.id}`)
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'agent_jobs',
+        filter: `id=eq.${selectedJob.id}`
+      }, (payload) => {
+        setSelectedJob(payload.new as any as AgentJob);
+      })
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'job_audit_logs',
+        filter: `job_id=eq.${selectedJob.id}`
+      }, (payload) => {
+        setAuditLogs(prev => [payload.new as any as JobAuditLog, ...prev]);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [selectedJob?.id]);
 
   const run = async (mode: "classify" | "execute") => {
     if (!prompt.trim()) {
@@ -398,7 +438,16 @@ export default function OrchestratorPage() {
                   <CardTitle>Histórico de Execuções</CardTitle>
                   <CardDescription>Monitoramento em tempo real dos jobs processados.</CardDescription>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
+                  <div className="relative w-full lg:w-auto">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="TraceID / ID..."
+                      className="pl-8 w-full lg:w-[200px]"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
                   <Select value={agentFilter} onValueChange={setAgentFilter}>
                     <SelectTrigger className="w-[150px]">
                       <SelectValue placeholder="Agente" />
@@ -419,6 +468,7 @@ export default function OrchestratorPage() {
                       <SelectItem value="completed">Concluído</SelectItem>
                       <SelectItem value="failed">Falhou</SelectItem>
                       <SelectItem value="processing">Processando</SelectItem>
+                      <SelectItem value="paused">Pausado</SelectItem>
                     </SelectContent>
                   </Select>
                   <Button variant="ghost" size="icon" onClick={loadJobs} disabled={jobsLoading}>

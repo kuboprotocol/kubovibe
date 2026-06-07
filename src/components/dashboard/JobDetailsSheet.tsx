@@ -8,8 +8,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Clock, Hash, Activity, Terminal, Shield, 
   Download, Play, Pause, XCircle, History,
-  FileJson, FileSpreadsheet, AlertCircle, Info
+  FileJson, FileSpreadsheet, AlertCircle, Info,
+  Search, ChevronLeft, ChevronRight
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -42,13 +44,20 @@ interface JobDetailsSheetProps {
 export function JobDetailsSheet({ job, auditLogs, onClose, onAction, loading }: JobDetailsSheetProps) {
   const [activeTab, setActiveTab] = useState("overview");
   const [confirmAction, setConfirmAction] = useState<"cancel" | "pause" | "resume" | "retry" | null>(null);
+  const [timelineSearch, setTimelineSearch] = useState("");
+  
+  // Export pagination
+  const [exportLimit, setExportLimit] = useState(100);
+  const [exportOffset, setExportOffset] = useState(0);
 
   if (!job) return null;
 
   const exportJSON = () => {
+    const pagedLogs = auditLogs.slice(exportOffset, exportOffset + exportLimit);
     const data = {
       job,
-      audit_logs: auditLogs
+      audit_logs: pagedLogs,
+      export_info: { limit: exportLimit, offset: exportOffset, total_available: auditLogs.length }
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -61,7 +70,8 @@ export function JobDetailsSheet({ job, auditLogs, onClose, onAction, loading }: 
 
   const exportCSV = () => {
     const headers = ["ID", "Action", "Correlation ID", "Created At", "Details"];
-    const rows = auditLogs.map(log => [
+    const pagedLogs = auditLogs.slice(exportOffset, exportOffset + exportLimit);
+    const rows = pagedLogs.map(log => [
       log.id,
       log.action,
       log.correlation_id || "",
@@ -84,12 +94,21 @@ export function JobDetailsSheet({ job, auditLogs, onClose, onAction, loading }: 
   };
   
   const getExportPreview = (format: 'json' | 'csv') => {
+    const pagedLogs = auditLogs.slice(exportOffset, exportOffset + exportLimit);
     return {
       totalEntries: auditLogs.length,
+      pagedEntries: pagedLogs.length,
       format,
-      estimatedSize: format === 'json' ? `${(JSON.stringify(auditLogs).length / 1024).toFixed(1)} KB` : `${(auditLogs.length * 100 / 1024).toFixed(1)} KB`
+      estimatedSize: format === 'json' ? `${(JSON.stringify(pagedLogs).length / 1024).toFixed(1)} KB` : `${(pagedLogs.length * 100 / 1024).toFixed(1)} KB`
     };
   };
+
+  const filteredLogs = auditLogs.filter(log => 
+    !timelineSearch || 
+    log.action.toLowerCase().includes(timelineSearch.toLowerCase()) ||
+    (log.correlation_id && log.correlation_id.toLowerCase().includes(timelineSearch.toLowerCase())) ||
+    (log.details && JSON.stringify(log.details).toLowerCase().includes(timelineSearch.toLowerCase()))
+  );
 
   const handleConfirmedAction = async () => {
     if (confirmAction) {
@@ -219,10 +238,19 @@ export function JobDetailsSheet({ job, auditLogs, onClose, onAction, loading }: 
             </TabsContent>
 
             <TabsContent value="timeline" className="flex-1 overflow-hidden pt-4">
-              <ScrollArea className="h-full pr-4">
+              <div className="mb-4 relative">
+                <Search className="absolute left-2 top-2.5 h-3 w-3 text-muted-foreground" />
+                <Input 
+                  placeholder="Filtrar eventos ou TraceID..." 
+                  className="pl-7 h-8 text-xs" 
+                  value={timelineSearch}
+                  onChange={(e) => setTimelineSearch(e.target.value)}
+                />
+              </div>
+              <ScrollArea className="h-[calc(100%-3rem)] pr-4">
                 <div className="space-y-4 relative before:absolute before:inset-0 before:left-2 before:w-px before:bg-border">
-                  {auditLogs.length > 0 ? (
-                    auditLogs.map((log) => {
+                  {filteredLogs.length > 0 ? (
+                    filteredLogs.map((log) => {
                       const isAttempt = log.action.includes('attempt');
                       const isError = log.action.includes('failed') || log.action.includes('error');
                       const isSuccess = log.action.includes('success') || log.action.includes('succeeded');
@@ -289,12 +317,34 @@ export function JobDetailsSheet({ job, auditLogs, onClose, onAction, loading }: 
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-muted-foreground">Exportar Dados</span>
+                  <span className="text-xs font-medium text-muted-foreground">Exportar Paginado</span>
                   <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
                     <Info className="h-3 w-3" />
-                    <span>{auditLogs.length} entradas selecionadas</span>
+                    <span>{getExportPreview('json').pagedEntries} de {auditLogs.length} entradas</span>
                   </div>
                 </div>
+                
+                <div className="flex items-center gap-2 mb-1">
+                   <div className="flex-1 flex items-center gap-1 bg-muted rounded p-1">
+                      <Button variant="ghost" size="icon" className="h-6 w-6" disabled={exportOffset <= 0} onClick={() => setExportOffset(Math.max(0, exportOffset - exportLimit))}>
+                        <ChevronLeft className="h-3 w-3" />
+                      </Button>
+                      <span className="text-[10px] font-mono flex-1 text-center">Offset: {exportOffset}</span>
+                      <Button variant="ghost" size="icon" className="h-6 w-6" disabled={exportOffset + exportLimit >= auditLogs.length} onClick={() => setExportOffset(exportOffset + exportLimit)}>
+                        <ChevronRight className="h-3 w-3" />
+                      </Button>
+                   </div>
+                   <div className="w-24">
+                      <Input 
+                        type="number" 
+                        value={exportLimit} 
+                        onChange={(e) => setExportLimit(parseInt(e.target.value) || 10)}
+                        className="h-8 text-[10px]"
+                        placeholder="Limite"
+                      />
+                   </div>
+                </div>
+
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" className="h-7 text-[10px] flex-1" onClick={exportJSON}>
                     <FileJson className="h-3 w-3 mr-1" /> JSON ({getExportPreview('json').estimatedSize})
