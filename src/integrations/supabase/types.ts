@@ -1990,6 +1990,16 @@ export type Database = {
       }
       is_kubo_admin: { Args: never; Returns: boolean }
       is_skill_admin: { Args: never; Returns: boolean }
+      log_connector_activity: {
+        Args: {
+          _connector_slug: string
+          _event_type: string
+          _message: string
+          _metadata?: Json
+          _status?: string
+        }
+        Returns: string
+      }
       log_security_audit: {
         Args: {
           _action: string
