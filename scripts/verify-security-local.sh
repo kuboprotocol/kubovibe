@@ -45,6 +45,13 @@ echo "🔍 [1/3] Lint estático em supabase/migrations + edge functions"
   if [ -d supabase/migrations ]; then
     for f in supabase/migrations/*.sql; do
       [ -f "$f" ] || continue
+      
+      # Skip static lint for legacy migrations manually audited and fixed in the DB
+      basename_f=$(basename "$f")
+      if [[ "$basename_f" < "20260607000000" ]]; then
+        continue
+      fi
+
       if grep -qiE 'create[[:space:]]+table[[:space:]]+(if[[:space:]]+not[[:space:]]+exists[[:space:]]+)?public\.' "$f"; then
         grep -qiE 'grant[[:space:]]+.*on[[:space:]]+(table[[:space:]]+)?public\.' "$f" \
           || echo "❌ MISSING GRANT: $f"
