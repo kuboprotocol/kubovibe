@@ -11,7 +11,7 @@ import {
   Loader2, Sparkles, Activity, ArrowLeft, CheckCircle2, 
   XCircle, Send, History, Settings, Filter, RefreshCcw, 
   ToggleLeft, ToggleRight, Clock, AlertCircle, Info, MoreVertical,
-  Pause, Play, Search, BarChart3, AlertTriangle
+  Pause, Play, Search, BarChart3, AlertTriangle, Copy
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { 
@@ -104,7 +104,7 @@ export default function OrchestratorPage() {
   const [jobsLoading, setJobsLoading] = useState(false);
   const [agentFilter, setAgentFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [searchTerm, setSearchTerm] = useState(searchParams.get("q") || "");
+  const [searchTerm, setSearchTerm] = useState(searchParams.get("q") || localStorage.getItem('kubo_last_search') || "");
 
   useEffect(() => {
     const q = searchParams.get("q");
@@ -114,6 +114,9 @@ export default function OrchestratorPage() {
   }, [searchParams]);
 
   useEffect(() => {
+    if (searchTerm) {
+      localStorage.setItem('kubo_last_search', searchTerm);
+    }
     setSearchParams(prev => {
       if (searchTerm) prev.set("q", searchTerm);
       else prev.delete("q");
@@ -140,6 +143,15 @@ export default function OrchestratorPage() {
     return saved ? parseInt(saved, 10) : 500;
   }); // ms
   const [maxRetryLimit] = useState(20);
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast({
+      title: `${label} copiado!`,
+      description: "Valor salvo na área de transferência.",
+    });
+  };
+
 
 
 
