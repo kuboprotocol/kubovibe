@@ -194,6 +194,8 @@ Deno.serve(async (req) => {
   let upstreamResponse;
   let lastError;
   const maxRetries = mode === "execute" ? 3 : 1;
+  const correlationId = req.headers.get("x-correlation-id") || `corr-${crypto.randomUUID()}`;
+  const requestId = req.headers.get("x-request-id") ?? crypto.randomUUID();
   
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
@@ -202,12 +204,25 @@ Deno.serve(async (req) => {
         await new Promise(resolve => setTimeout(resolve, backoff));
       }
 
+      // Log attempt
+      await admin.from("job_audit_logs").insert({
+        action: "attempt",
+        correlation_id: correlationId,
+        details: { 
+          attempt: attempt + 1, 
+          max_retries: maxRetries,
+          timestamp: new Date().toISOString(),
+          backoff_ms: attempt > 0 ? Math.pow(2, attempt) * 1000 : 0
+        }
+      });
+
       upstreamResponse = await fetch(`${FUNCTIONS_URL}/agent-route`, {
         method: "POST",
         headers: {
           Authorization: auth,
           "Content-Type": "application/json",
-          "x-request-id": req.headers.get("x-request-id") ?? crypto.randomUUID(),
+          "x-request-id": requestId,
+          "x-correlation-id": correlationId,
           ...(idempotencyKey ? { "x-idempotency-key": idempotencyKey } : {}),
         },
         body: JSON.stringify({
@@ -216,10 +231,31 @@ Deno.serve(async (req) => {
         }),
       });
 
-      if (upstreamResponse.ok) break;
+      if (upstreamResponse.ok) {
+        // Log success
+        await admin.from("job_audit_logs").insert({
+          action: "attempt_success",
+          correlation_id: correlationId,
+          details: { attempt: attempt + 1, timestamp: new Date().toISOString() }
+        });
+        break;
+      }
       
       const errText = await upstreamResponse.text();
       lastError = `Attempt ${attempt + 1} failed: ${errText}`;
+      
+      // Log failure
+      await admin.from("job_audit_logs").insert({
+        action: "attempt_failed",
+        correlation_id: correlationId,
+        details: { 
+          attempt: attempt + 1, 
+          error: errText, 
+          timestamp: new Date().toISOString(),
+          next_retry_in: attempt + 1 < maxRetries ? `${Math.pow(2, attempt + 1)}s` : "none"
+        }
+      });
+
     } catch (e) {
       lastError = `Attempt ${attempt + 1} exception: ${e.message}`;
     }
