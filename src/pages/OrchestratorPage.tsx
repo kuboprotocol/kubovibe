@@ -116,7 +116,10 @@ export default function OrchestratorPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<"connecting" | "live" | "polling">("connecting");
   const [nextPollIn, setNextPollIn] = useState(15);
-  const [metrics, setMetrics] = useState<{ query_time_ms: number } | null>(null);
+  const [pollingRetryCount, setPollingRetryCount] = useState(0);
+  const [metrics, setMetrics] = useState<{ query_time_ms: number; latency_p95?: number } | null>(null);
+  const [latencyThreshold, setLatencyThreshold] = useState(500); // ms
+
 
   const loadHealth = async () => {
     setHealthLoading(true);
@@ -152,7 +155,23 @@ export default function OrchestratorPage() {
       setJobs((data as any[]) || []);
       
       const end = performance.now();
-      setMetrics({ query_time_ms: Math.round(end - start) });
+      const queryTime = Math.round(end - start);
+      
+      // Simulação de p95 baseada no histórico carregado (ou metadados se existissem)
+      const latencies = (data as any[] || []).map(j => j.execution_time_ms || j.duration_ms || 0).filter(l => l > 0);
+      const sortedLatencies = [...latencies].sort((a, b) => a - b);
+      const p95 = sortedLatencies.length > 0 ? sortedLatencies[Math.floor(sortedLatencies.length * 0.95)] : undefined;
+      
+      setMetrics({ query_time_ms: queryTime, latency_p95: p95 });
+      
+      if (p95 && p95 > latencyThreshold) {
+        toast({ 
+          title: "Alerta de Performance", 
+          description: `Latência p95 (${p95}ms) acima do limite (${latencyThreshold}ms)`, 
+          variant: "destructive" 
+        });
+      }
+
     } catch (e) {
       toast({ title: "Falha ao carregar jobs", description: (e as Error).message, variant: "destructive" });
     } finally {
@@ -271,8 +290,12 @@ export default function OrchestratorPage() {
             setConnectionStatus("live");
           } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
             setConnectionStatus("polling");
-            setNextPollIn(5);
+            setPollingRetryCount(prev => prev + 1);
+            // Retry com backoff exponencial + jitter limitado a 60s
+            const backoff = Math.min(60, Math.pow(2, pollingRetryCount) + Math.random() * 5);
+            setNextPollIn(Math.round(backoff));
           }
+
         });
       return channel;
     };
@@ -283,7 +306,12 @@ export default function OrchestratorPage() {
       setNextPollIn(prev => {
         if (prev <= 1) {
           loadJobs();
-          return connectionStatus === "polling" ? 5 : 15;
+          // Reset retry count se a carga for bem sucedida (ou manter se o status for polling)
+          const backoff = connectionStatus === "polling" 
+            ? Math.min(60, Math.pow(2, pollingRetryCount) + Math.random() * 5)
+            : 15;
+          return Math.round(backoff);
+
         }
         return prev - 1;
       });
@@ -410,7 +438,13 @@ export default function OrchestratorPage() {
               <div className="flex items-center gap-2 text-[9px] text-muted-foreground font-mono bg-muted/30 px-2 py-0.5 rounded border border-border/50">
                 <BarChart3 className="h-3 w-3" />
                 Query: {metrics.query_time_ms}ms | Trace Match: INDEXED
+                {metrics.latency_p95 && (
+                  <span className={`ml-2 px-1 rounded ${metrics.latency_p95 > latencyThreshold ? 'bg-destructive/20 text-destructive' : 'text-emerald-500'}`}>
+                    p95: {metrics.latency_p95}ms
+                  </span>
+                )}
               </div>
+
             )}
           </div>
         </div>
@@ -698,8 +732,11 @@ export default function OrchestratorPage() {
         loading={actionLoading}
         connectionStatus={connectionStatus}
         nextPollIn={nextPollIn}
+        pollingRetryCount={pollingRetryCount}
         onReconnect={() => {
+          setPollingRetryCount(0);
           setConnectionStatus("connecting");
+
           loadJobs();
         }}
       />
