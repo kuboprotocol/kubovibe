@@ -90,11 +90,38 @@ serve(async (req) => {
           break
         }
         case 'health_check': {
-          const url = String(body.url || '')
-          if (!url) throw new Error('missing url')
+          const rawUrl = String(body.url || '')
+          if (!rawUrl) throw new Error('missing url')
+          // SSRF guard: only allow public http(s) URLs; block private/reserved/metadata hosts
+          let parsed: URL
+          try { parsed = new URL(rawUrl) } catch { throw new Error('invalid url') }
+          if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+            throw new Error('unsupported protocol')
+          }
+          const host = parsed.hostname.toLowerCase()
+          const isIPv4 = /^\d{1,3}(\.\d{1,3}){3}$/.test(host)
+          const isPrivateIPv4 = isIPv4 && (() => {
+            const p = host.split('.').map(Number)
+            return (
+              p[0] === 10 ||
+              p[0] === 127 ||
+              (p[0] === 169 && p[1] === 254) ||
+              (p[0] === 172 && p[1] >= 16 && p[1] <= 31) ||
+              (p[0] === 192 && p[1] === 168) ||
+              p[0] === 0 ||
+              p[0] >= 224
+            )
+          })()
+          const blockedHosts = new Set(['localhost', '0.0.0.0', '::1', 'metadata.google.internal'])
+          if (blockedHosts.has(host) || host.endsWith('.local') || host.endsWith('.internal') || isPrivateIPv4 || host.includes(':')) {
+            throw new Error('host not allowed')
+          }
           const start = performance.now()
           try {
-            const r = await fetch(url, { method: 'GET', redirect: 'follow' })
+            const ctrl = new AbortController()
+            const t = setTimeout(() => ctrl.abort(), 10_000)
+            const r = await fetch(parsed.toString(), { method: 'GET', redirect: 'manual', signal: ctrl.signal })
+            clearTimeout(t)
             result = { ok: r.ok, status: r.status, latency_ms: Math.round(performance.now() - start) }
           } catch (e: any) {
             result = { ok: false, error: e.message, latency_ms: Math.round(performance.now() - start) }
