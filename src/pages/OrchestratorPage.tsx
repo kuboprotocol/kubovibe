@@ -387,23 +387,31 @@ export default function OrchestratorPage() {
             <h1 className="mt-2 text-3xl font-bold tracking-tight">Orquestrador KUBO</h1>
             <p className="text-muted-foreground">Orquestração full-stack com filas, retries e roteamento dinâmico.</p>
           </div>
-          <div className="flex items-center gap-3">
-            <div 
-              className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-medium ${
-                connectionStatus === 'polling' ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-muted/50'
-              }`}
-              title={connectionStatus === 'polling' ? 'WebSocket falhou. Usando polling automático.' : undefined}
-            >
-              <div className={`h-1.5 w-1.5 rounded-full ${
-                connectionStatus === 'live' ? 'bg-emerald-500 animate-pulse' : 
-                connectionStatus === 'connecting' ? 'bg-amber-500' : 'bg-amber-600'
-              }`} />
-              {connectionStatus === 'live' ? 'LIVE' : connectionStatus === 'connecting' ? 'CONECTANDO...' : 'POLLING (WS FAIL)'}
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex items-center gap-3">
+              <div 
+                className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-medium transition-colors ${
+                  connectionStatus === 'polling' ? 'bg-amber-100 text-amber-700 border border-amber-200' : 
+                  connectionStatus === 'live' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-muted/50'
+                }`}
+              >
+                <div className={`h-1.5 w-1.5 rounded-full ${
+                  connectionStatus === 'live' ? 'bg-emerald-500 animate-pulse' : 
+                  connectionStatus === 'connecting' ? 'bg-amber-500' : 'bg-amber-600'
+                }`} />
+                {connectionStatus === 'live' ? 'LIVE' : connectionStatus === 'connecting' ? 'CONECTANDO...' : `POLLING (${nextPollIn}s)`}
+              </div>
+              <Button variant="outline" size="sm" onClick={() => { loadHealth(); loadJobs(); loadConfig(); }}>
+                <RefreshCcw className="mr-2 h-4 w-4" /> Atualizar
+              </Button>
+              <Badge variant="secondary" className="h-8">V2.1</Badge>
             </div>
-            <Button variant="outline" size="sm" onClick={() => { loadHealth(); loadJobs(); loadConfig(); }}>
-              <RefreshCcw className="mr-2 h-4 w-4" /> Atualizar
-            </Button>
-            <Badge variant="secondary" className="h-8">V2.0</Badge>
+            {metrics && (
+              <div className="flex items-center gap-2 text-[9px] text-muted-foreground font-mono bg-muted/30 px-2 py-0.5 rounded border border-border/50">
+                <BarChart3 className="h-3 w-3" />
+                Query: {metrics.query_time_ms}ms | Trace Match: INDEXED
+              </div>
+            )}
           </div>
         </div>
 
