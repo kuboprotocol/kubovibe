@@ -11,7 +11,7 @@ CORR_ID="test-corr-$(date +%s)"
 
 echo "Running concurrent actions..."
 for i in {1..5}; do
-  psql -c "SELECT execute_job_action('$JOB_ID', 'pause', '$ACTOR_ID', '$CORR_ID');" > /dev/null &
+  psql -c "SELECT public.execute_job_action('$JOB_ID', 'pause', '$ACTOR_ID', '$CORR_ID');" &
 done
 
 wait
