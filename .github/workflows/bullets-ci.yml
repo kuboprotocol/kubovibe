@@ -37,18 +37,18 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: bullets-coverage-PR-${{ github.event.pull_request.number || 'main' }}-SHA-${{ github.sha }}
+          name: bullets-coverage-PR${{ github.event.number || '0' }}-${{ github.sha }}
           path: coverage/bullets/
-          retention-days: 14
+          retention-days: 7 # Optimized retention as requested
 
       - name: Upload JSON Test Results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: bullets-json-results-PR-${{ github.event.pull_request.number || 'main' }}-SHA-${{ github.sha }}
+          name: bullets-json-results-PR${{ github.event.number || '0' }}-${{ github.sha }}
           path: test-results/bullets-results.json
+          retention-days: 7 # Optimized retention as requested
 
-          retention-days: 14
 
       - name: PR Summary
         if: github.event_name == 'pull_request' && always()
@@ -72,9 +72,14 @@ jobs:
             **Tests:** ${results.numPassedTests || 0} / ${results.numTotalTests || 0} passed
             **Coverage:** ${coverage}
             
-            **Artifacts (Retention: 14 days):**
-            - [HTML Report](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) (Check Artifacts section)
+            **Artifacts (Retention: 7 days):**
+            - [HTML Report](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) (Available in Artifacts section)
             - [JSON Results](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            
+            **Registry Info:**
+            - Path: `test-results/bullets-results.json`
+            - PR: #${{ github.event.number }}
+            - Commit: `${{ github.sha }}`
             
             *SHA: ${{ github.sha }}*`;
             
@@ -84,3 +89,4 @@ jobs:
               repo: context.repo.repo,
               body: body
             });
+

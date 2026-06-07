@@ -59,18 +59,27 @@ XXXX. Match as roman-like
     expect(extractBullets(invalidMd, true)).toEqual([]);
   });
 
-  it("should fail build or validation if strict roman rule is requested (Demonstration)", () => {
-    const nonStrictMatches = ["IIV", "XXXX", "IX"];
+  it("should fail build with explicit message for invalid Roman numerals in strict mode", () => {
+    const md = `
+I. Valid
+IIV. Invalid
+    `.trim();
     
-    // Simulação de lógica que o CI usaria para falhar se encontrasse romanos inválidos
-    const invalidOnes = nonStrictMatches.filter(s => !isValidRoman(s));
+    // Exttração (permissiva por padrão para captura de conteúdo)
+    const matches = Array.from(md.matchAll(EXTENDED_BULLET_REGEX));
     
-    // Se estivéssemos em um modo estrito, isso falharia o build
-    // Aqui apenas validamos que conseguimos detectar para erro claro
-    expect(invalidOnes).toContain("IIV");
-    expect(invalidOnes).toContain("XXXX");
-    expect(isValidRoman("IX")).toBe(true);
+    matches.forEach(m => {
+      const marker = m[1].replace(/[.)]/g, "");
+      // Se parece romano (contém apenas ivxlcdm), validamos estritamente
+      if (/^[ivxlcdm]+$/i.test(marker)) {
+        if (!isValidRoman(marker)) {
+          // Mensagem de erro explícita e consistente conforme solicitado
+          throw new Error(`[ROMAN_VALIDATION_ERROR]: O marcador '${marker}' não é um algarismo romano válido. Exemplos válidos: IV, IX, XII. Entrada inválida: ${marker}`);
+        }
+      }
+    });
   });
+
 
 
   it("should handle mixed markers and numbering types across levels", () => {

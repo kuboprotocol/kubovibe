@@ -3,13 +3,14 @@
 > Plataforma autônoma de criação, execução e monetização de software baseada em IA.
 > Transforma ideias em produtos digitais completos — SaaS, metaversos, jogos AAA e aplicações Web3.
 
-<!-- CI badges (clique para abrir o histórico de runs) -->
+<!-- CI badges -->
+[![Markdown Bullets CI](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/bullets-ci.yml/badge.svg)](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/bullets-ci.yml)
 [![Markdown Bullets Coverage](https://img.shields.io/badge/Bullets_Coverage-100%25-brightgreen)](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/bullets-ci.yml)
 [![env-check](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/env-check.yml/badge.svg?branch=main)](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/env-check.yml?query=branch%3Amain)
 [![vitest](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/vitest.yml/badge.svg?branch=main)](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/vitest.yml?query=branch%3Amain)
 [![e2e](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/e2e.yml/badge.svg?branch=main)](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/e2e.yml?query=branch%3Amain)
 [![wgsl-sanitizer](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/wgsl-sanitizer.yml/badge.svg?branch=main)](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/wgsl-sanitizer.yml?query=branch%3Amain)
-[![post-migration-security](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/post-migration-security.yml/badge.svg?branch=main)](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/post-migration-security.yml?query=branch%3Amain)
+
 
 
 > Cada badge linka para o histórico filtrado em `branch=main`. Verde = último run passou, vermelho = falhou (clique para ver logs e artifacts, incluindo `env-check-report`).
