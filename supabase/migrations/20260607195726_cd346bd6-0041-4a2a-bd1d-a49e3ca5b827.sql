@@ -1,0 +1,1 @@
+ALTER TABLE public.orchestration_plans ADD COLUMN correlation_id TEXT;
