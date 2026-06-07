@@ -772,7 +772,11 @@ export default function OrchestratorPage() {
                       <Input 
                         type="number" 
                         value={latencyThreshold} 
-                        onChange={(e) => setLatencyThreshold(Number(e.target.value))}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setLatencyThreshold(val);
+                          localStorage.setItem('kubo_latency_threshold', val.toString());
+                        }}
                         className="w-24"
                       />
                       <span className="text-xs text-muted-foreground">Jobs acima deste valor dispararão alertas na UI.</span>
