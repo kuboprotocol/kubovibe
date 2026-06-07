@@ -769,8 +769,6 @@ export function JobDetailsSheet({
                       <XCircle className="h-3 w-3" />
                     </Button>
                   )}
-                </div>
-              </div>
               
               <div className="grid grid-cols-3 gap-2">
                 <div className="bg-background p-2 rounded border text-center">
