@@ -6,7 +6,7 @@ JOB_ID=$(psql -Atc "INSERT INTO agent_jobs (user_id, agent_slug, status, input) 
 echo "Created job: $JOB_ID"
 
 # 2. Call RPC concurrently using psql in background
-ACTOR_ID="00000000-0000-0000-0000-000000000000"
+ACTOR_ID="$USER_ID"
 CORR_ID="test-corr-$(date +%s)"
 
 echo "Running concurrent actions..."
