@@ -40,6 +40,7 @@ import CreativePage from "./pages/CreativePage";
 import AgentsHubPage from "./pages/AgentsHubPage";
 import AgentDetailPage from "./pages/AgentDetailPage";
 import AdminPage from "./pages/AdminPage";
+import OrchestratorPage from "./pages/OrchestratorPage";
 
 const queryClient = new QueryClient();
 
@@ -98,6 +99,7 @@ const App = () => (
             <Route path="/agents" element={<ProtectedRoute><AgentsHubPage /></ProtectedRoute>} />
             <Route path="/agents/:slug" element={<ProtectedRoute><AgentDetailPage /></ProtectedRoute>} />
             <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
+            <Route path="/orchestrator" element={<ProtectedRoute><OrchestratorPage /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
