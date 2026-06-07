@@ -781,7 +781,7 @@ export type Database = {
           created_at: string
           details: Json | null
           id: string
-          job_id: string
+          job_id: string | null
         }
         Insert: {
           action: string
@@ -790,7 +790,7 @@ export type Database = {
           created_at?: string
           details?: Json | null
           id?: string
-          job_id: string
+          job_id?: string | null
         }
         Update: {
           action?: string
@@ -799,7 +799,7 @@ export type Database = {
           created_at?: string
           details?: Json | null
           id?: string
-          job_id?: string
+          job_id?: string | null
         }
         Relationships: [
           {
