@@ -24,7 +24,8 @@ jobs:
       - name: Run Tests with Coverage
         id: run_tests
         run: |
-          bunx vitest run src/test/markdown-bullets.test.ts --coverage --reporter=json --outputFile=test-results/results.json
+          bunx vitest run src/test/markdown-bullets.test.ts --coverage --reporter=json --outputFile=test-results/bullets-results.json
+
         
       - name: Check Coverage Threshold
         run: |
@@ -45,7 +46,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: bullets-json-results-PR-${{ github.event.pull_request.number || 'main' }}-SHA-${{ github.sha }}
-          path: test-results/results.json
+          path: test-results/bullets-results.json
+
           retention-days: 14
 
       - name: PR Summary
@@ -56,8 +58,9 @@ jobs:
             const fs = require('fs');
             let results;
             try {
-              results = JSON.parse(fs.readFileSync('test-results/results.json', 'utf8'));
+              results = JSON.parse(fs.readFileSync('test-results/bullets-results.json', 'utf8'));
             } catch (e) {
+
               results = { numPassedTests: 0, numTotalTests: 0, success: false };
             }
             
