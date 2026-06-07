@@ -486,18 +486,6 @@ export function JobDetailsSheet({
                         </ul>
                       </div>
                     </div>
-                      ) : (
-                        <p className="text-[10px] mt-1">Aguardando processamento ou novos logs do job.</p>
-                      )}
-                      <div className="mt-4 pt-4 border-t border-dashed border-border/50">
-                        <p className="text-[10px] font-semibold uppercase tracking-wider mb-2">Sugestões de Investigação:</p>
-                        <ul className="text-[9px] text-left list-disc list-inside space-y-1 max-w-[200px] mx-auto">
-                          <li>Verifique se o TraceID está correto</li>
-                          <li>Confirme se o CorrelationID existe no log central</li>
-                          <li>Tente aumentar o limite de polling nas configurações</li>
-                        </ul>
-                      </div>
-                    </div>
                   )}
                 </div>
               </ScrollArea>
