@@ -685,9 +685,12 @@ export function JobDetailsSheet({
               </div>
 
               <div className="space-y-1">
-                <p className="text-[9px] text-muted-foreground ml-1 flex items-center gap-1">
-                  <Calendar className="h-2 w-2" /> Intervalo de Datas (Opcional)
-                </p>
+                <div className="flex items-center justify-between">
+                  <p className="text-[9px] text-muted-foreground ml-1 flex items-center gap-1">
+                    <Calendar className="h-2 w-2" /> Intervalo de Datas (Opcional)
+                  </p>
+                  {dateError && <p className="text-[9px] text-destructive font-bold animate-pulse">{dateError}</p>}
+                </div>
                 <div className="flex gap-2">
                   <Popover>
                     <PopoverTrigger asChild>
