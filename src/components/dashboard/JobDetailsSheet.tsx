@@ -10,7 +10,7 @@ import {
   Download, Play, Pause, XCircle, History,
   FileJson, FileSpreadsheet, AlertCircle, Info,
   Search, ChevronLeft, ChevronRight, RefreshCw,
-  BarChart3, FileText, Copy, Check, Calendar
+  BarChart3, FileText, Copy, Check, Calendar, Globe
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -81,6 +81,27 @@ export function JobDetailsSheet({
   const [exportLimit, setExportLimit] = useState(100);
   const [exportOffset, setExportOffset] = useState(0);
   const [dateError, setDateError] = useState<string | null>(null);
+  const [timeZone, setTimeZone] = useState("UTC");
+
+  const timeZones = [
+    { label: "UTC", value: "UTC" },
+    { label: "Brasília (BRT)", value: "America/Sao_Paulo" },
+    { label: "New York (EST)", value: "America/New_York" },
+    { label: "London (GMT)", value: "Europe/London" },
+  ];
+
+  const formatWithTZ = (date: string | Date, formatStr: string = "yyyy-MM-dd HH:mm:ss") => {
+    return new Intl.DateTimeFormat('pt-BR', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    }).format(new Date(date));
+  };
 
   const validateDateRange = () => {
     setDateError(null);
@@ -184,7 +205,7 @@ export function JobDetailsSheet({
       return;
     }
 
-    const headers = ["ID", "Action", "TraceID", "CorrelationID", "Latency p95", "Retries", "Created At"];
+    const headers = ["ID", "Action", "TraceID", "CorrelationID", "Latency p95", "Retries", "Created At", "TimeZone"];
     const rows = alertLogs.map(log => [
       log.id,
       log.action,
@@ -192,7 +213,8 @@ export function JobDetailsSheet({
       log.correlation_id || job.correlation_id || "",
       log.details?.latency_p95 || "",
       log.details?.attempt || "",
-      new Date(log.created_at).toISOString()
+      formatWithTZ(log.created_at),
+      timeZone
     ]);
 
     const csvContent = [
@@ -279,14 +301,14 @@ export function JobDetailsSheet({
       doc.setFontSize(10);
       doc.setTextColor(100);
       doc.text(`TraceID: ${job.id}`, 14, finalY + 7);
-      doc.text(`Filtro Período: ${dateRange.from ? format(dateRange.from, "dd/MM/yyyy") : "Início"} - ${dateRange.to ? format(dateRange.to, "dd/MM/yyyy") : "Fim"}`, 14, finalY + 12);
+      doc.text(`Filtro Período: ${dateRange.from ? format(dateRange.from, "dd/MM/yyyy") : "Início"} - ${dateRange.to ? format(dateRange.to, "dd/MM/yyyy") : "Fim"} (${timeZone})`, 14, finalY + 12);
 
       const tableRows = alertLogs.map(log => [
         log.action,
         log.correlation_id || job.correlation_id || "N/A",
         log.details?.latency_p95 ? `${log.details.latency_p95}ms` : "N/A",
         log.details?.attempt || "N/A",
-        new Date(log.created_at).toLocaleString()
+        formatWithTZ(log.created_at)
       ]);
 
       autoTable(doc, {
@@ -305,7 +327,7 @@ export function JobDetailsSheet({
       
       doc.setTextColor(100);
       doc.text(`TraceID consultado: ${job.id}`, 14, 70);
-      doc.text(`Período: ${dateRange.from ? format(dateRange.from, "dd/MM/yyyy") : "Início"} - ${dateRange.to ? format(dateRange.to, "dd/MM/yyyy") : "Fim"}`, 14, 75);
+      doc.text(`Período: ${dateRange.from ? format(dateRange.from, "dd/MM/yyyy") : "Início"} - ${dateRange.to ? format(dateRange.to, "dd/MM/yyyy") : "Fim"} (${timeZone})`, 14, 75);
     }
 
     doc.save(fileName);
