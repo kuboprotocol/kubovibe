@@ -1,24 +1,34 @@
 import { useState } from "react";
 import { 
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
-  SheetFooter
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Clock, Hash, Activity, Terminal, Shield, 
-  Download, Play, Pause, XCircle, History
+  Download, Play, Pause, XCircle, History,
+  FileJson, FileSpreadsheet, AlertCircle
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface AuditLog {
   id: string;
   action: string;
   created_at: string;
   details: any;
-  actor_id?: string;
+  correlation_id?: string;
 }
 
 interface JobDetailsSheetProps {
