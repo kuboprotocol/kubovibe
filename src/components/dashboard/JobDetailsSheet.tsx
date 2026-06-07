@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Clock, Hash, Activity, Terminal, Shield, 
   Download, Play, Pause, XCircle, History,
-  FileJson, FileSpreadsheet, AlertCircle
+  FileJson, FileSpreadsheet, AlertCircle, Info
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
