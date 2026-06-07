@@ -722,6 +722,7 @@ export default function OrchestratorPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Status</TableHead>
+                      <TableHead>Identificadores</TableHead>
                       <TableHead>Agente</TableHead>
                       <TableHead>Duração</TableHead>
                       <TableHead>Retries</TableHead>
