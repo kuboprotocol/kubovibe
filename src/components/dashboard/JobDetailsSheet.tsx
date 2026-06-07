@@ -184,17 +184,30 @@ export function JobDetailsSheet({
           </SheetHeader>
 
           {connectionStatus === "polling" && (
-            <Alert className="mb-4 py-2 border-amber-200 bg-amber-50">
+            <Alert className="mb-4 py-2 border-amber-200 bg-amber-50 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
               <RefreshCw className="h-4 w-4 text-amber-600 animate-spin" />
-              <AlertTitle className="text-xs font-bold text-amber-800">Polling Ativo</AlertTitle>
-              <AlertDescription className="text-[10px] text-amber-700 flex items-center justify-between">
-                WebSocket falhou. Próxima atualização em {nextPollIn || 5}s (Tentativa #{pollingRetryCount || 1}).
-                <Button variant="link" size="sm" className="h-auto p-0 text-[10px]" onClick={onReconnect}>
-                  Tentar reconectar
-                </Button>
+              <AlertTitle className="text-xs font-bold text-amber-800 flex items-center gap-2">
+                Fallback para Polling Ativo
+                <Badge variant="outline" className="h-4 px-1 text-[8px] border-amber-300 text-amber-700 bg-amber-100/50">
+                  Tentativa #{pollingRetryCount || 1}
+                </Badge>
+              </AlertTitle>
+              <AlertDescription className="text-[10px] text-amber-700 mt-1">
+                <div className="flex items-center justify-between">
+                  <span>Próxima atualização estimada em <strong>{nextPollIn || 0}s</strong></span>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-auto p-0 text-[10px] text-amber-800 font-bold hover:text-amber-900 hover:bg-transparent underline" 
+                    onClick={onReconnect}
+                  >
+                    Reconectar WebSocket
+                  </Button>
+                </div>
               </AlertDescription>
             </Alert>
           )}
+
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
             <TabsList className="grid w-full grid-cols-3">

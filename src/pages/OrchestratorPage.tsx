@@ -119,6 +119,8 @@ export default function OrchestratorPage() {
   const [pollingRetryCount, setPollingRetryCount] = useState(0);
   const [metrics, setMetrics] = useState<{ query_time_ms: number; latency_p95?: number } | null>(null);
   const [latencyThreshold, setLatencyThreshold] = useState(500); // ms
+  const [maxRetryLimit] = useState(20);
+
 
 
   const loadHealth = async () => {
@@ -288,17 +290,21 @@ export default function OrchestratorPage() {
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
             setConnectionStatus("live");
+            setPollingRetryCount(0);
           } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
             setConnectionStatus("polling");
-            setPollingRetryCount(prev => prev + 1);
-            // Retry com backoff exponencial + jitter limitado a 60s
-            const backoff = Math.min(60, Math.pow(2, pollingRetryCount) + Math.random() * 5);
-            setNextPollIn(Math.round(backoff));
+            setPollingRetryCount(prev => {
+              const nextCount = Math.min(prev + 1, maxRetryLimit);
+              // Retry com backoff exponencial + jitter limitado a 60s
+              const backoff = Math.min(60, Math.pow(2, nextCount) + Math.random() * 5);
+              setNextPollIn(Math.round(backoff));
+              return nextCount;
+            });
           }
-
         });
       return channel;
     };
+
 
     let channel = setupRealtime();
 
@@ -306,16 +312,18 @@ export default function OrchestratorPage() {
       setNextPollIn(prev => {
         if (prev <= 1) {
           loadJobs();
-          // Reset retry count se a carga for bem sucedida (ou manter se o status for polling)
-          const backoff = connectionStatus === "polling" 
-            ? Math.min(60, Math.pow(2, pollingRetryCount) + Math.random() * 5)
-            : 15;
-          return Math.round(backoff);
-
+          if (connectionStatus === "polling") {
+            const nextCount = Math.min(pollingRetryCount + 1, maxRetryLimit);
+            setPollingRetryCount(nextCount);
+            const backoff = Math.min(60, Math.pow(2, nextCount) + Math.random() * 5);
+            return Math.round(backoff);
+          }
+          return 15;
         }
         return prev - 1;
       });
     }, 1000);
+
 
     return () => {
       supabase.removeChannel(channel);
@@ -676,9 +684,31 @@ export default function OrchestratorPage() {
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               <Card>
                 <CardHeader>
+                  <CardTitle>Performance & Latência</CardTitle>
+                  <CardDescription>Configure limites para alertas automáticos de regressão.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Limite p95 (ms)</label>
+                    <div className="flex items-center gap-4">
+                      <Input 
+                        type="number" 
+                        value={latencyThreshold} 
+                        onChange={(e) => setLatencyThreshold(Number(e.target.value))}
+                        className="w-24"
+                      />
+                      <span className="text-xs text-muted-foreground">Jobs acima deste valor dispararão alertas na UI.</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
                   <CardTitle>Controle por Categoria</CardTitle>
                   <CardDescription>Habilite ou desabilite grupos inteiros de agentes instantaneamente.</CardDescription>
                 </CardHeader>
+
                 <CardContent className="space-y-4">
                   {categories.map(cat => (
                     <div key={cat} className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50">
