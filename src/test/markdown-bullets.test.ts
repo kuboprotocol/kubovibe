@@ -31,8 +31,14 @@ XXXX. Match as roman-like
     
     expect(() => validateMarkdownBullets(md)).toThrow(expectedError);
     
-    // Additional validation for other invalid forms
-    expect(() => validateMarkdownBullets("XXXX. Invalid")).toThrow("Rule violated");
+    // Categorized failure validation
+    const categories = {
+      invalid_roman: ["IIV.", "XXXX.", "VV.", "IL."]
+    };
+    
+    categories.invalid_roman.forEach(marker => {
+      expect(() => validateMarkdownBullets(`${marker} Item`)).toThrow(/\[ROMAN_VALIDATION_ERROR\]|Rule violated/);
+    });
   });
 
   it("should pass validation for valid Roman numerals", () => {
