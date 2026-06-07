@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { 
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
 } from "@/components/ui/sheet";
@@ -10,9 +10,12 @@ import {
   Download, Play, Pause, XCircle, History,
   FileJson, FileSpreadsheet, AlertCircle, Info,
   Search, ChevronLeft, ChevronRight, RefreshCw,
-  BarChart3, FileText, Copy, Check
+  BarChart3, FileText, Copy, Check, Calendar
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { format } from "date-fns";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -70,7 +73,11 @@ export function JobDetailsSheet({
   const [timelineSearch, setTimelineSearch] = useState("");
   const timelineRefs = useRef<Record<string, HTMLDivElement | null>>({});
   
-  // Export pagination
+  // Export states
+  const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
+    from: undefined,
+    to: undefined
+  });
   const [exportLimit, setExportLimit] = useState(100);
   const [exportOffset, setExportOffset] = useState(0);
 
@@ -165,21 +172,69 @@ export function JobDetailsSheet({
   };
 
   const exportAlertsPDF = () => {
-    const alertLogs = auditLogs.filter(log => 
-      log.action.includes('error') || 
-      log.action.includes('failed') || 
-      (log.details && log.details.latency_p95 > 0)
-    );
+    const alertLogs = auditLogs.filter(log => {
+      const isAlert = log.action.includes('error') || 
+                      log.action.includes('failed') || 
+                      (log.details && log.details.latency_p95 > 0);
+      
+      if (!isAlert) return false;
+      
+      if (dateRange.from || dateRange.to) {
+        const logDate = new Date(log.created_at);
+        if (dateRange.from && logDate < dateRange.from) return false;
+        if (dateRange.to && logDate > dateRange.to) return false;
+      }
+      
+      return true;
+    });
 
     const doc = new jsPDF();
+    const timestamp = new Date().getTime();
+    const fileName = `audit-${job.correlation_id || job.id}-${timestamp}.pdf`;
+
     doc.setFontSize(18);
     doc.text("Relatório de Auditoria de Alertas", 14, 22);
     
-    doc.setFontSize(11);
+    // Summary Section
+    doc.setFontSize(12);
+    doc.text("Resumo Agregado (CorrelationID)", 14, 32);
+    
+    const aggregation = alertLogs.reduce((acc: any, log) => {
+      const cid = log.correlation_id || job.correlation_id || "N/A";
+      if (!acc[cid]) {
+        acc[cid] = { count: 0, maxP95: 0, totalRetries: 0 };
+      }
+      acc[cid].count += 1;
+      const p95 = log.details?.latency_p95 || 0;
+      if (p95 > acc[cid].maxP95) acc[cid].maxP95 = p95;
+      acc[cid].totalRetries += (log.details?.attempt || 0);
+      return acc;
+    }, {});
+
+    const summaryRows = Object.entries(aggregation).map(([cid, data]: [string, any]) => [
+      cid,
+      data.count,
+      `${data.maxP95}ms`,
+      data.totalRetries
+    ]);
+
+    autoTable(doc, {
+      startY: 35,
+      head: [["CorrelationID", "Qtd Alertas", "Maior p95", "Total Retries"]],
+      body: summaryRows,
+      theme: 'striped',
+      headStyles: { fillColor: [50, 50, 50] }
+    });
+
+    const finalY = (doc as any).lastAutoTable.finalY + 15;
+
+    doc.setFontSize(12);
+    doc.text("Detalhes dos Alertas", 14, finalY);
+    
+    doc.setFontSize(10);
     doc.setTextColor(100);
-    doc.text(`Job ID (TraceID): ${job.id}`, 14, 30);
-    doc.text(`Agente: ${job.agent_slug}`, 14, 35);
-    doc.text(`Exportado em: ${new Date().toLocaleString()}`, 14, 40);
+    doc.text(`TraceID: ${job.id}`, 14, finalY + 7);
+    doc.text(`Filtro Período: ${dateRange.from ? format(dateRange.from, "dd/MM/yyyy") : "Início"} - ${dateRange.to ? format(dateRange.to, "dd/MM/yyyy") : "Fim"}`, 14, finalY + 12);
 
     const tableRows = alertLogs.map(log => [
       log.action,
@@ -190,15 +245,15 @@ export function JobDetailsSheet({
     ]);
 
     autoTable(doc, {
-      startY: 45,
+      startY: finalY + 15,
       head: [["Ação", "CorrelationID", "p95", "Retries", "Data/Hora"]],
       body: tableRows,
       theme: 'grid',
       headStyles: { fillColor: [79, 70, 229] }
     });
 
-    doc.save(`alerts-audit-${job.id}.pdf`);
-    toast({ title: "Relatório de Alertas PDF concluído" });
+    doc.save(fileName);
+    toast({ title: "Relatório de Alertas PDF concluído", description: `Arquivo: ${fileName}` });
   };
 
   const copyToClipboard = (text: string, label: string) => {
@@ -571,6 +626,54 @@ export function JobDetailsSheet({
               <div className="flex items-center justify-between border-b pb-2">
                 <span className="text-xs font-semibold">Configuração de Exportação</span>
                 <Badge variant="outline" className="text-[10px]">Página {Math.floor(exportOffset/exportLimit)+1}</Badge>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-[9px] text-muted-foreground ml-1 flex items-center gap-1">
+                  <Calendar className="h-2 w-2" /> Intervalo de Datas (Opcional)
+                </p>
+                <div className="flex gap-2">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-7 text-[10px] flex-1 justify-start">
+                        {dateRange.from ? format(dateRange.from, "dd/MM/yy") : "Início"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarComponent
+                        mode="single"
+                        selected={dateRange.from}
+                        onSelect={(date) => setDateRange(prev => ({ ...prev, from: date }))}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-7 text-[10px] flex-1 justify-start">
+                        {dateRange.to ? format(dateRange.to, "dd/MM/yy") : "Fim"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarComponent
+                        mode="single"
+                        selected={dateRange.to}
+                        onSelect={(date) => setDateRange(prev => ({ ...prev, to: date }))}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  {(dateRange.from || dateRange.to) && (
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-7 w-7" 
+                      onClick={() => setDateRange({ from: undefined, to: undefined })}
+                    >
+                      <XCircle className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
               </div>
               
               <div className="grid grid-cols-3 gap-2">
