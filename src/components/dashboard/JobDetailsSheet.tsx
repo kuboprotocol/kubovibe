@@ -349,5 +349,3 @@ export function JobDetailsSheet({ job, auditLogs, onClose, onAction, loading }: 
     </>
   );
 }
-  );
-}
