@@ -207,49 +207,28 @@ export default function OrchestratorPage() {
   const handleJobAction = async (jobId: string, action: "cancel" | "pause" | "resume" | "retry") => {
     setActionLoading(true);
     try {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error("Usuário não autenticado");
+
       const correlationId = `web-action-${Date.now()}`;
       
-      let update: any = { updated_at: new Date().toISOString() };
-      let auditAction = action;
-
-      if (action === "cancel") {
-        update.status = "failed";
-        update.error_message = "Cancelado pelo usuário";
-      } else if (action === "pause") {
-        update.status = "paused";
-        update.paused_at = new Date().toISOString();
-      } else if (action === "resume") {
-        update.status = "processing";
-        update.paused_at = null;
-      } else if (action === "retry") {
-        update.status = "processing";
-        update.retry_count = 0;
-        update.error_message = null;
-        update.next_retry_at = null;
-      }
-
-      const { error: jobError } = await supabase
-        .from("agent_jobs")
-        .update(update)
-        .eq("id", jobId);
-
-      if (jobError) throw jobError;
-
-      // Log de auditoria
-      await supabase.from("job_audit_logs").insert({
-        job_id: jobId,
-        action: auditAction,
-        correlation_id: correlationId,
-        details: { source: "web_ui", timestamp: new Date().toISOString() }
+      const { data, error } = await supabase.rpc('execute_job_action', {
+        p_job_id: jobId,
+        p_action: action,
+        p_actor_id: userData.user.id,
+        p_correlation_id: correlationId
       });
+
+      if (error) throw error;
+      if (data && !data.ok) throw new Error(data.error);
 
       toast({ title: `Ação ${action} concluída` });
       void loadJobs();
       
       if (selectedJob?.id === jobId) {
-        const { data } = await supabase.from("agent_jobs").select("*").eq("id", jobId).single();
-        if (data) setSelectedJob(data as any as AgentJob);
-        loadAuditLogs(jobId);
+        const { data: updatedJob } = await supabase.from("agent_jobs").select("*").eq("id", jobId).maybeSingle();
+        if (updatedJob) setSelectedJob(updatedJob as any as AgentJob);
+        loadAuditLogs(jobId, correlationId);
       }
     } catch (e) {
       toast({ title: "Erro na ação", description: (e as Error).message, variant: "destructive" });
