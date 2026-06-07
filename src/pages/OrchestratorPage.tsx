@@ -11,7 +11,7 @@ import {
   Loader2, Sparkles, Activity, ArrowLeft, CheckCircle2, 
   XCircle, Send, History, Settings, Filter, RefreshCcw, 
   ToggleLeft, ToggleRight, Clock, AlertCircle, Info, MoreVertical,
-  Pause, Play, Search, BarChart3
+  Pause, Play, Search, BarChart3, AlertTriangle
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { 
@@ -443,15 +443,21 @@ export default function OrchestratorPage() {
               <Badge variant="secondary" className="h-8">V2.1</Badge>
             </div>
             {metrics && (
-              <div className="flex items-center gap-2 text-[9px] text-muted-foreground font-mono bg-muted/30 px-2 py-0.5 rounded border border-border/50">
+              <div className={`flex items-center gap-2 text-[9px] font-mono px-2 py-0.5 rounded border transition-colors ${
+                metrics.latency_p95 && metrics.latency_p95 > latencyThreshold 
+                  ? 'bg-destructive/10 text-destructive border-destructive/30 animate-pulse' 
+                  : 'text-muted-foreground bg-muted/30 border-border/50'
+              }`}>
                 <BarChart3 className="h-3 w-3" />
                 Query: {metrics.query_time_ms}ms | Trace Match: INDEXED
                 {metrics.latency_p95 && (
-                  <span className={`ml-2 px-1 rounded ${metrics.latency_p95 > latencyThreshold ? 'bg-destructive/20 text-destructive' : 'text-emerald-500'}`}>
+                  <span className={`ml-2 px-1 rounded flex items-center gap-1 ${metrics.latency_p95 > latencyThreshold ? 'bg-destructive text-white font-bold' : 'text-emerald-500'}`}>
+                    {metrics.latency_p95 > latencyThreshold && <AlertTriangle className="h-2.5 w-2.5" />}
                     p95: {metrics.latency_p95}ms
                   </span>
                 )}
               </div>
+
 
             )}
           </div>
