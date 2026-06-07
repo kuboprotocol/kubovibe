@@ -10,7 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Loader2, Sparkles, Activity, ArrowLeft, CheckCircle2, 
   XCircle, Send, History, Settings, Filter, RefreshCcw, 
-  ToggleLeft, ToggleRight, Clock, AlertCircle, Info, MoreVertical
+  ToggleLeft, ToggleRight, Clock, AlertCircle, Info, MoreVertical,
+  Pause, Play
 } from "lucide-react";
 import { 
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
@@ -173,6 +174,80 @@ export default function OrchestratorPage() {
       void loadConfig();
     } catch (e) {
       toast({ title: "Erro ao salvar", description: (e as Error).message, variant: "destructive" });
+    }
+  };
+
+  const loadAuditLogs = async (jobId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("job_audit_logs")
+        .select("*")
+        .eq("job_id", jobId)
+        .order("created_at", { ascending: false });
+      
+      if (error) throw error;
+      setAuditLogs(data || []);
+    } catch (e) {
+      console.error("Audit log error", e);
+    }
+  };
+
+  const openJobDetails = (job: AgentJob) => {
+    setSelectedJob(job);
+    loadAuditLogs(job.id);
+  };
+
+  const handleJobAction = async (jobId: string, action: "cancel" | "pause" | "resume" | "retry") => {
+    setActionLoading(true);
+    try {
+      const correlationId = `web-action-${Date.now()}`;
+      
+      let update: any = { updated_at: new Date().toISOString() };
+      let auditAction = action;
+
+      if (action === "cancel") {
+        update.status = "failed";
+        update.error_message = "Cancelado pelo usuário";
+      } else if (action === "pause") {
+        update.status = "paused";
+        update.paused_at = new Date().toISOString();
+      } else if (action === "resume") {
+        update.status = "processing";
+        update.paused_at = null;
+      } else if (action === "retry") {
+        update.status = "processing";
+        update.retry_count = 0;
+        update.error_message = null;
+        update.next_retry_at = null;
+      }
+
+      const { error: jobError } = await supabase
+        .from("agent_jobs")
+        .update(update)
+        .eq("id", jobId);
+
+      if (jobError) throw jobError;
+
+      // Log de auditoria
+      await supabase.from("job_audit_logs").insert({
+        job_id: jobId,
+        action: auditAction,
+        correlation_id: correlationId,
+        details: { source: "web_ui", timestamp: new Date().toISOString() }
+      });
+
+      toast({ title: `Ação ${action} concluída` });
+      void loadJobs();
+      
+      if (selectedJob?.id === jobId) {
+        const { data } = await supabase.from("agent_jobs").select("*").eq("id", jobId).single();
+        if (data) setSelectedJob(data as AgentJob);
+        loadAuditLogs(jobId);
+      }
+    } catch (e) {
+      toast({ title: "Erro na ação", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setActionLoading(false);
     }
   };
 
