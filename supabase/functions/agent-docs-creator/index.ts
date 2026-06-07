@@ -6,12 +6,12 @@ import { runAgent, getSecret } from "../_shared/agentRuntime.ts";
  * garantindo que bullets aninhados sejam interpretados corretamente.
  */
 function processMarkdown(markdown: string) {
-  // Regex tolerante para bullets (captura conteúdo após o símbolo)
-  const bulletRegex = /^[ \t]*[*+-][ \t]+(.+)$/gm;
+  // Regex tolerante para bullets e listas numeradas (captura conteúdo após o símbolo ou número)
+  const bulletRegex = /^[ \t]*([*+-]|\d+[.)])[ \t]+(.+)$/gm;
   const bullets: string[] = [];
   let match;
   while ((match = bulletRegex.exec(markdown)) !== null) {
-    bullets.push(match[1].trim());
+    bullets.push(match[2].trim());
   }
 
   return {
