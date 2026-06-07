@@ -42,6 +42,7 @@ export type Database = {
         Row: {
           agent_slug: string
           completed_at: string | null
+          correlation_id: string | null
           created_at: string
           credits_charged: number
           duration_ms: number | null
@@ -50,8 +51,10 @@ export type Database = {
           idempotency_key: string | null
           input: Json
           last_error: string | null
+          metadata: Json | null
           next_retry_at: string | null
           output: Json | null
+          paused_at: string | null
           request_id: string | null
           retry_count: number | null
           status: string
@@ -61,6 +64,7 @@ export type Database = {
         Insert: {
           agent_slug: string
           completed_at?: string | null
+          correlation_id?: string | null
           created_at?: string
           credits_charged?: number
           duration_ms?: number | null
@@ -69,8 +73,10 @@ export type Database = {
           idempotency_key?: string | null
           input?: Json
           last_error?: string | null
+          metadata?: Json | null
           next_retry_at?: string | null
           output?: Json | null
+          paused_at?: string | null
           request_id?: string | null
           retry_count?: number | null
           status?: string
@@ -80,6 +86,7 @@ export type Database = {
         Update: {
           agent_slug?: string
           completed_at?: string | null
+          correlation_id?: string | null
           created_at?: string
           credits_charged?: number
           duration_ms?: number | null
@@ -88,8 +95,10 @@ export type Database = {
           idempotency_key?: string | null
           input?: Json
           last_error?: string | null
+          metadata?: Json | null
           next_retry_at?: string | null
           output?: Json | null
+          paused_at?: string | null
           request_id?: string | null
           retry_count?: number | null
           status?: string
@@ -763,6 +772,44 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      job_audit_logs: {
+        Row: {
+          action: string
+          actor_id: string | null
+          correlation_id: string | null
+          created_at: string
+          details: Json | null
+          id: string
+          job_id: string
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          correlation_id?: string | null
+          created_at?: string
+          details?: Json | null
+          id?: string
+          job_id: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          correlation_id?: string | null
+          created_at?: string
+          details?: Json | null
+          id?: string
+          job_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_audit_logs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "agent_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       kubo_dns_records: {
         Row: {

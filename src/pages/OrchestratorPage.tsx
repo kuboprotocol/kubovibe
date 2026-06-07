@@ -10,7 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Loader2, Sparkles, Activity, ArrowLeft, CheckCircle2, 
   XCircle, Send, History, Settings, Filter, RefreshCcw, 
-  ToggleLeft, ToggleRight, Clock, AlertCircle
+  ToggleLeft, ToggleRight, Clock, AlertCircle, Info, MoreVertical,
+  Pause, Play
 } from "lucide-react";
 import { 
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
@@ -19,6 +20,13 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue 
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { JobDetailsSheet } from "@/components/dashboard/JobDetailsSheet";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface HealthAgent {
   slug: string;
@@ -60,12 +68,25 @@ interface RunResult {
     status: string;
     input: any;
     result: any;
+    output?: any;
     error_message: string | null;
     execution_time_ms: number | null;
     retry_count: number;
     created_at: string;
+    completed_at?: string;
     next_retry_at?: string;
     duration_ms?: number;
+    idempotency_key?: string;
+    correlation_id?: string;
+    paused_at?: string;
+  }
+
+  interface JobAuditLog {
+    id: string;
+    job_id: string;
+    action: string;
+    details: any;
+    created_at: string;
   }
 
 
@@ -86,6 +107,11 @@ export default function OrchestratorPage() {
   const [disabledAgents, setDisabledAgents] = useState<string[]>([]);
   const [disabledCategories, setDisabledCategories] = useState<string[]>([]);
   const [configLoading, setConfigLoading] = useState(false);
+
+  // Detail View
+  const [selectedJob, setSelectedJob] = useState<AgentJob | null>(null);
+  const [auditLogs, setAuditLogs] = useState<JobAuditLog[]>([]);
+  const [actionLoading, setActionLoading] = useState(false);
 
   const loadHealth = async () => {
     setHealthLoading(true);
@@ -148,6 +174,80 @@ export default function OrchestratorPage() {
       void loadConfig();
     } catch (e) {
       toast({ title: "Erro ao salvar", description: (e as Error).message, variant: "destructive" });
+    }
+  };
+
+  const loadAuditLogs = async (jobId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("job_audit_logs")
+        .select("*")
+        .eq("job_id", jobId)
+        .order("created_at", { ascending: false });
+      
+      if (error) throw error;
+      setAuditLogs(data || []);
+    } catch (e) {
+      console.error("Audit log error", e);
+    }
+  };
+
+  const openJobDetails = (job: AgentJob) => {
+    setSelectedJob(job);
+    loadAuditLogs(job.id);
+  };
+
+  const handleJobAction = async (jobId: string, action: "cancel" | "pause" | "resume" | "retry") => {
+    setActionLoading(true);
+    try {
+      const correlationId = `web-action-${Date.now()}`;
+      
+      let update: any = { updated_at: new Date().toISOString() };
+      let auditAction = action;
+
+      if (action === "cancel") {
+        update.status = "failed";
+        update.error_message = "Cancelado pelo usuário";
+      } else if (action === "pause") {
+        update.status = "paused";
+        update.paused_at = new Date().toISOString();
+      } else if (action === "resume") {
+        update.status = "processing";
+        update.paused_at = null;
+      } else if (action === "retry") {
+        update.status = "processing";
+        update.retry_count = 0;
+        update.error_message = null;
+        update.next_retry_at = null;
+      }
+
+      const { error: jobError } = await supabase
+        .from("agent_jobs")
+        .update(update)
+        .eq("id", jobId);
+
+      if (jobError) throw jobError;
+
+      // Log de auditoria
+      await supabase.from("job_audit_logs").insert({
+        job_id: jobId,
+        action: auditAction,
+        correlation_id: correlationId,
+        details: { source: "web_ui", timestamp: new Date().toISOString() }
+      });
+
+      toast({ title: `Ação ${action} concluída` });
+      void loadJobs();
+      
+      if (selectedJob?.id === jobId) {
+        const { data } = await supabase.from("agent_jobs").select("*").eq("id", jobId).single();
+        if (data) setSelectedJob(data as any as AgentJob);
+        loadAuditLogs(jobId);
+      }
+    } catch (e) {
+      toast({ title: "Erro na ação", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -336,12 +436,13 @@ export default function OrchestratorPage() {
                   </TableHeader>
                   <TableBody>
                     {jobs.map((job) => (
-                      <TableRow key={job.id}>
+                      <TableRow key={job.id} className="cursor-pointer hover:bg-muted/50" onClick={() => openJobDetails(job)}>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             {job.status === "completed" && <CheckCircle2 className="h-4 w-4 text-emerald-500" />}
                             {job.status === "failed" && <AlertCircle className="h-4 w-4 text-destructive" />}
                             {job.status === "processing" && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
+                            {job.status === "paused" && <Pause className="h-4 w-4 text-amber-500" />}
                             <span className="capitalize text-xs font-medium">{job.status}</span>
                           </div>
                         </TableCell>
@@ -349,8 +450,39 @@ export default function OrchestratorPage() {
                         <TableCell className="text-xs">{job.execution_time_ms || job.duration_ms ? `${job.execution_time_ms || job.duration_ms}ms` : '-'}</TableCell>
                         <TableCell className="text-xs">{job.retry_count || 0}</TableCell>
                         <TableCell className="text-xs">{new Date(job.created_at).toLocaleString()}</TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="sm" onClick={() => console.log(job)}>Ver JSON</Button>
+                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => openJobDetails(job)}>
+                                <Info className="mr-2 h-4 w-4" /> Ver Detalhes
+                              </DropdownMenuItem>
+                              {job.status === "failed" && (
+                                <DropdownMenuItem onClick={() => handleJobAction(job.id, "retry")}>
+                                  <RefreshCcw className="mr-2 h-4 w-4" /> Reexecutar
+                                </DropdownMenuItem>
+                              )}
+                              {job.status === "processing" && (
+                                <>
+                                  <DropdownMenuItem onClick={() => handleJobAction(job.id, "pause")}>
+                                    <Pause className="mr-2 h-4 w-4" /> Pausar
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem className="text-destructive" onClick={() => handleJobAction(job.id, "cancel")}>
+                                    <XCircle className="mr-2 h-4 w-4" /> Cancelar
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                              {job.status === "paused" && (
+                                <DropdownMenuItem onClick={() => handleJobAction(job.id, "resume")}>
+                                  <Play className="mr-2 h-4 w-4" /> Retomar
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -460,6 +592,14 @@ export default function OrchestratorPage() {
           </TabsContent>
         </Tabs>
       </div>
+      
+      <JobDetailsSheet 
+        job={selectedJob} 
+        auditLogs={auditLogs}
+        onClose={() => setSelectedJob(null)}
+        onAction={(action) => handleJobAction(selectedJob?.id || "", action)}
+        loading={actionLoading}
+      />
     </div>
   );
 }
