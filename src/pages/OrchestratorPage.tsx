@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Loader2, Sparkles, Activity, ArrowLeft, CheckCircle2, 
   XCircle, Send, History, Settings, Filter, RefreshCcw, 
-  ToggleLeft, ToggleRight, Clock, AlertCircle
+  ToggleLeft, ToggleRight, Clock, AlertCircle, Info, MoreVertical
 } from "lucide-react";
 import { 
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
@@ -19,6 +19,13 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue 
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { JobDetailsSheet } from "@/components/dashboard/JobDetailsSheet";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface HealthAgent {
   slug: string;
@@ -60,12 +67,25 @@ interface RunResult {
     status: string;
     input: any;
     result: any;
+    output?: any;
     error_message: string | null;
     execution_time_ms: number | null;
     retry_count: number;
     created_at: string;
+    completed_at?: string;
     next_retry_at?: string;
     duration_ms?: number;
+    idempotency_key?: string;
+    correlation_id?: string;
+    paused_at?: string;
+  }
+
+  interface JobAuditLog {
+    id: string;
+    job_id: string;
+    action: string;
+    details: any;
+    created_at: string;
   }
 
 
@@ -86,6 +106,11 @@ export default function OrchestratorPage() {
   const [disabledAgents, setDisabledAgents] = useState<string[]>([]);
   const [disabledCategories, setDisabledCategories] = useState<string[]>([]);
   const [configLoading, setConfigLoading] = useState(false);
+
+  // Detail View
+  const [selectedJob, setSelectedJob] = useState<AgentJob | null>(null);
+  const [auditLogs, setAuditLogs] = useState<JobAuditLog[]>([]);
+  const [actionLoading, setActionLoading] = useState(false);
 
   const loadHealth = async () => {
     setHealthLoading(true);
@@ -336,12 +361,13 @@ export default function OrchestratorPage() {
                   </TableHeader>
                   <TableBody>
                     {jobs.map((job) => (
-                      <TableRow key={job.id}>
+                      <TableRow key={job.id} className="cursor-pointer hover:bg-muted/50" onClick={() => openJobDetails(job)}>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             {job.status === "completed" && <CheckCircle2 className="h-4 w-4 text-emerald-500" />}
                             {job.status === "failed" && <AlertCircle className="h-4 w-4 text-destructive" />}
                             {job.status === "processing" && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
+                            {job.status === "paused" && <Pause className="h-4 w-4 text-amber-500" />}
                             <span className="capitalize text-xs font-medium">{job.status}</span>
                           </div>
                         </TableCell>
@@ -349,8 +375,39 @@ export default function OrchestratorPage() {
                         <TableCell className="text-xs">{job.execution_time_ms || job.duration_ms ? `${job.execution_time_ms || job.duration_ms}ms` : '-'}</TableCell>
                         <TableCell className="text-xs">{job.retry_count || 0}</TableCell>
                         <TableCell className="text-xs">{new Date(job.created_at).toLocaleString()}</TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="sm" onClick={() => console.log(job)}>Ver JSON</Button>
+                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => openJobDetails(job)}>
+                                <Info className="mr-2 h-4 w-4" /> Ver Detalhes
+                              </DropdownMenuItem>
+                              {job.status === "failed" && (
+                                <DropdownMenuItem onClick={() => handleJobAction(job.id, "retry")}>
+                                  <RefreshCcw className="mr-2 h-4 w-4" /> Reexecutar
+                                </DropdownMenuItem>
+                              )}
+                              {job.status === "processing" && (
+                                <>
+                                  <DropdownMenuItem onClick={() => handleJobAction(job.id, "pause")}>
+                                    <Pause className="mr-2 h-4 w-4" /> Pausar
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem className="text-destructive" onClick={() => handleJobAction(job.id, "cancel")}>
+                                    <XCircle className="mr-2 h-4 w-4" /> Cancelar
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                              {job.status === "paused" && (
+                                <DropdownMenuItem onClick={() => handleJobAction(job.id, "resume")}>
+                                  <Play className="mr-2 h-4 w-4" /> Retomar
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -460,6 +517,14 @@ export default function OrchestratorPage() {
           </TabsContent>
         </Tabs>
       </div>
+      
+      <JobDetailsSheet 
+        job={selectedJob} 
+        auditLogs={auditLogs}
+        onClose={() => setSelectedJob(null)}
+        onAction={(action) => handleJobAction(selectedJob?.id || "", action)}
+        loading={actionLoading}
+      />
     </div>
   );
 }
