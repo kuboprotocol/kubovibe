@@ -7,6 +7,20 @@ import { getFreshAccessToken } from '../_shared/gmailToken.ts'
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
+  // Security: only service_role can trigger sync
+  const authHeader = req.headers.get('Authorization')
+  const apiKey = req.headers.get('apikey')
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  
+  const isAuthorized = (authHeader === `Bearer ${serviceKey}`) || (apiKey === serviceKey)
+  if (!isAuthorized) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+
+
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
   const { data: accounts, error } = await admin
     .from('gmail_accounts')
