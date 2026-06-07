@@ -38,11 +38,23 @@ Para garantir previsibilidade, o sistema adota regras claras de extração:
 
 
 ### Integração Contínua e Relatórios
-Um workflow dedicado do GitHub Actions garante que a lógica de extração mantenha **100% de cobertura**. Os relatórios são gerados em:
-- **HTML:** Disponível como artefato `bullets-coverage` no CI.
-- **JSON:** Disponível como artefato `bullets-json-results` no CI.
+Um workflow dedicado do GitHub Actions (`bullets-ci.yml`) garante que a lógica de extração mantenha **100% de cobertura**. Os relatórios são gerados automaticamente em cada PR e Push:
 
-Os artefatos são versionados por commit/PR e retidos por 14 dias para facilitar a análise de regressões.
+#### Localização e Formato dos Artefatos
+Os artefatos são publicados no GitHub Actions sob o nome padronizado: `bullets-reports-PR{numero}-SHA-{commit}`.
+Este pacote contém:
+- **HTML (Relatório de Cobertura):** Localizado em `coverage/bullets/index.html`. Fornece visão visual de quais linhas foram testadas.
+- **JSON (Resultados Brutos):** Localizado em `test-results/bullets-results.json`. Contém o log técnico de cada afirmação (assertion).
+- **Sumário Agregado:** Localizado em `test-results/summary-report.json`. Um resumo simplificado com contagem por categoria (ex: Romanos Inválidos).
+
+#### Referência em Pull Requests
+A cada PR, um robô comenta automaticamente com:
+1. **Status Geral:** Sucesso ou Falha.
+2. **Métricas por Categoria:** Contagem de falhas específicas para validação de romanos vs extração simples.
+3. **Links Diretos:** Atalhos para o build do job e seção de artefatos para download imediato.
+
+Os artefatos são retidos por 7 dias para facilitar a auditoria de regressões.
+
 
 ---
 

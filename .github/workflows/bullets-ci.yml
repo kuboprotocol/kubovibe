@@ -25,7 +25,10 @@ jobs:
         id: run_tests
         run: |
           mkdir -p test-results
-          bunx vitest run src/test/markdown-bullets.test.ts --coverage --reporter=json --outputFile=test-results/bullets-results.json
+          # We use || true to ensure the CI continues even if tests fail,
+          # allowing us to generate and publish reports for the failures.
+          bunx vitest run src/test/markdown-bullets.test.ts --coverage --reporter=json --outputFile=test-results/bullets-results.json || true
+
         
       - name: Generate Summary Report
         if: always()
@@ -74,6 +77,30 @@ jobs:
             test-results/bullets-results.json
             test-results/summary-report.json
           retention-days: 7
+
+      - name: Verify Artifact Publication
+        if: always()
+        run: |
+          echo "Verifying standardized artifact paths..."
+          test -d coverage/bullets/ || (echo "Error: HTML coverage directory missing" && exit 1)
+          test -f test-results/bullets-results.json || (echo "Error: JSON results file missing" && exit 1)
+          test -f test-results/summary-report.json || (echo "Error: Aggregated Summary file missing" && exit 1)
+          echo "All artifacts verified in standardized locations."
+
+      - name: Enforce Test Success
+        if: always()
+        run: |
+          if [ -f test-results/summary-report.json ]; then
+            STATUS=$(node -e "console.log(JSON.parse(require('fs').readFileSync('test-results/summary-report.json', 'utf8')).status)")
+            if [ "$STATUS" != "PASS" ]; then
+              echo "Tests failed. Failing the job after report publication."
+              exit 1
+            fi
+          else
+            echo "Summary report missing. Failing job."
+            exit 1
+          fi
+
 
       - name: PR Summary
         if: github.event_name == 'pull_request' && always()

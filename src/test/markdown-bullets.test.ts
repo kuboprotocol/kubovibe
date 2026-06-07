@@ -38,21 +38,25 @@ XXXX. Match as roman-like
       expect(e.message).toBe(expectedError);
     }
 
-    // Categorized failure validation with exact message checks
+    // Categorized failure validation with exact message checks (Test Matrix)
     const invalidScenarios = [
       { marker: "XXXX.", expected: "Standard additive/subtractive Roman notation (e.g., no 'IIV'). Received: 'XXXX'." },
       { marker: "VV.", expected: "Standard additive/subtractive Roman notation (e.g., no 'IIV'). Received: 'VV'." },
-      { marker: "IL.", expected: "Standard additive/subtractive Roman notation (e.g., no 'IIV'). Received: 'IL'." }
+      { marker: "IL.", expected: "Standard additive/subtractive Roman notation (e.g., no 'IIV'). Received: 'IL'." },
+      { marker: "IC.", expected: "Standard additive/subtractive Roman notation (e.g., no 'IIV'). Received: 'IC'." },
+      { marker: "XM.", expected: "Standard additive/subtractive Roman notation (e.g., no 'IIV'). Received: 'XM'." },
+      { marker: "IIII.", expected: "Standard additive/subtractive Roman notation (e.g., no 'IIV'). Received: 'IIII'." }
     ];
     
     invalidScenarios.forEach(({ marker, expected }) => {
       const md = `${marker} Item`;
+      const expectedFull = `[ROMAN_VALIDATION_ERROR]: Invalid Roman numeral syntax. Rule violated: ${expected} Valid examples: IV, IX, XII.`;
+      
       try {
         validateMarkdownBullets(md);
         throw new Error(`Should have failed for ${marker}`);
       } catch (e: any) {
-        expect(e.message).toContain("[ROMAN_VALIDATION_ERROR]");
-        expect(e.message).toContain(expected);
+        expect(e.message).toBe(expectedFull);
       }
     });
   });
