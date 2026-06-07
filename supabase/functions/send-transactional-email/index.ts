@@ -30,14 +30,29 @@ function generateToken(): string {
     .join('')
 }
 
-// Auth note: this function uses verify_jwt = true in config.toml, so Supabase's
-// gateway validates the caller's JWT (anon or service_role) before the request
-// reaches this code. No in-function auth check is needed.
+// Auth: this function MUST only be callable by service_role.
+// It uses verify_jwt = true in config.toml, so Supabase's gateway validates
+// the caller's JWT (anon or service_role). We then check for service_role here.
 
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
+  }
+
+  // Security check: only service_role is allowed to call this function
+  // since it can send emails to any recipient using any template.
+  const authHeader = req.headers.get('Authorization')
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  
+  if (authHeader !== `Bearer ${serviceKey}`) {
+    console.warn('Unauthorized attempt to call send-transactional-email', {
+      hasAuth: !!authHeader,
+    })
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
