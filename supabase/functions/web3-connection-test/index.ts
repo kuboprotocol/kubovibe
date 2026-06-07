@@ -1,6 +1,8 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 import { z } from 'npm:zod@3'
+import { validatePublicUrl } from '../_shared/security.ts'
+
 
 // Aceita ou um id de conexão salva, ou um payload "dry-run" (testar antes de salvar).
 const BodySchema = z.union([
@@ -162,9 +164,13 @@ Deno.serve(async (req) => {
       family = parsed.data.family
     }
 
+    // SSRF Guard
+    validatePublicUrl(rpcUrl)
+
     const result = family === 'solana' ? await pingSolana(rpcUrl)
                  : family === 'utxo'   ? await pingUtxo(rpcUrl)
                  :                       await pingEvm(rpcUrl)
+
 
     if (connectionId) {
       await admin.from('web3_connections').update({

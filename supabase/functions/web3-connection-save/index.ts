@@ -1,6 +1,8 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 import { z } from 'npm:zod@3'
+import { validatePublicUrl } from '../_shared/security.ts'
+
 
 const BodySchema = z.object({
   id: z.string().uuid().optional(),
@@ -74,7 +76,12 @@ Deno.serve(async (req) => {
     if (!parsed.success) return new Response(JSON.stringify({ error: parsed.error.flatten().fieldErrors }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     const { id, provider, network, connection_name, rpc_url, explorer_url, api_key } = parsed.data
 
+    // SSRF Guard: prevent saving internal/private URLs
+    validatePublicUrl(rpc_url)
+    if (explorer_url) validatePublicUrl(explorer_url)
+
     const rpcEnc = await encrypt(rpc_url)
+
     const apiKeyEnc = api_key && api_key.length > 0 ? await encrypt(api_key) : null
     const apiKeyHint = api_key && api_key.length > 0 ? maskHint(api_key) : maskRpcInUrl(rpc_url)
 
