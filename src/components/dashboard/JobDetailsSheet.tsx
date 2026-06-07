@@ -156,12 +156,33 @@ export function JobDetailsSheet({
   };
 
   const exportAlertsCSV = () => {
-    // Collect specific alerts info
-    const alertLogs = auditLogs.filter(log => 
-      log.action.includes('error') || 
-      log.action.includes('failed') || 
-      (log.details && log.details.latency_p95 > 0)
-    );
+    if (!validateDateRange()) return;
+
+    // Collect specific alerts info with date filter
+    const alertLogs = auditLogs.filter(log => {
+      const isAlert = log.action.includes('error') || 
+                      log.action.includes('failed') || 
+                      (log.details && log.details.latency_p95 > 0);
+      
+      if (!isAlert) return false;
+      
+      if (dateRange.from || dateRange.to) {
+        const logDate = new Date(log.created_at);
+        if (dateRange.from && logDate < dateRange.from) return false;
+        if (dateRange.to && logDate > dateRange.to) return false;
+      }
+      
+      return true;
+    });
+
+    if (alertLogs.length === 0) {
+      toast({ 
+        title: "Nenhum alerta encontrado", 
+        description: "Não há dados para exportar no período selecionado.",
+        variant: "destructive"
+      });
+      return;
+    }
 
     const headers = ["ID", "Action", "TraceID", "CorrelationID", "Latency p95", "Retries", "Created At"];
     const rows = alertLogs.map(log => [
@@ -179,14 +200,17 @@ export function JobDetailsSheet({
       ...rows.map(e => e.map(cell => `"${cell}"`).join(","))
     ].join("\n");
 
+    const timestamp = new Date().getTime();
+    const fileName = `alerts-audit-${job.correlation_id || job.id}-${timestamp}.csv`;
+
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `alerts-audit-${job.id}.csv`;
+    a.download = fileName;
     a.click();
     URL.revokeObjectURL(url);
-    toast({ title: "Relatório de Alertas CSV concluído" });
+    toast({ title: "Relatório de Alertas CSV concluído", description: `Arquivo: ${fileName}` });
   };
 
   const exportAlertsPDF = () => {
