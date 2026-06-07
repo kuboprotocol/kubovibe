@@ -5,7 +5,9 @@
 
 <!-- CI badges -->
 [![Markdown Bullets CI](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/bullets-ci.yml/badge.svg)](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/bullets-ci.yml)
-[![Markdown Bullets Coverage](https://img.shields.io/badge/Bullets_Coverage-100%25-brightgreen)](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/bullets-ci.yml)
+[![Markdown Bullets Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/USER/GIST_ID/raw/coverage.json)](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/bullets-ci.yml)
+
+
 [![env-check](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/env-check.yml/badge.svg?branch=main)](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/env-check.yml?query=branch%3Amain)
 [![vitest](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/vitest.yml/badge.svg?branch=main)](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/vitest.yml?query=branch%3Amain)
 [![e2e](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/e2e.yml/badge.svg?branch=main)](https://github.com/kuboprotocol/kubo-vibedev/actions/workflows/e2e.yml?query=branch%3Amain)
