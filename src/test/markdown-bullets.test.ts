@@ -38,13 +38,22 @@ XXXX. Match as roman-like
       expect(e.message).toBe(expectedError);
     }
 
-    // Categorized failure validation
-    const categories = {
-      invalid_roman: ["IIV.", "XXXX.", "VV.", "IL."]
-    };
+    // Categorized failure validation with exact message checks
+    const invalidScenarios = [
+      { marker: "XXXX.", expected: "Standard additive/subtractive Roman notation (e.g., no 'IIV'). Received: 'XXXX'." },
+      { marker: "VV.", expected: "Standard additive/subtractive Roman notation (e.g., no 'IIV'). Received: 'VV'." },
+      { marker: "IL.", expected: "Standard additive/subtractive Roman notation (e.g., no 'IIV'). Received: 'IL'." }
+    ];
     
-    categories.invalid_roman.forEach(marker => {
-      expect(() => validateMarkdownBullets(`${marker} Item`)).toThrow(/\[ROMAN_VALIDATION_ERROR\]|Rule violated/);
+    invalidScenarios.forEach(({ marker, expected }) => {
+      const md = `${marker} Item`;
+      try {
+        validateMarkdownBullets(md);
+        throw new Error(`Should have failed for ${marker}`);
+      } catch (e: any) {
+        expect(e.message).toContain("[ROMAN_VALIDATION_ERROR]");
+        expect(e.message).toContain(expected);
+      }
     });
   });
 
