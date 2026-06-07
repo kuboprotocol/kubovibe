@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import * as fc from "fast-check";
 
 /**
  * Regex tolerante que encontra bullets Markdown (*, -, +) ou listas numeradas (1., 1))
@@ -52,28 +53,6 @@ describe("Markdown Bullet Extraction (Tolerant Regex)", () => {
     ]);
   });
 
-  it("should match bullets inside nested lists with deeper indentation and tabs", () => {
-    const md = `
-1. Item 1
-   * Nested Bullet 1.1
-   * Nested Bullet 1.2
-     - Deeper Bullet 1.2.1
-2. Item 2
-\t+ Nested Bullet 2.1
-\t3) Nested Numbered 2.2
-    `.trim();
-    const bullets = extractBullets(md);
-    expect(bullets).toEqual([
-      "Item 1",
-      "Nested Bullet 1.1",
-      "Nested Bullet 1.2",
-      "Deeper Bullet 1.2.1",
-      "Item 2",
-      "Nested Bullet 2.1",
-      "Nested Numbered 2.2"
-    ]);
-  });
-
   it("should ignore lines that are not bullets", () => {
     const md = `
 # Heading
@@ -84,5 +63,51 @@ Just some text.
     const bullets = extractBullets(md);
     expect(bullets).toEqual(["Valid bullet"]);
   });
+
+  describe("Property-based/Fuzz Testing", () => {
+    it("should extract correct content regardless of indentation and numbering style", () => {
+      fc.assert(
+        fc.property(
+          fc.array(
+            fc.record({
+              indent: fc.string({ unit: fc.constantFrom(" ", "\t"), minLength: 0, maxLength: 10 }),
+              prefix: fc.constantFrom("*", "-", "+", "1.", "1)", "99.", "0)"),
+              content: fc.string({ minLength: 1, maxLength: 50 }).filter(s => !s.includes("\n") && s.trim().length > 0)
+            }),
+            { minLength: 1, maxLength: 20 }
+          ),
+          (lines) => {
+            const markdown = lines.map(l => `${l.indent}${l.prefix} ${l.content}`).join("\n");
+            const extracted = extractBullets(markdown);
+            
+            // Verifica se a quantidade extraída bate com a gerada
+            expect(extracted.length).toBe(lines.length);
+            
+            // Verifica se o conteúdo (trimmed) bate
+            lines.forEach((line, i) => {
+              expect(extracted[i]).toBe(line.content.trim());
+            });
+          }
+        )
+      );
+    });
+
+    it("should not match lines that don't follow the bullet pattern", () => {
+      fc.assert(
+        fc.property(
+          fc.array(
+            fc.string().filter(s => !/^([ \t]*([*+-]|\d+[.)])[ \t]+)/.test(s)),
+            { minLength: 1, maxLength: 10 }
+          ),
+          (nonBullets) => {
+            const markdown = nonBullets.join("\n");
+            const extracted = extractBullets(markdown);
+            expect(extracted.length).toBe(0);
+          }
+        )
+      );
+    });
+  });
 });
+
 
