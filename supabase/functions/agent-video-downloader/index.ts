@@ -1,6 +1,7 @@
 // Video Downloader — valida URL e retorna metadados oEmbed quando disponível.
 // MVP: não armazena binário; entrega metadados + link de stream público.
 import { runAgent } from "../_shared/agentRuntime.ts";
+import { validatePublicUrl } from "../_shared/security.ts";
 
 function detectPlatform(url: string): string {
   if (/youtube\.com|youtu\.be/i.test(url)) return "youtube";
@@ -12,8 +13,9 @@ function detectPlatform(url: string): string {
 
 Deno.serve((req) =>
   runAgent("video-downloader", req, async ({ input }) => {
-    const { url } = input as { url?: string };
-    if (!url || !/^https?:\/\//i.test(url)) throw new Error("invalid_url");
+    const { url: rawUrl } = input as { url?: string };
+    if (!rawUrl) throw new Error("missing_url");
+    const url = validatePublicUrl(rawUrl).toString();
     const platform = detectPlatform(url);
 
     let metadata: Record<string, unknown> = { url, platform };

@@ -58,7 +58,8 @@ echo "🔍 [1/3] Lint estático em supabase/migrations + edge functions"
         grep -qiE 'enable[[:space:]]+row[[:space:]]+level[[:space:]]+security' "$f" \
           || echo "❌ MISSING RLS: $f"
       fi
-      if grep -qiE 'security[[:space:]]+definer' "$f" && ! grep -qiE 'set[[:space:]]+search_path' "$f"; then
+      # SECURITY DEFINER check (ignore comments)
+      if grep -vE '^[[:space:]]*--' "$f" | grep -qiE 'security[[:space:]]+definer' && ! grep -qiE 'set[[:space:]]+search_path' "$f"; then
         echo "❌ SECURITY DEFINER sem SET search_path: $f"
       fi
       if grep -qiE 'alter[[:space:]]+database[[:space:]]+postgres' "$f"; then

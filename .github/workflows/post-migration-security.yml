@@ -84,7 +84,8 @@ jobs:
               continue
             fi
 
-            if grep -qiE 'security[[:space:]]+definer' "$f" && ! grep -qiE 'set[[:space:]]+search_path' "$f"; then
+            # Use grep -v to ignore SQL comments for the SECURITY DEFINER check
+            if grep -vE '^[[:space:]]*--' "$f" | grep -qiE 'security[[:space:]]+definer' && ! grep -qiE 'set[[:space:]]+search_path' "$f"; then
               echo "❌ $f tem SECURITY DEFINER sem SET search_path"
               bad=1
             fi
