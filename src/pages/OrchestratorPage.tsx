@@ -133,6 +133,7 @@ export default function OrchestratorPage() {
 
   const loadJobs = async () => {
     setJobsLoading(true);
+    const start = performance.now();
     try {
       let query = supabase.from("agent_jobs").select("*").order("created_at", { ascending: false }).limit(50);
       
@@ -140,7 +141,6 @@ export default function OrchestratorPage() {
       if (statusFilter !== "all") query = query.eq("status", statusFilter);
       if (searchTerm) {
         if (searchTerm.match(/^[0-9a-fA-F-]{36}$/)) {
-          // It's a UUID, search exact
           query = query.or(`id.eq.${searchTerm},correlation_id.eq.${searchTerm}`);
         } else {
           query = query.or(`id.ilike.%${searchTerm}%,correlation_id.ilike.%${searchTerm}%,idempotency_key.ilike.%${searchTerm}%`);
@@ -150,6 +150,9 @@ export default function OrchestratorPage() {
       const { data, error } = await query;
       if (error) throw error;
       setJobs((data as any[]) || []);
+      
+      const end = performance.now();
+      setMetrics({ query_time_ms: Math.round(end - start) });
     } catch (e) {
       toast({ title: "Falha ao carregar jobs", description: (e as Error).message, variant: "destructive" });
     } finally {
