@@ -54,18 +54,20 @@ interface RunResult {
   cached?: boolean;
 }
 
-interface AgentJob {
-  id: string;
-  agent_slug: string;
-  status: string;
-  input: any;
-  result: any;
-  error_message: string;
-  execution_time_ms: number;
-  retry_count: number;
-  created_at: string;
-  next_retry_at?: string;
-}
+  interface AgentJob {
+    id: string;
+    agent_slug: string;
+    status: string;
+    input: any;
+    result: any;
+    error_message: string | null;
+    execution_time_ms: number | null;
+    retry_count: number;
+    created_at: string;
+    next_retry_at?: string;
+    duration_ms?: number;
+  }
+
 
 export default function OrchestratorPage() {
   const [prompt, setPrompt] = useState("");
@@ -108,7 +110,7 @@ export default function OrchestratorPage() {
       
       const { data, error } = await query;
       if (error) throw error;
-      setJobs(data || []);
+      setJobs((data as any[]) || []);
     } catch (e) {
       toast({ title: "Falha ao carregar jobs", description: (e as Error).message, variant: "destructive" });
     } finally {
@@ -122,8 +124,9 @@ export default function OrchestratorPage() {
       const { data, error } = await supabase.from("orchestrator_config").select("*");
       if (error) throw error;
       
-      const dAgents = data.find(r => r.key === 'disabled_agents')?.value || [];
-      const dCats = data.find(r => r.key === 'disabled_categories')?.value || [];
+      const dAgents = (data.find(r => r.key === 'disabled_agents')?.value as string[]) || [];
+      const dCats = (data.find(r => r.key === 'disabled_categories')?.value as string[]) || [];
+
       
       setDisabledAgents(dAgents);
       setDisabledCategories(dCats);
@@ -343,7 +346,7 @@ export default function OrchestratorPage() {
                           </div>
                         </TableCell>
                         <TableCell className="font-mono text-xs">{job.agent_slug}</TableCell>
-                        <TableCell className="text-xs">{job.execution_time_ms ? `${job.execution_time_ms}ms` : '-'}</TableCell>
+                        <TableCell className="text-xs">{job.execution_time_ms || job.duration_ms ? `${job.execution_time_ms || job.duration_ms}ms` : '-'}</TableCell>
                         <TableCell className="text-xs">{job.retry_count || 0}</TableCell>
                         <TableCell className="text-xs">{new Date(job.created_at).toLocaleString()}</TableCell>
                         <TableCell className="text-right">
