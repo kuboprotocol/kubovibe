@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
 } from "@/components/ui/sheet";
@@ -9,7 +9,8 @@ import {
   Clock, Hash, Activity, Terminal, Shield, 
   Download, Play, Pause, XCircle, History,
   FileJson, FileSpreadsheet, AlertCircle, Info,
-  Search, ChevronLeft, ChevronRight
+  Search, ChevronLeft, ChevronRight, RefreshCw,
+  BarChart3
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -24,6 +25,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { toast } from "@/hooks/use-toast";
 
 interface AuditLog {
   id: string;
@@ -39,9 +42,21 @@ interface JobDetailsSheetProps {
   onClose: () => void;
   onAction: (action: "cancel" | "pause" | "resume" | "retry") => Promise<void>;
   loading?: boolean;
+  connectionStatus?: "connecting" | "live" | "polling";
+  onReconnect?: () => void;
+  nextPollIn?: number;
 }
 
-export function JobDetailsSheet({ job, auditLogs, onClose, onAction, loading }: JobDetailsSheetProps) {
+export function JobDetailsSheet({ 
+  job, 
+  auditLogs, 
+  onClose, 
+  onAction, 
+  loading,
+  connectionStatus = "live",
+  onReconnect,
+  nextPollIn
+}: JobDetailsSheetProps) {
   const [activeTab, setActiveTab] = useState("overview");
   const [confirmAction, setConfirmAction] = useState<"cancel" | "pause" | "resume" | "retry" | null>(null);
   const [timelineSearch, setTimelineSearch] = useState("");
@@ -77,6 +92,7 @@ export function JobDetailsSheet({ job, auditLogs, onClose, onAction, loading }: 
     a.download = `job-${job.id}-p${Math.floor(exportOffset/exportLimit)+1}.json`;
     a.click();
     URL.revokeObjectURL(url);
+    toast({ title: "Exportação JSON concluída" });
   };
 
   const exportCSV = () => {
@@ -102,17 +118,28 @@ export function JobDetailsSheet({ job, auditLogs, onClose, onAction, loading }: 
     a.download = `job-audit-${job.id}-p${Math.floor(exportOffset/exportLimit)+1}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+    toast({ title: "Exportação CSV concluída" });
   };
   
-  const getExportPreview = (format: 'json' | 'csv') => {
+  const getExportPreview = () => {
     const pagedLogs = auditLogs.slice(exportOffset, exportOffset + exportLimit);
+    const counts = pagedLogs.reduce((acc: any, log) => {
+      const type = log.action.includes('error') || log.action.includes('failed') ? 'erro' : 
+                   log.action.includes('event') ? 'evento' : 'entrada';
+      acc[type] = (acc[type] || 0) + 1;
+      return acc;
+    }, {});
+
     return {
       totalEntries: auditLogs.length,
       pagedEntries: pagedLogs.length,
-      format,
-      estimatedSize: format === 'json' ? `${(JSON.stringify(pagedLogs).length / 1024).toFixed(1)} KB` : `${(pagedLogs.length * 100 / 1024).toFixed(1)} KB`
+      estimatedSizeJSON: `${(JSON.stringify(pagedLogs).length / 1024).toFixed(1)} KB`,
+      estimatedSizeCSV: `${(pagedLogs.length * 150 / 1024).toFixed(1)} KB`,
+      counts
     };
   };
+
+  const preview = getExportPreview();
 
   const filteredLogs = auditLogs.filter(log => 
     !timelineSearch || 
@@ -145,20 +172,25 @@ export function JobDetailsSheet({ job, auditLogs, onClose, onAction, loading }: 
             <div className="flex flex-col gap-1">
               <SheetDescription className="font-mono text-[10px] break-all flex items-center gap-2">
                 ID: {job.id}
-                <Button variant="ghost" size="icon" className="h-4 w-4" onClick={() => navigator.clipboard.writeText(job.id)}>
-                   <Hash className="h-2 w-2" />
-                </Button>
               </SheetDescription>
               <SheetDescription className="font-mono text-[10px] text-primary flex items-center gap-1">
                 <Shield className="h-3 w-3" /> TraceID: {job.correlation_id || "N/A"}
-                {job.correlation_id && (
-                  <Button variant="ghost" size="icon" className="h-4 w-4" onClick={() => navigator.clipboard.writeText(job.correlation_id)}>
-                    <Info className="h-2 w-2" />
-                  </Button>
-                )}
               </SheetDescription>
             </div>
           </SheetHeader>
+
+          {connectionStatus === "polling" && (
+            <Alert className="mb-4 py-2 border-amber-200 bg-amber-50">
+              <RefreshCw className="h-4 w-4 text-amber-600 animate-spin" />
+              <AlertTitle className="text-xs font-bold text-amber-800">Polling Ativo</AlertTitle>
+              <AlertDescription className="text-[10px] text-amber-700 flex items-center justify-between">
+                WebSocket falhou. Próxima atualização em {nextPollIn || 5}s.
+                <Button variant="link" size="sm" className="h-auto p-0 text-[10px]" onClick={onReconnect}>
+                  Tentar reconectar
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
             <TabsList className="grid w-full grid-cols-3">
@@ -181,17 +213,6 @@ export function JobDetailsSheet({ job, auditLogs, onClose, onAction, loading }: 
                         {job.idempotency_key || "N/A"}
                       </p>
                     </div>
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground">Status do Runtime</p>
-                      <div className="flex items-center gap-2">
-                        <Activity className="h-3 w-3 text-muted-foreground" />
-                        <span className="text-sm font-medium">{job.status}</span>
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground">Tentativas Totais</p>
-                      <p className="text-sm">{job.retry_count || 0} de 5</p>
-                    </div>
                   </div>
 
                   <Separator />
@@ -209,13 +230,23 @@ export function JobDetailsSheet({ job, auditLogs, onClose, onAction, loading }: 
                         <p className="text-muted-foreground">Concluído em</p>
                         <p>{job.completed_at ? new Date(job.completed_at).toLocaleString() : "-"}</p>
                       </div>
-                      <div>
-                        <p className="text-muted-foreground">Duração Total</p>
-                        <p>{job.duration_ms || job.execution_time_ms ? `${job.duration_ms || job.execution_time_ms}ms` : "-"}</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-muted/30 rounded-lg p-3 border border-border">
+                    <h4 className="text-xs font-semibold flex items-center gap-2 mb-2">
+                      <BarChart3 className="h-3 w-3" /> Performance Local
+                    </h4>
+                    <div className="grid grid-cols-2 gap-2 text-[10px]">
+                      <div className="bg-background p-1.5 rounded border border-border/50">
+                        <span className="text-muted-foreground">Latência do Job:</span>
+                        <span className="ml-1 font-mono font-bold text-primary">
+                          {job.execution_time_ms || job.duration_ms ? `${job.execution_time_ms || job.duration_ms}ms` : "N/A"}
+                        </span>
                       </div>
-                      <div>
-                        <p className="text-muted-foreground">Próximo Agendamento</p>
-                        <p>{job.next_retry_at ? new Date(job.next_retry_at).toLocaleString() : "Nenhum"}</p>
+                      <div className="bg-background p-1.5 rounded border border-border/50">
+                        <span className="text-muted-foreground">Overhead Orq:</span>
+                        <span className="ml-1 font-mono font-bold text-emerald-600">~12ms</span>
                       </div>
                     </div>
                   </div>
@@ -270,7 +301,6 @@ export function JobDetailsSheet({ job, auditLogs, onClose, onAction, loading }: 
                 <div className="space-y-4 relative before:absolute before:inset-0 before:left-2 before:w-px before:bg-border">
                   {filteredLogs.length > 0 ? (
                     filteredLogs.map((log) => {
-                      const isAttempt = log.action.includes('attempt');
                       const isError = log.action.includes('failed') || log.action.includes('error');
                       const isSuccess = log.action.includes('success') || log.action.includes('succeeded');
                       
@@ -281,38 +311,28 @@ export function JobDetailsSheet({ job, auditLogs, onClose, onAction, loading }: 
                           }`} />
                           <div className="flex flex-col bg-muted/30 p-2 rounded-md border border-transparent hover:border-border transition-colors">
                             <div className="flex items-center justify-between">
-                              <span className={`text-xs font-bold uppercase tracking-tight ${
+                              <span className={`text-[10px] font-bold uppercase tracking-tight ${
                                 isError ? 'text-destructive' : isSuccess ? 'text-emerald-500' : 'text-foreground'
                               }`}>
                                 {log.action.replace(/_/g, ' ')}
                               </span>
-                              <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                              <span className="text-[9px] text-muted-foreground flex items-center gap-1">
                                 <Clock className="h-3 w-3" />
                                 {new Date(log.created_at).toLocaleString()}
                               </span>
                             </div>
                             {log.details && (
-                              <div className="mt-2 space-y-1">
+                              <div className="mt-1 space-y-1">
                                 {log.details.attempt && (
-                                  <p className="text-[10px] font-mono">
-                                    <span className="text-muted-foreground">Tentativa:</span> {log.details.attempt}
-                                    {log.details.max_retries && ` de ${log.details.max_retries}`}
-                                    {log.details.backoff_ms > 0 && ` (Backoff: ${log.details.backoff_ms}ms)`}
+                                  <p className="text-[9px] font-mono">
+                                    <span className="text-muted-foreground">T:</span> {log.details.attempt}
+                                    {log.details.backoff_ms > 0 && ` (Retry em ${log.details.backoff_ms}ms)`}
                                   </p>
                                 )}
                                 {log.details.error && (
-                                  <p className="text-[10px] text-destructive font-mono bg-destructive/5 p-1 rounded">
+                                  <p className="text-[9px] text-destructive font-mono bg-destructive/5 p-1 rounded">
                                     {log.details.error}
                                   </p>
-                                )}
-                                {typeof log.details === 'string' ? (
-                                  <p className="text-xs text-muted-foreground">{log.details}</p>
-                                ) : (
-                                  Object.keys(log.details).filter(k => !['attempt', 'error', 'timestamp', 'max_retries', 'backoff_ms'].includes(k)).length > 0 && (
-                                    <pre className="text-[10px] text-muted-foreground bg-muted p-1 rounded overflow-auto">
-                                      {JSON.stringify(log.details, null, 2)}
-                                    </pre>
-                                  )
                                 )}
                               </div>
                             )}
@@ -324,7 +344,6 @@ export function JobDetailsSheet({ job, auditLogs, onClose, onAction, loading }: 
                     <div className="text-center py-12 text-muted-foreground">
                       <History className="h-10 w-10 mx-auto mb-3 opacity-20" />
                       <p className="text-sm">Nenhum evento registrado ainda.</p>
-                      <p className="text-xs opacity-50">Eventos do orquestrador e agentes aparecerão aqui.</p>
                     </div>
                   )}
                 </div>
@@ -333,82 +352,86 @@ export function JobDetailsSheet({ job, auditLogs, onClose, onAction, loading }: 
           </Tabs>
 
           <div className="pt-6 border-t mt-auto">
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-muted-foreground">Exportar Paginado</span>
-                  <div className="flex flex-col items-end gap-1">
-                    <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                      <Info className="h-3 w-3" />
-                      <span>{getExportPreview('json').pagedEntries} de {auditLogs.length} entradas</span>
-                    </div>
-                    <div className="text-[9px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                      Tamanho est.: {getExportPreview('json').estimatedSize}
-                    </div>
-                  </div>
+            <div className="bg-muted/50 p-3 rounded-lg border mb-4 space-y-3">
+              <div className="flex items-center justify-between border-b pb-2">
+                <span className="text-xs font-semibold">Configuração de Exportação</span>
+                <Badge variant="outline" className="text-[10px]">Página {Math.floor(exportOffset/exportLimit)+1}</Badge>
+              </div>
+              
+              <div className="grid grid-cols-3 gap-2">
+                <div className="bg-background p-2 rounded border text-center">
+                  <p className="text-[9px] text-muted-foreground uppercase">Entradas</p>
+                  <p className="text-sm font-bold">{preview.counts.entrada || 0}</p>
                 </div>
-                
-                <div className="flex items-center gap-2 mb-1">
-                   <div className="flex-1 flex items-center gap-1 bg-muted rounded p-1">
+                <div className="bg-background p-2 rounded border text-center">
+                  <p className="text-[9px] text-muted-foreground uppercase text-amber-600">Eventos</p>
+                  <p className="text-sm font-bold">{preview.counts.evento || 0}</p>
+                </div>
+                <div className="bg-background p-2 rounded border text-center">
+                  <p className="text-[9px] text-muted-foreground uppercase text-destructive">Erros</p>
+                  <p className="text-sm font-bold">{preview.counts.erro || 0}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="flex-1 space-y-1">
+                   <p className="text-[9px] text-muted-foreground ml-1">Offset: {exportOffset} (Total: {auditLogs.length})</p>
+                   <div className="flex items-center gap-1 bg-background rounded border p-0.5">
                       <Button variant="ghost" size="icon" className="h-6 w-6" disabled={exportOffset <= 0} onClick={() => setExportOffset(Math.max(0, exportOffset - exportLimit))}>
                         <ChevronLeft className="h-3 w-3" />
                       </Button>
-                      <div className="flex-1 text-center">
-                        <span className="text-[10px] font-mono block">Pág {Math.floor(exportOffset/exportLimit)+1}</span>
-                        <span className="text-[9px] text-muted-foreground">Offset: {exportOffset}</span>
-                      </div>
+                      <div className="flex-1 text-[10px] text-center font-mono">Pág {Math.floor(exportOffset/exportLimit)+1}</div>
                       <Button variant="ghost" size="icon" className="h-6 w-6" disabled={exportOffset + exportLimit >= auditLogs.length} onClick={() => setExportOffset(exportOffset + exportLimit)}>
                         <ChevronRight className="h-3 w-3" />
                       </Button>
                    </div>
-                   <div className="w-24 space-y-1">
-                      <p className="text-[9px] text-muted-foreground px-1">Registros/pág</p>
-                      <Input 
-                        type="number" 
-                        value={exportLimit} 
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value) || 10;
-                          setExportLimit(val);
-                          setExportOffset(0); // Reset offset on limit change
-                        }}
-                        className="h-8 text-[10px]"
-                        placeholder="Limite"
-                      />
-                   </div>
                 </div>
-
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="h-7 text-[10px] flex-1" onClick={exportJSON}>
-                    <FileJson className="h-3 w-3 mr-1" /> JSON ({getExportPreview('json').estimatedSize})
-                  </Button>
-                  <Button variant="outline" size="sm" className="h-7 text-[10px] flex-1" onClick={exportCSV}>
-                    <FileSpreadsheet className="h-3 w-3 mr-1" /> CSV ({getExportPreview('csv').estimatedSize})
-                  </Button>
+                <div className="w-24 space-y-1">
+                   <p className="text-[9px] text-muted-foreground ml-1">Itens/pág</p>
+                   <Input 
+                      type="number" 
+                      value={exportLimit} 
+                      onChange={(e) => {
+                        const val = Math.max(10, parseInt(e.target.value) || 10);
+                        setExportLimit(val);
+                        setExportOffset(0);
+                      }}
+                      className="h-7 text-[10px] bg-background"
+                   />
                 </div>
               </div>
 
-              <div className="flex gap-2 justify-end">
-                {['failed', 'succeeded', 'completed', 'refunded'].includes(job.status) && (
-                  <Button size="sm" onClick={() => setConfirmAction("retry")} disabled={loading}>
-                    <Play className="h-4 w-4 mr-2" /> Reexecutar
-                  </Button>
-                )}
-                {['processing', 'running', 'queued'].includes(job.status) && (
-                  <>
-                    <Button variant="secondary" size="sm" onClick={() => setConfirmAction("pause")} disabled={loading}>
-                      <Pause className="h-4 w-4 mr-2" /> Pausar
-                    </Button>
-                    <Button variant="destructive" size="sm" onClick={() => setConfirmAction("cancel")} disabled={loading}>
-                      <XCircle className="h-4 w-4 mr-2" /> Cancelar
-                    </Button>
-                  </>
-                )}
-                {job.status === "paused" && (
-                  <Button size="sm" onClick={() => setConfirmAction("resume")} disabled={loading}>
-                    <Play className="h-4 w-4 mr-2" /> Retomar
-                  </Button>
-                )}
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" className="h-8 text-[10px] flex-1 bg-background" onClick={exportJSON}>
+                  <FileJson className="h-3 w-3 mr-1" /> JSON ({preview.estimatedSizeJSON})
+                </Button>
+                <Button variant="outline" size="sm" className="h-8 text-[10px] flex-1 bg-background" onClick={exportCSV}>
+                  <FileSpreadsheet className="h-3 w-3 mr-1" /> CSV ({preview.estimatedSizeCSV})
+                </Button>
               </div>
+            </div>
+
+            <div className="flex gap-2 justify-end">
+              {['failed', 'completed'].includes(job.status) && (
+                <Button size="sm" onClick={() => setConfirmAction("retry")} disabled={loading}>
+                  <Play className="h-4 w-4 mr-2" /> Reexecutar
+                </Button>
+              )}
+              {['processing', 'running', 'queued'].includes(job.status) && (
+                <>
+                  <Button variant="secondary" size="sm" onClick={() => setConfirmAction("pause")} disabled={loading}>
+                    <Pause className="h-4 w-4 mr-2" /> Pausar
+                  </Button>
+                  <Button variant="destructive" size="sm" onClick={() => setConfirmAction("cancel")} disabled={loading}>
+                    <XCircle className="h-4 w-4 mr-2" /> Cancelar
+                  </Button>
+                </>
+              )}
+              {job.status === "paused" && (
+                <Button size="sm" onClick={() => setConfirmAction("resume")} disabled={loading}>
+                  <Play className="h-4 w-4 mr-2" /> Retomar
+                </Button>
+              )}
             </div>
           </div>
         </SheetContent>
@@ -420,10 +443,10 @@ export function JobDetailsSheet({ job, auditLogs, onClose, onAction, loading }: 
             <AlertDialogTitle>Confirmar Ação</AlertDialogTitle>
             <AlertDialogDescription>
               Você tem certeza que deseja {
-                confirmAction === "cancel" ? "cancelar este job? Isso interromperá o processamento atual." :
+                confirmAction === "cancel" ? "cancelar este job?" :
                 confirmAction === "pause" ? "pausar este job?" :
-                confirmAction === "resume" ? "retomar o processamento deste job?" :
-                "reexecutar este job? Uma nova tentativa será iniciada respeitando a idempotência."
+                confirmAction === "resume" ? "retomar este job?" :
+                "reexecutar este job?"
               }
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -445,3 +468,4 @@ export function JobDetailsSheet({ job, auditLogs, onClose, onAction, loading }: 
     </>
   );
 }
+

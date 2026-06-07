@@ -1219,6 +1219,30 @@ export type Database = {
         }
         Relationships: []
       }
+      performance_metrics: {
+        Row: {
+          context: Json | null
+          created_at: string | null
+          id: string
+          metric_name: string
+          value_ms: number
+        }
+        Insert: {
+          context?: Json | null
+          created_at?: string | null
+          id?: string
+          metric_name: string
+          value_ms: number
+        }
+        Update: {
+          context?: Json | null
+          created_at?: string | null
+          id?: string
+          metric_name?: string
+          value_ms?: number
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null

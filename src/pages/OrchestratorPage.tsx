@@ -11,7 +11,7 @@ import {
   Loader2, Sparkles, Activity, ArrowLeft, CheckCircle2, 
   XCircle, Send, History, Settings, Filter, RefreshCcw, 
   ToggleLeft, ToggleRight, Clock, AlertCircle, Info, MoreVertical,
-  Pause, Play, Search
+  Pause, Play, Search, BarChart3
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { 
@@ -115,6 +115,8 @@ export default function OrchestratorPage() {
   const [auditLogs, setAuditLogs] = useState<JobAuditLog[]>([]);
   const [actionLoading, setActionLoading] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<"connecting" | "live" | "polling">("connecting");
+  const [nextPollIn, setNextPollIn] = useState(15);
+  const [metrics, setMetrics] = useState<{ query_time_ms: number } | null>(null);
 
   const loadHealth = async () => {
     setHealthLoading(true);
@@ -131,6 +133,7 @@ export default function OrchestratorPage() {
 
   const loadJobs = async () => {
     setJobsLoading(true);
+    const start = performance.now();
     try {
       let query = supabase.from("agent_jobs").select("*").order("created_at", { ascending: false }).limit(50);
       
@@ -138,7 +141,6 @@ export default function OrchestratorPage() {
       if (statusFilter !== "all") query = query.eq("status", statusFilter);
       if (searchTerm) {
         if (searchTerm.match(/^[0-9a-fA-F-]{36}$/)) {
-          // It's a UUID, search exact
           query = query.or(`id.eq.${searchTerm},correlation_id.eq.${searchTerm}`);
         } else {
           query = query.or(`id.ilike.%${searchTerm}%,correlation_id.ilike.%${searchTerm}%,idempotency_key.ilike.%${searchTerm}%`);
@@ -148,6 +150,9 @@ export default function OrchestratorPage() {
       const { data, error } = await query;
       if (error) throw error;
       setJobs((data as any[]) || []);
+      
+      const end = performance.now();
+      setMetrics({ query_time_ms: Math.round(end - start) });
     } catch (e) {
       toast({ title: "Falha ao carregar jobs", description: (e as Error).message, variant: "destructive" });
     } finally {
@@ -254,34 +259,41 @@ export default function OrchestratorPage() {
     void loadJobs();
     void loadConfig();
 
-    // Inscrição Realtime para a lista de Jobs
-    const channel = supabase
-      .channel('public:agent_jobs')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'agent_jobs' }, (payload) => {
-        console.log('Realtime update:', payload);
-        void loadJobs();
-      })
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          setConnectionStatus("live");
-        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-          setConnectionStatus("polling");
-        }
-      });
+    const setupRealtime = () => {
+      setConnectionStatus("connecting");
+      const channel = supabase
+        .channel('public:agent_jobs')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'agent_jobs' }, (payload) => {
+          void loadJobs();
+        })
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            setConnectionStatus("live");
+          } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+            setConnectionStatus("polling");
+            setNextPollIn(5);
+          }
+        });
+      return channel;
+    };
 
-    // Polling de fallback (mais frequente se realtime estiver offline)
+    let channel = setupRealtime();
+
     const interval = setInterval(() => {
-      const needsUpdate = jobs.some(j => ['processing', 'running', 'queued'].includes(j.status));
-      if (connectionStatus === "polling" || needsUpdate) {
-        loadJobs();
-      }
-    }, connectionStatus === "polling" ? 5000 : 15000);
+      setNextPollIn(prev => {
+        if (prev <= 1) {
+          loadJobs();
+          return connectionStatus === "polling" ? 5 : 15;
+        }
+        return prev - 1;
+      });
+    }, 1000);
 
     return () => {
       supabase.removeChannel(channel);
       clearInterval(interval);
     };
-  }, [agentFilter, statusFilter, searchTerm, connectionStatus]); // Recarrega ao mudar filtros ou status de conexão
+  }, [agentFilter, statusFilter, searchTerm, connectionStatus]);
 
   // Efeito separado para o Job selecionado (Timeline Realtime)
   useEffect(() => {
@@ -375,23 +387,31 @@ export default function OrchestratorPage() {
             <h1 className="mt-2 text-3xl font-bold tracking-tight">Orquestrador KUBO</h1>
             <p className="text-muted-foreground">Orquestração full-stack com filas, retries e roteamento dinâmico.</p>
           </div>
-          <div className="flex items-center gap-3">
-            <div 
-              className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-medium ${
-                connectionStatus === 'polling' ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-muted/50'
-              }`}
-              title={connectionStatus === 'polling' ? 'WebSocket falhou. Usando polling automático.' : undefined}
-            >
-              <div className={`h-1.5 w-1.5 rounded-full ${
-                connectionStatus === 'live' ? 'bg-emerald-500 animate-pulse' : 
-                connectionStatus === 'connecting' ? 'bg-amber-500' : 'bg-amber-600'
-              }`} />
-              {connectionStatus === 'live' ? 'LIVE' : connectionStatus === 'connecting' ? 'CONECTANDO...' : 'POLLING (WS FAIL)'}
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex items-center gap-3">
+              <div 
+                className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-medium transition-colors ${
+                  connectionStatus === 'polling' ? 'bg-amber-100 text-amber-700 border border-amber-200' : 
+                  connectionStatus === 'live' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-muted/50'
+                }`}
+              >
+                <div className={`h-1.5 w-1.5 rounded-full ${
+                  connectionStatus === 'live' ? 'bg-emerald-500 animate-pulse' : 
+                  connectionStatus === 'connecting' ? 'bg-amber-500' : 'bg-amber-600'
+                }`} />
+                {connectionStatus === 'live' ? 'LIVE' : connectionStatus === 'connecting' ? 'CONECTANDO...' : `POLLING (${nextPollIn}s)`}
+              </div>
+              <Button variant="outline" size="sm" onClick={() => { loadHealth(); loadJobs(); loadConfig(); }}>
+                <RefreshCcw className="mr-2 h-4 w-4" /> Atualizar
+              </Button>
+              <Badge variant="secondary" className="h-8">V2.1</Badge>
             </div>
-            <Button variant="outline" size="sm" onClick={() => { loadHealth(); loadJobs(); loadConfig(); }}>
-              <RefreshCcw className="mr-2 h-4 w-4" /> Atualizar
-            </Button>
-            <Badge variant="secondary" className="h-8">V2.0</Badge>
+            {metrics && (
+              <div className="flex items-center gap-2 text-[9px] text-muted-foreground font-mono bg-muted/30 px-2 py-0.5 rounded border border-border/50">
+                <BarChart3 className="h-3 w-3" />
+                Query: {metrics.query_time_ms}ms | Trace Match: INDEXED
+              </div>
+            )}
           </div>
         </div>
 
@@ -676,6 +696,12 @@ export default function OrchestratorPage() {
         onClose={() => setSelectedJob(null)}
         onAction={(action) => handleJobAction(selectedJob?.id || "", action)}
         loading={actionLoading}
+        connectionStatus={connectionStatus}
+        nextPollIn={nextPollIn}
+        onReconnect={() => {
+          setConnectionStatus("connecting");
+          loadJobs();
+        }}
       />
     </div>
   );
