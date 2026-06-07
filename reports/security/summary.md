@@ -1,10 +1,10 @@
 # Post-Migration Security — Relatório Local
 
-_Gerado em 2026-06-07T18:01:39Z_
+_Gerado em 2026-06-07T18:03:58Z_
 
 | Camada | Status |
 |---|---|
-| 1. Lint estático        | ❌ |
+| 1. Lint estático        | ✅ |
 | 2. Checagens no banco   | ✅ |
 | 3. Supabase linter      | ⏭️ |
 
