@@ -194,8 +194,13 @@ export function JobDetailsSheet({
               <SheetDescription className="font-mono text-[10px] break-all flex items-center gap-2">
                 ID: {job.id}
               </SheetDescription>
-              <SheetDescription className="font-mono text-[10px] text-primary flex items-center gap-1">
-                <Shield className="h-3 w-3" /> TraceID: {job.correlation_id || "N/A"}
+              <SheetDescription className="font-mono text-[10px] text-primary flex flex-col gap-1">
+                <span className="flex items-center gap-1"><Shield className="h-3 w-3" /> TraceID: {job.id}</span>
+                {job.correlation_id && (
+                  <span className="flex items-center gap-1 text-emerald-600">
+                    <Hash className="h-3 w-3" /> CorrelationID: {job.correlation_id}
+                  </span>
+                )}
               </SheetDescription>
             </div>
           </SheetHeader>
@@ -339,7 +344,7 @@ export function JobDetailsSheet({
               <div className="mb-4 relative">
                 <Search className="absolute left-2 top-2.5 h-3 w-3 text-muted-foreground" />
                 <Input 
-                  placeholder="Filtrar eventos ou TraceID..." 
+                  placeholder="Filtrar eventos, TraceID ou CorrelationID..." 
                   className="pl-7 h-8 text-xs" 
                   value={timelineSearch}
                   onChange={(e) => setTimelineSearch(e.target.value)}
@@ -361,7 +366,7 @@ export function JobDetailsSheet({
                               log.correlation_id === timelineSearch || 
                               log.id === timelineSearch || 
                               (log.details && JSON.stringify(log.details).includes(timelineSearch))
-                            ) ? 'scale-[1.02] bg-primary/5 rounded-r-md -ml-2 pl-9' : ''
+                            ) ? 'scale-[1.02] bg-primary/10 rounded-r-md -ml-2 pl-9 ring-1 ring-primary/20 shadow-md' : ''
                           }`}
                         >
                           <div className={`absolute left-0 top-1 w-4 h-4 rounded-full bg-background border-2 z-10 ${
