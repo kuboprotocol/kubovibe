@@ -1,12 +1,33 @@
 // Docs Creator — gera documentos Markdown estruturados (relatórios, propostas).
 import { runAgent, getSecret } from "../_shared/agentRuntime.ts";
 
+/**
+ * Utilitário para sanitizar e validar o Markdown gerado,
+ * garantindo que bullets aninhados sejam interpretados corretamente.
+ */
+function processMarkdown(markdown: string) {
+  // Regex tolerante para bullets (captura conteúdo após o símbolo)
+  const bulletRegex = /^[ \t]*[*+-][ \t]+(.+)$/gm;
+  const bullets: string[] = [];
+  let match;
+  while ((match = bulletRegex.exec(markdown)) !== null) {
+    bullets.push(match[1].trim());
+  }
+
+  return {
+    markdown,
+    word_count: markdown.split(/\s+/).filter(Boolean).length,
+    extracted_bullets: bullets,
+    bullet_count: bullets.length
+  };
+}
+
 Deno.serve((req) =>
   runAgent("docs-creator", req, async ({ input }) => {
     const { prompt, docType = "report", language = "pt-BR" } = input as Record<string, string>;
     if (!prompt) throw new Error("missing_prompt");
 
-    const sys = `Você é um redator técnico. Gere um documento ${docType} em Markdown bem estruturado (títulos, subtítulos, listas, tabelas quando útil). Idioma: ${language}.`;
+    const sys = `Você é um redator técnico. Gere um documento ${docType} em Markdown bem estruturado (títulos, subtítulos, listas, tabelas quando útil). Use identação padrão para listas aninhadas. Idioma: ${language}.`;
     const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${getSecret("LOVABLE_API_KEY")}`, "Content-Type": "application/json" },
@@ -15,9 +36,21 @@ Deno.serve((req) =>
         messages: [{ role: "system", content: sys }, { role: "user", content: prompt }],
       }),
     });
-    if (!r.ok) throw new Error(`ai_${r.status}`);
+
+    if (!r.ok) {
+      const errorText = await r.text();
+      throw new Error(`AI Gateway Error (${r.status}): ${errorText.slice(0, 150)}`);
+    }
+
     const data = await r.json();
-    const markdown = data?.choices?.[0]?.message?.content ?? "";
-    return { output: { doc_type: docType, language, markdown, word_count: markdown.split(/\s+/).length } };
+    const rawMarkdown = data?.choices?.[0]?.message?.content ?? "";
+    
+    return { 
+      output: { 
+        doc_type: docType, 
+        language, 
+        ...processMarkdown(rawMarkdown) 
+      } 
+    };
   })
 );

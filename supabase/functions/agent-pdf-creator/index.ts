@@ -45,10 +45,15 @@ listas, callouts e uma conclusão final acionável. Use Markdown puro.`;
     });
     if (!resp.ok) {
       const txt = await resp.text();
-      throw new Error(`ai_gateway_${resp.status}:${txt.slice(0, 200)}`);
+      // Melhora na saída de erro com detalhamento
+      throw new Error(`AI_GATEWAY_FAILURE (Status ${resp.status}): ${txt.slice(0, 256) || "No response body"}`);
     }
     const data = await resp.json();
     const markdown = data?.choices?.[0]?.message?.content ?? "";
+
+    // Regex tolerante para garantir captura de bullets em listas aninhadas
+    const bulletRegex = /^[ \t]*[*+-][ \t]+(.+)$/gm;
+    const bullets = [...markdown.matchAll(bulletRegex)].map(m => m[1].trim());
 
     return {
       output: {
@@ -57,6 +62,8 @@ listas, callouts e uma conclusão final acionável. Use Markdown puro.`;
         language,
         title: topic,
         markdown,
+        extracted_bullets: bullets,
+        bullet_count: bullets.length,
         render_hint: "client_pdf",
         usage: data?.usage ?? null,
       },
