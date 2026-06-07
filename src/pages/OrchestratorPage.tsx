@@ -376,12 +376,17 @@ export default function OrchestratorPage() {
             <p className="text-muted-foreground">Orquestração full-stack com filas, retries e roteamento dinâmico.</p>
           </div>
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-muted/50 text-[10px] font-medium">
+            <div 
+              className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-medium ${
+                connectionStatus === 'polling' ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-muted/50'
+              }`}
+              title={connectionStatus === 'polling' ? 'WebSocket falhou. Usando polling automático.' : undefined}
+            >
               <div className={`h-1.5 w-1.5 rounded-full ${
                 connectionStatus === 'live' ? 'bg-emerald-500 animate-pulse' : 
-                connectionStatus === 'connecting' ? 'bg-amber-500' : 'bg-blue-500'
+                connectionStatus === 'connecting' ? 'bg-amber-500' : 'bg-amber-600'
               }`} />
-              {connectionStatus === 'live' ? 'LIVE' : connectionStatus === 'connecting' ? 'CONECTANDO...' : 'POLLING'}
+              {connectionStatus === 'live' ? 'LIVE' : connectionStatus === 'connecting' ? 'CONECTANDO...' : 'POLLING (WS FAIL)'}
             </div>
             <Button variant="outline" size="sm" onClick={() => { loadHealth(); loadJobs(); loadConfig(); }}>
               <RefreshCcw className="mr-2 h-4 w-4" /> Atualizar

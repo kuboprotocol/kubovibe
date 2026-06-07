@@ -337,9 +337,14 @@ export function JobDetailsSheet({ job, auditLogs, onClose, onAction, loading }: 
               <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-muted-foreground">Exportar Paginado</span>
-                  <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                    <Info className="h-3 w-3" />
-                    <span>{getExportPreview('json').pagedEntries} de {auditLogs.length} entradas</span>
+                  <div className="flex flex-col items-end gap-1">
+                    <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                      <Info className="h-3 w-3" />
+                      <span>{getExportPreview('json').pagedEntries} de {auditLogs.length} entradas</span>
+                    </div>
+                    <div className="text-[9px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                      Tamanho est.: {getExportPreview('json').estimatedSize}
+                    </div>
                   </div>
                 </div>
                 
