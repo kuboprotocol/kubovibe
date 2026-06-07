@@ -57,4 +57,5 @@ Deno.test("orchestrator propagates correlation_id to agent calls", async () => {
   // Mesmo que falhe por falta de auth real no ambiente de teste Deno,
   // validamos que o orchestrator tenta ler o header.
   assert(r.status === 401 || r.status === 200);
+  await r.body?.cancel();
 });
