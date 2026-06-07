@@ -605,6 +605,9 @@ export type Database = {
       github_connections: {
         Row: {
           access_token: string
+          access_token_ciphertext: string | null
+          access_token_iv: string | null
+          access_token_tag: string | null
           connected_at: string
           github_avatar_url: string | null
           github_username: string | null
@@ -615,6 +618,9 @@ export type Database = {
         }
         Insert: {
           access_token: string
+          access_token_ciphertext?: string | null
+          access_token_iv?: string | null
+          access_token_tag?: string | null
           connected_at?: string
           github_avatar_url?: string | null
           github_username?: string | null
@@ -625,6 +631,9 @@ export type Database = {
         }
         Update: {
           access_token?: string
+          access_token_ciphertext?: string | null
+          access_token_iv?: string | null
+          access_token_tag?: string | null
           connected_at?: string
           github_avatar_url?: string | null
           github_username?: string | null
