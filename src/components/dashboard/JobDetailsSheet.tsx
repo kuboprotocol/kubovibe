@@ -127,6 +127,40 @@ export function JobDetailsSheet({
     URL.revokeObjectURL(url);
     toast({ title: "Exportação CSV concluída" });
   };
+
+  const exportAlertsCSV = () => {
+    // Collect specific alerts info
+    const alertLogs = auditLogs.filter(log => 
+      log.action.includes('error') || 
+      log.action.includes('failed') || 
+      (log.details && log.details.latency_p95 > 0)
+    );
+
+    const headers = ["ID", "Action", "TraceID", "CorrelationID", "Latency p95", "Retries", "Created At"];
+    const rows = alertLogs.map(log => [
+      log.id,
+      log.action,
+      job.id,
+      log.correlation_id || job.correlation_id || "",
+      log.details?.latency_p95 || "",
+      log.details?.attempt || "",
+      new Date(log.created_at).toISOString()
+    ]);
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(e => e.map(cell => `"${cell}"`).join(","))
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `alerts-audit-${job.id}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: "Relatório de Alertas CSV concluído" });
+  };
   
   const getExportPreview = () => {
     const pagedLogs = auditLogs.slice(exportOffset, exportOffset + exportLimit);
@@ -162,6 +196,10 @@ export function JobDetailsSheet({
     }
   };
 
+  const clearFilters = () => {
+    setTimelineSearch("");
+  };
+
   useEffect(() => {
     if (activeTab === "timeline" && timelineSearch) {
       const match = filteredLogs.find(log => 
@@ -175,6 +213,12 @@ export function JobDetailsSheet({
       }
     }
   }, [activeTab, timelineSearch, filteredLogs.length]);
+
+  const hasEventsForCorrelation = (corrId: string) => {
+    return auditLogs.some(log => log.correlation_id === corrId);
+  };
+
+  const isSearchingCorrelation = timelineSearch && timelineSearch.length > 10;
 
   return (
     <>
@@ -351,7 +395,7 @@ export function JobDetailsSheet({
                 />
               </div>
               <ScrollArea className="h-[calc(100%-3rem)] pr-4">
-                <div className="space-y-4 relative before:absolute before:inset-0 before:left-2 before:w-px before:bg-border">
+                <div className="space-y-4 relative before:absolute before:inset-0 before:left-2 before:w-px before:bg-border min-h-[200px]">
                   {filteredLogs.length > 0 ? (
                     filteredLogs.map((log) => {
                       const isError = log.action.includes('failed') || log.action.includes('error');
@@ -409,9 +453,38 @@ export function JobDetailsSheet({
                       );
                     })
                   ) : (
-                    <div className="text-center py-12 text-muted-foreground">
+                    <div className="text-center py-12 text-muted-foreground bg-muted/20 rounded-lg border border-dashed mx-2">
                       <History className="h-10 w-10 mx-auto mb-3 opacity-20" />
-                      <p className="text-sm">Nenhum evento registrado ainda.</p>
+                      <p className="text-sm font-medium">Nenhum evento encontrado</p>
+                      {timelineSearch ? (
+                        <div className="mt-2 space-y-2">
+                          <p className="text-[10px]">
+                            {isSearchingCorrelation && !hasEventsForCorrelation(timelineSearch) 
+                              ? `Não foram encontrados eventos específicos para o CorrelationID "${timelineSearch}" neste job.`
+                              : `Não há eventos correspondentes a "${timelineSearch}"`}
+                          </p>
+                          <div className="flex justify-center gap-2">
+                            <Button 
+                              variant="link" 
+                              size="sm" 
+                              className="h-auto p-0 text-[10px]" 
+                              onClick={clearFilters}
+                            >
+                              Limpar filtro
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-[10px] mt-1">Aguardando processamento ou novos logs do job.</p>
+                      )}
+                      <div className="mt-4 pt-4 border-t border-dashed border-border/50">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider mb-2">Sugestões de Investigação:</p>
+                        <ul className="text-[9px] text-left list-disc list-inside space-y-1 max-w-[240px] mx-auto">
+                          <li>O CorrelationID pode estar em outro Job (verifique a busca global)</li>
+                          <li>Certifique-se que o evento não foi filtrado por erro de rede</li>
+                          <li>Tente reexecutar o job para gerar novos logs</li>
+                        </ul>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -475,6 +548,9 @@ export function JobDetailsSheet({
                 </Button>
                 <Button variant="outline" size="sm" className="h-8 text-[10px] flex-1 bg-background" onClick={exportCSV}>
                   <FileSpreadsheet className="h-3 w-3 mr-1" /> CSV ({preview.estimatedSizeCSV})
+                </Button>
+                <Button variant="outline" size="sm" className="h-8 text-[10px] flex-1 bg-amber-50 text-amber-700 border-amber-200" onClick={exportAlertsCSV}>
+                  <AlertCircle className="h-3 w-3 mr-1" /> Relatório Alertas
                 </Button>
               </div>
             </div>
