@@ -46,6 +46,7 @@ interface JobDetailsSheetProps {
   onReconnect?: () => void;
   nextPollIn?: number;
   pollingRetryCount?: number;
+  websocketError?: string | null;
 }
 
 
@@ -58,7 +59,8 @@ export function JobDetailsSheet({
   connectionStatus = "live",
   onReconnect,
   nextPollIn,
-  pollingRetryCount
+   pollingRetryCount,
+   websocketError
 }: JobDetailsSheetProps) {
 
   const [activeTab, setActiveTab] = useState("overview");
@@ -193,16 +195,24 @@ export function JobDetailsSheet({
                 </Badge>
               </AlertTitle>
               <AlertDescription className="text-[10px] text-amber-700 mt-1">
-                <div className="flex items-center justify-between">
-                  <span>Próxima atualização estimada em <strong>{nextPollIn || 0}s</strong></span>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="h-auto p-0 text-[10px] text-amber-800 font-bold hover:text-amber-900 hover:bg-transparent underline" 
-                    onClick={onReconnect}
-                  >
-                    Reconectar WebSocket
-                  </Button>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <span>Próxima atualização estimada em <strong>{nextPollIn || 0}s</strong></span>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-auto p-0 text-[10px] text-amber-800 font-bold hover:text-amber-900 hover:bg-transparent underline" 
+                      onClick={onReconnect}
+                    >
+                      Reconectar WebSocket
+                    </Button>
+                  </div>
+                  {websocketError && (
+                    <div className="bg-amber-100/50 p-1.5 rounded border border-amber-200/50 flex items-start gap-1.5">
+                      <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
+                      <span>Motivo da falha: <code className="text-[9px]">{websocketError}</code></span>
+                    </div>
+                  )}
                 </div>
               </AlertDescription>
             </Alert>
@@ -264,6 +274,12 @@ export function JobDetailsSheet({
                       <div className="bg-background p-1.5 rounded border border-border/50">
                         <span className="text-muted-foreground">Overhead Orq:</span>
                         <span className="ml-1 font-mono font-bold text-emerald-600">~12ms</span>
+                      </div>
+                      <div className="bg-background p-1.5 rounded border border-border/50">
+                        <span className="text-muted-foreground">Retries Polling:</span>
+                        <span className="ml-1 font-mono font-bold text-amber-600">
+                          {pollingRetryCount || 0}
+                        </span>
                       </div>
                     </div>
                   </div>
