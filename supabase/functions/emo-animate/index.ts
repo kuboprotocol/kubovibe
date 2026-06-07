@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { validatePublicUrl } from "../_shared/security.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -20,17 +21,23 @@ serve(async (req) => {
     if (authError || !user) throw new Error("Unauthorized");
 
     const body = await req.json();
-    const { source_image, driving_video } = body;
+    const { source_image: rawImg, driving_video: rawVid } = body;
+    if (!rawImg || !rawVid) throw new Error("Missing source_image or driving_video");
 
-    if (!source_image || !driving_video) {
-      throw new Error("Missing source_image or driving_video");
-    }
+    const source_image = validatePublicUrl(rawImg).toString();
+    const driving_video = validatePublicUrl(rawVid).toString();
 
-    // Credits check (5 credits for EMO)
+    // Atomic credits check (5 credits for EMO)
     const cost = 5;
-    const { data: profile } = await supabase.from("profiles").select("edits_remaining").eq("id", user.id).single();
-    if ((profile?.edits_remaining ?? 0) < cost) {
-      throw new Error("insufficient_credits");
+    const { data: debit, error: debitErr } = await supabase.rpc("execute_atomic_credit_deduction", {
+      _user_id: user.id,
+      _amount: cost,
+      _reason: "emo_animate",
+      _category: "creative_economy",
+      _metadata: { source_image, driving_video }
+    });
+    if (debitErr || !(debit as any)?.success) {
+      throw new Error(debitErr?.message || "insufficient_credits");
     }
 
     // Call external FastAPI backend
@@ -53,7 +60,7 @@ serve(async (req) => {
         metadata: { source_image, driving_video }
       });
 
-      await supabase.rpc("decrement_credits", { user_id: user.id, amount: cost });
+      // Credits already deducted atomically above
 
       return new Response(JSON.stringify({ status: "success", video: "output/result.mp4", asset_id }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -100,7 +107,7 @@ serve(async (req) => {
       metadata: { source_image, driving_video }
     });
 
-    await supabase.rpc("decrement_credits", { user_id: user.id, amount: cost });
+    // Credits already deducted atomically above
 
     return new Response(JSON.stringify({ ...result, asset_id }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
