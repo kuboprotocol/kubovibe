@@ -143,6 +143,7 @@ export default function CreativePage() {
   const [selectedExport, setSelectedExport] = useState<any | null>(null);
   const [auditDateStart, setAuditDateStart] = useState("");
   const [auditDateEnd, setAuditDateEnd] = useState("");
+  const [selectedAssetForInvestigation, setSelectedAssetForInvestigation] = useState<any | null>(null);
 
 
 
@@ -837,6 +838,7 @@ export default function CreativePage() {
       </main>
 
       <AssetDetailDialog asset={selected} onClose={() => setSelected(null)} onRerun={rerun} onCancel={cancelExecution} rerunning={!!rerunning && rerunning === selected?.id} />
+      <AssetInvestigationDialog asset={selectedAssetForInvestigation} onClose={() => setSelectedAssetForInvestigation(null)} onRerun={rerun} onCancel={cancelExecution} rerunning={!!rerunning && rerunning === selectedAssetForInvestigation?.id} />
       <OrgBrandingDialog />
     </div>
   );
@@ -1327,6 +1329,14 @@ function Dashboard({ editsRemaining, subscription, history, filter, setFilter, s
                           {log.details?.export_id && (
                             <Button variant="link" className="p-0 h-auto text-[10px] text-destructive underline" onClick={() => setSelectedExport(exports.find(e => e.id === log.details.export_id))}>
                               Ver Exportação
+                            </Button>
+                          )}
+                          {log.asset_id && (
+                            <Button variant="link" className="p-0 h-auto text-[10px] text-destructive underline ml-2" onClick={async () => {
+                              const { data } = await supabase.from("creative_assets").select("*").eq("id", log.asset_id).single();
+                              if (data) setSelectedAssetForInvestigation(data);
+                            }}>
+                              Investigar Execução
                             </Button>
                           )}
                         </div>
