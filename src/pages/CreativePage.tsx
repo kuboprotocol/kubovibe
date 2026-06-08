@@ -16,6 +16,7 @@ import {
   Video, Music, BookOpen, Sparkles, Loader2, Coins, ArrowLeft, RotateCw, AlertTriangle, Upload,
   FileDown, History
 } from "lucide-react";
+import { ManusLauncher } from "@/components/creative/ManusLauncher";
 
 type ToolKey = "dashboard" | "chat" | "nano_banana" | "downloader" | "clips" | "avatar" | "shorts" | "music" | "ebook" | "emo";
 
