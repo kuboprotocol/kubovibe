@@ -129,6 +129,10 @@ export default function CreativePage() {
   const alertedRef = useRef<{ low?: boolean; empty?: boolean }>({});
   const globalCooldown = useCooldown();
   const PAGE_SIZE = 20;
+  const [showAuditSchedule, setShowAuditSchedule] = useState(false);
+  const [auditEmail, setAuditEmail] = useState("");
+  const [auditTime, setAuditTime] = useState("09:00");
+
 
   useEffect(() => {
     if (tool) setActive(tool as ToolKey);
@@ -174,10 +178,40 @@ export default function CreativePage() {
   }
 
   // Initial + refresh on user/active/filter change.
+  // Save preferences
+  useEffect(() => {
+    if (!user) return;
+    const savePrefs = async () => {
+      await supabase.from("creative_user_settings").upsert({
+        user_id: user.id,
+        filter,
+        search_query: searchQuery,
+        sort_order: sortOrder
+      });
+    };
+    const t = setTimeout(savePrefs, 2000);
+    return () => clearTimeout(t);
+  }, [user, filter, searchQuery, sortOrder]);
+
+  // Load preferences
+  useEffect(() => {
+    if (!user) return;
+    const loadPrefs = async () => {
+      const { data } = await supabase.from("creative_user_settings").select("*").eq("user_id", user.id).single();
+      if (data) {
+        setFilter(data.filter as any);
+        setSearchQuery(data.search_query);
+        setSortOrder(data.sort_order as any);
+      }
+    };
+    loadPrefs();
+  }, [user]);
+
   useEffect(() => {
     setCursorStack([]);
     loadHistory(null);
   }, [user, active, filter, searchQuery, sortOrder]);
+
 
   // Realtime with reconnect handling. Channel rebuilt on user change; status reflected in UI.
   const prevStatusRef = useRef<Record<string, string>>({});
@@ -214,9 +248,20 @@ export default function CreativePage() {
                 duration: 4000
               });
 
+              // Send email notification for important status changes
+              if (["failed", "error", "cancelled", "completed"].includes(newItem.status)) {
+                authedFetch("creative-status-email", {
+                  asset_id: newItem.id,
+                  status: newItem.status,
+                  user_id: user.id,
+                  tool: toolTitle
+                }).catch(console.error);
+              }
+
               // Audit logging for real-time transitions
               console.log(`[Audit] Mudança de status detectada: Asset ${newItem.id}, De ${oldStatus} para ${newItem.status}, User ${user.id}, Time: ${new Date().toISOString()}`);
             }
+
             prevStatusRef.current[newItem.id] = newItem.status;
           }
 
@@ -398,7 +443,71 @@ export default function CreativePage() {
     if (!user) return;
     
     // Only items reprocessed in retry (rerun:...)
+    const retryItems = history.filter(h => h.idempotency_key?.startsWith("rerun:"));
+    if (!retryItems.length) {
+      toast.info("Nenhum item reprocessado encontrado para exportar auditoria.");
+      return;
+    }
+
+    const filename = `audit-trail-retry-${new Date().toISOString().split("T")[0]}.${format}`;
+    let content = "";
+
+    if (format === "json") {
+      content = JSON.stringify(retryItems.map(h => ({
+        id: h.id,
+        tool: h.tool,
+        user_id: h.user_id,
+        timestamp: h.updated_at || h.created_at,
+        idempotency_key: h.idempotency_key,
+        status: h.status,
+        error: h.error_message
+      })), null, 2);
+    } else {
+      const header = "ID,Tool,UserID,Timestamp,IdempotencyKey,Status,Error";
+      const rows = retryItems.map(h => [
+        h.id,
+        h.tool,
+        h.user_id,
+        h.updated_at || h.created_at,
+        h.idempotency_key,
+        h.status,
+        `"${(h.error_message || "").replace(/"/g, '""')}"`
+      ].join(","));
+      content = [header, ...rows].join("\n");
+    }
+
+    const blob = new Blob([content], { type: format === "json" ? "application/json" : "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Trilha de auditoria (retry) exportada.");
+    setShowAuditExportOptions(false);
+  }
+
+  async function scheduleAuditExport() {
+    if (!user || !auditEmail || !auditTime) return;
+    try {
+      const { error } = await supabase.from("creative_audit_schedules").upsert({
+        user_id: user.id,
+        email: auditEmail,
+        schedule_time: auditTime,
+        is_active: true
+      });
+      if (error) throw error;
+      toast.success("Exportação de auditoria agendada com sucesso!");
+      setShowAuditSchedule(false);
+    } catch (e: any) {
+      toast.error("Falha ao agendar: " + e.message);
+    }
+  }
+
+  async function exportAuditTrailLegacy(format: "csv" | "json") {
+    if (!user) return;
     const { data, error } = await supabase
+
       .from("creative_assets")
       .select("*")
       .eq("user_id", user.id)
@@ -525,7 +634,15 @@ export default function CreativePage() {
               onAuditExport={exportAuditTrail}
               showAuditExportOptions={showAuditExportOptions}
               setShowAuditExportOptions={setShowAuditExportOptions}
+              showAuditSchedule={showAuditSchedule}
+              setShowAuditSchedule={setShowAuditSchedule}
+              auditEmail={auditEmail}
+              setAuditEmail={setAuditEmail}
+              auditTime={auditTime}
+              setAuditTime={setAuditTime}
+              scheduleAuditExport={scheduleAuditExport}
             />
+
 
           </TabsContent>
 
@@ -670,7 +787,7 @@ function AssetDetailDialog({ asset, onClose, onRerun, onCancel, rerunning }: { a
 }
 
 
-function Dashboard({ editsRemaining, subscription, history, filter, setFilter, searchQuery, setSearchQuery, sortOrder, setSortOrder, onPick, onOpen, onRerun, onCancel, onBatchRetry, isBatchRetrying, rerunningId, pageIndex, pageSize, totalCount, hasNext, hasPrev, realtimeStatus, globalCooldown, onNext, onPrev, onExport, exportColumns, setExportColumns, showExportOptions, setShowExportOptions, onAuditExport, showAuditExportOptions, setShowAuditExportOptions }: any) {
+function Dashboard({ editsRemaining, subscription, history, filter, setFilter, searchQuery, setSearchQuery, sortOrder, setSortOrder, onPick, onOpen, onRerun, onCancel, onBatchRetry, isBatchRetrying, rerunningId, pageIndex, pageSize, totalCount, hasNext, hasPrev, realtimeStatus, globalCooldown, onNext, onPrev, onExport, exportColumns, setExportColumns, showExportOptions, setShowExportOptions, onAuditExport, showAuditExportOptions, setShowAuditExportOptions, showAuditSchedule, setShowAuditSchedule, auditEmail, setAuditEmail, auditTime, setAuditTime, scheduleAuditExport }: any) {
   const lowBalance = (editsRemaining ?? 0) <= 10;
   return (
     <div className="space-y-6">
@@ -839,9 +956,34 @@ function Dashboard({ editsRemaining, subscription, history, filter, setFilter, s
                   </div>
                 </DialogContent>
               </Dialog>
+              <Dialog open={showAuditSchedule} onOpenChange={setShowAuditSchedule}>
+                <Button size="icon" variant="ghost" className="h-7 w-7 text-green-500" onClick={() => setShowAuditSchedule(true)} title="Agendar Auditoria">
+                  <Sparkles className="h-3.5 w-3.5" />
+                </Button>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Agendar Auditoria Automática</DialogTitle>
+                    <DialogDescription>
+                      Receba a trilha de auditoria por e-mail diariamente.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="py-4 space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">E-mail para envio</label>
+                      <Input value={auditEmail} onChange={(e) => setAuditEmail(e.target.value)} placeholder="seu@email.com" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Horário (UTC)</label>
+                      <Input type="time" value={auditTime} onChange={(e) => setAuditTime(e.target.value)} />
+                    </div>
+                    <Button className="w-full" onClick={scheduleAuditExport}>Agendar Exportação</Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
         </div>
+
 
         <Card className="divide-y divide-border/40">
           {history.length === 0 && (

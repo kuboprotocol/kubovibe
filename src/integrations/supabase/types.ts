@@ -453,6 +453,66 @@ export type Database = {
         }
         Relationships: []
       }
+      creative_audit_schedules: {
+        Row: {
+          created_at: string | null
+          email: string
+          id: string
+          is_active: boolean | null
+          last_run: string | null
+          schedule_time: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          id?: string
+          is_active?: boolean | null
+          last_run?: string | null
+          schedule_time: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          id?: string
+          is_active?: boolean | null
+          last_run?: string | null
+          schedule_time?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      creative_user_settings: {
+        Row: {
+          filter: string | null
+          id: string
+          search_query: string | null
+          sort_order: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          filter?: string | null
+          id?: string
+          search_query?: string | null
+          sort_order?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          filter?: string | null
+          id?: string
+          search_query?: string | null
+          sort_order?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       credit_transactions: {
         Row: {
           balance_after: number
