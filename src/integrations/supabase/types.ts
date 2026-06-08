@@ -486,6 +486,60 @@ export type Database = {
         }
         Relationships: []
       }
+      creative_org_branding: {
+        Row: {
+          logo_url: string | null
+          org_name: string | null
+          primary_color: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          logo_url?: string | null
+          org_name?: string | null
+          primary_color?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          logo_url?: string | null
+          org_name?: string | null
+          primary_color?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      creative_scheduled_exports: {
+        Row: {
+          created_at: string | null
+          email: string
+          id: string
+          last_run_at: string | null
+          schedule_time: string
+          status: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          id?: string
+          last_run_at?: string | null
+          schedule_time: string
+          status?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          id?: string
+          last_run_at?: string | null
+          schedule_time?: string
+          status?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       creative_user_settings: {
         Row: {
           filter: string | null

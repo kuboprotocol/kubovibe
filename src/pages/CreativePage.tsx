@@ -116,6 +116,7 @@ export default function CreativePage() {
   const [filter, setFilter] = useState<"all" | "queued" | "processing" | "completed" | "failed">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
+  const [currentPage, setCurrentPage] = useState(1);
   const [cursorStack, setCursorStack] = useState<string[]>([]); // created_at cursors for prev navigation
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
@@ -209,6 +210,7 @@ export default function CreativePage() {
 
   useEffect(() => {
     setCursorStack([]);
+    setCurrentPage(1);
     loadHistory(null);
   }, [user, active, filter, searchQuery, sortOrder]);
 
@@ -617,11 +619,13 @@ export default function CreativePage() {
               onNext={() => {
                 if (!nextCursor) return;
                 setCursorStack((s) => [...s, nextCursor]);
+                setCurrentPage((p) => p + 1);
                 loadHistory(nextCursor);
               }}
               onPrev={() => {
                 setCursorStack((s) => {
                   const next = s.slice(0, -1);
+                  setCurrentPage((p) => Math.max(1, p - 1));
                   loadHistory(next[next.length - 1] ?? null);
                   return next;
                 });
@@ -641,6 +645,16 @@ export default function CreativePage() {
               auditTime={auditTime}
               setAuditTime={setAuditTime}
               scheduleAuditExport={scheduleAuditExport}
+              currentPage={currentPage}
+              onReset={() => {
+                setFilter("all");
+                setSearchQuery("");
+                setSortOrder("desc");
+                setCurrentPage(1);
+                setCursorStack([]);
+                loadHistory(null);
+                toast.info("Filtros redefinidos");
+              }}
             />
 
 
@@ -661,7 +675,73 @@ export default function CreativePage() {
       </main>
 
       <AssetDetailDialog asset={selected} onClose={() => setSelected(null)} onRerun={rerun} onCancel={cancelExecution} rerunning={!!rerunning && rerunning === selected?.id} />
+      <OrgBrandingDialog />
     </div>
+  );
+}
+
+function OrgBrandingDialog() {
+  const { user } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [branding, setBranding] = useState({ org_name: "", logo_url: "", primary_color: "#6366f1" });
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!user || !open) return;
+    const load = async () => {
+      const { data } = await supabase.from("creative_org_branding").select("*").eq("user_id", user.id).single();
+      if (data) setBranding({ org_name: data.org_name || "", logo_url: data.logo_url || "", primary_color: data.primary_color || "#6366f1" });
+    };
+    load();
+  }, [user, open]);
+
+  const save = async () => {
+    if (!user) return;
+    setLoading(true);
+    const { error } = await supabase.from("creative_org_branding").upsert({ user_id: user.id, ...branding });
+    setLoading(false);
+    if (error) toast.error("Falha ao salvar branding: " + error.message);
+    else { toast.success("Layout de e-mail atualizado!"); setOpen(false); }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <Button 
+        variant="ghost" 
+        size="icon" 
+        className="fixed bottom-4 right-4 h-10 w-10 rounded-full shadow-lg bg-card border border-border/40"
+        onClick={() => setOpen(true)}
+        title="Personalizar Layout de E-mail"
+      >
+        <Sparkles className="h-5 w-5 text-primary" />
+      </Button>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Personalizar Layout de E-mail</DialogTitle>
+          <DialogDescription>Personalize como as notificações de status aparecem para sua organização.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <label className="text-xs font-semibold uppercase text-muted-foreground">Nome da Organização</label>
+            <Input value={branding.org_name} onChange={(e) => setBranding({ ...branding, org_name: e.target.value })} placeholder="Minha Org" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-xs font-semibold uppercase text-muted-foreground">URL do Logo</label>
+            <Input value={branding.logo_url} onChange={(e) => setBranding({ ...branding, logo_url: e.target.value })} placeholder="https://..." />
+          </div>
+          <div className="space-y-2">
+            <label className="text-xs font-semibold uppercase text-muted-foreground">Cor Principal</label>
+            <div className="flex gap-2">
+              <Input type="color" value={branding.primary_color} onChange={(e) => setBranding({ ...branding, primary_color: e.target.value })} className="w-12 h-10 p-1" />
+              <Input value={branding.primary_color} onChange={(e) => setBranding({ ...branding, primary_color: e.target.value })} className="flex-1" />
+            </div>
+          </div>
+          <Button onClick={save} disabled={loading} className="w-full">
+            {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : "Salvar Alterações"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -787,7 +867,7 @@ function AssetDetailDialog({ asset, onClose, onRerun, onCancel, rerunning }: { a
 }
 
 
-function Dashboard({ editsRemaining, subscription, history, filter, setFilter, searchQuery, setSearchQuery, sortOrder, setSortOrder, onPick, onOpen, onRerun, onCancel, onBatchRetry, isBatchRetrying, rerunningId, pageIndex, pageSize, totalCount, hasNext, hasPrev, realtimeStatus, globalCooldown, onNext, onPrev, onExport, exportColumns, setExportColumns, showExportOptions, setShowExportOptions, onAuditExport, showAuditExportOptions, setShowAuditExportOptions, showAuditSchedule, setShowAuditSchedule, auditEmail, setAuditEmail, auditTime, setAuditTime, scheduleAuditExport }: any) {
+function Dashboard({ editsRemaining, subscription, history, filter, setFilter, searchQuery, setSearchQuery, sortOrder, setSortOrder, onPick, onOpen, onRerun, onCancel, onBatchRetry, isBatchRetrying, rerunningId, pageIndex, pageSize, totalCount, hasNext, hasPrev, realtimeStatus, globalCooldown, onNext, onPrev, onExport, exportColumns, setExportColumns, showExportOptions, setShowExportOptions, onAuditExport, showAuditExportOptions, setShowAuditExportOptions, showAuditSchedule, setShowAuditSchedule, auditEmail, setAuditEmail, auditTime, setAuditTime, scheduleAuditExport, onReset, currentPage }: any) {
   const lowBalance = (editsRemaining ?? 0) <= 10;
   return (
     <div className="space-y-6">
@@ -815,7 +895,7 @@ function Dashboard({ editsRemaining, subscription, history, filter, setFilter, s
         <Card className="p-5">
           <div className="text-xs text-muted-foreground uppercase tracking-wider">Gerações totais</div>
           <div className="text-4xl font-bold mt-2 font-mono">{totalCount ?? history.length}</div>
-          <div className="text-xs text-muted-foreground mt-3">Página {(pageIndex ?? 0) + 1}</div>
+          <div className="text-xs text-muted-foreground mt-3">Página {currentPage}</div>
         </Card>
         <Card className="p-5">
           <div className="text-xs text-muted-foreground uppercase tracking-wider">Créditos usados (página)</div>
@@ -848,15 +928,10 @@ function Dashboard({ editsRemaining, subscription, history, filter, setFilter, s
               size="sm"
               variant="ghost"
               className="h-8 text-[10px] text-muted-foreground hover:text-foreground"
-              onClick={() => {
-                setFilter("all");
-                setSearchQuery("");
-                setSortOrder("desc");
-                toast.info("Filtros redefinidos");
-              }}
+              onClick={onReset}
             >
               <RotateCw className="h-3 w-3 mr-1" />
-              Limpar
+              Reiniciar
             </Button>
             <div className="relative flex-1 sm:w-48">
               <Input 
