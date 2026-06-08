@@ -319,6 +319,44 @@ test.describe("Notification preferences", () => {
     await page.getByTestId("save-prefs").click();
     await expect(page.getByText(/preferências salvas/i)).toBeVisible({ timeout: 5000 });
   });
+
+  test("debounce: search and filters update URL only after typing stops", async ({ page }) => {
+    await ensureAuthed(page, "/creative/investigation");
+    
+    const searchInput = page.getByTestId("filter-search");
+    await searchInput.clear();
+    
+    // Type rapidly
+    await searchInput.type("debounce-test", { delay: 50 });
+    
+    // Check URL immediately - should not have the full query yet due to 500ms debounce
+    const url = page.url();
+    expect(url).not.toContain("q=debounce-test");
+    
+    // Wait for debounce
+    await page.waitForTimeout(1000);
+    await expect(page).toHaveURL(/q=debounce-test/);
+  });
+
+  test("debounce: pagination and sorting remain consistent during filtering", async ({ page }) => {
+    await ensureAuthed(page, "/creative/investigation");
+    
+    // Set a sort and page
+    await page.locator("button:has-text('Ferramenta')").first().click(); // toggle sort
+    await page.getByRole("button", { name: "Próxima" }).click();
+    await expect(page).toHaveURL(/page=2/);
+    
+    const searchInput = page.getByTestId("filter-search");
+    await searchInput.fill("consist");
+    
+    // While typing, page and sort should still be in URL (unless reset by code)
+    await expect(page).toHaveURL(/page=2/);
+    
+    await page.waitForTimeout(1000);
+    await expect(page).toHaveURL(/q=consist/);
+    // Page was reset to 1 in InvestigationPage.tsx when filter changed (as it should)
+    await expect(page).toHaveURL(/page=1/); 
+  });
 });
 
 
