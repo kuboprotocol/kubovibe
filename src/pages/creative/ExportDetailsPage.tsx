@@ -215,8 +215,11 @@ export default function ExportDetailsPage() {
             {exportRow.status === "processing" && (
               <Button data-testid="cancel-export" variant="destructive" onClick={cancel}><Ban className="h-4 w-4 mr-2"/>Cancelar</Button>
             )}
-            {(exportRow.status === "failed" || exportRow.status === "cancelled") && (
-              <Button data-testid="requeue-export" onClick={requeue}><RotateCw className="h-4 w-4 mr-2"/>Reenfileirar</Button>
+            {(exportRow.status === "failed" || exportRow.status === "cancelled" || error) && (
+              <Button data-testid="requeue-export" onClick={() => error ? load() : requeue()} variant={error ? "default" : "secondary"}>
+                <RotateCw className="h-4 w-4 mr-2"/>
+                {error ? "Tentar novamente" : "Reenfileirar"}
+              </Button>
             )}
           </div>
         </Card>
