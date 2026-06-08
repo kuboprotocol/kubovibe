@@ -265,7 +265,8 @@ export default function CreativePage() {
       if (!isBatch) toast.error("Reexecução indisponível para esta ferramenta."); 
       return; 
     }
-    const idemKey = `rerun:${asset.id}`;
+    const attempt = (asset.retry_count || 0) + 1;
+    const idemKey = `rerun:${asset.id}:${attempt}`;
     if (!isBatch) setRerunningId(asset.id);
     try {
       const r = await authedFetch(cfg.fn, cfg.build(asset), idemKey);
@@ -274,6 +275,17 @@ export default function CreativePage() {
         if (!isBatch) handleFnError(d); 
         return false; 
       }
+      
+      if (!isBatch && user) {
+        await supabase.from("creative_audit_logs").insert({
+          user_id: user.id,
+          asset_id: asset.id,
+          event_type: 'retry',
+          tool: asset.tool,
+          metadata: { attempt }
+        });
+      }
+      
       return true;
     } catch (e: any) {
       if (!isBatch) toast.error(e?.message ?? "Falha ao reexecutar");
@@ -289,13 +301,29 @@ export default function CreativePage() {
   }
 
   async function cancelExecution(assetId: string) {
+    if (!user) return;
     try {
+      const asset = history.find(h => h.id === assetId);
       const { error } = await supabase
         .from("creative_assets")
-        .update({ status: "failed", error_message: "Cancelado pelo usuário", metadata: { cancelled_at: new Date().toISOString() } })
+        .update({ 
+          status: "failed", 
+          error_message: "Cancelado pelo usuário", 
+          cancelled_by: user.id,
+          metadata: { ...asset?.metadata, cancelled_at: new Date().toISOString() } 
+        })
         .eq("id", assetId);
       
       if (error) throw error;
+      
+      await supabase.from("creative_audit_logs").insert({
+        user_id: user.id,
+        asset_id: assetId,
+        event_type: 'cancel',
+        tool: asset?.tool,
+        metadata: { reason: "Cancelado via UI" }
+      });
+
       toast.success("Execução cancelada");
       loadHistory(cursorStack.length === 0 ? null : cursorStack[cursorStack.length - 1]);
     } catch (e: any) {
@@ -305,12 +333,21 @@ export default function CreativePage() {
 
   async function batchRetryFailed() {
     const failed = history.filter(h => h.status === "failed" || h.status === "error");
-    if (!failed.length) return;
+    if (!failed.length || !user) return;
     setIsBatchRetrying(true);
     let success = 0;
     for (const asset of failed) {
       const ok = await rerun(asset, true);
-      if (ok) success++;
+      if (ok) {
+        success++;
+        await supabase.from("creative_audit_logs").insert({
+          user_id: user.id,
+          asset_id: asset.id,
+          event_type: 'retry',
+          tool: asset.tool,
+          metadata: { batch: true, attempt: (asset.retry_count || 0) + 1 }
+        });
+      }
     }
     setIsBatchRetrying(false);
     toast.success(`${success} itens reprocessados em lote.`);
