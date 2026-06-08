@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, Header, HTTPException, Depends
 import subprocess
 import os
 import shutil
@@ -6,13 +6,23 @@ import uuid
 
 app = FastAPI()
 
+# Simple API Key security for the internal backend
+API_KEY = os.getenv("EMO_BACKEND_SECRET", "kubo-emo-secret-placeholder")
+
+async def verify_api_key(x_api_key: str = Header(None)):
+    if not x_api_key or x_api_key != API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid or missing API Key")
+    return x_api_key
+
+
 # Ensure output directory exists
 os.makedirs("output", exist_ok=True)
 
 @app.post("/animate")
 async def animate(
     source_image: UploadFile = File(...),
-    driving_video: UploadFile = File(...)
+    driving_video: UploadFile = File(...),
+    token: str = Depends(verify_api_key)
 ):
     """
     EMO: Emotive Portrait Alive integration
