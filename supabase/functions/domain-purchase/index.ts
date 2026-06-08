@@ -1,9 +1,15 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders, sanitizeError } from "../_shared/cors.ts";
+import { z } from "npm:zod@3";
 
 const IONOS_API = "https://api.hosting.ionos.com/domains/v1";
 const RESELLER_API = "https://api.ionos.com/reseller/v2";
+
+const PurchaseSchema = z.object({
+  domain: z.string().min(3).max(253).regex(/^[a-z0-9-]+(\.[a-z0-9-]+)+$/),
+  project_id: z.string().uuid().optional().nullable(),
+});
 
 function buildIonosKey(): string {
   const key = (Deno.env.get("IONOS_API_KEY") ?? "").trim();
@@ -89,12 +95,15 @@ Deno.serve(async (req) => {
     if (ue || !userRes?.user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     const user = userRes.user;
 
-    const body = await req.json().catch(() => ({}));
-    const domain = String(body?.domain ?? "").trim().toLowerCase();
-    const project_id = body?.project_id ?? null;
-    if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(domain)) {
-      return new Response(JSON.stringify({ error: "invalid_domain" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const rawBody = await req.json().catch(() => ({}));
+    const parsed = PurchaseSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      return new Response(JSON.stringify({ error: "invalid_input", details: parsed.error.flatten().fieldErrors }), { 
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } 
+      });
     }
+
+    const { domain, project_id } = parsed.data;
     const tld = tldOf(domain);
     const price = TLD_PRICES[tld] ?? 20;
 
