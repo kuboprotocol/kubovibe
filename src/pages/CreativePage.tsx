@@ -409,7 +409,7 @@ export default function CreativePage() {
     if (!user) return;
     setIsLoadingAudit(true);
     try {
-      let q = supabase.from("creative_export_audit_log").select("*").eq("export_id", exportId);
+      let q = supabase.from("creative_export_audit_log").select("*, profiles(email)").eq("export_id", exportId);
       if (investigationSearch) q = q.or(`action.ilike.%${investigationSearch}%,details->>reason.ilike.%${investigationSearch}%,details->>error.ilike.%${investigationSearch}%`);
       if (investigationDateStart) q = q.gte("created_at", investigationDateStart);
       if (investigationDateEnd) q = q.lte("created_at", investigationDateEnd);
