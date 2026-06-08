@@ -166,6 +166,8 @@ export default function CreativePage() {
   }, [user, active, filter]);
 
   // Realtime with reconnect handling. Channel rebuilt on user change; status reflected in UI.
+  const prevStatusRef = useRef<Record<string, string>>({});
+
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
@@ -177,7 +179,28 @@ export default function CreativePage() {
           schema: "public",
           table: "creative_assets",
           filter: `user_id=eq.${user.id}`,
-        }, () => {
+        }, (payload) => {
+          // Notification check
+          if (payload.eventType === "UPDATE" || payload.eventType === "INSERT") {
+            const newItem = payload.new as any;
+            const oldStatus = prevStatusRef.current[newItem.id];
+            if (oldStatus && oldStatus !== newItem.status) {
+              const statusMap: Record<string, string> = {
+                queued: "em fila",
+                processing: "processando",
+                completed: "concluído",
+                failed: "falhou",
+                error: "erro",
+                cancelled: "cancelado"
+              };
+              toast.info(`Status atualizado: ${statusMap[newItem.status] || newItem.status}`, {
+                description: `${TOOLS.find(t => t.key === newItem.tool)?.title || newItem.tool}: ${newItem.prompt?.slice(0, 40)}...`,
+                duration: 3000
+              });
+            }
+            prevStatusRef.current[newItem.id] = newItem.status;
+          }
+
           // refresh current page (top if no cursor, otherwise the page we're on)
           const top = cursorStack.length === 0 ? null : cursorStack[cursorStack.length - 1];
           loadHistory(top);
