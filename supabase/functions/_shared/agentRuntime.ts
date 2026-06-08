@@ -109,7 +109,10 @@ export async function runAgent(
     })
     .select("id")
     .single();
-  if (jobErr || !job) return jsonResponse({ error: "job_create_failed", detail: jobErr?.message }, 500);
+  if (jobErr || !job) {
+    console.error("[runAgent] job_create_failed:", jobErr);
+    return jsonResponse({ error: "job_create_failed" }, 500);
+  }
 
   const jobId = job.id as string;
   const startedAt = Date.now();
