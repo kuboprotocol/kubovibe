@@ -76,7 +76,8 @@ Deno.serve(async (req) => {
       status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "error" }), {
+    console.error("[creative-chat] error:", e);
+    return new Response(JSON.stringify({ error: sanitizeError(e) }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
