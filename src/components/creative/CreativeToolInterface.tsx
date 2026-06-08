@@ -5,7 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Sparkles, Send, Coins, Settings2, Info } from "lucide-react";
+import { Loader2, Sparkles, Send, Coins, Settings2, Info, AlertCircle, Wallet } from "lucide-react";
+import { useSubscription } from "@/hooks/useSubscription";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -111,10 +113,23 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     config.options?.reduce((acc, opt) => ({ ...acc, [opt.key]: opt.default }), {}) || {}
   );
   const [loading, setLoading] = useState(false);
+  const { subscription, editsRemaining } = useSubscription();
 
   const handleExecute = async () => {
+    if (loading) return; // Prevent double clicks
+    
     if (!prompt.trim() && toolKey !== "emo") {
       toast.error("O campo de prompt/URL é obrigatório");
+      return;
+    }
+
+    const cost = config.cost;
+    const balance = editsRemaining || 0;
+
+    if (balance < cost) {
+      toast.error("Saldo insuficiente", {
+        description: `Esta ferramenta custa ${cost} créditos, mas você possui apenas ${balance}.`
+      });
       return;
     }
 
@@ -169,14 +184,31 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
   return (
     <div className="max-w-3xl mx-auto space-y-6 py-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col gap-1">
-        <h2 className="text-2xl font-bold flex items-center gap-2">
-          {config.title}
-          <Badge variant="secondary" className="font-mono flex items-center gap-1">
-            <Coins className="h-3 w-3" /> {config.cost}
-          </Badge>
+        <h2 className="text-2xl font-bold flex items-center justify-between">
+          <span className="flex items-center gap-2">{config.title}</span>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="flex items-center gap-1.5 py-1 px-3">
+              <Wallet className="h-3.5 w-3.5 text-primary" />
+              <span className="text-xs font-medium">Saldo: {editsRemaining ?? 0}</span>
+            </Badge>
+            <Badge variant="secondary" className="font-mono flex items-center gap-1.5 py-1 px-3 bg-primary/10 text-primary border-primary/20">
+              <Coins className="h-3.5 w-3.5" />
+              <span className="text-xs font-bold">{config.cost} créditos</span>
+            </Badge>
+          </div>
         </h2>
         <p className="text-muted-foreground">{config.description}</p>
       </div>
+
+      {(editsRemaining !== undefined && editsRemaining < config.cost) && (
+        <Alert variant="destructive" className="bg-destructive/5 border-destructive/20">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Créditos Insuficientes</AlertTitle>
+          <AlertDescription>
+            Você precisa de {config.cost} créditos, mas possui apenas {editsRemaining}.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Card className="p-6 bg-card/40 backdrop-blur border-border/40 space-y-4">
         <div className="space-y-2">

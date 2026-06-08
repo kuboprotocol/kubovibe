@@ -1,12 +1,37 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Creative Economy Panel E2E', () => {
+  test('navigation and full flow: Selection -> Configuration -> Execution', async ({ page }) => {
+    await page.goto('/creative');
+    
+    // Stage 1: Selection (ManusLauncher)
+    await expect(page.getByText(/Kubo Chat/i)).toBeVisible();
+    await page.getByRole('button', { name: /Kubo Chat/i }).click();
+    
+    // Stage 2: Configuration (CreativeToolInterface)
+    await expect(page.getByRole('heading', { name: /Kubo Chat/i })).toBeVisible();
+    await expect(page.getByText(/Saldo:/i)).toBeVisible();
+    await expect(page.getByText(/1 crédito/i)).toBeVisible();
+    
+    const promptInput = page.getByPlaceholder(/Escreva um artigo/i);
+    await promptInput.fill('Teste de fluxo E2E');
+    
+    // Stage 3: Execution
+    const generateBtn = page.getByRole('button', { name: /Gerar Agora/i });
+    await generateBtn.click();
+    
+    // Validate feedback and return to dashboard/history
+    await expect(page.getByText(/Solicitação enviada/i)).toBeVisible();
+    
+    // Ensure state reset and ready for next tool or history view
+    await expect(promptInput).toHaveValue('');
+  });
+
   test('navigation and state preservation', async ({ page }) => {
     await page.goto('/dashboard');
     const creativeBtn = page.getByRole('button', { name: /Economia Criativa/i });
     await expect(creativeBtn).toBeVisible();
     
-    // Simulate some local state if possible, or just check navigation
     await creativeBtn.click();
     await expect(page).toHaveURL(/\/creative/);
     
