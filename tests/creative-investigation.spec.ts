@@ -55,11 +55,19 @@ test.describe("Creative investigation UI states", () => {
     await expect(page.getByTestId("investigation-row").first().or(page.getByText(/Nenhuma execução/))).toBeVisible();
   });
 
-  test("investigate query param opens detail on load", async ({ page }) => {
-    // Need a valid ID if possible, but testing the logic with any string
+  test("investigate query param opens detail on load and persists on reload", async ({ page }) => {
     const mockId = "00000000-0000-0000-0000-000000000000";
     await ensureAuthed(page, `/creative/investigation?investigate=${mockId}`);
+    
+    // Check if query param is present
+    await expect(page).toHaveURL(new RegExp(`investigate=${mockId}`));
+    
     // Should attempt to load and likely show "not found" or details
+    await expect(page.getByTestId("investigation-detail").or(page.getByText(/não encontrada/i))).toBeVisible();
+    
+    // Reload and verify persistence
+    await page.reload();
+    await expect(page).toHaveURL(new RegExp(`investigate=${mockId}`));
     await expect(page.getByTestId("investigation-detail").or(page.getByText(/não encontrada/i))).toBeVisible();
   });
 });
@@ -84,29 +92,52 @@ test.describe("Creative investigation", () => {
     
     let requestCount = 0;
     page.on("request", (req) => {
+      // Filter for Supabase PostgREST requests to creative_assets
       if (req.url().includes("creative_assets") && req.method() === "GET") {
         requestCount++;
       }
     });
 
     const searchInput = page.getByTestId("filter-search");
-    await searchInput.fill("a");
-    await searchInput.fill("ab");
-    await searchInput.fill("abc");
+    // Type rapidly
+    await searchInput.pressSequentially("abcdef", { delay: 50 });
     
-    // Typing 3 chars quickly should only trigger 1 request (eventually)
+    // Typing quickly should result in fewer requests than characters
     await page.waitForTimeout(1000);
+    // 6 characters typed rapidly should only trigger 1-2 requests due to 500ms debounce
     expect(requestCount).toBeLessThan(4); 
-    await expect(page).toHaveURL(/q=abc/);
+    await expect(page).toHaveURL(/q=abcdef/);
   });
 
-  test("pagination controls advance the page", async ({ page }) => {
+  test("pagination and sorting persist across reloads and filter changes", async ({ page }) => {
     await ensureAuthed(page, "/creative/investigation");
-    const next = page.getByRole("button", { name: "Próxima" });
-    if (await next.isEnabled()) {
-      await next.click();
+    
+    // Sort by tool
+    const toolHeader = page.getByRole("columnheader", { name: /ferramenta/i });
+    if (await toolHeader.isVisible()) {
+      await toolHeader.click();
+      await page.waitForTimeout(500);
+      await expect(page).toHaveURL(/sort=tool/);
+    }
+    
+    // Go to next page if possible
+    const nextBtn = page.getByRole("button", { name: /próxima/i });
+    if (await nextBtn.isEnabled()) {
+      await nextBtn.click();
       await expect(page).toHaveURL(/page=2/);
     }
+
+    // Apply a filter
+    await page.getByTestId("filter-search").fill("abc");
+    await page.waitForTimeout(1000);
+    
+    // Verify sort and page (page often resets to 1 when filters change, which is correct behavior)
+    await expect(page).toHaveURL(/sort=tool/);
+    
+    // Reload
+    await page.reload();
+    await expect(page).toHaveURL(/sort=tool/);
+    await expect(page).toHaveURL(/q=abc/);
   });
 
   test("export audit JSON/CSV download contains only filtered range", async ({ page }) => {
@@ -131,27 +162,35 @@ test.describe("Creative investigation", () => {
 
 test.describe("Error and Retry Flows", () => {
   test("ExportDetails retry preserves investigation context", async ({ page }) => {
-    // Navigate with a query param that would trigger investigation navigation
-    const investId = "some-id";
-    await ensureAuthed(page, `/creative/export/not-found`); // Force error
+    const investId = "some-investigate-id";
+    // Force an error by going to a non-existent ID but with investigate param
+    await ensureAuthed(page, `/creative/export/non-existent-id?investigate=${investId}`);
     
     await expect(page.getByText(/não encontrada/i)).toBeVisible();
-    const retryBtn = page.getByRole("button", { name: /voltar/i }); // Fallback button when not found
+    
+    // Check if investigation context is still in URL (implied by path if handled via searchParams)
+    await expect(page).toHaveURL(new RegExp(`investigate=${investId}`));
+    
+    const retryBtn = page.getByRole("button", { name: /tentar novamente/i });
     await expect(retryBtn).toBeVisible();
     
-    // Testing specific ExportDetailsPage reload if ID existed but failed
-    // We'll simulate a reload which is what "Tentar novamente" does
+    // Click retry - should stay on same URL and show loading then error again (since ID is fake)
+    await retryBtn.click();
+    await expect(page.locator(".skeleton")).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`investigate=${investId}`));
   });
 
-  test("InvestigationPage shows error message and allows retry", async ({ page }) => {
+  test("InvestigationPage shows empty states and error messages", async ({ page }) => {
     await ensureAuthed(page, "/creative/investigation");
-    // We can't easily force a Supabase error without intercepting
-    // But we can check if the UI elements exist
-    const retryBtn = page.getByRole("button", { name: /tentar novamente/i });
-    if (await retryBtn.count() > 0) {
-      await retryBtn.click();
-      await expect(page.getByTestId("investigation-row").first()).toBeVisible();
-    }
+    
+    // Filter for something that returns nothing
+    await page.getByTestId("filter-search").fill("non-existent-search-term-12345");
+    await page.waitForTimeout(1000);
+    await expect(page.getByText(/Nenhuma execução encontrada/i)).toBeVisible();
+    
+    // Verify "Clear filters" button works from empty state
+    await page.getByTestId("btn-clear-filters").click();
+    await expect(page.getByTestId("filter-search")).toHaveValue("");
   });
 });
 
@@ -188,4 +227,5 @@ test.describe("Notification preferences", () => {
     await expect(page.getByText(/preferências salvas/i)).toBeVisible({ timeout: 5000 });
   });
 });
+
 
