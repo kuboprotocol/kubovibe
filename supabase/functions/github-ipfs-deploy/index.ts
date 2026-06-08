@@ -214,8 +214,8 @@ async function deployToIPFS(htmlContent: string, repoName: string) {
 
     if (!uploadRes.ok) {
       const errText = await uploadRes.text()
-      console.error('Pinata upload error:', errText)
-      return new Response(JSON.stringify({ error: 'IPFS upload failed', details: errText }), {
+      console.error('[github-ipfs-deploy] Pinata upload error:', errText)
+      return new Response(JSON.stringify({ error: 'IPFS upload failed' }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }

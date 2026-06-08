@@ -39,7 +39,8 @@ Deno.serve((req) =>
 
     if (!r.ok) {
       const errorText = await r.text();
-      throw new Error(`AI Gateway Error (${r.status}): ${errorText.slice(0, 150)}`);
+      console.error(`[docs-creator] AI Gateway error ${r.status}:`, errorText);
+      throw new Error(`ai_service_error`);
     }
 
     const data = await r.json();
