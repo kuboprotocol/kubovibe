@@ -77,7 +77,7 @@ export default function Web3ConnectionList({
   async function load() {
     setLoading(true)
     const { data, error } = await supabase
-      .from('web3_connections')
+      .from('web3_connections_safe')
       .select('id, provider, network, connection_name, explorer_url, api_key_hint, last_status, last_block, last_latency_ms, last_checked_at, updated_at')
       .eq('provider', providerId)
       .order('updated_at', { ascending: false })
