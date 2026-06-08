@@ -810,7 +810,11 @@ export default function CreativePage() {
                           <option value="America/New_York">NY (EST)</option>
                         </select>
                       </div>
-                      <Button variant="outline" onClick={() => { setFilter("all"); setSearchQuery(""); setSortOrder("desc"); setSelectedTimezone("UTC"); }}>
+                      <Button 
+                        variant="outline" 
+                        onClick={() => { setFilter("all"); setSearchQuery(""); setSortOrder("desc"); setSelectedTimezone("UTC"); }}
+                        disabled={isLoadingHistory}
+                      >
                         Resetar
                       </Button>
 
@@ -825,7 +829,12 @@ export default function CreativePage() {
 
                  <Card className="overflow-hidden border-border/40 bg-card/40 backdrop-blur">
                     <div className="divide-y divide-border/20">
-                      {history.length === 0 ? (
+                      {isLoadingHistory ? (
+                        <div className="p-10 flex flex-col items-center justify-center text-muted-foreground gap-3">
+                          <Loader2 className="h-6 w-6 animate-spin text-primary/60" />
+                          <p className="text-sm font-medium">Carregando histórico...</p>
+                        </div>
+                      ) : history.length === 0 ? (
                         <div className="p-10 text-center text-muted-foreground">
                           <p>Nenhum item encontrado.</p>
                         </div>
@@ -860,8 +869,15 @@ export default function CreativePage() {
                                 <History className="h-4 w-4 mr-2" /> Investigar
                               </Button>
                              {(h.status === 'queued' || h.status === 'processing') && (
-                               <Button size="sm" variant="outline" className="text-destructive hover:bg-destructive/10" onClick={() => cancelExecution(h.id)}>
-                                 <X className="h-4 w-4 mr-2" /> Cancelar
+                               <Button 
+                                size="sm" 
+                                variant="outline" 
+                                className="text-destructive hover:bg-destructive/10" 
+                                onClick={() => cancelExecution(h.id)}
+                                disabled={isCancelling === h.id}
+                               >
+                                 {isCancelling === h.id ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <X className="h-4 w-4 mr-2" />} 
+                                 Cancelar
                                </Button>
                              )}
                              {(h.status === 'failed' || h.status === 'error' || h.status === 'completed') && (
