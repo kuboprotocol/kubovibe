@@ -451,12 +451,6 @@ export default function InvestigationPage() {
               </div>
             </div>
           )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
         </Card>
       </div>
     </div>
