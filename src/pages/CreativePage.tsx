@@ -257,15 +257,16 @@ export default function CreativePage() {
     setCursorStack([]);
     setCurrentPage(1);
     loadHistory(null);
-    
-    // Check for investigation URL param
+  }, [user, active, filter, searchQuery, sortOrder]);
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const investigateId = params.get("investigate");
     if (investigateId && history.length > 0) {
       const asset = history.find(h => h.id === investigateId);
       if (asset) setSelectedAssetForInvestigation(asset);
     }
-  }, [user, active, filter, searchQuery, sortOrder, history.length]);
+  }, [history]);
 
   async function rerun(asset: any, isBatch = false) {
     const cfg = RERUN_MAP[asset.tool];
