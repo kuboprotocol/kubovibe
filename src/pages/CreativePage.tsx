@@ -257,7 +257,15 @@ export default function CreativePage() {
     setCursorStack([]);
     setCurrentPage(1);
     loadHistory(null);
-  }, [user, active, filter, searchQuery, sortOrder]);
+    
+    // Check for investigation URL param
+    const params = new URLSearchParams(window.location.search);
+    const investigateId = params.get("investigate");
+    if (investigateId && history.length > 0) {
+      const asset = history.find(h => h.id === investigateId);
+      if (asset) setSelectedAssetForInvestigation(asset);
+    }
+  }, [user, active, filter, searchQuery, sortOrder, history.length]);
 
   async function rerun(asset: any, isBatch = false) {
     const cfg = RERUN_MAP[asset.tool];
@@ -283,6 +291,15 @@ export default function CreativePage() {
           event_type: 'retry',
           tool: asset.tool,
           metadata: { attempt }
+        });
+        
+        // Notify via email for retry
+        await authedFetch("creative-status-email", {
+          asset_id: asset.id,
+          status: "retrying",
+          user_id: user.id,
+          tool: asset.tool,
+          reason: "Reiniciado manualmente"
         });
       }
       
@@ -322,6 +339,15 @@ export default function CreativePage() {
         event_type: 'cancel',
         tool: asset?.tool,
         metadata: { reason: "Cancelado via UI" }
+      });
+
+      // Notify via email for cancellation
+      await authedFetch("creative-status-email", {
+        asset_id: assetId,
+        status: "cancelled",
+        user_id: user.id,
+        tool: asset?.tool,
+        reason: "Cancelado manualmente"
       });
 
       toast.success("Execução cancelada");
@@ -388,10 +414,10 @@ export default function CreativePage() {
       const headers = ["ID", "Action", "Created At", "User", "Details"];
       const rows = exportAuditLogs.map(log => [
         log.id,
-        log.action,
+        log.action || log.event_type,
         log.created_at,
         log.profiles?.email || log.user_id,
-        JSON.stringify(log.details).replace(/"/g, '""')
+        JSON.stringify(log.details || log.metadata).replace(/"/g, '""')
       ].map(v => `"${v}"`).join(","));
       content = [headers.join(","), ...rows].join("\n");
     }
@@ -465,8 +491,18 @@ export default function CreativePage() {
     if (!user) return;
     setIsLoadingAudit(true);
     try {
-      let q = supabase.from("creative_export_audit_log").select("*, profiles(email)").eq("export_id", exportId);
-      if (investigationSearch) q = q.or(`action.ilike.%${investigationSearch}%,details->>reason.ilike.%${investigationSearch}%,details->>error.ilike.%${investigationSearch}%`);
+      const auditTable = selectedAssetForInvestigation.asset_id ? "creative_export_audit_log" : "creative_audit_logs";
+      const idField = selectedAssetForInvestigation.asset_id ? "export_id" : "asset_id";
+      
+      let q = supabase.from(auditTable).select("*, profiles(email)").eq(idField, exportId);
+      
+      if (investigationSearch) {
+        if (selectedAssetForInvestigation.asset_id) {
+          q = q.or(`action.ilike.%${investigationSearch}%,details->>reason.ilike.%${investigationSearch}%,details->>error.ilike.%${investigationSearch}%`);
+        } else {
+          q = q.or(`event_type.ilike.%${investigationSearch}%,metadata->>reason.ilike.%${investigationSearch}%,metadata->>error.ilike.%${investigationSearch}%`);
+        }
+      }
       if (investigationDateStart) q = q.gte("created_at", investigationDateStart);
       if (investigationDateEnd) q = q.lte("created_at", investigationDateEnd);
       const { data, error } = await q.order("created_at", { ascending: false });
@@ -651,11 +687,11 @@ export default function CreativePage() {
                               <tr key={log.id} className="hover:bg-muted/30">
                                 <td className="p-3 whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</td>
                                 <td className="p-3">
-                                  <Badge variant="outline" className="capitalize">{log.action}</Badge>
+                                  <Badge variant="outline" className="capitalize">{log.action || log.event_type}</Badge>
                                 </td>
                                 <td className="p-3">{log.profiles?.email || 'Sistema'}</td>
                                 <td className="p-3 text-xs font-mono max-w-md truncate">
-                                  {JSON.stringify(log.details)}
+                                  {JSON.stringify(log.details || log.metadata)}
                                 </td>
                               </tr>
                             ))}

@@ -11,7 +11,7 @@ serve(async (req) => {
     return new Response(null, { headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type" } });
   }
 
-  const { asset_id, status, user_id, tool } = await req.json();
+  const { asset_id, status, user_id, tool, reason } = await req.json();
   const { data: profile } = await supabase.from("profiles").select("email").eq("id", user_id).single();
   const { data: branding } = await supabase.from("creative_org_branding").select("*").eq("user_id", user_id).single();
   
@@ -63,11 +63,11 @@ serve(async (req) => {
             <p>A execução da ferramenta <strong>${tool}</strong> no painel Economia Criativa de <strong>${orgName}</strong> foi atualizada.</p>
             <div style="background-color: #f9fafb; border-left: 4px solid ${statusColor}; padding: 15px; margin: 20px 0;">
               <strong>Status:</strong> ${label}<br>
-              <strong>Asset ID:</strong> <code style="font-size: 12px;">${asset_id}</code>
+              <strong>Asset ID:</strong> <code style="font-size: 12px;">${asset_id}</code>${reason ? `<br><strong>Motivo:</strong> ${reason}` : ""}
             </div>
             <p>Você pode conferir todos os detalhes diretamente no seu painel.</p>
             <div style="text-align: center; margin-top: 30px;">
-              <a href="${Deno.env.get("SITE_URL") || "https://kubovibe.dev"}/creative" style="background-color: ${primaryColor}; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Ver no Painel</a>
+              <a href="${Deno.env.get("SITE_URL") || "https://kubovibe.dev"}/creative?investigate=${asset_id}" style="background-color: ${primaryColor}; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Investigar Falha</a>
             </div>
           </div>
           <div style="background-color: #f3f4f6; padding: 15px; text-align: center; font-size: 12px; color: #6b7280;">

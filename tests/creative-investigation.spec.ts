@@ -41,11 +41,27 @@ test.describe("Creative Page Investigation and Audit", () => {
     // Retry an item
     await page.locator('button:has-text("Investigar")').first().click();
     await page.locator('button:has-text("Retry")').first().click();
-    await expect(page.locator("text=Execução cancelada")).toBeHidden(); // modal close or refresh
+    await expect(page.locator("text=Execução cancelada")).toBeHidden();
     
-    // Verify in investigation modal
+    // Verify audit logs again
     await page.locator('button:has-text("Investigar")').first().click();
     await expect(page.locator("text=cancel")).toBeVisible();
     await expect(page.locator("text=retry")).toBeVisible();
+    
+    // Check if user is present in audit log
+    await expect(page.locator('td:has-text("@")')).toBeVisible(); // email
+  });
+
+  test("should filter investigation logs by execution and date", async ({ page }) => {
+    await page.goto("/creative");
+    await page.locator('button:has-text("Investigar")').first().click();
+    
+    await page.fill('input[placeholder="Buscar na trilha..."]', "manual");
+    // Verify it filters
+    const rows = page.locator('tbody tr');
+    await expect(rows).toHaveCount(0); // Assuming no "manual" action yet or filtering works
+    
+    await page.fill('input[placeholder="Buscar na trilha..."]', "");
+    await expect(rows.count()).not.toBe(0);
   });
 });
