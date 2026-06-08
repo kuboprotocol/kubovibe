@@ -134,7 +134,15 @@ export default function CreativePage() {
   const [isExporting, setIsExporting] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isCancelling, setIsCancelling] = useState<string | null>(null);
-  const [errorState, setErrorState] = useState<{ step: string; message: string; correlationId?: string; traceId?: string; originalAction?: () => void } | null>(null);
+  const [errorState, setErrorState] = useState<{ 
+    step: string; 
+    message: string; 
+    correlationId?: string; 
+    traceId?: string; 
+    stack?: string;
+    originalAction?: () => void 
+  } | null>(null);
+  const [showErrorModal, setShowErrorModal] = useState(false);
   const globalCooldown = useCooldown();
   const PAGE_SIZE = 20;
   const [showAuditSchedule, setShowAuditSchedule] = useState(false);
@@ -340,6 +348,7 @@ export default function CreativePage() {
             message: d.error || "Erro ao tentar reexecutar a ferramenta.",
             correlationId: cId,
             traceId: tId,
+            stack: d.stack || "Nenhum stack trace disponível",
             originalAction: () => rerun(asset, isBatch)
           });
           handleFnError(d); 
@@ -449,50 +458,62 @@ export default function CreativePage() {
     loadHistory(cursorStack.length === 0 ? null : cursorStack[cursorStack.length - 1]);
   }
 
-  async function exportFullPanelReport() {
+  async function exportFullPanelReport(format: "json" | "csv" = "json") {
     if (!history.length || !user) return;
     setIsExporting(true);
     try {
       const timestamp = new Date().toLocaleString('sv-SE', { timeZone: selectedTimezone }).replace(/[: ]/g, '-');
       const correlationId = crypto.randomUUID().slice(0, 8);
-      const filename = `creative-panel-full-report-${correlationId}-${timestamp}.json`;
+      const filename = `creative-panel-full-report-${correlationId}-${timestamp}.${format}`;
       
-      const report = {
-        meta: {
-          generated_at: new Date().toISOString(),
-          timezone: selectedTimezone,
-          user_id: user.id,
-          total_items: totalCount,
-          correlation_id: correlationId
-        },
-        steps: {
-          selection: { status: "active", items_count: history.length },
-          configuration: { status: active === "dashboard" ? "pending" : "active", current_tool: active },
-          execution: { 
-            status: history.some(h => h.status === "processing") ? "active" : "idle",
-            processing_count: history.filter(h => h.status === "processing").length
-          }
-        },
-        history: history.map(h => ({
-          id: h.id,
-          tool: h.tool,
-          status: h.status,
-          prompt: h.prompt,
-          error: h.error_message,
-          created_at: h.created_at,
-          metadata: h.metadata,
-          retry_count: h.retry_count
-        }))
-      };
+      const reportData = history.map(h => ({
+        id: h.id,
+        tool: h.tool,
+        status: h.status,
+        prompt: h.prompt,
+        error: h.error_message,
+        created_at: h.created_at,
+        metadata: h.metadata,
+        retry_count: h.retry_count,
+        correlation_id: h.metadata?.correlation_id,
+        trace_id: h.metadata?.trace_id
+      }));
 
-      const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success("Relatório completo exportado");
+      if (format === "json") {
+        const report = {
+          meta: {
+            generated_at: new Date().toISOString(),
+            timezone: selectedTimezone,
+            user_id: user.id,
+            total_items: totalCount,
+            correlation_id: correlationId
+          },
+          steps: {
+            selection: { status: "active", items_count: history.length },
+            configuration: { status: active === "dashboard" ? "pending" : "active", current_tool: active },
+            execution: { 
+              status: history.some(h => h.status === "processing") ? "active" : "idle",
+              processing_count: history.filter(h => h.status === "processing").length
+            }
+          },
+          history: reportData
+        };
+        const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = filename; a.click();
+        URL.revokeObjectURL(url);
+      } else {
+        const headers = ["ID", "Tool", "Status", "Prompt", "Error", "CreatedAt", "RetryCount", "CorrelationID"];
+        const rows = reportData.map(d => [d.id, d.tool, d.status, d.prompt, d.error, d.created_at, d.retry_count, d.correlation_id]);
+        const csvContent = [headers.join(","), ...rows.map(r => r.map(v => `"${String(v || "").replace(/"/g, '""')}"`).join(","))].join("\n");
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = filename; a.click();
+        URL.revokeObjectURL(url);
+      }
+      toast.success(`Relatório completo (${format.toUpperCase()}) exportado`);
     } catch (e: any) {
       toast.error("Falha ao exportar relatório");
     } finally {
@@ -790,6 +811,14 @@ export default function CreativePage() {
                     size="sm" 
                     variant="ghost" 
                     className="hover:bg-destructive/5"
+                    onClick={() => setShowErrorModal(true)}
+                  >
+                    Ver Detalhes
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    className="hover:bg-destructive/5"
                     onClick={() => setErrorState(null)}
                   >
                     Fechar
@@ -799,6 +828,47 @@ export default function CreativePage() {
             </div>
           </Alert>
         )}
+
+        <Dialog open={showErrorModal} onOpenChange={setShowErrorModal}>
+          <DialogContent className="max-w-2xl bg-card border-border/40">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-destructive">
+                <AlertCircle className="h-5 w-5" /> Detalhes do Erro
+              </DialogTitle>
+              <DialogDescription>
+                Informações técnicas para suporte e depuração.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="space-y-1">
+                  <p className="text-muted-foreground uppercase text-[10px] font-bold">Etapa</p>
+                  <p className="font-semibold">{errorState?.step}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-muted-foreground uppercase text-[10px] font-bold">Mensagem</p>
+                  <p className="text-foreground/80">{errorState?.message}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-muted-foreground uppercase text-[10px] font-bold">Correlation ID</p>
+                  <p className="font-mono text-xs">{errorState?.correlationId || "N/A"}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-muted-foreground uppercase text-[10px] font-bold">Trace ID</p>
+                  <p className="font-mono text-xs">{errorState?.traceId || "N/A"}</p>
+                </div>
+              </div>
+              {errorState?.stack && (
+                <div className="space-y-1 mt-4">
+                  <p className="text-muted-foreground uppercase text-[10px] font-bold">Stack Trace</p>
+                  <pre className="p-3 bg-muted/50 rounded-lg text-[10px] font-mono overflow-auto max-h-[200px] border border-border/20">
+                    {errorState.stack}
+                  </pre>
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Progress Bar Flow */}
         <div className="max-w-2xl mx-auto mb-10 space-y-6">
@@ -930,11 +1000,19 @@ export default function CreativePage() {
                         </Button>
                         <Button 
                           variant="secondary" 
-                          onClick={exportFullPanelReport}
+                          onClick={() => exportFullPanelReport("json")}
                           disabled={isExporting || history.length === 0}
                         >
                           {isExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileDown className="h-4 w-4 mr-2" />}
-                          Relatório Full
+                          Relatório (JSON)
+                        </Button>
+                        <Button 
+                          variant="secondary" 
+                          onClick={() => exportFullPanelReport("csv")}
+                          disabled={isExporting || history.length === 0}
+                        >
+                          {isExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileDown className="h-4 w-4 mr-2" />}
+                          Relatório (CSV)
                         </Button>
                       </div>
 

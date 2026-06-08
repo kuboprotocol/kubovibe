@@ -28,21 +28,29 @@ test.describe('Creative Economy Panel E2E', () => {
     await expect(generateBtn).toBeEnabled();
   });
 
-  test('error logging and recovery in execution', async ({ page }) => {
+  test('error logging, retry and detailed modal', async ({ page }) => {
     await page.goto('/creative');
     await page.getByRole('button', { name: /Kubo Chat/i }).click();
     
-    // Simulate empty prompt error
+    // Force invalid request to trigger error alert
     const generateBtn = page.getByRole('button', { name: /Gerar Agora/i });
     await generateBtn.click();
-    await expect(page.getByText(/O campo de prompt\/URL é obrigatório/i)).toBeVisible();
-    await expect(generateBtn).toBeEnabled();
     
-    // Check loading state on valid click
-    await page.getByPlaceholder(/Escreva um artigo/i).fill('Teste de loading');
-    await generateBtn.click();
-    await expect(generateBtn).toBeDisabled();
-    await expect(page.locator('.animate-spin')).toBeVisible();
+    const alert = page.getByRole('alert');
+    await expect(alert).toBeVisible();
+    await expect(alert).toContainText(/Erro na Configuração/i);
+    
+    // Open details modal
+    await page.getByRole('button', { name: /Ver Detalhes/i }).click();
+    await expect(page.getByText(/Detalhes do Erro Técnicos/i)).toBeVisible();
+    await page.keyboard.press('Escape');
+
+    // Simulate recovery on retry
+    await page.getByPlaceholder(/Escreva um artigo/i).fill('Teste de retry sucesso');
+    const retryBtn = page.getByRole('button', { name: /Tentar Novamente/i });
+    await retryBtn.click();
+    
+    await expect(page.getByText(/Solicitação enviada/i)).toBeVisible();
   });
 
   test('navigation and state preservation', async ({ page }) => {
