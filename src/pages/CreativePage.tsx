@@ -115,6 +115,7 @@ export default function CreativePage() {
   const [history, setHistory] = useState<any[]>([]);
   const [filter, setFilter] = useState<"all" | "queued" | "processing" | "completed" | "failed">("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearch = useDebounce(searchQuery, 600);
   const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
   const [currentPage, setCurrentPage] = useState(1);
   const [cursorStack, setCursorStack] = useState<string[]>([]);
