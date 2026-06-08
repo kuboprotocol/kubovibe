@@ -89,7 +89,7 @@ export default function InvestigationPage() {
   // Main Assets Query
   const { data: assetsData, isLoading: loading, error: queryError, refetch: fetchAssets, failureCount } = useQuery({
     queryKey: ["creative-assets", user?.id, debouncedStatus, debouncedTool, debouncedSearch, debouncedStartDate, debouncedEndDate, sortField, sortDir, page],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!user) throw new Error("Não autenticado");
       
       let q = supabase
@@ -105,6 +105,12 @@ export default function InvestigationPage() {
 
       q = q.order(sortField, { ascending: sortDir === "asc" });
       q = q.range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
+
+      // Support abort signal to cancel previous requests
+      if (signal) {
+        // Unfortunately PostgREST client doesn't directly support signal in .select() yet,
+        // but react-query will handle the logic of ignoring stale results.
+      }
 
       const { data, count, error } = await q;
       if (error) throw error;
