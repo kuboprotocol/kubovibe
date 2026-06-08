@@ -10,11 +10,12 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
   MessageSquare, Image as ImageIcon, Download, Scissors, User2,
   Video, Music, BookOpen, Sparkles, Loader2, Coins, ArrowLeft, RotateCw, AlertTriangle, Upload,
-  FileDown, History
+  FileDown, History, Check, Search
 } from "lucide-react";
 import { ManusLauncher } from "@/components/creative/ManusLauncher";
 
@@ -615,6 +616,69 @@ export default function CreativePage() {
         </div>
       </header>
       <main className="container max-w-7xl mx-auto px-4 py-6">
+        {/* Progress Bar Flow */}
+        <div className="max-w-xl mx-auto mb-10 space-y-4">
+          <div className="flex justify-between items-center relative">
+            <div className="absolute top-4 left-0 w-full h-0.5 bg-muted -z-10" />
+            {[
+              { label: "Seleção", icon: Search },
+              { label: "Configuração", icon: Sparkles },
+              { label: "Execução", icon: Loader2 }
+            ].map((step, i) => {
+              const stepNum = i + 1;
+              const isDashboard = active === "dashboard";
+              const hasProcessing = history.some(h => (h.status === "processing" || h.status === "queued") && (!isDashboard ? h.tool === active : true));
+              
+              let currentStep = 1;
+              if (!isDashboard) currentStep = 2;
+              if (hasProcessing && !isDashboard) currentStep = 3;
+
+              const isCompleted = stepNum < currentStep;
+              const isActive = stepNum === currentStep;
+              const Icon = step.icon;
+
+              return (
+                <div key={step.label} className="flex flex-col items-center gap-2 bg-background px-2">
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center border-2 transition-all duration-500 ${
+                    isCompleted ? "bg-primary border-primary text-primary-foreground shadow-[0_0_15px_rgba(var(--primary),0.3)]" :
+                    isActive ? "border-primary text-primary shadow-[0_0_10px_rgba(var(--primary),0.2)]" :
+                    "border-muted text-muted-foreground bg-background"
+                  }`}>
+                    {isCompleted ? <Check className="h-5 w-5" /> : <Icon className={`h-5 w-5 ${isActive ? "animate-pulse" : ""}`} />}
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <span className={`text-[11px] font-bold uppercase tracking-wider ${isActive ? "text-primary" : "text-muted-foreground"}`}>
+                      {step.label}
+                    </span>
+                    {isActive && (
+                      <span className="text-[9px] text-primary/70 font-medium">
+                        {currentStep === 1 ? "2 restantes" : currentStep === 2 ? "1 restante" : "Em andamento"}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          
+          {(() => {
+            const isDashboard = active === "dashboard";
+            const hasProcessing = history.some(h => (h.status === "processing" || h.status === "queued") && (!isDashboard ? h.tool === active : true));
+            let currentStep = 1;
+            if (!isDashboard) currentStep = 2;
+            if (hasProcessing && !isDashboard) currentStep = 3;
+            return (
+              <div className="space-y-1">
+                <Progress value={(currentStep / 3) * 100} className="h-1.5" />
+                <div className="flex justify-between items-center text-[10px] text-muted-foreground font-medium uppercase tracking-tighter">
+                  <span>Passo {currentStep} de 3</span>
+                  <span>{Math.round((currentStep / 3) * 100)}% concluído</span>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+
         <Tabs value={active} onValueChange={(v) => { setActive(v as ToolKey); navigate(v === "dashboard" ? "/creative" : `/creative/${v}`); }}>
           <TabsContent value="dashboard">
              <div className="space-y-6">
