@@ -288,34 +288,59 @@ export default function CreativeAuditPage() {
       <main className="max-w-7xl mx-auto space-y-6">
         {/* Alerts & Insights */}
         {(recurrentFailures.length > 0 || multipleAttempts > 0) && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {recurrentFailures.length > 0 && (
-              <Card className="p-4 border-destructive/20 bg-destructive/5">
+              <Card className="p-4 border-destructive/20 bg-destructive/5 lg:col-span-1">
                 <div className="flex items-center gap-2 mb-3 text-destructive">
                   <AlertCircle className="h-5 w-5" />
-                  <h3 className="font-semibold">Falhas Recorrentes Detectadas</h3>
+                  <h3 className="font-semibold">Falhas Recorrentes</h3>
                 </div>
                 <div className="space-y-2">
                   {recurrentFailures.map(([cause, info]) => (
                     <div key={cause} className="text-sm flex justify-between items-start bg-background/50 p-2 rounded">
-                      <span className="line-clamp-1 flex-1 font-mono text-xs">{cause}</span>
+                      <span className="line-clamp-2 flex-1 font-mono text-xs">{cause}</span>
                       <Badge variant="destructive" className="ml-2">{info.count}x</Badge>
                     </div>
                   ))}
                 </div>
               </Card>
             )}
+            
+            {failureTrends.length > 1 && (
+              <Card className="p-4 lg:col-span-1">
+                <div className="flex items-center gap-2 mb-3 text-primary">
+                  <TrendingUp className="h-5 w-5" />
+                  <h3 className="font-semibold">Tendência de Falhas</h3>
+                </div>
+                <div className="h-[120px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={failureTrends}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.1)" />
+                      <XAxis dataKey="date" hide />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333', color: '#fff' }}
+                        itemStyle={{ fontSize: '10px' }}
+                      />
+                      {Object.keys(failureTrends[0] || {}).filter(k => k !== 'date').map((key, i) => (
+                        <Line key={key} type="monotone" dataKey={key} stroke={`hsl(${i * 137.5}, 70%, 50%)`} dot={false} strokeWidth={2} />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </Card>
+            )}
+
             {multipleAttempts > 0 && (
-              <Card className="p-4 border-yellow-500/20 bg-yellow-500/5">
+              <Card className="p-4 border-yellow-500/20 bg-yellow-500/5 lg:col-span-1">
                 <div className="flex items-center gap-2 mb-3 text-yellow-600">
                   <History className="h-5 w-5" />
-                  <h3 className="font-semibold">Tentativas de Retry</h3>
+                  <h3 className="font-semibold">Alerta de Retries</h3>
                 </div>
                 <p className="text-sm text-muted-foreground mb-2">
-                  Identificamos <strong>{multipleAttempts}</strong> IDs de correlação com múltiplas entradas, indicando retries automáticos ou manuais.
+                  Identificamos <strong>{multipleAttempts}</strong> IDs com múltiplas tentativas.
                 </p>
                 <Button variant="outline" size="sm" onClick={() => setSearch("retry")}>
-                  Ver Retries
+                  Investigar Retries
                 </Button>
               </Card>
             )}
@@ -326,9 +351,10 @@ export default function CreativeAuditPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-4">
             <div className="relative lg:col-span-2">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
+              <input
+                type="text"
                 placeholder="ID, Correlation, Trace ou Ação..."
-                className="pl-9"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 pl-9"
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(1); }}
               />
@@ -356,17 +382,17 @@ export default function CreativeAuditPage() {
                 <SelectItem value="failed">Falhas / Erros</SelectItem>
               </SelectContent>
             </Select>
-            <Input
+            <input
               type="date"
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               value={startDate}
               onChange={(e) => { setStartDate(e.target.value); setPage(1); }}
-              placeholder="Início"
             />
-            <Input
+            <input
               type="date"
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               value={endDate}
               onChange={(e) => { setEndDate(e.target.value); setPage(1); }}
-              placeholder="Fim"
             />
           </div>
           
@@ -375,9 +401,12 @@ export default function CreativeAuditPage() {
               <Button variant="secondary" size="sm" onClick={saveCurrentFilters}>
                 <Save className="h-4 w-4 mr-2" /> Salvar Busca
               </Button>
+              <Button variant="outline" size="sm" onClick={shareCurrentView}>
+                <Share2 className="h-4 w-4 mr-2" /> Compartilhar Link
+              </Button>
               {savedFilters.length > 0 && (
                 <div className="flex gap-1">
-                  {savedFilters.map((f) => (
+                  {savedFilters.map((f: any) => (
                     <Badge 
                       key={f.id} 
                       variant="outline" 
