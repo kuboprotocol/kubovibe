@@ -2074,7 +2074,6 @@ export type Database = {
       }
       gmail_accounts_safe: {
         Row: {
-          access_token_cache: string | null
           access_token_expires_at: string | null
           avatar_url: string | null
           created_at: string | null
@@ -2087,7 +2086,6 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
-          access_token_cache?: string | null
           access_token_expires_at?: string | null
           avatar_url?: string | null
           created_at?: string | null
@@ -2100,7 +2098,6 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
-          access_token_cache?: string | null
           access_token_expires_at?: string | null
           avatar_url?: string | null
           created_at?: string | null
