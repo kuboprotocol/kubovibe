@@ -131,6 +131,8 @@ export default function CreativePage() {
   const [exportColumns, setExportColumns] = useState<string[]>(["ID", "Tool", "Status", "Prompt", "Credits", "Created At", "Error Message", "Config"]);
   const alertedRef = useRef<{ low?: boolean; empty?: boolean }>({});
   const [isExporting, setIsExporting] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [isCancelling, setIsCancelling] = useState<string | null>(null);
   const globalCooldown = useCooldown();
   const PAGE_SIZE = 20;
   const [showAuditSchedule, setShowAuditSchedule] = useState(false);
@@ -169,40 +171,48 @@ export default function CreativePage() {
 
   async function loadHistory(before: string | null = null) {
     if (!user) return;
-    let q = supabase.from("creative_assets")
-      .select("*", { count: "exact" })
-      .eq("user_id", user.id);
-    
-    if (filter !== "all") {
-      if (filter === "failed") {
-        q = q.in("status", ["failed", "error"]);
-      } else {
-        q = q.eq("status", filter);
+    setIsLoadingHistory(true);
+    try {
+      let q = supabase.from("creative_assets")
+        .select("*", { count: "exact" })
+        .eq("user_id", user.id);
+      
+      if (filter !== "all") {
+        if (filter === "failed") {
+          q = q.in("status", ["failed", "error"]);
+        } else {
+          q = q.eq("status", filter);
+        }
       }
-    }
 
-    if (debouncedSearch) {
-      q = q.or(`prompt.ilike.%${debouncedSearch}%,tool.ilike.%${debouncedSearch}%,error_message.ilike.%${debouncedSearch}%`);
-    }
-
-    q = q.order("created_at", { ascending: sortOrder === "asc" })
-      .limit(PAGE_SIZE + 1);
-    
-    if (before) {
-      if (sortOrder === "desc") {
-        q = q.lt("created_at", before);
-      } else {
-        q = q.gt("created_at", before);
+      if (debouncedSearch) {
+        q = q.or(`prompt.ilike.%${debouncedSearch}%,tool.ilike.%${debouncedSearch}%,error_message.ilike.%${debouncedSearch}%`);
       }
-    }
 
-    const { data, count } = await q;
-    const rows = data ?? [];
-    const hasMore = rows.length > PAGE_SIZE;
-    const visible = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
-    setHistory(visible);
-    setNextCursor(hasMore ? visible[visible.length - 1].created_at : null);
-    setTotalCount(count ?? 0);
+      q = q.order("created_at", { ascending: sortOrder === "asc" })
+        .limit(PAGE_SIZE + 1);
+      
+      if (before) {
+        if (sortOrder === "desc") {
+          q = q.lt("created_at", before);
+        } else {
+          q = q.gt("created_at", before);
+        }
+      }
+
+      const { data, count } = await q;
+      const rows = data ?? [];
+      const hasMore = rows.length > PAGE_SIZE;
+      const visible = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
+      setHistory(visible);
+      setNextCursor(hasMore ? visible[visible.length - 1].created_at : null);
+      setTotalCount(count ?? 0);
+    } catch (e: any) {
+      console.error("[CreativePanel:Selection] history_load_failed", { error: e.message, userId: user.id });
+      toast.error("Falha ao carregar histórico");
+    } finally {
+      setIsLoadingHistory(false);
+    }
   }
 
   async function loadPresets() {
@@ -310,6 +320,12 @@ export default function CreativePage() {
       const r = await authedFetch(cfg.fn, cfg.build(asset), idemKey);
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { 
+        console.error("[CreativePanel:Execution] tool_retry_failed", { 
+          assetId: asset.id, 
+          error: d.error, 
+          correlationId: r.headers.get("x-correlation-id"),
+          traceId: r.headers.get("x-trace-id") 
+        });
         if (!isBatch) handleFnError(d); 
         return false; 
       }
@@ -335,6 +351,7 @@ export default function CreativePage() {
       
       return true;
     } catch (e: any) {
+      console.error("[CreativePanel:Execution] tool_retry_exception", { assetId: asset.id, error: e.message, stack: e.stack });
       if (!isBatch) toast.error(e?.message ?? "Falha ao reexecutar");
       return false;
     } finally {
@@ -348,7 +365,8 @@ export default function CreativePage() {
   }
 
   async function cancelExecution(assetId: string) {
-    if (!user) return;
+    if (!user || isCancelling) return;
+    setIsCancelling(assetId);
     try {
       const asset = history.find(h => h.id === assetId);
       const { error } = await supabase
@@ -383,7 +401,10 @@ export default function CreativePage() {
       toast.success("Execução cancelada");
       loadHistory(cursorStack.length === 0 ? null : cursorStack[cursorStack.length - 1]);
     } catch (e: any) {
+      console.error("[CreativePanel:Execution] cancel_failed", { assetId, error: e.message, userId: user.id });
       toast.error("Falha ao cancelar: " + e.message);
+    } finally {
+      setIsCancelling(null);
     }
   }
 
@@ -789,7 +810,11 @@ export default function CreativePage() {
                           <option value="America/New_York">NY (EST)</option>
                         </select>
                       </div>
-                      <Button variant="outline" onClick={() => { setFilter("all"); setSearchQuery(""); setSortOrder("desc"); setSelectedTimezone("UTC"); }}>
+                      <Button 
+                        variant="outline" 
+                        onClick={() => { setFilter("all"); setSearchQuery(""); setSortOrder("desc"); setSelectedTimezone("UTC"); }}
+                        disabled={isLoadingHistory}
+                      >
                         Resetar
                       </Button>
 
@@ -804,7 +829,12 @@ export default function CreativePage() {
 
                  <Card className="overflow-hidden border-border/40 bg-card/40 backdrop-blur">
                     <div className="divide-y divide-border/20">
-                      {history.length === 0 ? (
+                      {isLoadingHistory ? (
+                        <div className="p-10 flex flex-col items-center justify-center text-muted-foreground gap-3">
+                          <Loader2 className="h-6 w-6 animate-spin text-primary/60" />
+                          <p className="text-sm font-medium">Carregando histórico...</p>
+                        </div>
+                      ) : history.length === 0 ? (
                         <div className="p-10 text-center text-muted-foreground">
                           <p>Nenhum item encontrado.</p>
                         </div>
@@ -839,8 +869,15 @@ export default function CreativePage() {
                                 <History className="h-4 w-4 mr-2" /> Investigar
                               </Button>
                              {(h.status === 'queued' || h.status === 'processing') && (
-                               <Button size="sm" variant="outline" className="text-destructive hover:bg-destructive/10" onClick={() => cancelExecution(h.id)}>
-                                 <X className="h-4 w-4 mr-2" /> Cancelar
+                               <Button 
+                                size="sm" 
+                                variant="outline" 
+                                className="text-destructive hover:bg-destructive/10" 
+                                onClick={() => cancelExecution(h.id)}
+                                disabled={isCancelling === h.id}
+                               >
+                                 {isCancelling === h.id ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <X className="h-4 w-4 mr-2" />} 
+                                 Cancelar
                                </Button>
                              )}
                              {(h.status === 'failed' || h.status === 'error' || h.status === 'completed') && (
