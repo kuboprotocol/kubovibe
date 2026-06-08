@@ -114,7 +114,8 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
   );
   const [loading, setLoading] = useState(false);
   const [traceInfo, setTraceInfo] = useState<{ correlationId?: string; traceId?: string } | null>(null);
-  const [errorState, setErrorState] = useState<{ message: string; correlationId?: string; traceId?: string } | null>(null);
+  const [errorState, setErrorState] = useState<{ message: string; correlationId?: string; traceId?: string; stack?: string } | null>(null);
+  const [showErrorModal, setShowErrorModal] = useState(false);
   const { subscription, editsRemaining } = useSubscription();
 
   const handleExecute = async () => {
@@ -196,7 +197,8 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       setErrorState({
         message: e.message,
         correlationId: traceInfo?.correlationId,
-        traceId: traceInfo?.traceId
+        traceId: traceInfo?.traceId,
+        stack: e.stack
       });
       toast.error(e.message);
     } finally {
@@ -245,17 +247,57 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                 {errorState.traceId && <p>TraceID: {errorState.traceId}</p>}
               </div>
             )}
-            <Button 
-              size="sm" 
-              variant="outline" 
-              className="mt-3 bg-background/50 hover:bg-background border-destructive/20 text-destructive"
-              onClick={handleExecute}
-            >
-              <RotateCw className="h-3.5 w-3.5 mr-2" /> Tentar Novamente
-            </Button>
+            <div className="mt-4 flex gap-3">
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="bg-background/50 hover:bg-background border-destructive/20 text-destructive"
+                onClick={handleExecute}
+              >
+                <RotateCw className="h-3.5 w-3.5 mr-2" /> Tentar Novamente
+              </Button>
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                className="hover:bg-destructive/5 text-destructive"
+                onClick={() => setShowErrorModal(true)}
+              >
+                Ver Detalhes
+              </Button>
+            </div>
           </AlertDescription>
         </Alert>
       )}
+
+      <Dialog open={showErrorModal} onOpenChange={setShowErrorModal}>
+        <DialogContent className="max-w-2xl bg-card border-border/40">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertCircle className="h-5 w-5" /> Detalhes do Erro Técnicos
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="space-y-1">
+                <p className="text-muted-foreground uppercase text-[10px] font-bold">Ferramenta</p>
+                <p className="font-semibold">{config.title}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-muted-foreground uppercase text-[10px] font-bold">Correlation ID</p>
+                <p className="font-mono text-xs">{errorState?.correlationId || "N/A"}</p>
+              </div>
+            </div>
+            {errorState?.stack && (
+              <div className="space-y-1 mt-4">
+                <p className="text-muted-foreground uppercase text-[10px] font-bold">Stack Trace</p>
+                <pre className="p-3 bg-muted/50 rounded-lg text-[10px] font-mono overflow-auto max-h-[200px] border border-border/20">
+                  {errorState.stack}
+                </pre>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {traceInfo && !errorState && (
         <Alert variant="default" className="bg-muted/50 border-muted-foreground/20 text-xs py-2">

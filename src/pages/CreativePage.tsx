@@ -134,7 +134,15 @@ export default function CreativePage() {
   const [isExporting, setIsExporting] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isCancelling, setIsCancelling] = useState<string | null>(null);
-  const [errorState, setErrorState] = useState<{ step: string; message: string; correlationId?: string; traceId?: string; originalAction?: () => void } | null>(null);
+  const [errorState, setErrorState] = useState<{ 
+    step: string; 
+    message: string; 
+    correlationId?: string; 
+    traceId?: string; 
+    stack?: string;
+    originalAction?: () => void 
+  } | null>(null);
+  const [showErrorModal, setShowErrorModal] = useState(false);
   const globalCooldown = useCooldown();
   const PAGE_SIZE = 20;
   const [showAuditSchedule, setShowAuditSchedule] = useState(false);
@@ -340,6 +348,7 @@ export default function CreativePage() {
             message: d.error || "Erro ao tentar reexecutar a ferramenta.",
             correlationId: cId,
             traceId: tId,
+            stack: d.stack || "Nenhum stack trace disponível",
             originalAction: () => rerun(asset, isBatch)
           });
           handleFnError(d); 
@@ -790,6 +799,14 @@ export default function CreativePage() {
                     size="sm" 
                     variant="ghost" 
                     className="hover:bg-destructive/5"
+                    onClick={() => setShowErrorModal(true)}
+                  >
+                    Ver Detalhes
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    className="hover:bg-destructive/5"
                     onClick={() => setErrorState(null)}
                   >
                     Fechar
@@ -799,6 +816,47 @@ export default function CreativePage() {
             </div>
           </Alert>
         )}
+
+        <Dialog open={showErrorModal} onOpenChange={setShowErrorModal}>
+          <DialogContent className="max-w-2xl bg-card border-border/40">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-destructive">
+                <AlertCircle className="h-5 w-5" /> Detalhes do Erro
+              </DialogTitle>
+              <DialogDescription>
+                Informações técnicas para suporte e depuração.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="space-y-1">
+                  <p className="text-muted-foreground uppercase text-[10px] font-bold">Etapa</p>
+                  <p className="font-semibold">{errorState?.step}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-muted-foreground uppercase text-[10px] font-bold">Mensagem</p>
+                  <p className="text-foreground/80">{errorState?.message}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-muted-foreground uppercase text-[10px] font-bold">Correlation ID</p>
+                  <p className="font-mono text-xs">{errorState?.correlationId || "N/A"}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-muted-foreground uppercase text-[10px] font-bold">Trace ID</p>
+                  <p className="font-mono text-xs">{errorState?.traceId || "N/A"}</p>
+                </div>
+              </div>
+              {errorState?.stack && (
+                <div className="space-y-1 mt-4">
+                  <p className="text-muted-foreground uppercase text-[10px] font-bold">Stack Trace</p>
+                  <pre className="p-3 bg-muted/50 rounded-lg text-[10px] font-mono overflow-auto max-h-[200px] border border-border/20">
+                    {errorState.stack}
+                  </pre>
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Progress Bar Flow */}
         <div className="max-w-2xl mx-auto mb-10 space-y-6">
@@ -930,11 +988,19 @@ export default function CreativePage() {
                         </Button>
                         <Button 
                           variant="secondary" 
-                          onClick={exportFullPanelReport}
+                          onClick={() => exportFullPanelReport("json")}
                           disabled={isExporting || history.length === 0}
                         >
                           {isExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileDown className="h-4 w-4 mr-2" />}
-                          Relatório Full
+                          Relatório (JSON)
+                        </Button>
+                        <Button 
+                          variant="secondary" 
+                          onClick={() => exportFullPanelReport("csv")}
+                          disabled={isExporting || history.length === 0}
+                        >
+                          {isExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileDown className="h-4 w-4 mr-2" />}
+                          Relatório (CSV)
                         </Button>
                       </div>
 
