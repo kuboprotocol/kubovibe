@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ArrowLeft, RotateCw, Ban, FileDown, Search, ExternalLink, AlertTriangle, ArrowUpDown, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useDebounce } from "@/hooks/use-debounce";
 
 type Asset = {
   id: string;
@@ -63,17 +64,23 @@ export default function InvestigationPage() {
 
   const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
 
+  const debouncedSearch = useDebounce(search, 500);
+  const debouncedStatus = useDebounce(status, 300);
+  const debouncedTool = useDebounce(tool, 300);
+  const debouncedStartDate = useDebounce(startDate, 300);
+  const debouncedEndDate = useDebounce(endDate, 300);
+
   // Persist filters to URL
   useEffect(() => {
     const next = new URLSearchParams();
-    if (search) next.set("q", search);
-    if (status !== "all") next.set("status", status);
-    if (tool !== "all") next.set("tool", tool);
-    if (startDate) next.set("from", startDate);
-    if (endDate) next.set("to", endDate);
+    if (debouncedSearch) next.set("q", debouncedSearch);
+    if (debouncedStatus !== "all") next.set("status", debouncedStatus);
+    if (debouncedTool !== "all") next.set("tool", debouncedTool);
+    if (debouncedStartDate) next.set("from", debouncedStartDate);
+    if (debouncedEndDate) next.set("to", debouncedEndDate);
     if (page > 1) next.set("page", String(page));
     setParams(next, { replace: true });
-  }, [search, status, tool, startDate, endDate, page, setParams]);
+  }, [debouncedSearch, debouncedStatus, debouncedTool, debouncedStartDate, debouncedEndDate, page, setParams]);
 
   const fetchAssets = useCallback(async () => {
     if (!user) return;
@@ -85,11 +92,11 @@ export default function InvestigationPage() {
         .select("*", { count: "exact" })
         .eq("user_id", user.id);
 
-      if (status !== "all") q = q.eq("status", status);
-      if (tool !== "all") q = q.eq("tool", tool);
-      if (search) q = q.or(`prompt.ilike.%${search}%,id.eq.${isUUID(search) ? search : "00000000-0000-0000-0000-000000000000"}`);
-      if (startDate) q = q.gte("created_at", startDate);
-      if (endDate) q = q.lte("created_at", endDate + "T23:59:59");
+      if (debouncedStatus !== "all") q = q.eq("status", debouncedStatus);
+      if (debouncedTool !== "all") q = q.eq("tool", debouncedTool);
+      if (debouncedSearch) q = q.or(`prompt.ilike.%${debouncedSearch}%,id.eq.${isUUID(debouncedSearch) ? debouncedSearch : "00000000-0000-0000-0000-000000000000"}`);
+      if (debouncedStartDate) q = q.gte("created_at", debouncedStartDate);
+      if (debouncedEndDate) q = q.lte("created_at", debouncedEndDate + "T23:59:59");
 
       q = q.order(sortField, { ascending: sortDir === "asc" });
       q = q.range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
@@ -105,7 +112,7 @@ export default function InvestigationPage() {
     } finally {
       setLoading(false);
     }
-  }, [user, status, tool, search, startDate, endDate, sortField, sortDir, page]);
+  }, [user, debouncedStatus, debouncedTool, debouncedSearch, debouncedStartDate, debouncedEndDate, sortField, sortDir, page]);
 
   useEffect(() => { fetchAssets(); }, [fetchAssets]);
 

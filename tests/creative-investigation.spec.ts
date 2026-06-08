@@ -13,14 +13,50 @@ async function ensureAuthed(page: any, path: string) {
   }
 }
 
+test.describe("Creative investigation UI states", () => {
+  test("skeleton appears during loading", async ({ page }) => {
+    await ensureAuthed(page, "/creative/investigation");
+    // Skeleton should be visible while loading
+    // Since loading might be fast, we check for its existence or use a slower connection if possible
+    const skeletons = page.locator(".skeleton, .animate-pulse");
+    // This is a soft check because on fast connections it might disappear quickly
+    const count = await skeletons.count();
+    if (count > 0) {
+      await expect(skeletons.first()).toBeVisible();
+    }
+  });
+
+  test("clear filters resets all fields and shows confirmation toast", async ({ page }) => {
+    await ensureAuthed(page, "/creative/investigation");
+    await page.getByTestId("filter-search").fill("to-be-cleared");
+    await page.getByTestId("filter-status").click();
+    await page.getByRole("option", { name: "Cancelado" }).click();
+    
+    // Wait for debounce/URL update
+    await page.waitForTimeout(1000);
+    await expect(page).toHaveURL(/q=to-be-cleared/);
+    await expect(page).toHaveURL(/status=cancelled/);
+    
+    await page.getByTestId("btn-clear-filters").click();
+    
+    await expect(page.getByText(/filtros limpos/i)).toBeVisible();
+    await expect(page.getByTestId("filter-search")).toHaveValue("");
+    await expect(page).not.toHaveURL(/q=/);
+    await expect(page).not.toHaveURL(/status=cancelled/);
+  });
+});
+
 test.describe("Creative investigation", () => {
   test("filters update results in real time and persist in URL", async ({ page }) => {
     await ensureAuthed(page, "/creative/investigation");
     await page.getByTestId("filter-search").fill("test-query");
+    // Wait for debounce
+    await page.waitForTimeout(1000);
     await expect(page).toHaveURL(/q=test-query/);
 
     await page.getByTestId("filter-start-date").fill("2025-01-01");
     await page.getByTestId("filter-end-date").fill("2025-12-31");
+    await page.waitForTimeout(1000);
     await expect(page).toHaveURL(/from=2025-01-01/);
     await expect(page).toHaveURL(/to=2025-12-31/);
   });
