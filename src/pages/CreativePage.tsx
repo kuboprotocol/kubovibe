@@ -528,7 +528,8 @@ export default function CreativePage() {
       const filters = { filter, searchQuery, sortOrder };
       const { data, error } = await supabase.from("creative_filter_presets").insert({ user_id: user.id, name: newPresetName, filters }).select().single();
       if (error) throw error;
-      setPresets([data, ...presets]);
+      const savedPreset: any = data;
+      setPresets([savedPreset, ...presets]);
       setNewPresetName("");
       setShowPresetDialog(false);
       toast.success(`Preset "${newPresetName}" salvo!`);
