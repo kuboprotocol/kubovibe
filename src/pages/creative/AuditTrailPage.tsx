@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Search, FileDown, ArrowUpDown, Loader2, X, Filter } from "lucide-react";
+import { ArrowLeft, Search, FileDown, ArrowUpDown, Loader2, X, Filter, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -34,6 +34,7 @@ export default function CreativeAuditPage() {
   
   const [search, setSearch] = useState("");
   const [step, setStep] = useState("all");
+  const [status, setStatus] = useState("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -42,7 +43,7 @@ export default function CreativeAuditPage() {
   const debouncedSearch = useDebounce(search, 500);
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["creative-audit-trail", user?.id, debouncedSearch, step, startDate, endDate, sortDir, page],
+    queryKey: ["creative-audit-trail", user?.id, debouncedSearch, step, status, startDate, endDate, sortDir, page],
     queryFn: async () => {
       if (!user) throw new Error("Não autenticado");
 
@@ -52,6 +53,14 @@ export default function CreativeAuditPage() {
 
       if (step !== "all") q = q.eq("step", step);
       
+      if (status !== "all") {
+        if (status === "failed") {
+          q = q.or('action.ilike.%failed%,action.ilike.%error%,params->>error.not.is.null');
+        } else if (status === "success") {
+          q = q.not('action', 'ilike', '%failed%').not('action', 'ilike', '%error%');
+        }
+      }
+
       if (debouncedSearch) {
         // Search in correlation_id, trace_id, action, or params (stringified)
         q = q.or(`correlation_id.ilike.%${debouncedSearch}%,trace_id.ilike.%${debouncedSearch}%,action.ilike.%${debouncedSearch}%`);
@@ -142,7 +151,7 @@ export default function CreativeAuditPage() {
 
       <main className="max-w-7xl mx-auto space-y-6">
         <Card className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
             <div className="relative lg:col-span-2">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -164,6 +173,17 @@ export default function CreativeAuditPage() {
                 <SelectItem value="Execution">Execução</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={status} onValueChange={(v) => { setStatus(v); setPage(1); }}>
+              <SelectTrigger>
+                <AlertTriangle className="h-4 w-4 mr-2 text-muted-foreground" />
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os status</SelectItem>
+                <SelectItem value="success">Sucesso</SelectItem>
+                <SelectItem value="failed">Falhas / Erros</SelectItem>
+              </SelectContent>
+            </Select>
             <Input
               type="date"
               value={startDate}
@@ -177,10 +197,10 @@ export default function CreativeAuditPage() {
               placeholder="Fim"
             />
           </div>
-          {(debouncedSearch || step !== "all" || startDate || endDate) && (
+          {(debouncedSearch || step !== "all" || status !== "all" || startDate || endDate) && (
             <div className="mt-4 flex justify-end">
               <Button variant="ghost" size="sm" onClick={() => {
-                setSearch(""); setStep("all"); setStartDate(""); setEndDate(""); setPage(1);
+                setSearch(""); setStep("all"); setStatus("all"); setStartDate(""); setEndDate(""); setPage(1);
               }}>
                 <X className="h-4 w-4 mr-2" /> Limpar Filtros
               </Button>
