@@ -4,12 +4,7 @@
 // download / commit no GitHub. A compilação/deploy fica para a próxima
 // iteração para manter a edge function leve e rápida.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers':
-    'authorization, x-client-info, apikey, content-type',
-}
+import { corsHeaders, sanitizeError } from '../_shared/cors.ts'
 
 type Body = {
   plan_id?: string
@@ -151,8 +146,8 @@ Deno.serve(async (req) => {
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     )
   } catch (e) {
-    console.error('web3-contract-gen error', e)
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : 'unknown' }), {
+    console.error('web3-contract-gen error:', e)
+    return new Response(JSON.stringify({ error: sanitizeError(e) }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
