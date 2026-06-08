@@ -101,7 +101,7 @@ Deno.serve(async (req) => {
 
   if (updateError) {
     console.error('Failed to mark token as used', { error: updateError, token })
-    return jsonResponse({ error: 'Failed to process unsubscribe' }, 500)
+    return jsonResponse({ error: 'Internal server error' }, 500)
   }
 
   if (!updated) {

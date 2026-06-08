@@ -76,8 +76,11 @@ Deno.serve(async (req) => {
     )
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Unknown error'
+    const safeMessage = (msg.includes("database") || msg.includes("sql"))
+      ? "Internal server error"
+      : msg;
     return new Response(
-      JSON.stringify({ error: msg }),
+      JSON.stringify({ error: safeMessage }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     )
   }

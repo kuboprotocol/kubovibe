@@ -34,12 +34,12 @@ Deno.serve(async (req: Request) => {
     );
 
     const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsErr } = await supabaseUser.auth.getClaims(token);
-    if (claimsErr || !claimsData?.claims) {
-      return json({ error: "Invalid token" }, 401);
+    const { data: userRes, error: authError } = await supabaseUser.auth.getUser(token);
+    if (authError || !userRes?.user) {
+      return json({ error: "Unauthorized" }, 401);
     }
 
-    const userId = claimsData.claims.sub;
+    const userId = userRes.user.id;
     const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
                      req.headers.get("cf-connecting-ip") || "unknown";
 
@@ -135,6 +135,9 @@ Deno.serve(async (req: Request) => {
     return json({ success: true, credits_earned: reward });
   } catch (err: any) {
     console.error("complete-shortlink error:", err);
-    return json({ error: err.message }, 500);
+    const safeMessage = (err.message?.includes("database") || err.message?.includes("sql"))
+      ? "Internal server error"
+      : err.message;
+    return json({ error: safeMessage }, 500);
   }
 });

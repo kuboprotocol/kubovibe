@@ -2015,6 +2015,33 @@ export type Database = {
       }
     }
     Views: {
+      api_credentials_safe: {
+        Row: {
+          connector_slug: string | null
+          created_at: string | null
+          id: string | null
+          masked_hint: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          connector_slug?: string | null
+          created_at?: string | null
+          id?: string | null
+          masked_hint?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          connector_slug?: string | null
+          created_at?: string | null
+          id?: string | null
+          masked_hint?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       github_connections_safe: {
         Row: {
           connected_at: string | null
@@ -2039,6 +2066,48 @@ export type Database = {
           github_avatar_url?: string | null
           github_username?: string | null
           id?: string | null
+          scope?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      gmail_accounts_safe: {
+        Row: {
+          access_token_cache: string | null
+          access_token_expires_at: string | null
+          avatar_url: string | null
+          created_at: string | null
+          display_name: string | null
+          email: string | null
+          id: string | null
+          last_synced_at: string | null
+          scope: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          access_token_cache?: string | null
+          access_token_expires_at?: string | null
+          avatar_url?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          email?: string | null
+          id?: string | null
+          last_synced_at?: string | null
+          scope?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          access_token_cache?: string | null
+          access_token_expires_at?: string | null
+          avatar_url?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          email?: string | null
+          id?: string | null
+          last_synced_at?: string | null
           scope?: string | null
           updated_at?: string | null
           user_id?: string | null

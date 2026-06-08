@@ -58,6 +58,8 @@ Deno.serve(async (req) => {
       expiresAt: share.expires_at,
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   } catch (e) {
-    return new Response(JSON.stringify({ error: (e as Error).message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    const msg = (e as Error).message
+    const safeMessage = (msg.includes("database") || msg.includes("sql")) ? "Internal server error" : msg;
+    return new Response(JSON.stringify({ error: safeMessage }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   }
 })

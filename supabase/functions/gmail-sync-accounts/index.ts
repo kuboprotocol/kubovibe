@@ -29,7 +29,8 @@ Deno.serve(async (req) => {
     .limit(200)
 
   if (error) {
-    return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    const safeMessage = (error.message.includes("database") || error.message.includes("sql")) ? "Internal server error" : error.message;
+    return new Response(JSON.stringify({ error: safeMessage }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   }
 
   let refreshed = 0

@@ -19,11 +19,11 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } },
     )
     const token = authHeader.replace('Bearer ', '')
-    const { data: claims, error: claimsErr } = await userClient.auth.getClaims(token)
-    if (claimsErr || !claims?.claims?.sub) {
+    const { data: userRes, error: userErr } = await userClient.auth.getUser(token)
+    if (userErr || !userRes?.user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
-    const userId = claims.claims.sub as string
+    const userId = userRes.user.id
     const { id } = await req.json().catch(() => ({}))
     if (!id) return new Response(JSON.stringify({ error: 'id required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
@@ -37,6 +37,8 @@ Deno.serve(async (req) => {
     await admin.storage.from('audit-reports').remove([share.storage_path]).catch(() => {})
     return new Response(JSON.stringify({ ok: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   } catch (e) {
-    return new Response(JSON.stringify({ error: (e as Error).message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    const msg = (e as Error).message
+    const safeMessage = (msg.includes("database") || msg.includes("sql")) ? "Internal server error" : msg;
+    return new Response(JSON.stringify({ error: safeMessage }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   }
 })
