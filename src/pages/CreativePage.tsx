@@ -844,6 +844,20 @@ function Dashboard({ editsRemaining, subscription, history, filter, setFilter, s
         <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
           <h2 className="text-lg font-bold">Histórico detalhado</h2>
           <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8 text-[10px] text-muted-foreground hover:text-foreground"
+              onClick={() => {
+                setFilter("all");
+                setSearchQuery("");
+                setSortOrder("desc");
+                toast.info("Filtros redefinidos");
+              }}
+            >
+              <RotateCw className="h-3 w-3 mr-1" />
+              Limpar
+            </Button>
             <div className="relative flex-1 sm:w-48">
               <Input 
                 value={searchQuery} 
