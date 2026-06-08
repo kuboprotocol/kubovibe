@@ -477,7 +477,15 @@ function Dashboard({ editsRemaining, subscription, history, onPick, onOpen, onRe
                   <div className="flex-1 truncate text-muted-foreground">{h.prompt || h.metadata?.title || h.output_url || "—"}</div>
                   <div className="text-xs text-muted-foreground hidden sm:block whitespace-nowrap">{new Date(h.created_at).toLocaleString("pt-BR")}</div>
                   <Badge variant="secondary" className="text-[10px] shrink-0">{h.credits_spent ?? 0}c</Badge>
-                  <Badge variant={h.status === "completed" ? "default" : h.status === "error" ? "destructive" : "secondary"} className="text-[10px] shrink-0">{h.status}</Badge>
+                  <Badge 
+                    variant={h.status === "completed" ? "default" : h.status === "failed" || h.status === "error" ? "destructive" : "secondary"} 
+                    className={`text-[10px] shrink-0 ${h.status === "processing" ? "animate-pulse" : ""}`}
+                  >
+                    {h.status === "processing" ? "processando" : 
+                     h.status === "queued" ? "em fila" :
+                     h.status === "completed" ? "concluído" : 
+                     h.status === "failed" || h.status === "error" ? "falhou" : h.status}
+                  </Badge>
                 </button>
                 <Button
                   size="icon"
