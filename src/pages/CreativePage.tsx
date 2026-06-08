@@ -114,6 +114,8 @@ export default function CreativePage() {
   const [active, setActive] = useState<ToolKey>((tool as ToolKey) || "dashboard");
   const [history, setHistory] = useState<any[]>([]);
   const [filter, setFilter] = useState<"all" | "queued" | "processing" | "completed" | "failed">("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
   const [cursorStack, setCursorStack] = useState<string[]>([]); // created_at cursors for prev navigation
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
@@ -122,6 +124,7 @@ export default function CreativePage() {
   const [rerunning, setRerunning] = useState<string | null>(null);
   const [isBatchRetrying, setIsBatchRetrying] = useState(false);
   const [showExportOptions, setShowExportOptions] = useState(false);
+  const [showAuditExportOptions, setShowAuditExportOptions] = useState(false);
   const [exportColumns, setExportColumns] = useState<string[]>(["ID", "Tool", "Status", "Prompt", "Credits", "Created At", "Error Message"]);
   const alertedRef = useRef<{ low?: boolean; empty?: boolean }>({});
   const globalCooldown = useCooldown();
@@ -146,10 +149,21 @@ export default function CreativePage() {
       }
     }
 
-    q = q.order("created_at", { ascending: false })
+    if (searchQuery) {
+      q = q.or(`prompt.ilike.%${searchQuery}%,tool.ilike.%${searchQuery}%,error_message.ilike.%${searchQuery}%`);
+    }
+
+    q = q.order("created_at", { ascending: sortOrder === "asc" })
       .limit(PAGE_SIZE + 1); // fetch one extra to detect "has next"
     
-    if (before) q = q.lt("created_at", before);
+    if (before) {
+      if (sortOrder === "desc") {
+        q = q.lt("created_at", before);
+      } else {
+        q = q.gt("created_at", before);
+      }
+    }
+
     const { data, count } = await q;
     const rows = data ?? [];
     const hasMore = rows.length > PAGE_SIZE;
@@ -163,7 +177,7 @@ export default function CreativePage() {
   useEffect(() => {
     setCursorStack([]);
     loadHistory(null);
-  }, [user, active, filter]);
+  }, [user, active, filter, searchQuery, sortOrder]);
 
   // Realtime with reconnect handling. Channel rebuilt on user change; status reflected in UI.
   const prevStatusRef = useRef<Record<string, string>>({});
@@ -380,9 +394,56 @@ export default function CreativePage() {
     toast.success(`Histórico exportado (${exportColumns.length} colunas)`);
     setShowExportOptions(false);
   }
+  async function exportAuditTrail(format: "csv" | "json") {
+    if (!user) return;
+    
+    // Only items reprocessed in retry (rerun:...)
+    const { data, error } = await supabase
+      .from("creative_assets")
+      .select("*")
+      .eq("user_id", user.id)
+      .like("idempotency_key", "rerun:%");
 
+    if (error || !data || data.length === 0) {
+      toast.error("Nenhuma trilha de auditoria para reprocessamentos encontrada.");
+      return;
+    }
 
+    const filename = `creative-audit-trail-${new Date().toISOString().split("T")[0]}.${format}`;
+    let content = "";
 
+    const auditData = data.map(h => ({
+      id: h.id,
+      user_id: h.user_id,
+      tool: h.tool,
+      timestamp: h.created_at,
+      updated_at: h.updated_at,
+      idempotency_key: h.idempotency_key,
+      status: h.status,
+      credits_spent: h.credits_spent,
+      event: "Batch/Single Retry Reprocess"
+    }));
+
+    if (format === "json") {
+      content = JSON.stringify(auditData, null, 2);
+    } else {
+      const headers = ["ID", "User ID", "Tool", "Timestamp", "Updated At", "Idempotency Key", "Status", "Credits", "Event"];
+      const rows = auditData.map(a => [
+        a.id, a.user_id, a.tool, a.timestamp, a.updated_at, a.idempotency_key, a.status, a.credits_spent, a.event
+      ].join(","));
+      content = [headers.join(","), ...rows].join("\n");
+    }
+
+    const blob = new Blob([content], { type: format === "json" ? "application/json" : "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Trilha de auditoria exportada (${auditData.length} itens)`);
+    setShowAuditExportOptions(false);
+  }
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="border-b border-border/40 bg-card/30 backdrop-blur sticky top-0 z-30">
@@ -426,6 +487,10 @@ export default function CreativePage() {
               history={history}
               filter={filter}
               setFilter={setFilter}
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              sortOrder={sortOrder}
+              setSortOrder={setSortOrder}
               onPick={(k: ToolKey) => { setActive(k); navigate(`/creative/${k}`); }}
               onOpen={(a: any) => setSelected(a)}
               onRerun={rerun}
@@ -457,6 +522,9 @@ export default function CreativePage() {
               setExportColumns={setExportColumns}
               showExportOptions={showExportOptions}
               setShowExportOptions={setShowExportOptions}
+              onAuditExport={exportAuditTrail}
+              showAuditExportOptions={showAuditExportOptions}
+              setShowAuditExportOptions={setShowAuditExportOptions}
             />
 
           </TabsContent>
@@ -602,7 +670,7 @@ function AssetDetailDialog({ asset, onClose, onRerun, onCancel, rerunning }: { a
 }
 
 
-function Dashboard({ editsRemaining, subscription, history, filter, setFilter, onPick, onOpen, onRerun, onCancel, onBatchRetry, isBatchRetrying, rerunningId, pageIndex, pageSize, totalCount, hasNext, hasPrev, realtimeStatus, globalCooldown, onNext, onPrev, onExport, exportColumns, setExportColumns, showExportOptions, setShowExportOptions }: any) {
+function Dashboard({ editsRemaining, subscription, history, filter, setFilter, searchQuery, setSearchQuery, sortOrder, setSortOrder, onPick, onOpen, onRerun, onCancel, onBatchRetry, isBatchRetrying, rerunningId, pageIndex, pageSize, totalCount, hasNext, hasPrev, realtimeStatus, globalCooldown, onNext, onPrev, onExport, exportColumns, setExportColumns, showExportOptions, setShowExportOptions, onAuditExport, showAuditExportOptions, setShowAuditExportOptions }: any) {
   const lowBalance = (editsRemaining ?? 0) <= 10;
   return (
     <div className="space-y-6">
@@ -658,17 +726,34 @@ function Dashboard({ editsRemaining, subscription, history, filter, setFilter, o
       <div>
         <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
           <h2 className="text-lg font-bold">Histórico detalhado</h2>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="relative flex-1 sm:w-48">
+              <Input 
+                value={searchQuery} 
+                onChange={(e) => setSearchQuery(e.target.value)} 
+                placeholder="Buscar no histórico..." 
+                className="h-8 text-xs pl-8"
+              />
+              <History className="h-3 w-3 absolute left-2.5 top-2.5 text-muted-foreground" />
+            </div>
             <select 
               value={filter} 
               onChange={(e) => setFilter(e.target.value as any)}
-              className="bg-card border border-border/40 rounded px-2 py-1 text-xs outline-none focus:border-primary/50"
+              className="bg-card border border-border/40 rounded px-2 py-1 h-8 text-xs outline-none focus:border-primary/50"
             >
               <option value="all">Todos os Status</option>
               <option value="queued">Em fila</option>
               <option value="processing">Processando</option>
               <option value="completed">Concluído</option>
               <option value="failed">Falhou</option>
+            </select>
+            <select 
+              value={sortOrder} 
+              onChange={(e) => setSortOrder(e.target.value as any)}
+              className="bg-card border border-border/40 rounded px-2 py-1 h-8 text-xs outline-none focus:border-primary/50"
+            >
+              <option value="desc">Mais recentes</option>
+              <option value="asc">Mais antigos</option>
             </select>
             {globalCooldown > 0 && (
               <Badge variant="outline" className="text-[10px] border-yellow-500/40 text-yellow-600 dark:text-yellow-400">
@@ -731,6 +816,24 @@ function Dashboard({ editsRemaining, subscription, history, filter, setFilter, o
                     <div className="flex gap-2 pt-2">
                       <Button className="flex-1" onClick={() => onExport("csv")}>Exportar CSV</Button>
                       <Button className="flex-1" variant="outline" onClick={() => onExport("json")}>Exportar JSON</Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              <Dialog open={showAuditExportOptions} onOpenChange={setShowAuditExportOptions}>
+                <Button size="icon" variant="ghost" className="h-7 w-7 text-primary" onClick={() => setShowAuditExportOptions(true)} title="Exportar Trilha de Auditoria (Reprocessamentos)">
+                  <History className="h-3.5 w-3.5" />
+                </Button>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Exportar Auditoria de Retry</DialogTitle>
+                    <DialogDescription>
+                      Exportar apenas itens que foram reprocessados via retry (audit trail).
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="py-4 space-y-4">
+                    <div className="flex gap-2 pt-2">
+                      <Button className="flex-1" onClick={() => onAuditExport("csv")}>Exportar CSV</Button>
+                      <Button className="flex-1" variant="outline" onClick={() => onAuditExport("json")}>Exportar JSON</Button>
                     </div>
                   </div>
                 </DialogContent>
