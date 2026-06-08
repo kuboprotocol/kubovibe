@@ -13,9 +13,14 @@ serve(async (req) => {
 
   const { asset_id, status, user_id, tool, reason } = await req.json();
   const { data: profile } = await supabase.from("profiles").select("email").eq("id", user_id).single();
-  const { data: branding } = await supabase.from("creative_org_branding").select("*").eq("user_id", user_id).single();
+  const { data: prefs } = await supabase.from("creative_notification_preferences").select("*").eq("user_id", user_id).single();
   
   if (!profile?.email) return new Response("No email found", { status: 400 });
+
+  // Check preferences
+  if (status === "cancelled" && prefs && !prefs.notify_cancel) return new Response("Cancelled notifications disabled", { status: 200 });
+  if (status === "retrying" && prefs && !prefs.notify_retry) return new Response("Retry notifications disabled", { status: 200 });
+
 
   const orgName = branding?.org_name || "Kubo Vibe";
   const logoUrl = branding?.logo_url || "";
@@ -65,10 +70,12 @@ serve(async (req) => {
               <strong>Status:</strong> ${label}<br>
               <strong>Asset ID:</strong> <code style="font-size: 12px;">${asset_id}</code>${reason ? `<br><strong>Motivo:</strong> ${reason}` : ""}
             </div>
+            ${(!prefs || prefs.include_investigation_link) ? `
             <p>Você pode conferir todos os detalhes diretamente no seu painel.</p>
             <div style="text-align: center; margin-top: 30px;">
               <a href="${Deno.env.get("SITE_URL") || "https://kubovibe.dev"}/creative?investigate=${asset_id}" style="background-color: ${primaryColor}; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Investigar Falha</a>
-            </div>
+            </div>` : ""}
+
           </div>
           <div style="background-color: #f3f4f6; padding: 15px; text-align: center; font-size: 12px; color: #6b7280;">
             ${orgName} &copy; 2026 - Inteligência Artificial para Criadores

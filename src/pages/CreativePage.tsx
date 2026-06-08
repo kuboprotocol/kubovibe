@@ -146,6 +146,14 @@ export default function CreativePage() {
   const [investigationDateEnd, setInvestigationDateEnd] = useState("");
   const [exportAuditLogs, setExportAuditLogs] = useState<any[]>([]);
   const [isLoadingAudit, setIsLoadingAudit] = useState(false);
+  const [auditPage, setAuditPage] = useState(1);
+  const [auditSortOrder, setAuditSortOrder] = useState<"desc" | "asc">("desc");
+  const [notificationPrefs, setNotificationPrefs] = useState({
+    notify_cancel: true,
+    notify_retry: true,
+    include_investigation_link: true
+  });
+
 
   useEffect(() => {
     if (tool) setActive(tool as ToolKey);
@@ -237,6 +245,14 @@ export default function CreativePage() {
         setAuditInterval(sch.export_interval_days || 7);
       }
 
+      const { data: nPrefs } = await supabase.from("creative_notification_preferences").select("*").eq("user_id", user.id).single();
+      if (nPrefs) {
+        setNotificationPrefs({
+          notify_cancel: nPrefs.notify_cancel,
+          notify_retry: nPrefs.notify_retry,
+          include_investigation_link: nPrefs.include_investigation_link
+        });
+      }
       loadExportHistory();
       
       const { data: logs } = await supabase.from("creative_export_logs")
@@ -492,7 +508,7 @@ export default function CreativePage() {
     if (!user) return;
     setIsLoadingAudit(true);
     try {
-      const isExport = !!selectedAssetForInvestigation.asset_id;
+      const isExport = !!selectedAssetForInvestigation.asset_id || (selectedAssetForInvestigation.id && selectedAssetForInvestigation.user_id && !selectedAssetForInvestigation.tool);
       const auditTable = isExport ? "creative_export_audit_log" : "creative_audit_logs";
       const idField = isExport ? "export_id" : "asset_id";
       
@@ -506,7 +522,15 @@ export default function CreativePage() {
       });
       
       if (error) throw error;
-      setExportAuditLogs((data as any[]) || []);
+      
+      let sorted = [...((data as any[]) || [])];
+      sorted.sort((a, b) => {
+        const da = new Date(a.created_at).getTime();
+        const db = new Date(b.created_at).getTime();
+        return auditSortOrder === 'desc' ? db - da : da - db;
+      });
+      
+      setExportAuditLogs(sorted);
     } catch (e: any) {
       toast.error("Erro ao carregar logs: " + e.message);
     } finally {
@@ -514,11 +538,29 @@ export default function CreativePage() {
     }
   }
 
+  const AUDIT_PAGE_SIZE = 10;
+  const paginatedAuditLogs = useMemo(() => {
+    const start = (auditPage - 1) * AUDIT_PAGE_SIZE;
+    return exportAuditLogs.slice(start, start + AUDIT_PAGE_SIZE);
+  }, [exportAuditLogs, auditPage]);
+
+  async function updateNotificationPrefs(key: string, val: boolean) {
+    if (!user) return;
+    const newPrefs = { ...notificationPrefs, [key]: val };
+    setNotificationPrefs(newPrefs);
+    const { error } = await supabase.from("creative_notification_preferences").upsert({
+      user_id: user.id,
+      ...newPrefs
+    });
+    if (error) toast.error("Falha ao salvar preferências");
+  }
+
+
   useEffect(() => {
     if (selectedExport) {
       loadInvestigationLogs(selectedExport.id);
     }
-  }, [selectedExport, investigationSearch, investigationDateStart, investigationDateEnd]);
+  }, [selectedExport, investigationSearch, investigationDateStart, investigationDateEnd, auditSortOrder]);
 
   async function savePreset() {
     if (!user || !newPresetName.trim()) return;
@@ -658,7 +700,19 @@ export default function CreativePage() {
                            onChange={(e) => setInvestigationDateEnd(e.target.value)} 
                          />
                        </div>
-                       <div className="flex gap-2">
+                        <div className="space-y-1">
+                          <label className="text-xs font-medium text-muted-foreground">Ordem</label>
+                          <select 
+                            value={auditSortOrder} 
+                            onChange={(e) => setAuditSortOrder(e.target.value as any)}
+                            className="flex h-10 w-[120px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                          >
+                            <option value="desc">Recentes</option>
+                            <option value="asc">Antigos</option>
+                          </select>
+                        </div>
+                        <div className="flex gap-2">
+
                          <Button variant="outline" size="sm" onClick={() => exportAuditTrail("csv")}>
                            <FileDown className="h-4 w-4 mr-2" /> CSV
                          </Button>
@@ -681,9 +735,10 @@ export default function CreativePage() {
                           <tbody className="divide-y">
                             {isLoadingAudit ? (
                               <tr><td colSpan={4} className="p-8 text-center"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></td></tr>
-                            ) : exportAuditLogs.length === 0 ? (
+                            ) : paginatedAuditLogs.length === 0 ? (
                               <tr><td colSpan={4} className="p-8 text-center text-muted-foreground">Nenhum evento registrado.</td></tr>
-                            ) : exportAuditLogs.map((log: any) => (
+                            ) : paginatedAuditLogs.map((log: any) => (
+
                               <tr key={log.id} className="hover:bg-muted/30">
                                 <td className="p-3 whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</td>
                                 <td className="p-3">
@@ -698,7 +753,38 @@ export default function CreativePage() {
                           </tbody>
                         </table>
                      </div>
-                   </div>
+                      
+                      {exportAuditLogs.length > AUDIT_PAGE_SIZE && (
+                        <div className="flex items-center justify-between py-2 border-t">
+                          <span className="text-xs text-muted-foreground">Página {auditPage} de {Math.ceil(exportAuditLogs.length / AUDIT_PAGE_SIZE)}</span>
+                          <div className="flex gap-2">
+                            <Button size="sm" variant="outline" disabled={auditPage === 1} onClick={() => setAuditPage(p => p - 1)}>Anterior</Button>
+                            <Button size="sm" variant="outline" disabled={auditPage >= Math.ceil(exportAuditLogs.length / AUDIT_PAGE_SIZE)} onClick={() => setAuditPage(p => p + 1)}>Próxima</Button>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="space-y-4 pt-4 border-t">
+                        <h4 className="font-semibold text-sm flex items-center gap-2">
+                          Configurações de Notificação
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-muted/30 p-4 rounded-lg">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm">Notificar Cancelamentos</span>
+                            <input type="checkbox" checked={notificationPrefs.notify_cancel} onChange={(e) => updateNotificationPrefs('notify_cancel', e.target.checked)} className="h-4 w-4" />
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm">Notificar Retentativas</span>
+                            <input type="checkbox" checked={notificationPrefs.notify_retry} onChange={(e) => updateNotificationPrefs('notify_retry', e.target.checked)} className="h-4 w-4" />
+                          </div>
+                          <div className="flex items-center justify-between md:col-span-2">
+                            <span className="text-sm">Incluir link para investigação no e-mail</span>
+                            <input type="checkbox" checked={notificationPrefs.include_investigation_link} onChange={(e) => updateNotificationPrefs('include_investigation_link', e.target.checked)} className="h-4 w-4" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
                  </DialogContent>
                </Dialog>
              </div>
