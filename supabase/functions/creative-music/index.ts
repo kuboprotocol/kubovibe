@@ -83,7 +83,8 @@ Deno.serve(async (req) => {
 
     return j(400, { error: "invalid action" });
   } catch (e) {
-    return j(500, { error: e instanceof Error ? e.message : "error" });
+    console.error("[creative-music] error:", e);
+    return j(500, { error: sanitizeError(e) });
   }
 });
 

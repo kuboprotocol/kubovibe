@@ -1,6 +1,6 @@
 // Nano Banana — image generation via Lovable AI Gateway (google/gemini-2.5-flash-image)
 import { corsHeaders } from "../_shared/cors.ts";
-import { getUser, deductCredits, recordAsset } from "../_shared/creative.ts";
+import { getUser, deductCredits, recordAsset, sanitizeError } from "../_shared/creative.ts";
 
 const COST = 1;
 
@@ -45,7 +45,8 @@ Deno.serve(async (req) => {
 
     return j(200, { ok: true, image_url: imageUrl, asset_id: assetId });
   } catch (e) {
-    return j(500, { error: e instanceof Error ? e.message : "error" });
+    console.error("[creative-image] error:", e);
+    return j(500, { error: sanitizeError(e) });
   }
 });
 
