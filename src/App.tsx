@@ -37,6 +37,10 @@ import GamePage from "./pages/GamePage";
 import AdminSkillsPage from "./pages/AdminSkillsPage";
 import DomainsPage from "./pages/DomainsPage";
 import CreativePage from "./pages/CreativePage";
+import InvestigationPage from "./pages/creative/InvestigationPage";
+import PresetsPage from "./pages/creative/PresetsPage";
+import NotificationPreferencesPage from "./pages/creative/NotificationPreferencesPage";
+import ExportDetailsPage from "./pages/creative/ExportDetailsPage";
 import AgentsHubPage from "./pages/AgentsHubPage";
 import AgentDetailPage from "./pages/AgentDetailPage";
 import AdminPage from "./pages/AdminPage";
@@ -95,6 +99,10 @@ const App = () => (
             <Route path="/admin/skills" element={<ProtectedRoute><AdminSkillsPage /></ProtectedRoute>} />
             <Route path="/domains" element={<ProtectedRoute><DomainsPage /></ProtectedRoute>} />
             <Route path="/creative" element={<ProtectedRoute><CreativePage /></ProtectedRoute>} />
+            <Route path="/creative/investigation" element={<ProtectedRoute><InvestigationPage /></ProtectedRoute>} />
+            <Route path="/creative/presets" element={<ProtectedRoute><PresetsPage /></ProtectedRoute>} />
+            <Route path="/creative/notifications" element={<ProtectedRoute><NotificationPreferencesPage /></ProtectedRoute>} />
+            <Route path="/creative/exports/:id" element={<ProtectedRoute><ExportDetailsPage /></ProtectedRoute>} />
             <Route path="/creative/:tool" element={<ProtectedRoute><CreativePage /></ProtectedRoute>} />
             <Route path="/agents" element={<ProtectedRoute><AgentsHubPage /></ProtectedRoute>} />
             <Route path="/agents/:slug" element={<ProtectedRoute><AgentDetailPage /></ProtectedRoute>} />
