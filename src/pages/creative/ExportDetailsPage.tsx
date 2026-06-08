@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { RetryIndicator } from "@/components/creative/RetryIndicator";
 
 
 type Export = {
@@ -39,7 +40,7 @@ export default function ExportDetailsPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  const { data, isLoading: loading, error: queryError, refetch: load } = useQuery({
+  const { data, isLoading: loading, error: queryError, refetch: load, failureCount } = useQuery({
     queryKey: ["export-detail", id, user?.id],
     queryFn: async () => {
       if (!user || !id) throw new Error("Parâmetros inválidos");
@@ -198,6 +199,15 @@ export default function ExportDetailsPage() {
         </Button>
         <h1 className="text-xl font-bold flex-1">Detalhes da Exportação</h1>
       </header>
+
+      <div className="px-4 pt-4 max-w-5xl mx-auto">
+        <RetryIndicator 
+          failureCount={failureCount} 
+          error={queryError as Error} 
+          onRetry={() => load()} 
+          isLoading={loading} 
+        />
+      </div>
 
       <div className="p-4 max-w-5xl mx-auto space-y-4">
         <Card className="p-4">

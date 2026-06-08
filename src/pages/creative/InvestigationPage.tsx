@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { RetryIndicator } from "@/components/creative/RetryIndicator";
 
 const isUUID = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
 
@@ -86,7 +87,7 @@ export default function InvestigationPage() {
   }, [debouncedSearch, debouncedStatus, debouncedTool, debouncedStartDate, debouncedEndDate, page, sortField, sortDir]);
 
   // Main Assets Query
-  const { data: assetsData, isLoading: loading, error: queryError, refetch: fetchAssets } = useQuery({
+  const { data: assetsData, isLoading: loading, error: queryError, refetch: fetchAssets, failureCount } = useQuery({
     queryKey: ["creative-assets", user?.id, debouncedStatus, debouncedTool, debouncedSearch, debouncedStartDate, debouncedEndDate, sortField, sortDir, page],
     queryFn: async () => {
       if (!user) throw new Error("Não autenticado");
@@ -263,6 +264,15 @@ export default function InvestigationPage() {
           Presets
         </Button>
       </header>
+
+      <div className="px-4 pt-4">
+        <RetryIndicator 
+          failureCount={failureCount} 
+          error={queryError as Error} 
+          onRetry={() => fetchAssets()} 
+          isLoading={loading} 
+        />
+      </div>
 
       <div className="p-4 grid lg:grid-cols-[1fr_400px] gap-4">
         <div className="space-y-3">
