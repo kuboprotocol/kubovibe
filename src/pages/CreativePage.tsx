@@ -619,11 +619,13 @@ export default function CreativePage() {
               onNext={() => {
                 if (!nextCursor) return;
                 setCursorStack((s) => [...s, nextCursor]);
+                setCurrentPage((p) => p + 1);
                 loadHistory(nextCursor);
               }}
               onPrev={() => {
                 setCursorStack((s) => {
                   const next = s.slice(0, -1);
+                  setCurrentPage((p) => Math.max(1, p - 1));
                   loadHistory(next[next.length - 1] ?? null);
                   return next;
                 });
@@ -643,6 +645,16 @@ export default function CreativePage() {
               auditTime={auditTime}
               setAuditTime={setAuditTime}
               scheduleAuditExport={scheduleAuditExport}
+              currentPage={currentPage}
+              onReset={() => {
+                setFilter("all");
+                setSearchQuery("");
+                setSortOrder("desc");
+                setCurrentPage(1);
+                setCursorStack([]);
+                loadHistory(null);
+                toast.info("Filtros redefinidos");
+              }}
             />
 
 
@@ -855,7 +867,7 @@ function AssetDetailDialog({ asset, onClose, onRerun, onCancel, rerunning }: { a
 }
 
 
-function Dashboard({ editsRemaining, subscription, history, filter, setFilter, searchQuery, setSearchQuery, sortOrder, setSortOrder, onPick, onOpen, onRerun, onCancel, onBatchRetry, isBatchRetrying, rerunningId, pageIndex, pageSize, totalCount, hasNext, hasPrev, realtimeStatus, globalCooldown, onNext, onPrev, onExport, exportColumns, setExportColumns, showExportOptions, setShowExportOptions, onAuditExport, showAuditExportOptions, setShowAuditExportOptions, showAuditSchedule, setShowAuditSchedule, auditEmail, setAuditEmail, auditTime, setAuditTime, scheduleAuditExport }: any) {
+function Dashboard({ editsRemaining, subscription, history, filter, setFilter, searchQuery, setSearchQuery, sortOrder, setSortOrder, onPick, onOpen, onRerun, onCancel, onBatchRetry, isBatchRetrying, rerunningId, pageIndex, pageSize, totalCount, hasNext, hasPrev, realtimeStatus, globalCooldown, onNext, onPrev, onExport, exportColumns, setExportColumns, showExportOptions, setShowExportOptions, onAuditExport, showAuditExportOptions, setShowAuditExportOptions, showAuditSchedule, setShowAuditSchedule, auditEmail, setAuditEmail, auditTime, setAuditTime, scheduleAuditExport, onReset, currentPage }: any) {
   const lowBalance = (editsRemaining ?? 0) <= 10;
   return (
     <div className="space-y-6">
@@ -883,7 +895,7 @@ function Dashboard({ editsRemaining, subscription, history, filter, setFilter, s
         <Card className="p-5">
           <div className="text-xs text-muted-foreground uppercase tracking-wider">Gerações totais</div>
           <div className="text-4xl font-bold mt-2 font-mono">{totalCount ?? history.length}</div>
-          <div className="text-xs text-muted-foreground mt-3">Página {(pageIndex ?? 0) + 1}</div>
+          <div className="text-xs text-muted-foreground mt-3">Página {currentPage}</div>
         </Card>
         <Card className="p-5">
           <div className="text-xs text-muted-foreground uppercase tracking-wider">Créditos usados (página)</div>
@@ -916,15 +928,7 @@ function Dashboard({ editsRemaining, subscription, history, filter, setFilter, s
               size="sm"
               variant="ghost"
               className="h-8 text-[10px] text-muted-foreground hover:text-foreground"
-              onClick={() => {
-                setFilter("all");
-                setSearchQuery("");
-                setSortOrder("desc");
-                setCurrentPage(1);
-                setCursorStack([]);
-                loadHistory(null);
-                toast.info("Filtros redefinidos");
-              }}
+              onClick={onReset}
             >
               <RotateCw className="h-3 w-3 mr-1" />
               Reiniciar
