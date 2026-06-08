@@ -6,6 +6,11 @@ import { z } from "npm:zod@3";
 const IONOS_API = "https://api.hosting.ionos.com/domains/v1";
 const RESELLER_API = "https://api.ionos.com/reseller/v2";
 
+const PurchaseSchema = z.object({
+  domain: z.string().min(3).max(253).regex(/^[a-z0-9-]+(\.[a-z0-9-]+)+$/),
+  project_id: z.string().uuid().optional().nullable(),
+});
+
 function buildIonosKey(): string {
   const key = (Deno.env.get("IONOS_API_KEY") ?? "").trim();
   const prefix = (Deno.env.get("IONOS_API_PREFIX") ?? "").trim();
