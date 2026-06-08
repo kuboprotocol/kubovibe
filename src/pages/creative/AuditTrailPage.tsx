@@ -57,6 +57,11 @@ export default function CreativeAuditPage() {
   const [endDate, setEndDate] = useState("");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
+  const [selectedEntry, setSelectedEntry] = useState<AuditTrail | null>(null);
+  const [savedFilters, setSavedFilters] = useState<any[]>(() => {
+    const saved = localStorage.getItem("creative_audit_filters");
+    return saved ? JSON.parse(saved) : [];
+  });
 
   const debouncedSearch = useDebounce(search, 500);
 
