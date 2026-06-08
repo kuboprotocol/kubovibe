@@ -117,6 +117,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
   const [traceInfo, setTraceInfo] = useState<{ correlationId?: string; traceId?: string } | null>(null);
   const [errorState, setErrorState] = useState<{ message: string; correlationId?: string; traceId?: string; stack?: string } | null>(null);
   const [showErrorModal, setShowErrorModal] = useState(false);
+  const [simulationMode, setSimulationMode] = useState(false);
   const { subscription, editsRemaining } = useSubscription();
 
   const handleExecute = async () => {
@@ -141,6 +142,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     setTraceInfo(null);
     setErrorState(null);
     try {
+      if (simulationMode) throw new Error("Falha simulada na etapa de Configuração");
       const { data: { session } } = await supabase.auth.getSession();
       
       const TOOL_TO_FN: Record<string, string> = {
@@ -358,9 +360,21 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
         )}
 
         <div className="pt-4 flex items-center justify-between gap-4 border-t border-border/20">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Info className="h-3.5 w-3.5" />
-            <span>Sua execução entrará na fila de processamento.</span>
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Info className="h-3.5 w-3.5" />
+              <span>Sua execução entrará na fila de processamento.</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <input 
+                type="checkbox" 
+                id="sim-mode" 
+                checked={simulationMode} 
+                onChange={(e) => setSimulationMode(e.target.checked)}
+                className="h-3 w-3"
+              />
+              <label htmlFor="sim-mode" className="text-[10px] uppercase font-bold text-muted-foreground cursor-pointer">Simular Falha</label>
+            </div>
           </div>
           <Button 
             onClick={handleExecute} 
