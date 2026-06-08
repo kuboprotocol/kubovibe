@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@^2";
+import { corsHeaders, sanitizeError } from "../_shared/cors.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -217,10 +218,7 @@ Deno.serve(async (req: Request) => {
     );
   } catch (err: any) {
     console.error("unity-ad-reward error:", err);
-    const safeMessage = (err.message?.includes("database") || err.message?.includes("sql"))
-      ? "Internal server error"
-      : err.message;
-    return new Response(JSON.stringify({ error: safeMessage }), {
+    return new Response(JSON.stringify({ error: sanitizeError(err) }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

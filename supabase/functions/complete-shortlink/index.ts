@@ -1,10 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@^2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+import { corsHeaders, sanitizeError } from "../_shared/cors.ts";
 
 const MIN_WAIT_SECONDS = 5;
 const DAILY_LINK_LIMIT = 10;
@@ -135,9 +131,6 @@ Deno.serve(async (req: Request) => {
     return json({ success: true, credits_earned: reward });
   } catch (err: any) {
     console.error("complete-shortlink error:", err);
-    const safeMessage = (err.message?.includes("database") || err.message?.includes("sql"))
-      ? "Internal server error"
-      : err.message;
-    return json({ error: safeMessage }, 500);
+    return json({ error: sanitizeError(err) }, 500);
   }
 });

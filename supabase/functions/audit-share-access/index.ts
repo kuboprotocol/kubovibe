@@ -1,11 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import bcrypt from 'npm:bcryptjs@2.4.3'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-}
+import { corsHeaders, sanitizeError } from '../_shared/cors.ts'
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -58,8 +53,7 @@ Deno.serve(async (req) => {
       expiresAt: share.expires_at,
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   } catch (e) {
-    const msg = (e as Error).message
-    const safeMessage = (msg.includes("database") || msg.includes("sql")) ? "Internal server error" : msg;
-    return new Response(JSON.stringify({ error: safeMessage }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    console.error('[audit-share-access] error:', e);
+    return new Response(JSON.stringify({ error: sanitizeError(e) }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   }
 })

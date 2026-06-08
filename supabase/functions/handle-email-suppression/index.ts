@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { WebhookError, verifyWebhookRequest } from 'npm:@lovable.dev/webhooks-js'
+import { sanitizeError } from '../_shared/cors.ts'
 
 // Suppression event payload sent by the Go API when Mailgun reports
 // a bounce, complaint, or unsubscribe.
@@ -76,7 +77,7 @@ Deno.serve(async (req) => {
       }
     }
     console.error('Unexpected error during verification', { error })
-    return jsonResponse({ error: 'Internal error' }, 500)
+    return jsonResponse({ error: sanitizeError(error) }, 500)
   }
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey)
