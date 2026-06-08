@@ -6,10 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Download, RotateCw, Ban, ExternalLink, Clock, Package, AlertTriangle, Info } from "lucide-react";
+import { ArrowLeft, Download, RotateCw, Ban, ExternalLink, Clock, Package, AlertTriangle, Info, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 
 type Export = {
@@ -36,16 +37,13 @@ export default function ExportDetailsPage() {
   const [searchParams] = useSearchParams();
   const investigateId = searchParams.get("investigate");
   const { user } = useAuth();
-  const [exportRow, setExportRow] = useState<Export | null>(null);
-  const [executions, setExecutions] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-  const load = useCallback(async (silent = false) => {
-    if (!user || !id) return;
-    if (!silent) setLoading(true);
-    setError(null);
-    try {
+  const { data, isLoading: loading, error: queryError, refetch: load } = useQuery({
+    queryKey: ["export-detail", id, user?.id],
+    queryFn: async () => {
+      if (!user || !id) throw new Error("Parâmetros inválidos");
+      
       const { data: exp, error: expErr } = await supabase
         .from("creative_export_history")
         .select("*")
@@ -54,30 +52,29 @@ export default function ExportDetailsPage() {
         .maybeSingle();
       
       if (expErr) throw expErr;
-      if (!exp) {
-        setError("Exportação não encontrada");
-        setLoading(false);
-        return;
-      }
-      setExportRow(exp as Export);
+      if (!exp) throw new Error("Exportação não encontrada");
 
+      let executions = [];
       if (exp.item_ids && exp.item_ids.length > 0) {
         const { data: items, error: itemsErr } = await supabase
           .from("creative_assets")
           .select("id, tool, status, prompt, created_at, metadata")
           .in("id", exp.item_ids);
         if (itemsErr) throw itemsErr;
-        setExecutions(items || []);
+        executions = items || [];
       }
-    } catch (err: any) {
-      if (!silent) setError(err.message);
-      toast.error("Erro ao carregar detalhes: " + err.message);
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  }, [user, id]);
+      
+      return { exportRow: exp as Export, executions };
+    },
+    enabled: !!user && !!id,
+    retry: 2,
+    staleTime: 10000,
+  });
 
-  useEffect(() => { load(); }, [load]);
+  const exportRow = data?.exportRow || null;
+  const executions = data?.executions || [];
+  const error = queryError ? (queryError as Error).message : null;
+
 
 
   // Realtime polling for status changes
@@ -87,7 +84,7 @@ export default function ExportDetailsPage() {
       .channel(`export-${id}`)
       .on("postgres_changes", {
         event: "UPDATE", schema: "public", table: "creative_export_history", filter: `id=eq.${id}`,
-      }, () => load(true))
+      }, () => queryClient.invalidateQueries({ queryKey: ["export-detail", id] }))
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [user, id, load]);
