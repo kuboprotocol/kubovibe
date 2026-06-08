@@ -582,16 +582,43 @@ export default function CreativePage() {
   }
 
   async function cancelExport(id: string) {
-    const { error } = await supabase.from("creative_export_history").update({ status: "failed", error_message: "Cancelado pelo usuário" }).eq("id", id);
+    if (!user) return;
+    const { error } = await supabase.from("creative_export_history").update({ 
+      status: "failed", 
+      error_message: "Cancelado pelo usuário",
+      cancelled_at: new Date().toISOString(),
+      cancelled_by: user.id
+    }).eq("id", id);
+    
     if (!error) {
+      await supabase.from("creative_export_audit_log").insert({
+        export_id: id,
+        user_id: user.id,
+        action: 'cancel',
+        details: { reason: "Cancelado via UI" }
+      });
       toast.info("Exportação cancelada");
       loadExportHistory();
     }
   }
 
   async function retryExport(id: string) {
-    const { error } = await supabase.from("creative_export_history").update({ status: "queued", error_message: null }).eq("id", id);
+    if (!user) return;
+    const exportToRetry = exports.find(e => e.id === id);
+    const { error } = await supabase.from("creative_export_history").update({ 
+      status: "queued", 
+      error_message: null,
+      retry_count: (exportToRetry?.retry_count || 0) + 1,
+      last_retry_at: new Date().toISOString()
+    }).eq("id", id);
+    
     if (!error) {
+      await supabase.from("creative_export_audit_log").insert({
+        export_id: id,
+        user_id: user.id,
+        action: 'retry',
+        details: { attempt: (exportToRetry?.retry_count || 0) + 1 }
+      });
       toast.success("Exportação reenfileirada");
       loadExportHistory();
     }
@@ -1470,53 +1497,119 @@ function Dashboard({ editsRemaining, subscription, history, filter, setFilter, s
                   </div>
 
                   {/* Detalhes da Exportação */}
-                  <Dialog open={!!selectedExport} onOpenChange={(o) => !o && setSelectedExport(null)}>
-                    <DialogContent className="max-w-md">
+                  <Dialog open={!!selectedExport} onOpenChange={(o) => {
+                    if (!o) {
+                      setSelectedExport(null);
+                      setExportAuditLogs([]);
+                      setInvestigationSearch("");
+                      setInvestigationDateStart("");
+                      setInvestigationDateEnd("");
+                    }
+                  }}>
+                    <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
                       <DialogHeader>
-                        <DialogTitle>Detalhes da Exportação</DialogTitle>
-                        <DialogDescription>Informações detalhadas sobre o job de auditoria.</DialogDescription>
+                        <DialogTitle>Investigação e Detalhes da Exportação</DialogTitle>
+                        <DialogDescription>Analise o status, logs e realize retentativas.</DialogDescription>
                       </DialogHeader>
                       {selectedExport && (
-                        <div className="space-y-4 py-4 text-sm">
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <div className="text-[10px] uppercase text-muted-foreground">Status</div>
+                        <div className="space-y-6 py-4">
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                            <Card className="p-3 bg-muted/20">
+                              <div className="text-[10px] uppercase text-muted-foreground font-bold">Status</div>
                               <Badge className="mt-1">{selectedExport.status}</Badge>
-                            </div>
-                            <div>
-                              <div className="text-[10px] uppercase text-muted-foreground">Formato</div>
-                              <div className="font-mono mt-1">{selectedExport.format.toUpperCase()}</div>
-                            </div>
-                            <div>
-                              <div className="text-[10px] uppercase text-muted-foreground">Contagem de Itens</div>
-                              <div className="font-mono mt-1">{selectedExport.included_count || selectedExport.item_count || 0}</div>
-                            </div>
-                            <div>
-                              <div className="text-[10px] uppercase text-muted-foreground">Tempo de Geração</div>
-                              <div className="font-mono mt-1">
+                            </Card>
+                            <Card className="p-3 bg-muted/20">
+                              <div className="text-[10px] uppercase text-muted-foreground font-bold">Itens</div>
+                              <div className="font-mono mt-1 text-lg">{selectedExport.included_count || selectedExport.item_count || 0}</div>
+                            </Card>
+                            <Card className="p-3 bg-muted/20">
+                              <div className="text-[10px] uppercase text-muted-foreground font-bold">Tentativas</div>
+                              <div className="font-mono mt-1 text-lg">{selectedExport.retry_count || 0}</div>
+                            </Card>
+                            <Card className="p-3 bg-muted/20">
+                              <div className="text-[10px] uppercase text-muted-foreground font-bold">Tempo</div>
+                              <div className="font-mono mt-1 text-lg">
                                 {selectedExport.generation_time_ms ? `${(selectedExport.generation_time_ms / 1000).toFixed(2)}s` : "—"}
                               </div>
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-[10px] uppercase text-muted-foreground mb-1">Execuções Incluídas</div>
-                            <Card className="p-2 max-h-32 overflow-y-auto bg-muted/20">
-                              {selectedExport.item_ids?.length > 0 ? (
-                                <div className="space-y-1">
-                                  {selectedExport.item_ids.map((id: string) => (
-                                    <div key={id} className="text-[10px] font-mono border-b border-border/20 last:border-0 pb-1">{id}</div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <span className="text-xs italic text-muted-foreground">Nenhuma execução listada.</span>
-                              )}
                             </Card>
                           </div>
+
+                          <div className="space-y-3">
+                            <h4 className="text-sm font-bold flex items-center gap-2">
+                              <History className="h-4 w-4" /> Trilha de Auditoria e Logs
+                            </h4>
+                            <div className="flex flex-wrap gap-2">
+                              <Input 
+                                placeholder="Pesquisar motivo ou ação..." 
+                                className="h-8 text-xs max-w-[200px]"
+                                value={investigationSearch}
+                                onChange={(e) => setInvestigationSearch(e.target.value)}
+                              />
+                              <Input 
+                                type="date" 
+                                className="h-8 text-xs w-auto" 
+                                value={investigationDateStart}
+                                onChange={(e) => setInvestigationDateStart(e.target.value)}
+                              />
+                              <Input 
+                                type="date" 
+                                className="h-8 text-xs w-auto"
+                                value={investigationDateEnd}
+                                onChange={(e) => setInvestigationDateEnd(e.target.value)}
+                              />
+                              <Button size="sm" variant="outline" className="h-8" onClick={() => loadInvestigationLogs(selectedExport.id)}>
+                                {isLoadingAudit ? <Loader2 className="h-3 w-3 animate-spin" /> : "Filtrar"}
+                              </Button>
+                            </div>
+
+                            <Card className="p-0 overflow-hidden border-border/40">
+                              <div className="max-h-[300px] overflow-y-auto divide-y divide-border/20">
+                                {exportAuditLogs.length === 0 && !isLoadingAudit && (
+                                  <div className="p-8 text-center text-xs text-muted-foreground italic">Nenhum log encontrado para este filtro.</div>
+                                )}
+                                {exportAuditLogs.map((log) => (
+                                  <div key={log.id} className="p-3 hover:bg-muted/10 transition-colors flex items-start justify-between gap-4">
+                                    <div className="min-w-0">
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <Badge variant="outline" className="text-[9px] uppercase font-mono">{log.action}</Badge>
+                                        <span className="text-[10px] text-muted-foreground">{new Date(log.created_at).toLocaleString()}</span>
+                                      </div>
+                                      <p className="text-xs text-foreground/80 break-words">
+                                        {log.details?.reason || log.details?.error || "Ação executada com sucesso"}
+                                      </p>
+                                    </div>
+                                    {log.details?.logs_link && (
+                                      <Button size="sm" variant="ghost" className="h-7 text-[10px] text-primary underline shrink-0" asChild>
+                                        <a href={log.details.logs_link} target="_blank" rel="noopener noreferrer">Ver Logs</a>
+                                      </Button>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </Card>
+                          </div>
+
                           {selectedExport.error_message && (
-                            <div className="p-3 bg-destructive/10 border border-destructive/20 rounded text-destructive text-xs font-mono">
-                              {selectedExport.error_message}
+                            <div className="p-3 bg-destructive/10 border border-destructive/20 rounded space-y-2">
+                              <p className="text-destructive text-xs font-bold uppercase flex items-center gap-1">
+                                <AlertTriangle className="h-3 w-3" /> Motivo da Falha
+                              </p>
+                              <p className="text-xs font-mono break-words">{selectedExport.error_message}</p>
                             </div>
                           )}
+
+                          <div className="flex justify-end gap-3 pt-4 border-t border-border/40">
+                            {selectedExport.status === "failed" && (
+                              <Button className="gap-2" onClick={() => { retryExport(selectedExport.id); setSelectedExport(null); }}>
+                                <RotateCw className="h-4 w-4" /> Tentar Novamente
+                              </Button>
+                            )}
+                            {(selectedExport.status === "processing" || selectedExport.status === "queued") && (
+                              <Button variant="destructive" className="gap-2" onClick={() => { cancelExport(selectedExport.id); setSelectedExport(null); }}>
+                                <AlertTriangle className="h-4 w-4" /> Cancelar Exportação
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       )}
                     </DialogContent>
