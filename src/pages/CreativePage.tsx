@@ -640,6 +640,40 @@ export default function CreativePage() {
     return () => clearInterval(interval);
   }, [user, exports]);
 
+  async function loadInvestigationLogs(exportId: string) {
+    if (!user) return;
+    setIsLoadingAudit(true);
+    try {
+      let q = supabase.from("creative_export_audit_log").select("*").eq("export_id", exportId);
+      
+      if (investigationSearch) {
+        q = q.or(`action.ilike.%${investigationSearch}%,details->>reason.ilike.%${investigationSearch}%,details->>error.ilike.%${investigationSearch}%`);
+      }
+      
+      if (investigationDateStart) {
+        q = q.gte("created_at", investigationDateStart);
+      }
+      
+      if (investigationDateEnd) {
+        q = q.lte("created_at", investigationDateEnd);
+      }
+      
+      const { data, error } = await q.order("created_at", { ascending: false });
+      if (error) throw error;
+      setExportAuditLogs(data || []);
+    } catch (e: any) {
+      toast.error("Erro ao carregar logs: " + e.message);
+    } finally {
+      setIsLoadingAudit(false);
+    }
+  }
+
+  useEffect(() => {
+    if (selectedExport) {
+      loadInvestigationLogs(selectedExport.id);
+    }
+  }, [selectedExport, investigationSearch, investigationDateStart, investigationDateEnd]);
+
 
   async function savePreset() {
     if (!user || !newPresetName.trim()) return;
