@@ -1,25 +1,16 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { validatePublicUrl } from "../_shared/security.ts";
+import { corsHeaders } from "../_shared/cors.ts";
+import { getUser, deductCredits, recordAsset, sanitizeError } from "../_shared/creative.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-idempotency-key",
-};
+const COST = 5;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const user = await getUser(req.headers.get("Authorization"));
+  if (!user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
 
+  const idempotencyKey = req.headers.get("X-Idempotency-Key") ?? undefined;
   try {
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
-
-    const authHeader = req.headers.get("Authorization")!;
-    const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader.replace("Bearer ", ""));
-    if (authError || !user) throw new Error("Unauthorized");
-
     const { source_image: rawImg, driving_video: rawVid } = await req.json();
     if (!rawImg || !rawVid) throw new Error("Missing source_image or driving_video");
 
@@ -27,14 +18,11 @@ serve(async (req) => {
     if (!ded.ok) return new Response(JSON.stringify({ error: ded.error }), { status: (ded as any).status ?? 402, headers: corsHeaders });
 
     // Call external FastAPI backend
-    // In a real scenario, this would be a URL to a GPU server running the EMO model.
     const EMO_BACKEND_URL = Deno.env.get("EMO_BACKEND_URL");
     
     if (!EMO_BACKEND_URL) {
-      // Mock success if no backend configured yet (for demo/audit purposes)
       console.warn("EMO_BACKEND_URL not set, returning mock result.");
       
-      const asset_id = crypto.randomUUID();
       const asset_id = await recordAsset(user.id, {
         tool: "emo",
         prompt: "EMO Animation",
@@ -44,18 +32,11 @@ serve(async (req) => {
         metadata: { source_image: rawImg, driving_video: rawVid }
       });
 
-      // Credits already deducted atomically above
-
       return new Response(JSON.stringify({ status: "success", video: "output/result.mp4", asset_id }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Real integration: Proxy the request to the FastAPI server
-    // Note: FastAPI expects UploadFile (form-data). We'll fetch the URLs and send them as files if needed, 
-    // or just pass URLs if the backend supports it. The provided code expects UploadFile.
-    
-    // For now, let's assume we fetch the files and forward them.
     const formData = new FormData();
     const imgRes = await fetch(rawImg);
     const imgBlob = await imgRes.blob();
