@@ -24,12 +24,14 @@ Deno.serve(async (req) => {
 
   const idempotencyKey = req.headers.get("X-Idempotency-Key") ?? undefined;
   try {
-    const { messages } = await req.json();
-    if (!Array.isArray(messages) || messages.length === 0) {
-      return new Response(JSON.stringify({ error: "messages required" }), {
+    const body = await req.json();
+    const parsed = InputSchema.safeParse(body);
+    if (!parsed.success) {
+      return new Response(JSON.stringify({ error: "invalid_input", details: parsed.error.flatten() }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    const { messages } = parsed.data;
 
     const ded = await deductCredits(user.id, COST, "creative_chat", { count: messages.length }, user.email, idempotencyKey);
     if (!ded.ok) {
