@@ -216,17 +216,53 @@ export default function CreativeAuditPage() {
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => exportData("json")}>
-            <FileDown className="h-4 w-4 mr-2" /> JSON
+            <FileDown className="h-4 w-4 mr-2" /> Exportar JSON
           </Button>
           <Button variant="outline" onClick={() => exportData("csv")}>
-            <FileDown className="h-4 w-4 mr-2" /> CSV
+            <FileDown className="h-4 w-4 mr-2" /> Exportar CSV
           </Button>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto space-y-6">
+        {/* Alerts & Insights */}
+        {(recurrentFailures.length > 0 || multipleAttempts > 0) && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {recurrentFailures.length > 0 && (
+              <Card className="p-4 border-destructive/20 bg-destructive/5">
+                <div className="flex items-center gap-2 mb-3 text-destructive">
+                  <AlertCircle className="h-5 w-5" />
+                  <h3 className="font-semibold">Falhas Recorrentes Detectadas</h3>
+                </div>
+                <div className="space-y-2">
+                  {recurrentFailures.map(([cause, info]) => (
+                    <div key={cause} className="text-sm flex justify-between items-start bg-background/50 p-2 rounded">
+                      <span className="line-clamp-1 flex-1 font-mono text-xs">{cause}</span>
+                      <Badge variant="destructive" className="ml-2">{info.count}x</Badge>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
+            {multipleAttempts > 0 && (
+              <Card className="p-4 border-yellow-500/20 bg-yellow-500/5">
+                <div className="flex items-center gap-2 mb-3 text-yellow-600">
+                  <History className="h-5 w-5" />
+                  <h3 className="font-semibold">Tentativas de Retry</h3>
+                </div>
+                <p className="text-sm text-muted-foreground mb-2">
+                  Identificamos <strong>{multipleAttempts}</strong> IDs de correlação com múltiplas entradas, indicando retries automáticos ou manuais.
+                </p>
+                <Button variant="outline" size="sm" onClick={() => setSearch("retry")}>
+                  Ver Retries
+                </Button>
+              </Card>
+            )}
+          </div>
+        )}
+
         <Card className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-4">
             <div className="relative lg:col-span-2">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -272,15 +308,35 @@ export default function CreativeAuditPage() {
               placeholder="Fim"
             />
           </div>
-          {(debouncedSearch || step !== "all" || status !== "all" || startDate || endDate) && (
-            <div className="mt-4 flex justify-end">
+          
+          <div className="flex flex-wrap items-center justify-between gap-4 pt-2 border-t">
+            <div className="flex gap-2">
+              <Button variant="secondary" size="sm" onClick={saveCurrentFilters}>
+                <Save className="h-4 w-4 mr-2" /> Salvar Busca
+              </Button>
+              {savedFilters.length > 0 && (
+                <div className="flex gap-1">
+                  {savedFilters.map((f) => (
+                    <Badge 
+                      key={f.id} 
+                      variant="outline" 
+                      className="cursor-pointer hover:bg-accent"
+                      onClick={() => applySavedFilter(f)}
+                    >
+                      {f.name}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+            {(debouncedSearch || step !== "all" || status !== "all" || startDate || endDate) && (
               <Button variant="ghost" size="sm" onClick={() => {
                 setSearch(""); setStep("all"); setStatus("all"); setStartDate(""); setEndDate(""); setPage(1);
               }}>
                 <X className="h-4 w-4 mr-2" /> Limpar Filtros
               </Button>
-            </div>
-          )}
+            )}
+          </div>
         </Card>
 
         <Card className="overflow-hidden">
