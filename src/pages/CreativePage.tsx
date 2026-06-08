@@ -504,7 +504,10 @@ export default function CreativePage() {
     }
   }
 
+  async function exportAuditTrailLegacy(format: "csv" | "json") {
+    if (!user) return;
     const { data, error } = await supabase
+
       .from("creative_assets")
       .select("*")
       .eq("user_id", user.id)
