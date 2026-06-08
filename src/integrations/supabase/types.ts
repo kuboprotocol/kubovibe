@@ -2083,44 +2083,6 @@ export type Database = {
       }
     }
     Functions: {
-      admin_clear_connector_run: {
-        Args: { _connector_slug: string; _run_id: string }
-        Returns: number
-      }
-      admin_list_connector_runs: {
-        Args: { _connector_slug: string; _limit?: number }
-        Returns: {
-          event_count: number
-          is_mine: boolean
-          run_id: string
-          run_label: string
-          started_at: string
-          user_id: string
-        }[]
-      }
-      bump_rate_limit: {
-        Args: { _bucket: string; _user: string; _window_seconds: number }
-        Returns: number
-      }
-      delete_email: {
-        Args: { message_id: number; queue_name: string }
-        Returns: boolean
-      }
-      enqueue_email: {
-        Args: { payload: Json; queue_name: string }
-        Returns: number
-      }
-      execute_atomic_credit_deduction: {
-        Args: {
-          _amount: number
-          _category?: string
-          _idempotency_key?: string
-          _metadata?: Json
-          _reason: string
-          _user_id: string
-        }
-        Returns: Json
-      }
       execute_job_action: {
         Args: {
           p_action: string
@@ -2130,13 +2092,7 @@ export type Database = {
         }
         Returns: Json
       }
-      grant_credits: {
-        Args: { p_amount: number; p_user_id: string }
-        Returns: undefined
-      }
       has_role: { Args: { _role: string }; Returns: boolean }
-      is_admin: { Args: { p_user_id: string }; Returns: boolean }
-      is_kubo_admin: { Args: never; Returns: boolean }
       log_connector_activity: {
         Args: {
           _connector_slug: string
@@ -2146,40 +2102,6 @@ export type Database = {
           _status?: string
         }
         Returns: string
-      }
-      log_security_audit: {
-        Args: {
-          _action: string
-          _actor_role?: string
-          _actor_user_id?: string
-          _error_message?: string
-          _ip?: unknown
-          _job_id?: string
-          _metadata?: Json
-          _request_id?: string
-          _resource_id?: string
-          _resource_type: string
-          _success?: boolean
-          _user_agent?: string
-        }
-        Returns: string
-      }
-      move_to_dlq: {
-        Args: {
-          dlq_name: string
-          message_id: number
-          payload: Json
-          source_queue: string
-        }
-        Returns: number
-      }
-      read_email_batch: {
-        Args: { batch_size: number; queue_name: string; vt: number }
-        Returns: {
-          message: Json
-          msg_id: number
-          read_ct: number
-        }[]
       }
     }
     Enums: {
