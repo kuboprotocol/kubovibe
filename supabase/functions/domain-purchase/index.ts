@@ -95,12 +95,15 @@ Deno.serve(async (req) => {
     if (ue || !userRes?.user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     const user = userRes.user;
 
-    const body = await req.json().catch(() => ({}));
-    const domain = String(body?.domain ?? "").trim().toLowerCase();
-    const project_id = body?.project_id ?? null;
-    if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(domain)) {
-      return new Response(JSON.stringify({ error: "invalid_domain" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const rawBody = await req.json().catch(() => ({}));
+    const parsed = PurchaseSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      return new Response(JSON.stringify({ error: "invalid_input", details: parsed.error.flatten().fieldErrors }), { 
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } 
+      });
     }
+
+    const { domain, project_id } = parsed.data;
     const tld = tldOf(domain);
     const price = TLD_PRICES[tld] ?? 20;
 
