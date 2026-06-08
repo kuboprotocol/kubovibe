@@ -56,9 +56,6 @@ Deno.serve(async (req) => {
     });
   }
 
-  const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
   const { data: agent, error } = await admin
     .from("agent_registry")
     .select("slug, edge_function, status")
