@@ -492,21 +492,22 @@ export default function CreativePage() {
     if (!user) return;
     setIsLoadingAudit(true);
     try {
-      const auditTable = selectedAssetForInvestigation.asset_id ? "creative_export_audit_log" : "creative_audit_logs";
-      const idField = selectedAssetForInvestigation.asset_id ? "export_id" : "asset_id";
+      const isExport = !!selectedAssetForInvestigation.asset_id;
+      const auditTable = isExport ? "creative_export_audit_log" : "creative_audit_logs";
+      const idField = isExport ? "export_id" : "asset_id";
       
-      let q = supabase.from(auditTable).select("*, profiles(email)").eq(idField, exportId);
+      let query: any = supabase.from(auditTable).select("*, profiles(email)").eq(idField, exportId);
       
       if (investigationSearch) {
-        if (selectedAssetForInvestigation.asset_id) {
-          q = q.or(`action.ilike.%${investigationSearch}%,details->>reason.ilike.%${investigationSearch}%,details->>error.ilike.%${investigationSearch}%`);
+        if (isExport) {
+          query = query.or(`action.ilike.%${investigationSearch}%,details->>reason.ilike.%${investigationSearch}%,details->>error.ilike.%${investigationSearch}%`);
         } else {
-          q = q.or(`event_type.ilike.%${investigationSearch}%,metadata->>reason.ilike.%${investigationSearch}%,metadata->>error.ilike.%${investigationSearch}%`);
+          query = query.or(`event_type.ilike.%${investigationSearch}%,metadata->>reason.ilike.%${investigationSearch}%,metadata->>error.ilike.%${investigationSearch}%`);
         }
       }
-      if (investigationDateStart) q = q.gte("created_at", investigationDateStart);
-      if (investigationDateEnd) q = q.lte("created_at", investigationDateEnd);
-      const { data, error } = await q.order("created_at", { ascending: false });
+      if (investigationDateStart) query = query.gte("created_at", investigationDateStart);
+      if (investigationDateEnd) query = query.lte("created_at", investigationDateEnd);
+      const { data, error } = await query.order("created_at", { ascending: false });
       if (error) throw error;
       setExportAuditLogs(data || []);
     } catch (e: any) {
