@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -6,9 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Download, RotateCw, Ban, ExternalLink, Clock, Package, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Download, RotateCw, Ban, ExternalLink, Clock, Package, AlertTriangle, Info } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
 
 type Export = {
   id: string;
@@ -39,9 +41,9 @@ export default function ExportDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  async function load() {
+  const load = useCallback(async (silent = false) => {
     if (!user || !id) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const { data: exp, error: expErr } = await supabase
@@ -62,20 +64,21 @@ export default function ExportDetailsPage() {
       if (exp.item_ids && exp.item_ids.length > 0) {
         const { data: items, error: itemsErr } = await supabase
           .from("creative_assets")
-          .select("id, tool, status, prompt, created_at")
+          .select("id, tool, status, prompt, created_at, metadata")
           .in("id", exp.item_ids);
         if (itemsErr) throw itemsErr;
         setExecutions(items || []);
       }
     } catch (err: any) {
-      setError(err.message);
+      if (!silent) setError(err.message);
       toast.error("Erro ao carregar detalhes: " + err.message);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  }
+  }, [user, id]);
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [user, id]);
+  useEffect(() => { load(); }, [load]);
+
 
   // Realtime polling for status changes
   useEffect(() => {
@@ -84,10 +87,11 @@ export default function ExportDetailsPage() {
       .channel(`export-${id}`)
       .on("postgres_changes", {
         event: "UPDATE", schema: "public", table: "creative_export_history", filter: `id=eq.${id}`,
-      }, () => load())
+      }, () => load(true))
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [user, id]); // eslint-disable-line
+  }, [user, id, load]);
+
 
   async function cancel() {
     if (!exportRow || !user) return;
@@ -259,7 +263,22 @@ export default function ExportDetailsPage() {
                 <TableRow key={e.id}>
                   <TableCell><Badge variant="outline">{e.tool}</Badge></TableCell>
                   <TableCell className="font-mono text-xs">{e.id.slice(0, 8)}</TableCell>
-                  <TableCell><Badge>{e.status}</Badge></TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Badge className={`capitalize ${e.status === 'completed' ? 'bg-emerald-500/10 text-emerald-500' : e.status === 'failed' ? 'bg-destructive/10 text-destructive' : ''}`}>
+                        {e.status}
+                      </Badge>
+                      {(e.metadata?.error || e.metadata?.reason) && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger><Info className="h-3 w-3 text-muted-foreground" /></TooltipTrigger>
+                            <TooltipContent className="max-w-xs">{e.metadata.error || e.metadata.reason}</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
+                    </div>
+                  </TableCell>
+
                   <TableCell className="text-xs">{new Date(e.created_at).toLocaleString()}</TableCell>
                   <TableCell className="text-right">
                     <Button size="sm" variant="ghost" onClick={() => {

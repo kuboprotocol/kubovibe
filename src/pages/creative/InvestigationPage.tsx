@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -8,12 +8,14 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, RotateCw, Ban, FileDown, Search, ExternalLink, AlertTriangle, ArrowUpDown, Loader2, X } from "lucide-react";
+import { ArrowLeft, RotateCw, Ban, FileDown, Search, ExternalLink, AlertTriangle, ArrowUpDown, Loader2, X, Info, Package } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const isUUID = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+
 
 
 type Asset = {
@@ -133,27 +135,34 @@ export default function InvestigationPage() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "creative_assets", filter: `user_id=eq.${user.id}` },
-        () => fetchAssets()
+        () => {
+          fetchAssets();
+          // Also refresh detail if currently open
+          const investigateId = params.get("investigate");
+          if (investigateId) loadDetail(investigateId, true);
+        }
       )
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [user, fetchAssets]);
+  }, [user, fetchAssets, params]);
 
   // Investigate from query param
   useEffect(() => {
     const investigateId = params.get("investigate");
-    if (investigateId && !selected) loadDetail(investigateId);
+    if (investigateId) loadDetail(investigateId);
   }, [params]); // eslint-disable-line
 
-  async function loadDetail(id: string) {
-    setDetailLoading(true);
+  async function loadDetail(id: string, silent = false) {
+    if (!silent) setDetailLoading(true);
     try {
+
       const { data: a, error: aErr } = await supabase.from("creative_assets").select("*").eq("id", id).maybeSingle();
       if (aErr) throw aErr;
       if (!a) {
-        toast.error("Execução não encontrada");
+        if (!silent) toast.error("Execução não encontrada");
         return;
       }
+
       setSelected(a as Asset);
       const { data: logs, error: lErr } = await supabase
         .from("creative_audit_logs")
@@ -405,64 +414,94 @@ export default function InvestigationPage() {
               </div>
             </div>
           ) : !selected ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
-              <Search className="h-12 w-12 mb-4 opacity-20" />
-              <p className="text-sm">Selecione uma execução para ver detalhes, logs e trilha de auditoria.</p>
+            <div className="h-[400px] flex flex-col items-center justify-center text-center p-6 space-y-4 text-muted-foreground border-2 border-dashed border-border rounded-xl">
+              <div className="bg-muted p-3 rounded-full">
+                <Search className="h-6 w-6" />
+              </div>
+              <div>
+                <p className="font-semibold text-foreground">Nenhuma execução selecionada</p>
+                <p className="text-sm">Selecione uma linha na tabela para ver os detalhes completos e trilha de auditoria.</p>
+              </div>
             </div>
           ) : (
-            <div className="space-y-3" data-testid="investigation-detail">
+            <div className="space-y-4 animate-in fade-in duration-300" data-testid="investigation-detail">
               <div className="flex items-start justify-between">
                 <div>
-                  <div className="text-xs text-muted-foreground">Execução</div>
-                  <div className="font-mono text-sm">{selected.id}</div>
+                  <h2 className="text-lg font-bold flex items-center gap-2">
+                    Detalhes: {selected.id.slice(0, 8)}
+                    <Badge variant="secondary" className="font-mono text-[10px]">{selected.tool}</Badge>
+                  </h2>
+                  <p className="text-xs text-muted-foreground">{new Date(selected.created_at).toLocaleString()}</p>
                 </div>
-                <StatusBadge status={selected.status} />
+                <Button variant="ghost" size="icon" onClick={() => { setSelected(null); setParams((p) => { p.delete("investigate"); return p; }); }}>
+                  <X className="h-4 w-4" />
+                </Button>
               </div>
-              <div className="text-sm">
-                <div className="text-xs text-muted-foreground">Prompt</div>
-                <div className="line-clamp-3 bg-muted/30 p-2 rounded">{selected.prompt || "—"}</div>
-              </div>
-              {selected.metadata?.error && (
-                <div className="text-sm border-l-2 border-destructive pl-2">
-                  <div className="text-xs text-muted-foreground">Motivo do erro</div>
-                  <div className="text-destructive font-medium">{selected.metadata.error}</div>
-                </div>
-              )}
 
-              <div className="flex gap-2 pt-2">
+              <div className="space-y-2">
+                <Label className="text-xs uppercase text-muted-foreground">Prompt / Entrada</Label>
+                <p className="text-sm bg-muted/30 p-2 rounded border border-border/50 max-h-32 overflow-y-auto whitespace-pre-wrap">
+                  {selected.prompt || "Nenhum prompt disponível"}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="p-2 rounded border border-border bg-muted/10">
+                  <Label className="text-[10px] uppercase text-muted-foreground block">Créditos</Label>
+                  <span className="text-sm font-semibold">{selected.credits_spent}</span>
+                </div>
+                <div className="p-2 rounded border border-border bg-muted/10">
+                  <Label className="text-[10px] uppercase text-muted-foreground block">Status</Label>
+                  <StatusBadge status={selected.status} />
+                </div>
+              </div>
+
+              <div className="flex gap-2">
                 {(selected.status === "failed" || selected.status === "error" || selected.status === "cancelled") && (
-                  <Button data-testid="detail-requeue" size="sm" onClick={() => requeueAsset(selected)}><RotateCw className="h-3 w-3 mr-1"/>Reenfileirar</Button>
+                  <Button data-testid="detail-requeue" size="sm" className="flex-1" onClick={() => requeueAsset(selected)}><RotateCw className="h-3 w-3 mr-1" /> Reenfileirar</Button>
                 )}
                 {(selected.status === "processing" || selected.status === "queued") && (
-                  <Button data-testid="detail-cancel" size="sm" variant="destructive" onClick={() => cancelAsset(selected)}><Ban className="h-3 w-3 mr-1"/>Cancelar</Button>
+                  <Button data-testid="detail-cancel" size="sm" variant="destructive" className="flex-1" onClick={() => cancelAsset(selected)}><Ban className="h-3 w-3 mr-1" /> Cancelar</Button>
                 )}
                 {selected.output_url && (
-                  <a href={selected.output_url} target="_blank" rel="noreferrer" className="flex-1">
-                    <Button size="sm" variant="outline" className="w-full"><ExternalLink className="h-3 w-3 mr-1"/>Logs</Button>
-                  </a>
+                  <Button size="sm" variant="outline" className="flex-1" asChild>
+                    <a href={selected.output_url} target="_blank" rel="noreferrer"><ExternalLink className="h-3 w-3 mr-1" /> Ver Output</a>
+                  </Button>
                 )}
               </div>
 
-              <div className="border-t border-border pt-3">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-semibold">Trilha de auditoria ({audit.length})</h3>
+              <div className="pt-4 border-t border-border">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-bold flex items-center gap-1">
+                    Trilha de Auditoria
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger><Info className="h-3 w-3 text-muted-foreground" /></TooltipTrigger>
+                        <TooltipContent>Histórico completo de eventos e ações para esta execução.</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </h3>
                   <div className="flex gap-1">
-                    <Button data-testid="export-audit-json" size="sm" variant="ghost" className="h-7 px-2" onClick={() => exportAudit("json")}><FileDown className="h-3 w-3 mr-1"/>JSON</Button>
-                    <Button data-testid="export-audit-csv" size="sm" variant="ghost" className="h-7 px-2" onClick={() => exportAudit("csv")}><FileDown className="h-3 w-3 mr-1"/>CSV</Button>
+                    <Button data-testid="export-audit-json" variant="ghost" size="icon" className="h-7 w-7" onClick={() => exportAudit("json")} title="Exportar JSON"><FileDown className="h-3.5 w-3.5" /></Button>
+                    <Button data-testid="export-audit-csv" variant="ghost" size="icon" className="h-7 w-7" onClick={() => exportAudit("csv")} title="Exportar CSV"><Package className="h-3.5 w-3.5" /></Button>
                   </div>
                 </div>
-                <div className="max-h-[400px] overflow-y-auto space-y-2 pr-1">
-                  {audit.length === 0 && <p className="text-xs text-muted-foreground py-4 text-center">Nenhum evento registrado</p>}
-                  {audit.map((e) => (
-                    <div key={e.id} className="text-xs border-l-2 border-primary/40 pl-2 py-1 bg-muted/20 rounded-r">
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-primary">{e.event_type ?? e.action}</span>
-                        <span className="text-[10px] text-muted-foreground">{new Date(e.created_at).toLocaleString()}</span>
+                
+                <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                  {audit.length === 0 ? (
+                    <p className="text-xs text-center py-4 text-muted-foreground italic">Nenhum log registrado</p>
+                  ) : (
+                    audit.map((e) => (
+                      <div key={e.id} className="text-xs border-l-2 border-primary/30 pl-3 py-1 hover:border-primary transition-colors">
+                        <div className="flex justify-between font-medium">
+                          <span className="capitalize">{e.event_type?.replace(/_/g, " ") || "Evento"}</span>
+                          <span className="text-[10px] text-muted-foreground">{new Date(e.created_at).toLocaleTimeString()}</span>
+                        </div>
+                        {e.metadata?.error && <p className="text-destructive font-mono mt-1 break-all">{e.metadata.error}</p>}
+                        {e.metadata?.actor_email && <p className="text-[10px] text-muted-foreground mt-1">Por: {e.metadata.actor_email}</p>}
                       </div>
-                      <div className="text-muted-foreground">por {e.metadata?.actor_email ?? e.user_id?.slice(0,8) ?? "sistema"}</div>
-                      {e.metadata?.reason && <div className="mt-1 italic">Motivo: {e.metadata.reason}</div>}
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
             </div>
@@ -474,14 +513,19 @@ export default function InvestigationPage() {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, string> = {
-    failed: "bg-destructive text-destructive-foreground",
-    error: "bg-destructive text-destructive-foreground",
-    cancelled: "bg-amber-500 text-white",
-    processing: "bg-blue-500 text-white",
-    completed: "bg-emerald-500 text-white",
-    queued: "bg-muted text-foreground",
+  const variants: any = {
+    completed: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
+    failed: "bg-destructive/10 text-destructive border-destructive/20",
+    error: "bg-destructive/10 text-destructive border-destructive/20",
+    processing: "bg-amber-500/10 text-amber-500 border-amber-500/20",
+    queued: "bg-blue-500/10 text-blue-500 border-blue-500/20",
+    cancelled: "bg-slate-500/10 text-slate-500 border-slate-500/20",
   };
-  return <Badge className={map[status] ?? ""}>{status}</Badge>;
+  return <Badge variant="outline" className={`capitalize ${variants[status] || ""}`}>{status}</Badge>;
 }
+
+function Label({ children, className, ...props }: any) {
+  return <label className={`text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 ${className}`} {...props}>{children}</label>;
+}
+
 
