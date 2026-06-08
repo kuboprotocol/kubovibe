@@ -112,6 +112,7 @@ export default function CreativePage() {
   const { subscription, editsRemaining, refetch } = useSubscription();
   const [active, setActive] = useState<ToolKey>((tool as ToolKey) || "dashboard");
   const [history, setHistory] = useState<any[]>([]);
+  const [filter, setFilter] = useState<"all" | "queued" | "processing" | "completed" | "failed">("all");
   const [cursorStack, setCursorStack] = useState<string[]>([]); // created_at cursors for prev navigation
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
@@ -131,9 +132,19 @@ export default function CreativePage() {
     if (!user) return;
     let q = supabase.from("creative_assets")
       .select("*", { count: "exact" })
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
+      .eq("user_id", user.id);
+    
+    if (filter !== "all") {
+      if (filter === "failed") {
+        q = q.in("status", ["failed", "error"]);
+      } else {
+        q = q.eq("status", filter);
+      }
+    }
+
+    q = q.order("created_at", { ascending: false })
       .limit(PAGE_SIZE + 1); // fetch one extra to detect "has next"
+    
     if (before) q = q.lt("created_at", before);
     const { data, count } = await q;
     const rows = data ?? [];
@@ -144,11 +155,11 @@ export default function CreativePage() {
     setTotalCount(count ?? 0);
   }
 
-  // Initial + refresh on user/active change.
+  // Initial + refresh on user/active/filter change.
   useEffect(() => {
     setCursorStack([]);
     loadHistory(null);
-  }, [user, active]);
+  }, [user, active, filter]);
 
   // Realtime with reconnect handling. Channel rebuilt on user change; status reflected in UI.
   useEffect(() => {
@@ -277,6 +288,8 @@ export default function CreativePage() {
               editsRemaining={editsRemaining}
               subscription={subscription}
               history={history}
+              filter={filter}
+              setFilter={setFilter}
               onPick={(k: ToolKey) => { setActive(k); navigate(`/creative/${k}`); }}
               onOpen={(a: any) => setSelected(a)}
               onRerun={rerun}
@@ -389,7 +402,7 @@ function AssetDetailDialog({ asset, onClose, onRerun, rerunning }: { asset: any;
 }
 
 
-function Dashboard({ editsRemaining, subscription, history, onPick, onOpen, onRerun, rerunningId, pageIndex, pageSize, totalCount, hasNext, hasPrev, realtimeStatus, globalCooldown, onNext, onPrev }: any) {
+function Dashboard({ editsRemaining, subscription, history, filter, setFilter, onPick, onOpen, onRerun, rerunningId, pageIndex, pageSize, totalCount, hasNext, hasPrev, realtimeStatus, globalCooldown, onNext, onPrev }: any) {
   const lowBalance = (editsRemaining ?? 0) <= 10;
   return (
     <div className="space-y-6">
@@ -446,6 +459,17 @@ function Dashboard({ editsRemaining, subscription, history, onPick, onOpen, onRe
         <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
           <h2 className="text-lg font-bold">Histórico detalhado</h2>
           <div className="flex items-center gap-2">
+            <select 
+              value={filter} 
+              onChange={(e) => setFilter(e.target.value as any)}
+              className="bg-card border border-border/40 rounded px-2 py-1 text-xs outline-none focus:border-primary/50"
+            >
+              <option value="all">Todos os Status</option>
+              <option value="queued">Em fila</option>
+              <option value="processing">Processando</option>
+              <option value="completed">Concluído</option>
+              <option value="failed">Falhou</option>
+            </select>
             {globalCooldown > 0 && (
               <Badge variant="outline" className="text-[10px] border-yellow-500/40 text-yellow-600 dark:text-yellow-400">
                 <AlertTriangle className="h-3 w-3 mr-1" />
