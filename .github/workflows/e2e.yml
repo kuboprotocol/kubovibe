@@ -82,7 +82,7 @@ jobs:
           VITE_SUPABASE_PROJECT_ID: ${{ secrets.VITE_SUPABASE_PROJECT_ID }}
         run: |
           echo "::group::[${JOB_LABEL}] playwright test (main suite)"
-          npx playwright test --project=chromium --grep-invert "(hash preservation across cached 301|fuzz #)"
+          npx playwright test --project=chromium --grep-invert "(hash preservation across cached 301|fuzz #)" || (echo "E2E Failure Logs:" && npx playwright show-report --reporter=list && exit 1)
           echo "::endgroup::"
 
       - name: Upload Playwright report

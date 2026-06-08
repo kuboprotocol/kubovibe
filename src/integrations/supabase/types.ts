@@ -411,6 +411,7 @@ export type Database = {
           credits_spent: number
           error_message: string | null
           id: string
+          idempotency_key: string | null
           metadata: Json
           output_text: string | null
           output_url: string | null
@@ -425,6 +426,7 @@ export type Database = {
           credits_spent?: number
           error_message?: string | null
           id?: string
+          idempotency_key?: string | null
           metadata?: Json
           output_text?: string | null
           output_url?: string | null
@@ -439,6 +441,7 @@ export type Database = {
           credits_spent?: number
           error_message?: string | null
           id?: string
+          idempotency_key?: string | null
           metadata?: Json
           output_text?: string | null
           output_url?: string | null
