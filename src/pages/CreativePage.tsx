@@ -120,6 +120,7 @@ export default function CreativePage() {
   const [realtimeStatus, setRealtimeStatus] = useState<"connecting" | "live" | "reconnecting" | "offline">("connecting");
   const [selected, setSelected] = useState<any | null>(null);
   const [rerunning, setRerunning] = useState<string | null>(null);
+  const [isBatchRetrying, setIsBatchRetrying] = useState(false);
   const alertedRef = useRef<{ low?: boolean; empty?: boolean }>({});
   const globalCooldown = useCooldown();
   const PAGE_SIZE = 20;
@@ -247,15 +248,53 @@ export default function CreativePage() {
     }
   }
 
+  async function cancelExecution(assetId: string) {
+    try {
+      const { error } = await supabase
+        .from("creative_assets")
+        .update({ 
+          status: "failed", 
+          error_message: "Cancelado pelo usuário",
+          metadata: { cancelled_at: new Date().toISOString() } 
+        })
+        .eq("id", assetId);
+      
+      if (error) throw error;
+      toast.success("Execução cancelada");
+      loadHistory(cursorStack.length === 0 ? null : cursorStack[cursorStack.length - 1]);
+    } catch (e: any) {
+      toast.error("Falha ao cancelar: " + e.message);
+    }
+  }
+
+  async function batchRetryFailed() {
+    const failed = history.filter(h => h.status === "failed" || h.status === "error");
+    if (!failed.length) return;
+    setIsBatchRetrying(true);
+    let success = 0;
+    for (const asset of failed) {
+      const cfg = RERUN_MAP[asset.tool];
+      if (!cfg) continue;
+      try {
+        const r = await authedFetch(cfg.fn, cfg.build(asset), `rerun:${asset.id}`);
+        if (r.ok) success++;
+      } catch (e) { console.error("Batch retry failed for", asset.id, e); }
+    }
+    setIsBatchRetrying(false);
+    toast.success(`${success} itens reprocessados em lote.`);
+    refetch();
+    loadHistory(cursorStack.length === 0 ? null : cursorStack[cursorStack.length - 1]);
+  }
+
   function exportHistory(format: "csv" | "json") {
     if (!history.length) return;
-    let content = "";
     const filename = `creative-history-${new Date().toISOString().split("T")[0]}.${format}`;
+    let content = "";
     
     if (format === "json") {
       content = JSON.stringify(history, null, 2);
     } else {
-      const headers = ["ID", "Tool", "Status", "Prompt", "Credits", "Created At", "Error"];
+      const headers = ["ID", "Tool", "Status", "Prompt", "Credits", "Created At", "Error Message", "Error Detail"];
       const rows = history.map(h => [
         h.id,
         h.tool,
@@ -263,6 +302,7 @@ export default function CreativePage() {
         `"${(h.prompt || "").replace(/"/g, '""')}"`,
         h.credits_spent || 0,
         h.created_at,
+        `"${(h.error_message || "").split("\n")[0].replace(/"/g, '""')}"`,
         `"${(h.error_message || "").replace(/"/g, '""')}"`
       ]);
       content = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
@@ -326,6 +366,9 @@ export default function CreativePage() {
               onPick={(k: ToolKey) => { setActive(k); navigate(`/creative/${k}`); }}
               onOpen={(a: any) => setSelected(a)}
               onRerun={rerun}
+              onCancel={cancelExecution}
+              onBatchRetry={batchRetryFailed}
+              isBatchRetrying={isBatchRetrying}
               rerunningId={rerunning}
               pageIndex={cursorStack.length}
               pageSize={PAGE_SIZE}
@@ -365,12 +408,12 @@ export default function CreativePage() {
         </Tabs>
       </main>
 
-      <AssetDetailDialog asset={selected} onClose={() => setSelected(null)} onRerun={rerun} rerunning={!!rerunning && rerunning === selected?.id} />
+      <AssetDetailDialog asset={selected} onClose={() => setSelected(null)} onRerun={rerun} onCancel={cancelExecution} rerunning={!!rerunning && rerunning === selected?.id} />
     </div>
   );
 }
 
-function AssetDetailDialog({ asset, onClose, onRerun, rerunning }: { asset: any; onClose: () => void; onRerun: (a: any) => void; rerunning: boolean }) {
+function AssetDetailDialog({ asset, onClose, onRerun, onCancel, rerunning }: { asset: any; onClose: () => void; onRerun: (a: any) => void; onCancel: (id: string) => void; rerunning: boolean }) {
   const open = !!asset;
   if (!asset) return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -469,6 +512,11 @@ function AssetDetailDialog({ asset, onClose, onRerun, rerunning }: { asset: any;
 
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={onClose}>Fechar</Button>
+            {(asset.status === "queued" || asset.status === "processing") && (
+              <Button variant="destructive" onClick={() => { onCancel(asset.id); onClose(); }}>
+                Cancelar
+              </Button>
+            )}
             <Button onClick={() => onRerun(asset)} disabled={!canRerun || rerunning}>
               {rerunning ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RotateCw className="h-4 w-4 mr-2" />}
               Reexecutar
@@ -481,7 +529,7 @@ function AssetDetailDialog({ asset, onClose, onRerun, rerunning }: { asset: any;
 }
 
 
-function Dashboard({ editsRemaining, subscription, history, filter, setFilter, onPick, onOpen, onRerun, rerunningId, pageIndex, pageSize, totalCount, hasNext, hasPrev, realtimeStatus, globalCooldown, onNext, onPrev, onExport }: any) {
+function Dashboard({ editsRemaining, subscription, history, filter, setFilter, onPick, onOpen, onRerun, onCancel, onBatchRetry, isBatchRetrying, rerunningId, pageIndex, pageSize, totalCount, hasNext, hasPrev, realtimeStatus, globalCooldown, onNext, onPrev, onExport }: any) {
   const lowBalance = (editsRemaining ?? 0) <= 10;
   return (
     <div className="space-y-6">
@@ -565,6 +613,18 @@ function Dashboard({ editsRemaining, subscription, history, filter, setFilter, o
                realtimeStatus === "reconnecting" ? "reconectando…" :
                realtimeStatus === "offline" ? "offline" : "conectando…"}
             </Badge>
+            {history.some((h: any) => h.status === "failed" || h.status === "error") && (
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="h-7 text-[10px] gap-1.5 border-destructive/30 hover:bg-destructive/10" 
+                onClick={onBatchRetry}
+                disabled={isBatchRetrying}
+              >
+                {isBatchRetrying ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCw className="h-3 w-3" />}
+                Retry falhas
+              </Button>
+            )}
             <div className="flex items-center gap-1 ml-1 border-l pl-2 border-border/40">
               <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onExport("csv")} title="Exportar CSV">
                 <FileDown className="h-3.5 w-3.5" />
@@ -599,17 +659,31 @@ function Dashboard({ editsRemaining, subscription, history, filter, setFilter, o
                      h.status === "failed" || h.status === "error" ? "falhou" : h.status}
                   </Badge>
                 </button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="shrink-0 h-8 w-8"
-                  disabled={!RERUN_MAP[h.tool] || !!rerunningId}
-                  onClick={(e) => { e.stopPropagation(); onRerun(h); }}
-                  aria-label="Reexecutar"
-                  title="Reexecutar (idempotente)"
-                >
-                  {isRerunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />}
-                </Button>
+                <div className="flex gap-1 shrink-0">
+                  {(h.status === "queued" || h.status === "processing") && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={(e) => { e.stopPropagation(); onCancel(h.id); }}
+                      aria-label="Cancelar"
+                      title="Cancelar execução"
+                    >
+                      <AlertTriangle className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    disabled={!RERUN_MAP[h.tool] || !!rerunningId}
+                    onClick={(e) => { e.stopPropagation(); onRerun(h); }}
+                    aria-label="Reexecutar"
+                    title="Reexecutar (idempotente)"
+                  >
+                    {isRerunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />}
+                  </Button>
+                </div>
               </div>
             );
           })}
