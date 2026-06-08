@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import AuthPage from "./pages/AuthPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import DashboardPage from "./pages/DashboardPage";
@@ -99,10 +100,10 @@ const App = () => (
             <Route path="/admin/skills" element={<ProtectedRoute><AdminSkillsPage /></ProtectedRoute>} />
             <Route path="/domains" element={<ProtectedRoute><DomainsPage /></ProtectedRoute>} />
             <Route path="/creative" element={<ProtectedRoute><CreativePage /></ProtectedRoute>} />
-            <Route path="/creative/investigation" element={<ProtectedRoute><InvestigationPage /></ProtectedRoute>} />
-            <Route path="/creative/presets" element={<ProtectedRoute><PresetsPage /></ProtectedRoute>} />
+            <Route path="/creative/investigation" element={<ProtectedRoute><ErrorBoundary><InvestigationPage /></ErrorBoundary></ProtectedRoute>} />
+            <Route path="/creative/presets" element={<ProtectedRoute><ErrorBoundary><PresetsPage /></ErrorBoundary></ProtectedRoute>} />
             <Route path="/creative/notifications" element={<ProtectedRoute><NotificationPreferencesPage /></ProtectedRoute>} />
-            <Route path="/creative/exports/:id" element={<ProtectedRoute><ExportDetailsPage /></ProtectedRoute>} />
+            <Route path="/creative/exports/:id" element={<ProtectedRoute><ErrorBoundary><ExportDetailsPage /></ErrorBoundary></ProtectedRoute>} />
             <Route path="/creative/:tool" element={<ProtectedRoute><CreativePage /></ProtectedRoute>} />
             <Route path="/agents" element={<ProtectedRoute><AgentsHubPage /></ProtectedRoute>} />
             <Route path="/agents/:slug" element={<ProtectedRoute><AgentDetailPage /></ProtectedRoute>} />

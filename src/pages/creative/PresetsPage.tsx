@@ -6,10 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Pencil, Trash2, Save, X, AlertTriangle, ExternalLink } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2, Save, X, AlertTriangle, ExternalLink, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 
 type Preset = {
@@ -23,33 +24,30 @@ type Preset = {
 export default function PresetsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [presets, setPresets] = useState<Preset[]>([]);
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  async function load() {
-    if (!user) return;
-    setLoading(true);
-    const { data, error: err } = await supabase
-      .from("creative_filter_presets")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: sortDir === "asc" });
-    if (err) {
-      setError(err.message);
-      toast.error(err.message);
-    } else {
-      setPresets((data as Preset[]) || []);
-      setError(null);
-    }
-    setLoading(false);
-  }
+  const { data: presets = [], isLoading: loading, error: queryError, refetch: load } = useQuery({
+    queryKey: ["filter-presets", user?.id, sortDir],
+    queryFn: async () => {
+      if (!user) throw new Error("Não autenticado");
+      const { data, error: err } = await supabase
+        .from("creative_filter_presets")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: sortDir === "asc" });
+      if (err) throw err;
+      return (data as Preset[]) || [];
+    },
+    enabled: !!user,
+    retry: 2,
+  });
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [user, sortDir]);
+  const error = queryError ? (queryError as Error).message : null;
+
 
   async function rename(id: string) {
     if (!editName.trim()) return;
