@@ -528,20 +528,4 @@ function Label({ children, className, ...props }: any) {
   return <label className={`text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 ${className}`} {...props}>{children}</label>;
 }
 
-      </div>
-    </div>
-  );
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, string> = {
-    failed: "bg-destructive text-destructive-foreground",
-    error: "bg-destructive text-destructive-foreground",
-    cancelled: "bg-amber-500 text-white",
-    processing: "bg-blue-500 text-white",
-    completed: "bg-emerald-500 text-white",
-    queued: "bg-muted text-foreground",
-  };
-  return <Badge className={map[status] ?? ""}>{status}</Badge>;
-}
 
