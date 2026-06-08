@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -8,12 +8,14 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, RotateCw, Ban, FileDown, Search, ExternalLink, AlertTriangle, ArrowUpDown, Loader2, X } from "lucide-react";
+import { ArrowLeft, RotateCw, Ban, FileDown, Search, ExternalLink, AlertTriangle, ArrowUpDown, Loader2, X, Info } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const isUUID = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+
 
 
 type Asset = {
@@ -133,21 +135,27 @@ export default function InvestigationPage() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "creative_assets", filter: `user_id=eq.${user.id}` },
-        () => fetchAssets()
+        () => {
+          fetchAssets();
+          // Also refresh detail if currently open
+          const investigateId = params.get("investigate");
+          if (investigateId) loadDetail(investigateId, true);
+        }
       )
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [user, fetchAssets]);
+  }, [user, fetchAssets, params]);
 
   // Investigate from query param
   useEffect(() => {
     const investigateId = params.get("investigate");
-    if (investigateId && !selected) loadDetail(investigateId);
+    if (investigateId) loadDetail(investigateId);
   }, [params]); // eslint-disable-line
 
-  async function loadDetail(id: string) {
-    setDetailLoading(true);
+  async function loadDetail(id: string, silent = false) {
+    if (!silent) setDetailLoading(true);
     try {
+
       const { data: a, error: aErr } = await supabase.from("creative_assets").select("*").eq("id", id).maybeSingle();
       if (aErr) throw aErr;
       if (!a) {

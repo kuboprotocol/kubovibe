@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -6,9 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Pencil, Trash2, Save, X, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2, Save, X, AlertTriangle, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useDebounce } from "@/hooks/use-debounce";
+
 
 type Preset = {
   id: string;
@@ -139,7 +141,18 @@ export default function PresetsPage() {
                     {Object.entries(p.filters || {}).map(([k, v]) => `${k}=${v}`).join(", ") || "—"}
                   </TableCell>
                   <TableCell className="text-xs">{new Date(p.updated_at).toLocaleString()}</TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right flex gap-1 justify-end">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        const qs = new URLSearchParams(p.filters).toString();
+                        navigate(`/creative/investigation?${qs}`);
+                      }}
+                      title="Aplicar filtros"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </Button>
                     {editingId === p.id ? (
                       <>
                         <Button size="sm" variant="ghost" onClick={() => rename(p.id)}><Save className="h-4 w-4"/></Button>
@@ -156,6 +169,7 @@ export default function PresetsPage() {
                       </>
                     )}
                   </TableCell>
+
                 </TableRow>
               ))}
             </TableBody>
