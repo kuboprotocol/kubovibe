@@ -20,25 +20,11 @@ serve(async (req) => {
     const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader.replace("Bearer ", ""));
     if (authError || !user) throw new Error("Unauthorized");
 
-    const body = await req.json();
-    const { source_image: rawImg, driving_video: rawVid } = body;
+    const { source_image: rawImg, driving_video: rawVid } = await req.json();
     if (!rawImg || !rawVid) throw new Error("Missing source_image or driving_video");
 
-    const source_image = validatePublicUrl(rawImg).toString();
-    const driving_video = validatePublicUrl(rawVid).toString();
-
-    // Atomic credits check (5 credits for EMO)
-    const cost = 5;
-    const { data: debit, error: debitErr } = await supabase.rpc("execute_atomic_credit_deduction", {
-      _user_id: user.id,
-      _amount: cost,
-      _reason: "emo_animate",
-      _category: "creative_economy",
-      _metadata: { source_image, driving_video }
-    });
-    if (debitErr || !(debit as any)?.success) {
-      throw new Error(debitErr?.message || "insufficient_credits");
-    }
+    const ded = await deductCredits(user.id, COST, "creative_emo", { rawImg, rawVid }, user.email, idempotencyKey);
+    if (!ded.ok) return new Response(JSON.stringify({ error: ded.error }), { status: (ded as any).status ?? 402, headers: corsHeaders });
 
     // Call external FastAPI backend
     // In a real scenario, this would be a URL to a GPU server running the EMO model.
@@ -49,15 +35,13 @@ serve(async (req) => {
       console.warn("EMO_BACKEND_URL not set, returning mock result.");
       
       const asset_id = crypto.randomUUID();
-      await supabase.from("creative_assets").insert({
-        id: asset_id,
-        user_id: user.id,
+      const asset_id = await recordAsset(user.id, {
         tool: "emo",
         prompt: "EMO Animation",
         status: "completed",
-        credits_spent: cost,
+        credits_spent: COST,
         output_url: "https://vjrqosvkvfyzfqqyqyqy.supabase.co/storage/v1/object/public/uploads/demo/emo_result.mp4",
-        metadata: { source_image, driving_video }
+        metadata: { source_image: rawImg, driving_video: rawVid }
       });
 
       // Credits already deducted atomically above
@@ -73,12 +57,11 @@ serve(async (req) => {
     
     // For now, let's assume we fetch the files and forward them.
     const formData = new FormData();
-    
-    const imgRes = await fetch(source_image);
+    const imgRes = await fetch(rawImg);
     const imgBlob = await imgRes.blob();
     formData.append("source_image", imgBlob, "source.jpg");
 
-    const vidRes = await fetch(driving_video);
+    const vidRes = await fetch(rawVid);
     const vidBlob = await vidRes.blob();
     formData.append("driving_video", vidBlob, "driving.mp4");
 
@@ -94,27 +77,21 @@ serve(async (req) => {
 
     const result = await response.json();
 
-    // Store asset
-    const asset_id = crypto.randomUUID();
-    await supabase.from("creative_assets").insert({
-      id: asset_id,
-      user_id: user.id,
+    const asset_id = await recordAsset(user.id, {
       tool: "emo",
       prompt: "EMO Animation",
       status: "completed",
-      credits_spent: cost,
+      credits_spent: COST,
       output_url: result.video.startsWith("http") ? result.video : `${EMO_BACKEND_URL}/${result.video}`,
-      metadata: { source_image, driving_video }
+      metadata: { source_image: rawImg, driving_video: rawVid }
     });
-
-    // Credits already deducted atomically above
 
     return new Response(JSON.stringify({ ...result, asset_id }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 
   } catch (e: any) {
-    return new Response(JSON.stringify({ error: e.message }), {
+    return new Response(JSON.stringify({ error: sanitizeError(e) }), {
       status: 400,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
