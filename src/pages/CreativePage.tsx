@@ -353,8 +353,9 @@ function AssetDetailDialog({ asset, onClose, onRerun, rerunning }: { asset: any;
               {new Date(asset.created_at).toLocaleString("pt-BR")}
             </span>
           </DialogTitle>
-          <DialogDescription>
-            Status: <span className="font-mono">{asset.status}</span> · Créditos: <span className="font-mono">{asset.credits_spent ?? 0}</span>
+          <DialogDescription className="flex items-center justify-between">
+            <div>Status: <span className="font-mono">{asset.status}</span> · Créditos: <span className="font-mono">{asset.credits_spent ?? 0}</span></div>
+            {asset.idempotency_key && <Badge variant="secondary" className="text-[9px] font-mono opacity-50">IDEM: {asset.idempotency_key.slice(0, 8)}</Badge>}
           </DialogDescription>
         </DialogHeader>
 
@@ -379,7 +380,15 @@ function AssetDetailDialog({ asset, onClose, onRerun, rerunning }: { asset: any;
             </div>
           )}
           {asset.error_message && (
-            <Card className="p-3 border-destructive/40 bg-destructive/10 text-destructive text-xs">{asset.error_message}</Card>
+            <div className="space-y-2">
+              <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Erro Detalhado</div>
+              <Card className="p-3 border-destructive/40 bg-destructive/10 text-destructive text-xs font-mono whitespace-pre-wrap">
+                {asset.error_message}
+              </Card>
+              <div className="text-[10px] text-muted-foreground italic">
+                Ações sugeridas: verifique sua conexão, saldo de créditos ou tente reexecutar se for um erro temporário.
+              </div>
+            </div>
           )}
           {asset.metadata && Object.keys(asset.metadata).length > 0 && (
             <div>
