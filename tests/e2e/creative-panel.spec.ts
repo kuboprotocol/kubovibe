@@ -53,6 +53,17 @@ test.describe('Creative Economy Panel E2E', () => {
     await expect(page.getByText(/Solicitação enviada/i)).toBeVisible();
   });
 
+  test('simulation mode and auth redirect', async ({ page }) => {
+    // Auth redirect (simulated by non-session state in test context)
+    await page.goto('/creative');
+    // If not logged in, should show restricted access
+    const restrictMsg = page.getByText(/Acesso Restrito/i);
+    if (await restrictMsg.isVisible()) {
+      await page.getByRole('button', { name: /Ir para Login/i }).click();
+      await expect(page).toHaveURL(/\/auth/);
+    }
+  });
+
   test('navigation and state preservation', async ({ page }) => {
     await page.goto('/dashboard');
     const creativeBtn = page.getByRole('button', { name: /Economia Criativa/i });

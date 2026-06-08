@@ -143,6 +143,7 @@ export default function CreativePage() {
     originalAction?: () => void 
   } | null>(null);
   const [showErrorModal, setShowErrorModal] = useState(false);
+  const [simulationMode, setSimulationMode] = useState<"none" | "selection" | "config" | "execution">("none");
   const globalCooldown = useCooldown();
   const PAGE_SIZE = 20;
   const [showAuditSchedule, setShowAuditSchedule] = useState(false);
@@ -181,6 +182,18 @@ export default function CreativePage() {
 
   async function loadHistory(before: string | null = null) {
     if (!user) return;
+    if (simulationMode === "selection") {
+      setIsLoadingHistory(true);
+      setTimeout(() => {
+        setIsLoadingHistory(false);
+        setErrorState({
+          step: "Seleção (Simulado)",
+          message: "Simulação de falha no carregamento do histórico.",
+          originalAction: () => loadHistory(before)
+        });
+      }, 1000);
+      return;
+    }
     setIsLoadingHistory(true);
     try {
       let q = supabase.from("creative_assets")
@@ -331,6 +344,7 @@ export default function CreativePage() {
     const idemKey = `rerun:${asset.id}:${attempt}`;
     if (!isBatch) setRerunningId(asset.id);
     try {
+      if (simulationMode === "execution") throw new Error("Falha simulada na execução");
       const r = await authedFetch(cfg.fn, cfg.build(asset), idemKey);
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { 
@@ -456,6 +470,50 @@ export default function CreativePage() {
     toast.success(`${success} itens reprocessados em lote.`);
     refetch();
     loadHistory(cursorStack.length === 0 ? null : cursorStack[cursorStack.length - 1]);
+  }
+
+  async function exportStepReport(step: "Selection" | "Configuration" | "Execution") {
+    if (!history.length || !user) return;
+    setIsExporting(true);
+    try {
+      const timestamp = new Date().toLocaleString('sv-SE', { timeZone: selectedTimezone }).replace(/[: ]/g, '-');
+      const correlationId = crypto.randomUUID().slice(0, 8);
+      const filename = `creative-${step.toLowerCase()}-report-${correlationId}-${timestamp}.json`;
+      
+      let filteredHistory = [...history];
+      if (step === "Execution") {
+        filteredHistory = history.filter(h => h.status === "processing" || h.status === "completed" || h.status === "failed");
+      }
+
+      const report = {
+        meta: {
+          step,
+          generated_at: new Date().toISOString(),
+          user_id: user.id,
+          correlation_id: correlationId
+        },
+        logs: filteredHistory.map(h => ({
+          asset_id: h.id,
+          tool: h.tool,
+          status: h.status,
+          error: h.error_message,
+          config: h.metadata,
+          correlation_id: h.metadata?.correlation_id || correlationId,
+          timestamp: h.created_at
+        }))
+      };
+
+      const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = filename; a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`Relatório de ${step} exportado`);
+    } catch (e) {
+      toast.error("Erro na exportação");
+    } finally {
+      setIsExporting(false);
+    }
   }
 
   async function exportFullPanelReport(format: "json" | "csv" = "json") {
@@ -759,6 +817,19 @@ export default function CreativePage() {
     }
   }
 
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="max-w-md w-full p-8 text-center space-y-4 border-border/40">
+          <AlertCircle className="h-12 w-12 text-destructive mx-auto" />
+          <h2 className="text-xl font-bold">Acesso Restrito</h2>
+          <p className="text-muted-foreground text-sm">Você precisa estar autenticado para acessar o painel de Economia Criativa.</p>
+          <Button onClick={() => navigate("/auth")} className="w-full">Ir para Login</Button>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border/40 bg-card p-4">
@@ -774,6 +845,19 @@ export default function CreativePage() {
             <Button variant="ghost" size="sm" onClick={() => navigate("/creative/presets")}>Presets</Button>
             <Button variant="ghost" size="sm" onClick={() => navigate("/creative/notifications")}>Notificações</Button>
             <span className="font-mono text-sm font-bold ml-2">{editsRemaining} créditos</span>
+            <div className="flex items-center gap-1 ml-4 border-l border-border/40 pl-4">
+              <label className="text-[10px] font-bold uppercase text-muted-foreground mr-1">Simular Falha:</label>
+              <select 
+                value={simulationMode} 
+                onChange={(e) => setSimulationMode(e.target.value as any)}
+                className="bg-muted text-[10px] rounded px-1 py-0.5 border-none outline-none focus:ring-0"
+              >
+                <option value="none">OFF</option>
+                <option value="selection">Seleção</option>
+                <option value="config">Config</option>
+                <option value="execution">Execução</option>
+              </select>
+            </div>
           </div>
 
         </div>
@@ -1002,18 +1086,25 @@ export default function CreativePage() {
                           variant="secondary" 
                           onClick={() => exportFullPanelReport("json")}
                           disabled={isExporting || history.length === 0}
+                          title="Exportar tudo em JSON"
                         >
                           {isExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileDown className="h-4 w-4 mr-2" />}
-                          Relatório (JSON)
+                          JSON Full
                         </Button>
-                        <Button 
-                          variant="secondary" 
-                          onClick={() => exportFullPanelReport("csv")}
-                          disabled={isExporting || history.length === 0}
-                        >
-                          {isExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileDown className="h-4 w-4 mr-2" />}
-                          Relatório (CSV)
-                        </Button>
+                        <div className="flex gap-1">
+                          {["Selection", "Configuration", "Execution"].map((step) => (
+                            <Button 
+                              key={step}
+                              variant="ghost" 
+                              size="sm"
+                              className="text-[10px] h-8"
+                              onClick={() => exportStepReport(step as any)}
+                              disabled={isExporting}
+                            >
+                              {step[0]}
+                            </Button>
+                          ))}
+                        </div>
                       </div>
 
                      {filter === "failed" && history.some(h => h.status === "failed") && (
