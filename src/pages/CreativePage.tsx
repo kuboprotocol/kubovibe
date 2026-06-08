@@ -496,18 +496,15 @@ export default function CreativePage() {
       const auditTable = isExport ? "creative_export_audit_log" : "creative_audit_logs";
       const idField = isExport ? "export_id" : "asset_id";
       
-      let query: any = supabase.from(auditTable).select("*, profiles(email)").eq(idField, exportId);
+      const { data, error } = await supabase.rpc('get_creative_audit_logs', {
+        p_table: auditTable,
+        p_id_field: idField,
+        p_id_value: exportId,
+        p_search: investigationSearch || null,
+        p_start_date: investigationDateStart || null,
+        p_end_date: investigationDateEnd || null
+      });
       
-      if (investigationSearch) {
-        if (isExport) {
-          query = query.or(`action.ilike.%${investigationSearch}%,details->>reason.ilike.%${investigationSearch}%,details->>error.ilike.%${investigationSearch}%`);
-        } else {
-          query = query.or(`event_type.ilike.%${investigationSearch}%,metadata->>reason.ilike.%${investigationSearch}%,metadata->>error.ilike.%${investigationSearch}%`);
-        }
-      }
-      if (investigationDateStart) query = query.gte("created_at", investigationDateStart);
-      if (investigationDateEnd) query = query.lte("created_at", investigationDateEnd);
-      const { data, error } = await query.order("created_at", { ascending: false });
       if (error) throw error;
       setExportAuditLogs(data || []);
     } catch (e: any) {

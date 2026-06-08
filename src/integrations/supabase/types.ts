@@ -2609,6 +2609,17 @@ export type Database = {
         }
         Returns: Json
       }
+      get_creative_audit_logs: {
+        Args: {
+          p_end_date?: string
+          p_id_field: string
+          p_id_value: string
+          p_search?: string
+          p_start_date?: string
+          p_table: string
+        }
+        Returns: Json
+      }
       grant_credits: {
         Args: { p_amount: number; p_user_id: string }
         Returns: undefined
