@@ -1,6 +1,6 @@
 # Post-Migration Security — Relatório Local
 
-_Gerado em 2026-06-08T03:53:20Z_
+_Gerado em 2026-06-08T11:07:32Z_
 
 | Camada | Status |
 |---|---|
