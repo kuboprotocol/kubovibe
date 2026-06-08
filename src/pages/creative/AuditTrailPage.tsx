@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { 
   ArrowLeft, Search, FileDown, ArrowUpDown, Loader2, X, Filter, 
-  AlertTriangle, Save, History, ChevronRight, Info, AlertCircle 
+  AlertTriangle, Save, History, ChevronRight, Info, AlertCircle, Share2, TrendingUp, Clock
 } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -31,6 +31,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 type AuditTrail = {
   id: string;
@@ -48,20 +49,36 @@ const PAGE_SIZE = 25;
 
 export default function CreativeAuditPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   
-  const [search, setSearch] = useState("");
-  const [step, setStep] = useState("all");
-  const [status, setStatus] = useState("all");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState(searchParams.get("search") || "");
+  const [step, setStep] = useState(searchParams.get("step") || "all");
+  const [status, setStatus] = useState(searchParams.get("status") || "all");
+  const [startDate, setStartDate] = useState(searchParams.get("start") || "");
+  const [endDate, setEndDate] = useState(searchParams.get("end") || "");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">((searchParams.get("sort") as "asc" | "desc") || "desc");
+  const [page, setPage] = useState(Number(searchParams.get("page")) || 1);
   const [selectedEntry, setSelectedEntry] = useState<AuditTrail | null>(null);
+  const [timelineEntries, setTimelineEntries] = useState<AuditTrail[]>([]);
+  const [isTimelineLoading, setIsTimelineLoading] = useState(false);
   const [savedFilters, setSavedFilters] = useState<any[]>(() => {
     const saved = localStorage.getItem("creative_audit_filters");
     return saved ? JSON.parse(saved) : [];
   });
+
+  // Update URL params when filters change
+  useEffect(() => {
+    const params: Record<string, string> = {};
+    if (search) params.search = search;
+    if (step !== "all") params.step = step;
+    if (status !== "all") params.status = status;
+    if (startDate) params.start = startDate;
+    if (endDate) params.end = endDate;
+    if (sortDir !== "desc") params.sort = sortDir;
+    if (page !== 1) params.page = String(page);
+    setSearchParams(params, { replace: true });
+  }, [search, step, status, startDate, endDate, sortDir, page, setSearchParams]);
 
   const debouncedSearch = useDebounce(search, 500);
 
@@ -115,21 +132,41 @@ export default function CreativeAuditPage() {
 
   // Recurrent failures summary
   const recurrentFailures = useMemo(() => {
-    const failures: Record<string, { count: number; lastTrace: string; lastCorrelation: string }> = {};
+    const failures: Record<string, { count: number; lastTrace: string; lastCorrelation: string; dates: string[] }> = {};
     entries.forEach(entry => {
       const isError = entry.action.toLowerCase().includes("failed") || entry.action.toLowerCase().includes("error") || entry.params?.error;
       if (isError) {
         const key = entry.params?.error?.message || entry.action;
-        if (!failures[key]) failures[key] = { count: 0, lastTrace: "", lastCorrelation: "" };
+        if (!failures[key]) failures[key] = { count: 0, lastTrace: "", lastCorrelation: "", dates: [] };
         failures[key].count++;
         failures[key].lastTrace = entry.trace_id || "";
         failures[key].lastCorrelation = entry.correlation_id || "";
+        failures[key].dates.push(entry.created_at);
       }
     });
     return Object.entries(failures)
       .filter(([_, v]) => v.count > 1)
       .sort((a, b) => b[1].count - a[1].count)
       .slice(0, 3);
+  }, [entries]);
+
+  // Failure Trends Data for Chart
+  const failureTrends = useMemo(() => {
+    const dailyData: Record<string, Record<string, number>> = {};
+    entries.forEach(entry => {
+      const isError = entry.action.toLowerCase().includes("failed") || entry.action.toLowerCase().includes("error") || entry.params?.error;
+      if (isError) {
+        const date = new Date(entry.created_at).toLocaleDateString();
+        const key = (entry.params?.error?.message || entry.action).slice(0, 20) + "...";
+        if (!dailyData[date]) dailyData[date] = {};
+        dailyData[date][key] = (dailyData[date][key] || 0) + 1;
+      }
+    });
+
+    return Object.entries(dailyData).map(([date, counts]) => ({
+      date,
+      ...counts
+    })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [entries]);
 
   // Multiple attempts detection
@@ -142,6 +179,30 @@ export default function CreativeAuditPage() {
     });
     return Object.entries(correlations).filter(([_, v]) => v > 1).length;
   }, [entries]);
+
+  const loadTimeline = async (correlationId: string) => {
+    setIsTimelineLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("creative_audit_trail")
+        .select("*")
+        .eq("correlation_id", correlationId)
+        .order("created_at", { ascending: true });
+      
+      if (error) throw error;
+      setTimelineEntries(data || []);
+    } catch (err) {
+      toast.error("Erro ao carregar linha do tempo");
+    } finally {
+      setIsTimelineLoading(false);
+    }
+  };
+
+  const shareCurrentView = () => {
+    const url = window.location.href;
+    navigator.clipboard.writeText(url);
+    toast.success("Link da consulta copiado!");
+  };
 
   const saveCurrentFilters = () => {
     const newFilter = {
@@ -227,34 +288,59 @@ export default function CreativeAuditPage() {
       <main className="max-w-7xl mx-auto space-y-6">
         {/* Alerts & Insights */}
         {(recurrentFailures.length > 0 || multipleAttempts > 0) && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {recurrentFailures.length > 0 && (
-              <Card className="p-4 border-destructive/20 bg-destructive/5">
+              <Card className="p-4 border-destructive/20 bg-destructive/5 lg:col-span-1">
                 <div className="flex items-center gap-2 mb-3 text-destructive">
                   <AlertCircle className="h-5 w-5" />
-                  <h3 className="font-semibold">Falhas Recorrentes Detectadas</h3>
+                  <h3 className="font-semibold">Falhas Recorrentes</h3>
                 </div>
                 <div className="space-y-2">
                   {recurrentFailures.map(([cause, info]) => (
                     <div key={cause} className="text-sm flex justify-between items-start bg-background/50 p-2 rounded">
-                      <span className="line-clamp-1 flex-1 font-mono text-xs">{cause}</span>
+                      <span className="line-clamp-2 flex-1 font-mono text-xs">{cause}</span>
                       <Badge variant="destructive" className="ml-2">{info.count}x</Badge>
                     </div>
                   ))}
                 </div>
               </Card>
             )}
+            
+            {failureTrends.length > 1 && (
+              <Card className="p-4 lg:col-span-1">
+                <div className="flex items-center gap-2 mb-3 text-primary">
+                  <TrendingUp className="h-5 w-5" />
+                  <h3 className="font-semibold">Tendência de Falhas</h3>
+                </div>
+                <div className="h-[120px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={failureTrends}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.1)" />
+                      <XAxis dataKey="date" hide />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333', color: '#fff' }}
+                        itemStyle={{ fontSize: '10px' }}
+                      />
+                      {Object.keys(failureTrends[0] || {}).filter(k => k !== 'date').map((key, i) => (
+                        <Line key={key} type="monotone" dataKey={key} stroke={`hsl(${i * 137.5}, 70%, 50%)`} dot={false} strokeWidth={2} />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </Card>
+            )}
+
             {multipleAttempts > 0 && (
-              <Card className="p-4 border-yellow-500/20 bg-yellow-500/5">
+              <Card className="p-4 border-yellow-500/20 bg-yellow-500/5 lg:col-span-1">
                 <div className="flex items-center gap-2 mb-3 text-yellow-600">
                   <History className="h-5 w-5" />
-                  <h3 className="font-semibold">Tentativas de Retry</h3>
+                  <h3 className="font-semibold">Alerta de Retries</h3>
                 </div>
                 <p className="text-sm text-muted-foreground mb-2">
-                  Identificamos <strong>{multipleAttempts}</strong> IDs de correlação com múltiplas entradas, indicando retries automáticos ou manuais.
+                  Identificamos <strong>{multipleAttempts}</strong> IDs com múltiplas tentativas.
                 </p>
                 <Button variant="outline" size="sm" onClick={() => setSearch("retry")}>
-                  Ver Retries
+                  Investigar Retries
                 </Button>
               </Card>
             )}
@@ -265,9 +351,10 @@ export default function CreativeAuditPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-4">
             <div className="relative lg:col-span-2">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
+              <input
+                type="text"
                 placeholder="ID, Correlation, Trace ou Ação..."
-                className="pl-9"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 pl-9"
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(1); }}
               />
@@ -295,17 +382,17 @@ export default function CreativeAuditPage() {
                 <SelectItem value="failed">Falhas / Erros</SelectItem>
               </SelectContent>
             </Select>
-            <Input
+            <input
               type="date"
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               value={startDate}
               onChange={(e) => { setStartDate(e.target.value); setPage(1); }}
-              placeholder="Início"
             />
-            <Input
+            <input
               type="date"
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               value={endDate}
               onChange={(e) => { setEndDate(e.target.value); setPage(1); }}
-              placeholder="Fim"
             />
           </div>
           
@@ -314,9 +401,12 @@ export default function CreativeAuditPage() {
               <Button variant="secondary" size="sm" onClick={saveCurrentFilters}>
                 <Save className="h-4 w-4 mr-2" /> Salvar Busca
               </Button>
+              <Button variant="outline" size="sm" onClick={shareCurrentView}>
+                <Share2 className="h-4 w-4 mr-2" /> Compartilhar Link
+              </Button>
               {savedFilters.length > 0 && (
                 <div className="flex gap-1">
-                  {savedFilters.map((f) => (
+                  {savedFilters.map((f: any) => (
                     <Badge 
                       key={f.id} 
                       variant="outline" 
@@ -495,7 +585,19 @@ export default function CreativeAuditPage() {
               </div>
 
               <div className="space-y-3">
-                <h4 className="text-sm font-semibold border-b pb-1">Identificadores</h4>
+                <div className="flex justify-between items-center border-b pb-1">
+                  <h4 className="text-sm font-semibold">Identificadores</h4>
+                  {selectedEntry.correlation_id && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-7 text-[10px]"
+                      onClick={() => loadTimeline(selectedEntry.correlation_id!)}
+                    >
+                      <Clock className="h-3 w-3 mr-1" /> Ver Linha do Tempo
+                    </Button>
+                  )}
+                </div>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-muted-foreground">Correlation ID:</span>
@@ -508,9 +610,29 @@ export default function CreativeAuditPage() {
                 </div>
               </div>
 
+              {/* Timeline Section */}
+              {timelineEntries.length > 0 && (
+                <div className="space-y-3 bg-accent/20 p-3 rounded-md border border-accent">
+                  <h4 className="text-sm font-semibold flex items-center gap-2">
+                    <Clock className="h-4 w-4" /> Histórico de Correlação
+                  </h4>
+                  <div className="space-y-3 relative before:absolute before:left-2 before:top-2 before:bottom-2 before:w-px before:bg-muted-foreground/30">
+                    {timelineEntries.map((te, i) => (
+                      <div key={te.id} className="relative pl-6 text-xs">
+                        <div className={`absolute left-0 top-1 w-4 h-4 rounded-full border-2 bg-background z-10 ${
+                          te.action.toLowerCase().includes('fail') ? 'border-destructive' : 'border-primary'
+                        }`} />
+                        <p className="font-bold opacity-70">{new Date(te.created_at).toLocaleTimeString()}</p>
+                        <p className="font-mono text-[10px] truncate">{te.action}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <h4 className="text-sm font-semibold border-b pb-1">Parâmetros / Stack</h4>
-                <div className="bg-black/95 text-green-400 p-4 rounded-md overflow-x-auto font-mono text-xs max-h-[400px]">
+                <div className="bg-black/95 text-green-400 p-4 rounded-md overflow-x-auto font-mono text-xs max-h-[300px]">
                   <pre>{JSON.stringify(selectedEntry.params, null, 2)}</pre>
                 </div>
               </div>
