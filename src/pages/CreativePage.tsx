@@ -15,9 +15,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import {
   MessageSquare, Image as ImageIcon, Download, Scissors, User2,
   Video, Music, BookOpen, Sparkles, Loader2, Coins, ArrowLeft, RotateCw, AlertTriangle, Upload,
-  FileDown, History, Check, Search
+  FileDown, History, Check, Search, ArrowRight
 } from "lucide-react";
 import { ManusLauncher } from "@/components/creative/ManusLauncher";
+import { CreativeToolInterface } from "@/components/creative/CreativeToolInterface";
 
 type ToolKey = "dashboard" | "chat" | "nano_banana" | "downloader" | "clips" | "avatar" | "shorts" | "music" | "ebook" | "emo";
 
@@ -617,43 +618,45 @@ export default function CreativePage() {
       </header>
       <main className="container max-w-7xl mx-auto px-4 py-6">
         {/* Progress Bar Flow */}
-        <div className="max-w-xl mx-auto mb-10 space-y-4">
+        <div className="max-w-2xl mx-auto mb-10 space-y-6">
           <div className="flex justify-between items-center relative">
-            <div className="absolute top-4 left-0 w-full h-0.5 bg-muted -z-10" />
+            <div className="absolute top-5 left-0 w-full h-0.5 bg-muted -z-10" />
             {[
               { label: "Seleção", icon: Search },
-              { label: "Configuração", icon: Sparkles },
+              { label: "Configuração", icon: Settings2 },
               { label: "Execução", icon: Loader2 }
             ].map((step, i) => {
               const stepNum = i + 1;
               const isDashboard = active === "dashboard";
-              const hasProcessing = history.some(h => (h.status === "processing" || h.status === "queued") && (!isDashboard ? h.tool === active : true));
+              
+              // Status logic
+              const hasProcessing = history.some(h => (h.status === "processing" || h.status === "queued"));
               
               let currentStep = 1;
               if (!isDashboard) currentStep = 2;
-              if (hasProcessing && !isDashboard) currentStep = 3;
+              if (hasProcessing) currentStep = 3;
 
               const isCompleted = stepNum < currentStep;
               const isActive = stepNum === currentStep;
               const Icon = step.icon;
 
               return (
-                <div key={step.label} className="flex flex-col items-center gap-2 bg-background px-2">
-                  <div className={`w-9 h-9 rounded-full flex items-center justify-center border-2 transition-all duration-500 ${
-                    isCompleted ? "bg-primary border-primary text-primary-foreground shadow-[0_0_15px_rgba(var(--primary),0.3)]" :
-                    isActive ? "border-primary text-primary shadow-[0_0_10px_rgba(var(--primary),0.2)]" :
+                <div key={step.label} className="flex flex-col items-center gap-2 bg-background px-4">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-500 z-10 ${
+                    isCompleted ? "bg-primary border-primary text-primary-foreground shadow-[0_0_20px_rgba(var(--primary),0.4)]" :
+                    isActive ? "border-primary text-primary bg-primary/5 shadow-[0_0_15px_rgba(var(--primary),0.25)]" :
                     "border-muted text-muted-foreground bg-background"
                   }`}>
                     {isCompleted ? <Check className="h-5 w-5" /> : <Icon className={`h-5 w-5 ${isActive ? "animate-pulse" : ""}`} />}
                   </div>
-                  <div className="flex flex-col items-center">
-                    <span className={`text-[11px] font-bold uppercase tracking-wider ${isActive ? "text-primary" : "text-muted-foreground"}`}>
+                  <div className="flex flex-col items-center text-center">
+                    <span className={`text-[10px] font-black uppercase tracking-widest ${isActive ? "text-primary" : "text-muted-foreground/60"}`}>
                       {step.label}
                     </span>
                     {isActive && (
-                      <span className="text-[9px] text-primary/70 font-medium">
-                        {currentStep === 1 ? "2 restantes" : currentStep === 2 ? "1 restante" : "Em andamento"}
-                      </span>
+                      <Badge variant="outline" className="text-[8px] h-4 mt-1 border-primary/30 text-primary px-1.5 py-0 leading-none">
+                        {currentStep === 1 ? "INÍCIO" : currentStep === 2 ? "PRÓXIMO" : "AO VIVO"}
+                      </Badge>
                     )}
                   </div>
                 </div>
@@ -663,17 +666,25 @@ export default function CreativePage() {
           
           {(() => {
             const isDashboard = active === "dashboard";
-            const hasProcessing = history.some(h => (h.status === "processing" || h.status === "queued") && (!isDashboard ? h.tool === active : true));
+            const hasProcessing = history.some(h => (h.status === "processing" || h.status === "queued"));
             let currentStep = 1;
             if (!isDashboard) currentStep = 2;
-            if (hasProcessing && !isDashboard) currentStep = 3;
+            if (hasProcessing) currentStep = 3;
+            
             return (
-              <div className="space-y-1">
-                <Progress value={(currentStep / 3) * 100} className="h-1.5" />
-                <div className="flex justify-between items-center text-[10px] text-muted-foreground font-medium uppercase tracking-tighter">
-                  <span>Passo {currentStep} de 3</span>
-                  <span>{Math.round((currentStep / 3) * 100)}% concluído</span>
+              <div className="space-y-2">
+                <div className="flex justify-between items-end mb-1">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-primary animate-ping" />
+                    <span className="text-xs font-bold text-foreground/80 uppercase tracking-tighter">
+                      Fluxo de Habilidades
+                    </span>
+                  </div>
+                  <span className="text-xs font-mono text-muted-foreground">
+                    {Math.round((currentStep / 3) * 100)}%
+                  </span>
                 </div>
+                <Progress value={(currentStep / 3) * 100} className="h-2 bg-muted/30" />
               </div>
             );
           })()}
@@ -683,63 +694,120 @@ export default function CreativePage() {
           <TabsContent value="dashboard">
              <div className="space-y-6">
                <ManusLauncher setActive={(k) => { setActive(k as ToolKey); navigate(k === "dashboard" ? "/creative" : `/creative/${k}`); }} />
-               <div className="flex flex-wrap gap-4 items-end">
-                 <div className="space-y-1">
-                   <label className="text-xs font-medium text-muted-foreground">Filtro</label>
-                   <select 
-                    value={filter} 
-                    onChange={(e) => setFilter(e.target.value as any)}
-                    className="flex h-10 w-[180px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                   >
-                     <option value="all">Todos os Status</option>
-                     <option value="queued">Na Fila</option>
-                     <option value="processing">Processando</option>
-                     <option value="completed">Concluído</option>
-                     <option value="failed">Falhou</option>
-                   </select>
+               
+               <div className="pt-6 border-t border-border/40">
+                 <div className="flex flex-wrap gap-4 items-end mb-4">
+                   <div className="space-y-1">
+                     <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</label>
+                     <select 
+                      value={filter} 
+                      onChange={(e) => setFilter(e.target.value as any)}
+                      className="flex h-10 w-[180px] rounded-md border border-input bg-background/50 px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                     >
+                       <option value="all">Todos os Status</option>
+                       <option value="queued">Na Fila</option>
+                       <option value="processing">Processando</option>
+                       <option value="completed">Concluído</option>
+                       <option value="failed">Falhou</option>
+                     </select>
+                   </div>
+                   <div className="flex-1 min-w-[200px] space-y-1">
+                     <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Busca</label>
+                     <div className="relative">
+                       <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                       <Input 
+                        value={searchQuery} 
+                        onChange={(e) => setSearchQuery(e.target.value)} 
+                        placeholder="Prompt, ferramenta ou erro..." 
+                        className="pl-9 bg-background/50"
+                       />
+                     </div>
+                   </div>
+                   <div className="flex gap-2">
+                     <Button variant="outline" onClick={() => { setFilter("all"); setSearchQuery(""); setSortOrder("desc"); }}>
+                       Resetar
+                     </Button>
+                     {filter === "failed" && history.some(h => h.status === "failed") && (
+                       <Button variant="secondary" onClick={batchRetryFailed} disabled={isBatchRetrying}>
+                         {isBatchRetrying ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RotateCw className="h-4 w-4 mr-2" />}
+                         Reprocessar Falhas
+                       </Button>
+                     )}
+                   </div>
                  </div>
-                 <div className="flex-1 min-w-[200px] space-y-1">
-                   <label className="text-xs font-medium text-muted-foreground">Busca</label>
-                   <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Prompt, ferramenta ou erro..." />
-                 </div>
-                 <Button variant="outline" onClick={() => { setFilter("all"); setSearchQuery(""); setSortOrder("desc"); }}>
-                   Resetar
-                 </Button>
-               </div>
 
-               <Card className="divide-y divide-border/40">
-                  {history.map((h: any) => (
-                    <div key={h.id} className="p-4 flex flex-wrap items-center justify-between gap-4">
-                       <div className="space-y-1">
-                         <div className="flex items-center gap-2">
-                           <Badge variant={h.status === 'completed' ? 'default' : h.status === 'failed' ? 'destructive' : 'outline'}>
-                             {h.status}
-                           </Badge>
-                           <span className="font-semibold">{h.tool}</span>
-                         </div>
-                         <p className="text-sm text-muted-foreground line-clamp-1">{h.prompt}</p>
-                       </div>
-                       <div className="flex gap-2">
-                          <Button size="sm" variant="ghost" onClick={() => navigate(`/creative/investigation?investigate=${h.id}`)}>
-                            <History className="h-4 w-4 mr-2" /> Investigar
-                          </Button>
-                         {(h.status === 'queued' || h.status === 'processing') && (
-                           <Button size="sm" variant="outline" onClick={() => cancelExecution(h.id)}>Cancelar</Button>
-                         )}
-                         {(h.status === 'failed' || h.status === 'error' || h.status === 'completed') && (
-                           <Button size="sm" variant="secondary" disabled={rerunningId === h.id} onClick={() => rerun(h)}>
-                             {rerunningId === h.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />}
-                           </Button>
-                         )}
-                       </div>
+                 <Card className="overflow-hidden border-border/40 bg-card/40 backdrop-blur">
+                    <div className="divide-y divide-border/20">
+                      {history.length === 0 ? (
+                        <div className="p-10 text-center text-muted-foreground">
+                          <p>Nenhum item encontrado.</p>
+                        </div>
+                      ) : history.map((h: any) => (
+                        <div key={h.id} className="p-4 flex flex-wrap items-center justify-between gap-4 transition hover:bg-muted/30">
+                           <div className="flex items-start gap-4 flex-1 min-w-[300px]">
+                             <div className={`p-2 rounded-xl bg-background/60 border border-border/40`}>
+                               {(() => {
+                                 const toolInfo = TOOLS.find(t => t.key === h.tool);
+                                 const Icon = toolInfo?.icon || Sparkles;
+                                 return <Icon className="h-5 w-5 text-foreground/70" />;
+                               })()}
+                             </div>
+                             <div className="space-y-1">
+                               <div className="flex items-center gap-2">
+                                 <Badge variant={h.status === 'completed' ? 'default' : h.status === 'failed' ? 'destructive' : 'outline'} className="capitalize">
+                                   {h.status}
+                                 </Badge>
+                                 <span className="font-semibold text-sm">{TOOLS.find(t => t.key === h.tool)?.title || h.tool}</span>
+                                 <span className="text-[10px] text-muted-foreground font-mono">{new Date(h.created_at).toLocaleString()}</span>
+                               </div>
+                               <p className="text-sm text-foreground/80 line-clamp-1 italic">"{h.prompt || "Sem prompt"}"</p>
+                               {h.error_message && (
+                                 <p className="text-[10px] text-destructive flex items-center gap-1">
+                                   <AlertTriangle className="h-3 w-3" /> {h.error_message}
+                                 </p>
+                               )}
+                             </div>
+                           </div>
+                           <div className="flex items-center gap-2">
+                              <Button size="sm" variant="ghost" onClick={() => navigate(`/creative/investigation?investigate=${h.id}`)}>
+                                <History className="h-4 w-4 mr-2" /> Investigar
+                              </Button>
+                             {(h.status === 'queued' || h.status === 'processing') && (
+                               <Button size="sm" variant="outline" className="text-destructive hover:bg-destructive/10" onClick={() => cancelExecution(h.id)}>
+                                 <X className="h-4 w-4 mr-2" /> Cancelar
+                               </Button>
+                             )}
+                             {(h.status === 'failed' || h.status === 'error' || h.status === 'completed') && (
+                               <Button size="sm" variant="secondary" disabled={rerunningId === h.id} onClick={() => rerun(h)}>
+                                 {rerunningId === h.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />}
+                               </Button>
+                             )}
+                           </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-               </Card>
-
-               {/* Investigation Dialog removed in favor of dedicated /creative/investigation page */}
+                 </Card>
+               </div>
              </div>
           </TabsContent>
-          <TabsContent value="chat">Kubo Chat...</TabsContent>
+          
+          {TOOLS.map((t) => (
+            <TabsContent key={t.key} value={t.key}>
+              <div className="space-y-6">
+                <Button variant="ghost" size="sm" onClick={() => { setActive("dashboard"); navigate("/creative"); }} className="mb-2">
+                  <ArrowLeft className="h-4 w-4 mr-2" /> Voltar ao Painel
+                </Button>
+                <CreativeToolInterface 
+                  toolKey={t.key as any} 
+                  onSuccess={() => {
+                    setActive("dashboard");
+                    navigate("/creative");
+                    loadHistory(null);
+                  }} 
+                />
+              </div>
+            </TabsContent>
+          ))}
         </Tabs>
       </main>
     </div>
