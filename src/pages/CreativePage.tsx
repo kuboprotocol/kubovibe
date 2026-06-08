@@ -268,6 +268,10 @@ export default function CreativePage() {
     setPresets(p || []);
   }
 
+  async function openAuditTrail() {
+    navigate("/creative/audit");
+  }
+
   async function renamePreset(id: string, newName: string) {
     const { error } = await supabase.from("creative_filter_presets").update({ name: newName }).eq("id", id);
     if (!error) {
