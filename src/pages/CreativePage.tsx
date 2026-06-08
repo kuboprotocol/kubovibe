@@ -117,16 +117,15 @@ export default function CreativePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
   const [currentPage, setCurrentPage] = useState(1);
-  const [cursorStack, setCursorStack] = useState<string[]>([]); // created_at cursors for prev navigation
+  const [cursorStack, setCursorStack] = useState<string[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
   const [realtimeStatus, setRealtimeStatus] = useState<"connecting" | "live" | "reconnecting" | "offline">("connecting");
   const [selected, setSelected] = useState<any | null>(null);
-  const [rerunning, setRerunning] = useState<string | null>(null);
+  const [rerunningId, setRerunningId] = useState<string | null>(null);
   const [isBatchRetrying, setIsBatchRetrying] = useState(false);
   const [showExportOptions, setShowExportOptions] = useState(false);
   const [showAuditExportOptions, setShowAuditExportOptions] = useState(false);
-  const [exportColumns, setExportColumns] = useState<string[]>(["ID", "Tool", "Status", "Prompt", "Credits", "Created At", "Error Message"]);
   const alertedRef = useRef<{ low?: boolean; empty?: boolean }>({});
   const globalCooldown = useCooldown();
   const PAGE_SIZE = 20;
@@ -149,6 +148,7 @@ export default function CreativePage() {
   const [investigationDateEnd, setInvestigationDateEnd] = useState("");
   const [exportAuditLogs, setExportAuditLogs] = useState<any[]>([]);
   const [isLoadingAudit, setIsLoadingAudit] = useState(false);
+  const [exportColumns, setExportColumns] = useState<string[]>(["ID", "Tool", "Status", "Prompt", "Credits", "Created At", "Error Message"]);
 
 
 
