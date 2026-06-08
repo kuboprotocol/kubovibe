@@ -133,6 +133,7 @@ export default function CreativePage() {
   const [isExporting, setIsExporting] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isCancelling, setIsCancelling] = useState<string | null>(null);
+  const [errorState, setErrorState] = useState<{ step: string; message: string; correlationId?: string; traceId?: string; originalAction?: () => void } | null>(null);
   const globalCooldown = useCooldown();
   const PAGE_SIZE = 20;
   const [showAuditSchedule, setShowAuditSchedule] = useState(false);
@@ -206,10 +207,14 @@ export default function CreativePage() {
       const visible = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
       setHistory(visible);
       setNextCursor(hasMore ? visible[visible.length - 1].created_at : null);
-      setTotalCount(count ?? 0);
+    setTotalCount(count ?? 0);
     } catch (e: any) {
       console.error("[CreativePanel:Selection] history_load_failed", { error: e.message, userId: user.id });
-      toast.error("Falha ao carregar histórico");
+      setErrorState({
+        step: "Seleção (Histórico)",
+        message: "Não foi possível carregar seu histórico de criações.",
+        originalAction: () => loadHistory(before)
+      });
     } finally {
       setIsLoadingHistory(false);
     }
@@ -320,13 +325,24 @@ export default function CreativePage() {
       const r = await authedFetch(cfg.fn, cfg.build(asset), idemKey);
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { 
+        const cId = r.headers.get("x-correlation-id") || undefined;
+        const tId = r.headers.get("x-trace-id") || undefined;
         console.error("[CreativePanel:Execution] tool_retry_failed", { 
           assetId: asset.id, 
           error: d.error, 
-          correlationId: r.headers.get("x-correlation-id"),
-          traceId: r.headers.get("x-trace-id") 
+          correlationId: cId,
+          traceId: tId 
         });
-        if (!isBatch) handleFnError(d); 
+        if (!isBatch) {
+          setErrorState({
+            step: "Execução (Retry)",
+            message: d.error || "Erro ao tentar reexecutar a ferramenta.",
+            correlationId: cId,
+            traceId: tId,
+            originalAction: () => rerun(asset, isBatch)
+          });
+          handleFnError(d); 
+        }
         return false; 
       }
       
@@ -430,6 +446,57 @@ export default function CreativePage() {
     toast.success(`${success} itens reprocessados em lote.`);
     refetch();
     loadHistory(cursorStack.length === 0 ? null : cursorStack[cursorStack.length - 1]);
+  }
+
+  async function exportFullPanelReport() {
+    if (!history.length || !user) return;
+    setIsExporting(true);
+    try {
+      const timestamp = new Date().toLocaleString('sv-SE', { timeZone: selectedTimezone }).replace(/[: ]/g, '-');
+      const correlationId = crypto.randomUUID().slice(0, 8);
+      const filename = `creative-panel-full-report-${correlationId}-${timestamp}.json`;
+      
+      const report = {
+        meta: {
+          generated_at: new Date().toISOString(),
+          timezone: selectedTimezone,
+          user_id: user.id,
+          total_items: totalCount,
+          correlation_id: correlationId
+        },
+        steps: {
+          selection: { status: "active", items_count: history.length },
+          configuration: { status: active === "dashboard" ? "pending" : "active", current_tool: active },
+          execution: { 
+            status: history.some(h => h.status === "processing") ? "active" : "idle",
+            processing_count: history.filter(h => h.status === "processing").length
+          }
+        },
+        history: history.map(h => ({
+          id: h.id,
+          tool: h.tool,
+          status: h.status,
+          prompt: h.prompt,
+          error: h.error_message,
+          created_at: h.created_at,
+          metadata: h.metadata,
+          retry_count: h.retry_count
+        }))
+      };
+
+      const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Relatório completo exportado");
+    } catch (e: any) {
+      toast.error("Falha ao exportar relatório");
+    } finally {
+      setIsExporting(false);
+    }
   }
 
   async function exportHistory(format: "csv" | "json") {
@@ -690,6 +757,48 @@ export default function CreativePage() {
         </div>
       </header>
       <main className="container max-w-7xl mx-auto px-4 py-6">
+        {errorState && (
+          <Alert variant="destructive" className="mb-6 bg-destructive/10 border-destructive/30 animate-in fade-in slide-in-from-top-4 duration-300">
+            <AlertCircle className="h-5 w-5" />
+            <div className="flex-1 ml-3">
+              <AlertTitle className="font-bold">Erro na etapa: {errorState.step}</AlertTitle>
+              <AlertDescription className="mt-1">
+                <p>{errorState.message}</p>
+                {(errorState.correlationId || errorState.traceId) && (
+                  <div className="mt-2 text-[10px] font-mono opacity-70 space-y-0.5">
+                    {errorState.correlationId && <p>CorrelationID: {errorState.correlationId}</p>}
+                    {errorState.traceId && <p>TraceID: {errorState.traceId}</p>}
+                  </div>
+                )}
+                <div className="mt-4 flex gap-3">
+                  {errorState.originalAction && (
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      className="bg-background/50 hover:bg-background border-destructive/20 text-destructive"
+                      onClick={() => {
+                        const action = errorState.originalAction;
+                        setErrorState(null);
+                        action?.();
+                      }}
+                    >
+                      <RotateCw className="h-3.5 w-3.5 mr-2" /> Tentar Novamente
+                    </Button>
+                  )}
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    className="hover:bg-destructive/5"
+                    onClick={() => setErrorState(null)}
+                  >
+                    Fechar
+                  </Button>
+                </div>
+              </div >
+            </div>
+          </Alert>
+        )}
+
         {/* Progress Bar Flow */}
         <div className="max-w-2xl mx-auto mb-10 space-y-6">
           <div className="flex justify-between items-center relative">
@@ -810,13 +919,23 @@ export default function CreativePage() {
                           <option value="America/New_York">NY (EST)</option>
                         </select>
                       </div>
-                      <Button 
-                        variant="outline" 
-                        onClick={() => { setFilter("all"); setSearchQuery(""); setSortOrder("desc"); setSelectedTimezone("UTC"); }}
-                        disabled={isLoadingHistory}
-                      >
-                        Resetar
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button 
+                          variant="outline" 
+                          onClick={() => { setFilter("all"); setSearchQuery(""); setSortOrder("desc"); setSelectedTimezone("UTC"); }}
+                          disabled={isLoadingHistory}
+                        >
+                          Resetar
+                        </Button>
+                        <Button 
+                          variant="secondary" 
+                          onClick={exportFullPanelReport}
+                          disabled={isExporting || history.length === 0}
+                        >
+                          {isExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileDown className="h-4 w-4 mr-2" />}
+                          Relatório Full
+                        </Button>
+                      </div>
 
                      {filter === "failed" && history.some(h => h.status === "failed") && (
                        <Button variant="secondary" onClick={batchRetryFailed} disabled={isBatchRetrying}>

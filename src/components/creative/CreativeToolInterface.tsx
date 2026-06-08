@@ -114,6 +114,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
   );
   const [loading, setLoading] = useState(false);
   const [traceInfo, setTraceInfo] = useState<{ correlationId?: string; traceId?: string } | null>(null);
+  const [errorState, setErrorState] = useState<{ message: string; correlationId?: string; traceId?: string } | null>(null);
   const { subscription, editsRemaining } = useSubscription();
 
   const handleExecute = async () => {
@@ -136,6 +137,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
 
     setLoading(true);
     setTraceInfo(null);
+    setErrorState(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       
@@ -191,6 +193,11 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       onSuccess?.();
     } catch (e: any) {
       console.error("[CreativePanel:Configuration] execution_exception", { toolKey, error: e.message, stack: e.stack });
+      setErrorState({
+        message: e.message,
+        correlationId: traceInfo?.correlationId,
+        traceId: traceInfo?.traceId
+      });
       toast.error(e.message);
     } finally {
       setLoading(false);
@@ -226,7 +233,31 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
         </Alert>
       )}
 
-      {traceInfo && (
+      {errorState && (
+        <Alert variant="destructive" className="bg-destructive/10 border-destructive/20 animate-in fade-in slide-in-from-top-4 duration-300">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle className="font-bold">Erro na Configuração</AlertTitle>
+          <AlertDescription>
+            <p>{errorState.message}</p>
+            {(errorState.correlationId || errorState.traceId) && (
+              <div className="mt-2 text-[10px] font-mono opacity-70">
+                {errorState.correlationId && <p>CorrelationID: {errorState.correlationId}</p>}
+                {errorState.traceId && <p>TraceID: {errorState.traceId}</p>}
+              </div>
+            )}
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="mt-3 bg-background/50 hover:bg-background border-destructive/20 text-destructive"
+              onClick={handleExecute}
+            >
+              <RotateCw className="h-3.5 w-3.5 mr-2" /> Tentar Novamente
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {traceInfo && !errorState && (
         <Alert variant="default" className="bg-muted/50 border-muted-foreground/20 text-xs py-2">
           <div className="flex flex-col gap-0.5 opacity-70">
             {traceInfo.correlationId && <span>ID de Correlação: {traceInfo.correlationId}</span>}

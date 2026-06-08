@@ -37,6 +37,12 @@ test.describe('Creative Economy Panel E2E', () => {
     await generateBtn.click();
     await expect(page.getByText(/O campo de prompt\/URL é obrigatório/i)).toBeVisible();
     await expect(generateBtn).toBeEnabled();
+    
+    // Check loading state on valid click
+    await page.getByPlaceholder(/Escreva um artigo/i).fill('Teste de loading');
+    await generateBtn.click();
+    await expect(generateBtn).toBeDisabled();
+    await expect(page.locator('.animate-spin')).toBeVisible();
   });
 
   test('navigation and state preservation', async ({ page }) => {
