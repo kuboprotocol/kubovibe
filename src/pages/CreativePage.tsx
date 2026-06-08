@@ -776,7 +776,7 @@ function AssetDetailDialog({ asset, onClose, onRerun, onCancel, rerunning }: { a
 }
 
 
-function Dashboard({ editsRemaining, subscription, history, filter, setFilter, searchQuery, setSearchQuery, sortOrder, setSortOrder, onPick, onOpen, onRerun, onCancel, onBatchRetry, isBatchRetrying, rerunningId, pageIndex, pageSize, totalCount, hasNext, hasPrev, realtimeStatus, globalCooldown, onNext, onPrev, onExport, exportColumns, setExportColumns, showExportOptions, setShowExportOptions, onAuditExport, showAuditExportOptions, setShowAuditExportOptions }: any) {
+function Dashboard({ editsRemaining, subscription, history, filter, setFilter, searchQuery, setSearchQuery, sortOrder, setSortOrder, onPick, onOpen, onRerun, onCancel, onBatchRetry, isBatchRetrying, rerunningId, pageIndex, pageSize, totalCount, hasNext, hasPrev, realtimeStatus, globalCooldown, onNext, onPrev, onExport, exportColumns, setExportColumns, showExportOptions, setShowExportOptions, onAuditExport, showAuditExportOptions, setShowAuditExportOptions, showAuditSchedule, setShowAuditSchedule, auditEmail, setAuditEmail, auditTime, setAuditTime, scheduleAuditExport }: any) {
   const lowBalance = (editsRemaining ?? 0) <= 10;
   return (
     <div className="space-y-6">
