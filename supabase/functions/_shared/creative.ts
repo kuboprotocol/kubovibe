@@ -1,6 +1,22 @@
 // Shared helpers for the Creative Economy panel edge functions
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+export function sanitizeError(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err);
+  // Bloqueia mensagens que contenham termos sensíveis de infra ou banco
+  if (
+    message.includes("database") ||
+    message.includes("sql") ||
+    message.includes("pg_") ||
+    message.includes("relation") ||
+    message.includes("/") ||
+    message.includes("\\")
+  ) {
+    return "internal_server_error";
+  }
+  return message;
+}
+
 export function supaForUser(authHeader: string) {
   return createClient(
     Deno.env.get("SUPABASE_URL")!,

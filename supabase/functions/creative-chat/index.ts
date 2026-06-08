@@ -1,6 +1,14 @@
 // Streaming chat for Kubo Chat. Primary: OpenRouter (gpt-4o-mini), Fallback: Lovable AI.
 import { corsHeaders } from "../_shared/cors.ts";
-import { getUser, deductCredits, recordAsset } from "../_shared/creative.ts";
+import { getUser, deductCredits, recordAsset, sanitizeError } from "../_shared/creative.ts";
+import { z } from "npm:zod@3";
+
+const InputSchema = z.object({
+  messages: z.array(z.object({
+    role: z.enum(["system", "user", "assistant"]),
+    content: z.string().min(1).max(5000),
+  })).min(1),
+});
 
 const COST = 1;
 
@@ -16,12 +24,14 @@ Deno.serve(async (req) => {
 
   const idempotencyKey = req.headers.get("X-Idempotency-Key") ?? undefined;
   try {
-    const { messages } = await req.json();
-    if (!Array.isArray(messages) || messages.length === 0) {
-      return new Response(JSON.stringify({ error: "messages required" }), {
+    const body = await req.json();
+    const parsed = InputSchema.safeParse(body);
+    if (!parsed.success) {
+      return new Response(JSON.stringify({ error: "invalid_input", details: parsed.error.flatten() }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    const { messages } = parsed.data;
 
     const ded = await deductCredits(user.id, COST, "creative_chat", { count: messages.length }, user.email, idempotencyKey);
     if (!ded.ok) {
@@ -66,7 +76,8 @@ Deno.serve(async (req) => {
       status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "error" }), {
+    console.error("[creative-chat] error:", e);
+    return new Response(JSON.stringify({ error: sanitizeError(e) }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

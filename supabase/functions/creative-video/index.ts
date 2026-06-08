@@ -3,7 +3,7 @@
 // retorna um pacote com roteiro + narração textual + cover image gerada (placeholder visual)
 // e marca o asset com status processing.
 import { corsHeaders } from "../_shared/cors.ts";
-import { getUser, deductCredits, recordAsset } from "../_shared/creative.ts";
+import { getUser, deductCredits, recordAsset, sanitizeError } from "../_shared/creative.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -89,7 +89,8 @@ Deno.serve(async (req) => {
       note: "Roteiro + thumbnail prontos. Renderização final de vídeo em fila (será disponibilizada em breve).",
     });
   } catch (e) {
-    return j(500, { error: e instanceof Error ? e.message : "error" });
+    console.error("[creative-video] error:", e);
+    return j(500, { error: sanitizeError(e) });
   }
 });
 

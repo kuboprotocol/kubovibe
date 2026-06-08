@@ -1,6 +1,6 @@
 // Downloader Universal — usa a API pública do cobalt.tools.
 import { corsHeaders } from "../_shared/cors.ts";
-import { getUser, deductCredits, recordAsset } from "../_shared/creative.ts";
+import { getUser, deductCredits, recordAsset, sanitizeError } from "../_shared/creative.ts";
 import { validatePublicUrl } from "../_shared/security.ts";
 
 const COST = 2;
@@ -48,7 +48,8 @@ Deno.serve(async (req) => {
 
     return j(200, { ok: true, download_url: downloadUrl, asset_id: assetId });
   } catch (e) {
-    return j(500, { error: e instanceof Error ? e.message : "error" });
+    console.error("[creative-download] error:", e);
+    return j(500, { error: sanitizeError(e) });
   }
 });
 

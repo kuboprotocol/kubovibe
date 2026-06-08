@@ -1,5 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
-import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
+import { corsHeaders, sanitizeError } from '../_shared/cors.ts'
 import { z } from 'npm:zod@3'
 
 const BodySchema = z.object({
@@ -161,7 +161,7 @@ Deno.serve(async (req) => {
       .maybeSingle()
 
     if (credErr) {
-      return new Response(JSON.stringify({ error: credErr.message }), {
+      return new Response(JSON.stringify({ error: sanitizeError(credErr) }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
@@ -175,7 +175,7 @@ Deno.serve(async (req) => {
     try {
       apiKey = await decrypt(cred.ciphertext, cred.iv, cred.tag)
     } catch (e) {
-      return new Response(JSON.stringify({ error: `Falha ao descriptografar: ${(e as Error).message}` }), {
+      return new Response(JSON.stringify({ error: `Falha ao descriptografar: ${sanitizeError(e)}` }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
@@ -202,7 +202,7 @@ Deno.serve(async (req) => {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (e) {
-    return new Response(JSON.stringify({ error: (e as Error).message }), {
+    return new Response(JSON.stringify({ error: sanitizeError(e) }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }

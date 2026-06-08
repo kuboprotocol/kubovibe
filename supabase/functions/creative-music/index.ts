@@ -1,5 +1,5 @@
 // Kubo Music AI — Suno API integration. Async: start + status.
-import { corsHeaders } from "../_shared/cors.ts";
+import { corsHeaders, sanitizeError } from "../_shared/cors.ts";
 import { getUser, deductCredits, recordAsset, supaAdmin } from "../_shared/creative.ts";
 
 const COST_GEN = 1;            // rounded from 0.001
@@ -83,7 +83,8 @@ Deno.serve(async (req) => {
 
     return j(400, { error: "invalid action" });
   } catch (e) {
-    return j(500, { error: e instanceof Error ? e.message : "error" });
+    console.error("[creative-music] error:", e);
+    return j(500, { error: sanitizeError(e) });
   }
 });
 
