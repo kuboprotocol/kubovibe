@@ -4,6 +4,8 @@ import { AlertTriangle, RotateCcw } from "lucide-react";
 
 interface Props {
   children: ReactNode;
+  resourceName?: string;
+  fallback?: ReactNode;
 }
 
 interface State {
@@ -32,21 +34,23 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public render() {
     if (this.state.hasError) {
+      if (this.props.fallback) return this.props.fallback;
+
       return (
         <div className="min-h-screen flex items-center justify-center bg-background p-4">
-          <div className="max-w-md w-full space-y-6 text-center">
+          <div className="max-w-md w-full space-y-6 text-center border border-border p-8 rounded-xl shadow-sm bg-card">
             <div className="flex justify-center">
               <div className="p-4 bg-destructive/10 rounded-full">
                 <AlertTriangle className="h-12 w-12 text-destructive" />
               </div>
             </div>
             <div className="space-y-2">
-              <h1 className="text-2xl font-bold tracking-tight">Ops! Algo deu errado</h1>
-              <p className="text-muted-foreground">
-                Ocorreu um erro inesperado nesta página. Você pode tentar recarregá-la.
+              <h1 className="text-2xl font-bold tracking-tight">Falha em: {this.props.resourceName || "Recurso"}</h1>
+              <p className="text-muted-foreground text-sm">
+                Ocorreu um erro ao carregar os dados. Você pode tentar recarregar a página.
               </p>
               {this.state.error && (
-                <div className="mt-4 p-3 bg-muted rounded text-xs font-mono text-left overflow-auto max-h-32">
+                <div className="mt-4 p-3 bg-muted rounded text-[10px] font-mono text-left overflow-auto max-h-24 opacity-70">
                   {this.state.error.message}
                 </div>
               )}

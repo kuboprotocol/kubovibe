@@ -100,10 +100,10 @@ const App = () => (
             <Route path="/admin/skills" element={<ProtectedRoute><AdminSkillsPage /></ProtectedRoute>} />
             <Route path="/domains" element={<ProtectedRoute><DomainsPage /></ProtectedRoute>} />
             <Route path="/creative" element={<ProtectedRoute><CreativePage /></ProtectedRoute>} />
-            <Route path="/creative/investigation" element={<ProtectedRoute><ErrorBoundary><InvestigationPage /></ErrorBoundary></ProtectedRoute>} />
-            <Route path="/creative/presets" element={<ProtectedRoute><ErrorBoundary><PresetsPage /></ErrorBoundary></ProtectedRoute>} />
+            <Route path="/creative/investigation" element={<ProtectedRoute><ErrorBoundary resourceName="InvestigationPage"><InvestigationPage /></ErrorBoundary></ProtectedRoute>} />
+            <Route path="/creative/presets" element={<ProtectedRoute><ErrorBoundary resourceName="PresetsPage"><PresetsPage /></ErrorBoundary></ProtectedRoute>} />
             <Route path="/creative/notifications" element={<ProtectedRoute><NotificationPreferencesPage /></ProtectedRoute>} />
-            <Route path="/creative/exports/:id" element={<ProtectedRoute><ErrorBoundary><ExportDetailsPage /></ErrorBoundary></ProtectedRoute>} />
+            <Route path="/creative/exports/:id" element={<ProtectedRoute><ErrorBoundary resourceName="ExportDetailsPage"><ExportDetailsPage /></ErrorBoundary></ProtectedRoute>} />
             <Route path="/creative/:tool" element={<ProtectedRoute><CreativePage /></ProtectedRoute>} />
             <Route path="/agents" element={<ProtectedRoute><AgentsHubPage /></ProtectedRoute>} />
             <Route path="/agents/:slug" element={<ProtectedRoute><AgentDetailPage /></ProtectedRoute>} />

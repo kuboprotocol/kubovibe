@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { RetryIndicator } from "@/components/creative/RetryIndicator";
 
 
 type Preset = {
@@ -30,7 +31,7 @@ export default function PresetsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
 
-  const { data: presets = [], isLoading: loading, error: queryError, refetch: load } = useQuery({
+  const { data: presets = [], isLoading: loading, error: queryError, refetch: load, failureCount } = useQuery({
     queryKey: ["filter-presets", user?.id, sortDir],
     queryFn: async () => {
       if (!user) throw new Error("Não autenticado");
@@ -79,6 +80,15 @@ export default function PresetsPage() {
         </Button>
         <h1 className="text-xl font-bold flex-1">Presets de Filtros</h1>
       </header>
+
+      <div className="px-4 pt-4 max-w-4xl mx-auto">
+        <RetryIndicator 
+          failureCount={failureCount} 
+          error={queryError as Error} 
+          onRetry={() => load()} 
+          isLoading={loading} 
+        />
+      </div>
 
       <div className="p-4 max-w-4xl mx-auto space-y-3">
         <div className="flex gap-2">
