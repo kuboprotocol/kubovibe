@@ -110,6 +110,30 @@ test.describe("Creative investigation", () => {
     await expect(page).toHaveURL(new RegExp(`investigate=${investId}`));
   });
 
+  test("loads correctly from direct URL with all filters and investigate context", async ({ page }) => {
+    const mockId = "00000000-0000-0000-0000-000000000000";
+    const fullUrl = `/creative/investigation?investigate=${mockId}&q=direct-load&status=failed&tool=chat&page=2&sort=tool&dir=asc`;
+    
+    await ensureAuthed(page, fullUrl);
+
+    // Verify URL parameters are still present
+    await expect(page).toHaveURL(new RegExp(`investigate=${mockId}`));
+    await expect(page).toHaveURL(/q=direct-load/);
+    await expect(page).toHaveURL(/status=failed/);
+    await expect(page).toHaveURL(/tool=chat/);
+    await expect(page).toHaveURL(/page=2/);
+    await expect(page).toHaveURL(/sort=tool/);
+    await expect(page).toHaveURL(/dir=asc/);
+
+    // Verify UI components reflect the URL state
+    await expect(page.getByTestId("filter-search")).toHaveValue("direct-load");
+    await expect(page.getByTestId("filter-status")).toContainText(/Falha/i);
+    
+    // Table should attempt to load data with these filters
+    await expect(page.getByTestId("investigation-row").first().or(page.getByText(/Nenhuma execução/))).toBeVisible();
+  });
+
+
 
   test("pagination and sorting persist across reloads and filter changes", async ({ page }) => {
     await ensureAuthed(page, "/creative/investigation");
