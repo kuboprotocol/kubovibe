@@ -2,18 +2,24 @@
 // MVP: não armazena binário; entrega metadados + link de stream público.
 import { runAgent } from "../_shared/agentRuntime.ts";
 import { validatePublicUrl } from "../_shared/security.ts";
+import { z } from "npm:zod@3";
+
+const InputSchema = z.object({
+  url: z.string().url().max(2048),
+});
 
 function detectPlatform(url: string): string {
-  if (/youtube\.com|youtu\.be/i.test(url)) return "youtube";
-  if (/vimeo\.com/i.test(url)) return "vimeo";
-  if (/tiktok\.com/i.test(url)) return "tiktok";
-  if (/instagram\.com/i.test(url)) return "instagram";
+...
   return "unknown";
 }
 
 Deno.serve((req) =>
   runAgent("video-downloader", req, async ({ input }) => {
-    const { url: rawUrl } = input as { url?: string };
+    const parsed = InputSchema.safeParse(input);
+    if (!parsed.success) {
+      throw new Error(`invalid_input: ${JSON.stringify(parsed.error.flatten().fieldErrors)}`);
+    }
+    const { url: rawUrl } = parsed.data;
     if (!rawUrl) throw new Error("missing_url");
     const url = validatePublicUrl(rawUrl).toString();
     const platform = detectPlatform(url);
