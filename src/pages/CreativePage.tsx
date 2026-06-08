@@ -121,6 +121,8 @@ export default function CreativePage() {
   const [selected, setSelected] = useState<any | null>(null);
   const [rerunning, setRerunning] = useState<string | null>(null);
   const [isBatchRetrying, setIsBatchRetrying] = useState(false);
+  const [showExportOptions, setShowExportOptions] = useState(false);
+  const [exportColumns, setExportColumns] = useState<string[]>(["ID", "Tool", "Status", "Prompt", "Credits", "Created At", "Error Message"]);
   const alertedRef = useRef<{ low?: boolean; empty?: boolean }>({});
   const globalCooldown = useCooldown();
   const PAGE_SIZE = 20;
@@ -227,24 +229,40 @@ export default function CreativePage() {
     (editsRemaining ?? 0) <= 10 ? "bg-yellow-500/10 border-yellow-500/40 text-yellow-600 dark:text-yellow-400" :
     "bg-primary/10 border-primary/30";
 
-  async function rerun(asset: any) {
+  async function rerun(asset: any, isBatch = false) {
     const cfg = RERUN_MAP[asset.tool];
-    if (!cfg) { toast.error("Reexecução indisponível para esta ferramenta."); return; }
+    if (!cfg) { 
+      if (!isBatch) toast.error("Reexecução indisponível para esta ferramenta."); 
+      return; 
+    }
     const idemKey = `rerun:${asset.id}`;
-    setRerunning(asset.id);
+    if (!isBatch) setRerunning(asset.id);
     try {
       const r = await authedFetch(cfg.fn, cfg.build(asset), idemKey);
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) { handleFnError(d); return; }
-      toast.success(d?.replayed ? "Reexecução idempotente (sem débito duplo)" : "Reexecutado com sucesso");
-      refetch();
-      const top = cursorStack.length === 0 ? null : cursorStack[cursorStack.length - 1];
-      loadHistory(top);
-      setSelected(null);
+      if (!r.ok) { 
+        if (!isBatch) handleFnError(d); 
+        return false; 
+      }
+      if (d?.replayed) {
+        if (!isBatch) toast.success("Reexecução idempotente (sem débito duplo)");
+        console.log(`[Audit] Retry idempotente detectado: Asset ${asset.id}, Tool ${asset.tool}, User ${user?.id}`);
+      } else {
+        if (!isBatch) toast.success("Reexecutado com sucesso");
+        console.log(`[Audit] Reprocessamento iniciado: Asset ${asset.id}, Tool ${asset.tool}, User ${user?.id}, Time: ${new Date().toISOString()}`);
+      }
+      return true;
     } catch (e: any) {
-      toast.error(e?.message ?? "Falha ao reexecutar");
+      if (!isBatch) toast.error(e?.message ?? "Falha ao reexecutar");
+      return false;
     } finally {
-      setRerunning(null);
+      if (!isBatch) {
+        setRerunning(null);
+        refetch();
+        const top = cursorStack.length === 0 ? null : cursorStack[cursorStack.length - 1];
+        loadHistory(top);
+        setSelected(null);
+      }
     }
   }
 
@@ -390,6 +408,10 @@ export default function CreativePage() {
                 });
               }}
               onExport={exportHistory}
+              exportColumns={exportColumns}
+              setExportColumns={setExportColumns}
+              showExportOptions={showExportOptions}
+              setShowExportOptions={setShowExportOptions}
             />
 
           </TabsContent>
@@ -489,9 +511,15 @@ function AssetDetailDialog({ asset, onClose, onRerun, onCancel, rerunning }: { a
                 <span>User ID: {asset.user_id?.slice(0, 8)}...</span>
               </div>
               {asset.idempotency_key && (
-                <div className="flex justify-between text-primary/80">
-                  <span>Chave de Idempotência:</span>
-                  <span>{asset.idempotency_key}</span>
+                <div className="flex flex-col gap-1 border-t border-border/20 pt-1 mt-1">
+                  <div className="flex justify-between text-primary/80">
+                    <span>Chave de Idempotência:</span>
+                    <span>{asset.idempotency_key}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 p-1.5 bg-primary/5 rounded border border-primary/20 text-[10px] text-primary">
+                    <RotateCw className="h-3 w-3" />
+                    <span>Esta chave garante que tentativas duplicadas não cobrem créditos extras.</span>
+                  </div>
                 </div>
               )}
               {asset.status === "completed" && (
@@ -529,7 +557,7 @@ function AssetDetailDialog({ asset, onClose, onRerun, onCancel, rerunning }: { a
 }
 
 
-function Dashboard({ editsRemaining, subscription, history, filter, setFilter, onPick, onOpen, onRerun, onCancel, onBatchRetry, isBatchRetrying, rerunningId, pageIndex, pageSize, totalCount, hasNext, hasPrev, realtimeStatus, globalCooldown, onNext, onPrev, onExport }: any) {
+function Dashboard({ editsRemaining, subscription, history, filter, setFilter, onPick, onOpen, onRerun, onCancel, onBatchRetry, isBatchRetrying, rerunningId, pageIndex, pageSize, totalCount, hasNext, hasPrev, realtimeStatus, globalCooldown, onNext, onPrev, onExport, exportColumns, setExportColumns, showExportOptions, setShowExportOptions }: any) {
   const lowBalance = (editsRemaining ?? 0) <= 10;
   return (
     <div className="space-y-6">
@@ -626,12 +654,42 @@ function Dashboard({ editsRemaining, subscription, history, filter, setFilter, o
               </Button>
             )}
             <div className="flex items-center gap-1 ml-1 border-l pl-2 border-border/40">
-              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onExport("csv")} title="Exportar CSV">
-                <FileDown className="h-3.5 w-3.5" />
-              </Button>
-              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onExport("json")} title="Exportar JSON">
-                <History className="h-3.5 w-3.5" />
-              </Button>
+              <Dialog open={showExportOptions} onOpenChange={setShowExportOptions}>
+                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setShowExportOptions(true)} title="Opções de Exportação">
+                  <FileDown className="h-3.5 w-3.5" />
+                </Button>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Exportar Histórico</DialogTitle>
+                    <DialogDescription>
+                      Selecione as colunas e o formato para exportar os dados filtrados.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="py-4 space-y-4">
+                    <div className="grid grid-cols-2 gap-2">
+                      {["ID", "Tool", "Status", "Prompt", "Credits", "Created At", "Error Message"].map((col) => (
+                        <div key={col} className="flex items-center gap-2">
+                          <input 
+                            type="checkbox" 
+                            id={`col-${col}`} 
+                            checked={exportColumns.includes(col)}
+                            onChange={(e) => {
+                              if (e.target.checked) setExportColumns([...exportColumns, col]);
+                              else setExportColumns(exportColumns.filter((c: string) => c !== col));
+                            }}
+                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                          />
+                          <label htmlFor={`col-${col}`} className="text-sm cursor-pointer">{col}</label>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex gap-2 pt-2">
+                      <Button className="flex-1" onClick={() => onExport("csv")}>Exportar CSV</Button>
+                      <Button className="flex-1" variant="outline" onClick={() => onExport("json")}>Exportar JSON</Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
         </div>
