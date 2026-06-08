@@ -140,6 +140,10 @@ export default function CreativePage() {
   const [exports, setExports] = useState<any[]>([]);
   const [exportLogs, setExportLogs] = useState<any[]>([]);
   const [showExportHistory, setShowExportHistory] = useState(false);
+  const [selectedExport, setSelectedExport] = useState<any | null>(null);
+  const [auditDateStart, setAuditDateStart] = useState("");
+  const [auditDateEnd, setAuditDateEnd] = useState("");
+
 
 
   useEffect(() => {
@@ -166,7 +170,7 @@ export default function CreativePage() {
     }
 
     q = q.order("created_at", { ascending: sortOrder === "asc" })
-      .limit(PAGE_SIZE + 1); // fetch one extra to detect "has next"
+      .limit(PAGE_SIZE + 1);
     
     if (before) {
       if (sortOrder === "desc") {
@@ -184,6 +188,21 @@ export default function CreativePage() {
     setNextCursor(hasMore ? visible[visible.length - 1].created_at : null);
     setTotalCount(count ?? 0);
   }
+
+  async function loadPresets() {
+    if (!user) return;
+    const { data: p } = await supabase.from("creative_filter_presets").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
+    setPresets(p || []);
+  }
+
+  async function renamePreset(id: string, newName: string) {
+    const { error } = await supabase.from("creative_filter_presets").update({ name: newName }).eq("id", id);
+    if (!error) {
+      toast.success("Preset renomeado");
+      loadPresets();
+    }
+  }
+
 
   // Initial + refresh on user/active/filter change.
   // Save preferences
@@ -544,6 +563,8 @@ export default function CreativePage() {
         email: auditEmail,
         schedule_time: auditTime,
         export_interval_days: auditInterval,
+        date_range_start: auditDateStart || null,
+        date_range_end: auditDateEnd || null,
         is_active: true
       });
       if (error) throw error;
@@ -553,6 +574,39 @@ export default function CreativePage() {
       toast.error("Falha ao agendar: " + e.message);
     }
   }
+
+  async function cancelExport(id: string) {
+    const { error } = await supabase.from("creative_export_history").update({ status: "failed", error_message: "Cancelado pelo usuário" }).eq("id", id);
+    if (!error) {
+      toast.info("Exportação cancelada");
+      loadExportHistory();
+    }
+  }
+
+  async function retryExport(id: string) {
+    const { error } = await supabase.from("creative_export_history").update({ status: "queued", error_message: null }).eq("id", id);
+    if (!error) {
+      toast.success("Exportação reenfileirada");
+      loadExportHistory();
+    }
+  }
+
+  async function loadExportHistory() {
+    if (!user) return;
+    const { data } = await supabase.from("creative_export_history").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
+    setExports(data || []);
+  }
+
+  // Polling for processing exports
+  useEffect(() => {
+    if (!user || exports.length === 0) return;
+    const hasProcessing = exports.some(e => e.status === "processing" || e.status === "queued");
+    if (!hasProcessing) return;
+
+    const interval = setInterval(loadExportHistory, 3000);
+    return () => clearInterval(interval);
+  }, [user, exports]);
+
 
   async function savePreset() {
     if (!user || !newPresetName.trim()) return;
@@ -744,6 +798,16 @@ export default function CreativePage() {
               showExportHistory={showExportHistory}
               setShowExportHistory={setShowExportHistory}
               currentPage={currentPage}
+              renamePreset={renamePreset}
+              auditDateStart={auditDateStart}
+              setAuditDateStart={setAuditDateStart}
+              auditDateEnd={auditDateEnd}
+              setAuditDateEnd={setAuditDateEnd}
+              cancelExport={cancelExport}
+              retryExport={retryExport}
+              selectedExport={selectedExport}
+              setSelectedExport={setSelectedExport}
+
               onReset={() => {
                 setFilter("all");
                 setSearchQuery("");
@@ -965,7 +1029,7 @@ function AssetDetailDialog({ asset, onClose, onRerun, onCancel, rerunning }: { a
 }
 
 
-function Dashboard({ editsRemaining, subscription, history, filter, setFilter, searchQuery, setSearchQuery, sortOrder, setSortOrder, onPick, onOpen, onRerun, onCancel, onBatchRetry, isBatchRetrying, rerunningId, pageIndex, pageSize, totalCount, hasNext, hasPrev, realtimeStatus, globalCooldown, onNext, onPrev, onExport, exportColumns, setExportColumns, showExportOptions, setShowExportOptions, onAuditExport, showAuditExportOptions, setShowAuditExportOptions, showAuditSchedule, setShowAuditSchedule, auditEmail, setAuditEmail, auditTime, setAuditTime, scheduleAuditExport, onReset, currentPage, auditInterval, setAuditInterval, presets, onApplyPreset, onDeletePreset, showPresetDialog, setShowPresetDialog, newPresetName, setNewPresetName, onSavePreset, exports, exportLogs, showExportHistory, setShowExportHistory }: any) {
+function Dashboard({ editsRemaining, subscription, history, filter, setFilter, searchQuery, setSearchQuery, sortOrder, setSortOrder, onPick, onOpen, onRerun, onCancel, onBatchRetry, isBatchRetrying, rerunningId, pageIndex, pageSize, totalCount, hasNext, hasPrev, realtimeStatus, globalCooldown, onNext, onPrev, onExport, exportColumns, setExportColumns, showExportOptions, setShowExportOptions, onAuditExport, showAuditExportOptions, setShowAuditExportOptions, showAuditSchedule, setShowAuditSchedule, auditEmail, setAuditEmail, auditTime, setAuditTime, scheduleAuditExport, onReset, currentPage, auditInterval, setAuditInterval, presets, onApplyPreset, onDeletePreset, showPresetDialog, setShowPresetDialog, newPresetName, setNewPresetName, onSavePreset, exports, exportLogs, showExportHistory, setShowExportHistory, renamePreset, auditDateStart, setAuditDateStart, auditDateEnd, setAuditDateEnd, cancelExport, retryExport, selectedExport, setSelectedExport }: any) {
   const lowBalance = (editsRemaining ?? 0) <= 10;
   return (
     <div className="space-y-6">
@@ -1188,6 +1252,16 @@ function Dashboard({ editsRemaining, subscription, history, filter, setFilter, s
                     </DialogDescription>
                   </DialogHeader>
                   <div className="py-4 space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Início do Período</label>
+                        <Input type="date" value={auditDateStart} onChange={(e) => setAuditDateStart(e.target.value)} />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Fim do Período</label>
+                        <Input type="date" value={auditDateEnd} onChange={(e) => setAuditDateEnd(e.target.value)} />
+                      </div>
+                    </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium">E-mail para envio</label>
                       <Input value={auditEmail} onChange={(e) => setAuditEmail(e.target.value)} placeholder="seu@email.com" />
@@ -1213,6 +1287,7 @@ function Dashboard({ editsRemaining, subscription, history, filter, setFilter, s
                       </p>
                     </div>
                     <Button className="w-full" onClick={scheduleAuditExport}>Agendar Exportação</Button>
+
                   </div>
                 </DialogContent>
               </Dialog>
@@ -1238,6 +1313,11 @@ function Dashboard({ editsRemaining, subscription, history, filter, setFilter, s
                         <div key={log.id} className="text-[11px] text-destructive-foreground border-b border-destructive/20 pb-1 last:border-0">
                           <span className="font-semibold">{new Date(log.created_at).toLocaleDateString()}:</span> {log.message}
                           {log.details?.reason && <span className="block italic mt-0.5">Motivo: {log.details.reason}</span>}
+                          {log.details?.export_id && (
+                            <Button variant="link" className="p-0 h-auto text-[10px] text-destructive underline" onClick={() => setSelectedExport(exports.find(e => e.id === log.details.export_id))}>
+                              Ver Exportação
+                            </Button>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -1246,29 +1326,94 @@ function Dashboard({ editsRemaining, subscription, history, filter, setFilter, s
                   <div className="py-4 space-y-3">
                     {exports.length === 0 && <p className="text-center text-sm text-muted-foreground py-8">Nenhum download gerado ainda.</p>}
                     {exports.map((ex: any) => (
-                      <Card key={ex.id} className="p-3 flex items-center justify-between hover:bg-muted/30 transition-colors border-border/40">
+                      <Card key={ex.id} className="p-3 flex items-center justify-between hover:bg-muted/30 transition-colors border-border/40 cursor-pointer" onClick={() => setSelectedExport(ex)}>
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 mb-1">
                             <Badge variant={ex.status === "completed" ? "default" : ex.status === "failed" ? "destructive" : "secondary"} className="text-[9px]">
-                              {ex.status}
+                              {ex.status === "processing" ? "gerando..." : ex.status}
                             </Badge>
-                            <span className="text-xs font-semibold">{ex.format.toUpperCase()} · {ex.item_count} itens</span>
+                            <span className="text-xs font-semibold">{ex.format.toUpperCase()} · {ex.item_count || ex.included_count || 0} itens</span>
                           </div>
                           <p className="text-[10px] text-muted-foreground truncate">
-                            Período: {ex.period_start ? new Date(ex.period_start).toLocaleDateString() : "—"} até {ex.period_end ? new Date(ex.period_end).toLocaleDateString() : "—"}
+                            Período: {ex.period_start || ex.date_range_start ? new Date(ex.period_start || ex.date_range_start).toLocaleDateString() : "—"} até {ex.period_end || ex.date_range_end ? new Date(ex.period_end || ex.date_range_end).toLocaleDateString() : "—"}
                           </p>
-                          {ex.error_message && <p className="text-[10px] text-destructive mt-1 font-mono">{ex.error_message}</p>}
                         </div>
-                        {ex.file_url && (
-                          <Button size="sm" variant="outline" className="h-8 gap-1.5" asChild>
-                            <a href={ex.file_url} download>
-                              <Download className="h-3 w-3" /> Baixar
-                            </a>
-                          </Button>
-                        )}
+                        <div className="flex gap-2">
+                          {ex.status === "failed" && (
+                             <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={(e) => { e.stopPropagation(); retryExport(ex.id); }} title="Reenfileirar">
+                               <RotateCw className="h-3 w-3" />
+                             </Button>
+                          )}
+                          {(ex.status === "processing" || ex.status === "queued") && (
+                             <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive" onClick={(e) => { e.stopPropagation(); cancelExport(ex.id); }} title="Cancelar">
+                               <AlertTriangle className="h-3 w-3" />
+                             </Button>
+                          )}
+                          {ex.file_url && (
+                            <Button size="sm" variant="outline" className="h-8 gap-1.5" asChild onClick={(e) => e.stopPropagation()}>
+                              <a href={ex.file_url} download>
+                                <Download className="h-3 w-3" /> Baixar
+                              </a>
+                            </Button>
+                          )}
+                        </div>
                       </Card>
                     ))}
                   </div>
+
+                  {/* Detalhes da Exportação */}
+                  <Dialog open={!!selectedExport} onOpenChange={(o) => !o && setSelectedExport(null)}>
+                    <DialogContent className="max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Detalhes da Exportação</DialogTitle>
+                        <DialogDescription>Informações detalhadas sobre o job de auditoria.</DialogDescription>
+                      </DialogHeader>
+                      {selectedExport && (
+                        <div className="space-y-4 py-4 text-sm">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <div className="text-[10px] uppercase text-muted-foreground">Status</div>
+                              <Badge className="mt-1">{selectedExport.status}</Badge>
+                            </div>
+                            <div>
+                              <div className="text-[10px] uppercase text-muted-foreground">Formato</div>
+                              <div className="font-mono mt-1">{selectedExport.format.toUpperCase()}</div>
+                            </div>
+                            <div>
+                              <div className="text-[10px] uppercase text-muted-foreground">Contagem de Itens</div>
+                              <div className="font-mono mt-1">{selectedExport.included_count || selectedExport.item_count || 0}</div>
+                            </div>
+                            <div>
+                              <div className="text-[10px] uppercase text-muted-foreground">Tempo de Geração</div>
+                              <div className="font-mono mt-1">
+                                {selectedExport.generation_time_ms ? `${(selectedExport.generation_time_ms / 1000).toFixed(2)}s` : "—"}
+                              </div>
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] uppercase text-muted-foreground mb-1">Execuções Incluídas</div>
+                            <Card className="p-2 max-h-32 overflow-y-auto bg-muted/20">
+                              {selectedExport.item_ids?.length > 0 ? (
+                                <div className="space-y-1">
+                                  {selectedExport.item_ids.map((id: string) => (
+                                    <div key={id} className="text-[10px] font-mono border-b border-border/20 last:border-0 pb-1">{id}</div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-xs italic text-muted-foreground">Nenhuma execução listada.</span>
+                              )}
+                            </Card>
+                          </div>
+                          {selectedExport.error_message && (
+                            <div className="p-3 bg-destructive/10 border border-destructive/20 rounded text-destructive text-xs font-mono">
+                              {selectedExport.error_message}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </DialogContent>
+                  </Dialog>
+
                 </DialogContent>
               </Dialog>
             </div>
