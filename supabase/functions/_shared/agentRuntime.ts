@@ -199,7 +199,12 @@ export async function runAgent(
       output: result.output,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = err instanceof Error ? err.message : "internal_error";
+    // Sanitize error message to avoid leaking internal details
+    const safeMessage = (message.includes("database") || message.includes("sql")) 
+      ? "internal_database_error" 
+      : message;
+
     // reembolso simétrico (insere crédito positivo no ledger)
     try {
       await admin.from("credit_transactions").insert({
@@ -243,7 +248,7 @@ export async function runAgent(
       _actor_user_id: userId,
     });
 
-    return jsonResponse({ error: message, job_id: jobId, refunded: true }, 500);
+    return jsonResponse({ error: safeMessage, job_id: jobId, refunded: true }, 500);
   }
 }
 
