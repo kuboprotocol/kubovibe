@@ -17,6 +17,7 @@ import {
   Video, Music, BookOpen, Sparkles, Loader2, Coins, ArrowLeft, RotateCw, AlertTriangle, Upload,
   FileDown, History, Check, Search, ArrowRight, Settings2, X
 } from "lucide-react";
+import { useDebounce } from "@/hooks/use-debounce";
 import { ManusLauncher } from "@/components/creative/ManusLauncher";
 import { CreativeToolInterface } from "@/components/creative/CreativeToolInterface";
 
