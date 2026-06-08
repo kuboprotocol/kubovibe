@@ -61,9 +61,10 @@ export default function InvestigationPage() {
   const [tool, setTool] = useState<string>(params.get("tool") ?? "all");
   const [startDate, setStartDate] = useState<string>(params.get("from") ?? "");
   const [endDate, setEndDate] = useState<string>(params.get("to") ?? "");
-  const [sortField, setSortField] = useState<"created_at" | "updated_at" | "tool" | "status">("created_at");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [sortField, setSortField] = useState<"created_at" | "updated_at" | "tool" | "status">((params.get("sort") as any) ?? "created_at");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">((params.get("dir") as any) ?? "desc");
   const [page, setPage] = useState(Number(params.get("page") ?? "1"));
+
 
   const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
 
@@ -75,15 +76,20 @@ export default function InvestigationPage() {
 
   // Persist filters to URL
   useEffect(() => {
-    const next = new URLSearchParams();
-    if (debouncedSearch) next.set("q", debouncedSearch);
-    if (debouncedStatus !== "all") next.set("status", debouncedStatus);
-    if (debouncedTool !== "all") next.set("tool", debouncedTool);
-    if (debouncedStartDate) next.set("from", debouncedStartDate);
-    if (debouncedEndDate) next.set("to", debouncedEndDate);
-    if (page > 1) next.set("page", String(page));
+    const next = new URLSearchParams(params); // Keep existing params like investigate
+    
+    if (debouncedSearch) next.set("q", debouncedSearch); else next.delete("q");
+    if (debouncedStatus !== "all") next.set("status", debouncedStatus); else next.delete("status");
+    if (debouncedTool !== "all") next.set("tool", debouncedTool); else next.delete("tool");
+    if (debouncedStartDate) next.set("from", debouncedStartDate); else next.delete("from");
+    if (debouncedEndDate) next.set("to", debouncedEndDate); else next.delete("to");
+    if (page > 1) next.set("page", String(page)); else next.delete("page");
+    if (sortField !== "created_at") next.set("sort", sortField); else next.delete("sort");
+    if (sortDir !== "desc") next.set("dir", sortDir); else next.delete("dir");
+    
     setParams(next, { replace: true });
-  }, [debouncedSearch, debouncedStatus, debouncedTool, debouncedStartDate, debouncedEndDate, page, setParams]);
+  }, [debouncedSearch, debouncedStatus, debouncedTool, debouncedStartDate, debouncedEndDate, page, sortField, sortDir, setParams]);
+
 
   const fetchAssets = useCallback(async () => {
     if (!user) return;
