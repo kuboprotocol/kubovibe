@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -159,6 +159,22 @@ export default function CreativePage() {
   const [selectedExport, setSelectedExport] = useState<any | null>(null);
   const [auditDateStart, setAuditDateStart] = useState("");
   const [auditDateEnd, setAuditDateEnd] = useState("");
+
+  const logAuditAction = useCallback(async (step: string, action: string, params: any = {}, correlationId?: string, traceId?: string) => {
+    if (!user) return;
+    try {
+      await supabase.from("creative_audit_trail").insert({
+        user_id: user.id,
+        step,
+        action,
+        params,
+        correlation_id: correlationId,
+        trace_id: traceId
+      });
+    } catch (e) {
+      console.error("Failed to log audit trail:", e);
+    }
+  }, [user]);
   const [selectedAssetForInvestigation, setSelectedAssetForInvestigation] = useState<any | null>(null);
   const [investigationSearch, setInvestigationSearch] = useState("");
   const [investigationDateStart, setInvestigationDateStart] = useState("");
@@ -186,15 +202,19 @@ export default function CreativePage() {
       setIsLoadingHistory(true);
       setTimeout(() => {
         setIsLoadingHistory(false);
+        const cId = crypto.randomUUID().slice(0, 8);
+        logAuditAction("Selection", "load_history_failed_simulated", { before }, cId);
         setErrorState({
           step: "Seleção (Simulado)",
           message: "Simulação de falha no carregamento do histórico.",
+          correlationId: cId,
           originalAction: () => loadHistory(before)
         });
       }, 1000);
       return;
     }
     setIsLoadingHistory(true);
+    await logAuditAction("Selection", "load_history_start", { before });
     try {
       let q = supabase.from("creative_assets")
         .select("*", { count: "exact" })
@@ -344,7 +364,11 @@ export default function CreativePage() {
     const idemKey = `rerun:${asset.id}:${attempt}`;
     if (!isBatch) setRerunningId(asset.id);
     try {
-      if (simulationMode === "execution") throw new Error("Falha simulada na execução");
+      if (simulationMode === "execution") {
+        const cId = crypto.randomUUID().slice(0, 8);
+        await logAuditAction("Execution", "rerun_failed_simulated", { assetId: asset.id }, cId);
+        throw new Error("Falha simulada na execução");
+      }
       const r = await authedFetch(cfg.fn, cfg.build(asset), idemKey);
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { 
