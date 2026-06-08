@@ -408,6 +408,7 @@ export type Database = {
       creative_assets: {
         Row: {
           cancelled_by: string | null
+          correlation_id: string | null
           created_at: string
           credits_spent: number
           error_message: string | null
@@ -421,11 +422,13 @@ export type Database = {
           retry_count: number | null
           status: string
           tool: string
+          trace_id: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           cancelled_by?: string | null
+          correlation_id?: string | null
           created_at?: string
           credits_spent?: number
           error_message?: string | null
@@ -439,11 +442,13 @@ export type Database = {
           retry_count?: number | null
           status?: string
           tool: string
+          trace_id?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           cancelled_by?: string | null
+          correlation_id?: string | null
           created_at?: string
           credits_spent?: number
           error_message?: string | null
@@ -457,6 +462,7 @@ export type Database = {
           retry_count?: number | null
           status?: string
           tool?: string
+          trace_id?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -538,6 +544,39 @@ export type Database = {
           last_run?: string | null
           schedule_time?: string
           updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      creative_audit_trail: {
+        Row: {
+          action: string
+          correlation_id: string | null
+          created_at: string | null
+          id: string
+          params: Json | null
+          step: string
+          trace_id: string | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          correlation_id?: string | null
+          created_at?: string | null
+          id?: string
+          params?: Json | null
+          step: string
+          trace_id?: string | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          correlation_id?: string | null
+          created_at?: string | null
+          id?: string
+          params?: Json | null
+          step?: string
+          trace_id?: string | null
           user_id?: string
         }
         Relationships: []
