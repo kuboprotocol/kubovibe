@@ -23,7 +23,7 @@ export async function getUser(authHeader: string | null) {
   return data?.user ?? null;
 }
 
-const ADMIN_EMAIL = "kuboprotocol@gmail.com";
+
 
 // Rate limit per tool per user. Default: 20 requests per 60 seconds.
 export async function enforceRateLimit(
@@ -31,7 +31,9 @@ export async function enforceRateLimit(
   tool: string,
   opts: { max?: number; windowSeconds?: number; userEmail?: string | null } = {},
 ): Promise<{ ok: true } | { ok: false; error: string; retryAfter: number }> {
-  if (opts.userEmail && opts.userEmail.toLowerCase() === ADMIN_EMAIL) return { ok: true };
+  const admin = supaAdmin();
+  const { data: isAdmin } = await admin.rpc("is_kubo_admin", { _user_id: userId });
+  if (isAdmin) return { ok: true };
   const max = opts.max ?? 20;
   const windowSeconds = opts.windowSeconds ?? 60;
   try {
@@ -62,7 +64,9 @@ export async function deductCredits(
 ): Promise<{ ok: true; replayed?: boolean } | { ok: false; error: string; status?: number }> {
   if (amount <= 0) return { ok: true };
   // Admin bypass (rate limit + credits)
-  if (userEmail && userEmail.toLowerCase() === ADMIN_EMAIL) return { ok: true };
+  const admin = supaAdmin();
+  const { data: isAdmin } = await admin.rpc("is_kubo_admin", { _user_id: userId });
+  if (isAdmin) return { ok: true };
 
   // Per-tool rate limit (20 req/min)
   const rl = await enforceRateLimit(userId, reason, { max: 20, windowSeconds: 60, userEmail });

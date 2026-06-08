@@ -15,7 +15,7 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const ADMIN_EMAIL = "kuboprotocol@gmail.com";
+
 const BUCKET = "skill-uploads";
 
 const json = (body: unknown, status = 200) =>
@@ -40,9 +40,13 @@ Deno.serve(async (req) => {
     });
     const { data: userData, error: userErr } = await authClient.auth.getUser();
     if (userErr || !userData.user) return json({ error: "invalid_token" }, 401);
-    if (userData.user.email?.toLowerCase() !== ADMIN_EMAIL) {
-      return json({ error: "forbidden" }, 403);
-    }
+    const { data: roleData } = await authClient
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userData.user.id)
+      .eq("role", "admin")
+      .maybeSingle();
+    if (!roleData) return json({ error: "forbidden" }, 403);
 
     const body = await req.json().catch(() => ({}));
     const action = body?.action as string | undefined;
