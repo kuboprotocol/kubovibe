@@ -178,8 +178,8 @@ export default function CreativePage() {
       }
     }
 
-    if (searchQuery) {
-      q = q.or(`prompt.ilike.%${searchQuery}%,tool.ilike.%${searchQuery}%,error_message.ilike.%${searchQuery}%`);
+    if (debouncedSearch) {
+      q = q.or(`prompt.ilike.%${debouncedSearch}%,tool.ilike.%${debouncedSearch}%,error_message.ilike.%${debouncedSearch}%`);
     }
 
     q = q.order("created_at", { ascending: sortOrder === "asc" })
@@ -222,13 +222,13 @@ export default function CreativePage() {
       await supabase.from("creative_user_settings").upsert({
         user_id: user.id,
         filter,
-        search_query: searchQuery,
+        search_query: debouncedSearch,
         sort_order: sortOrder
       });
     };
     const t = setTimeout(savePrefs, 2000);
     return () => clearTimeout(t);
-  }, [user, filter, searchQuery, sortOrder]);
+  }, [user, filter, debouncedSearch, sortOrder]);
 
   useEffect(() => {
     if (!user) return;
@@ -278,7 +278,7 @@ export default function CreativePage() {
     setCursorStack([]);
     setCurrentPage(1);
     loadHistory(null);
-  }, [user, active, filter, searchQuery, sortOrder]);
+  }, [user, active, filter, debouncedSearch, sortOrder]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
