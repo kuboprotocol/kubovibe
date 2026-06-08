@@ -617,6 +617,7 @@ export default function CreativePage() {
         <Tabs value={active} onValueChange={(v) => { setActive(v as ToolKey); navigate(v === "dashboard" ? "/creative" : `/creative/${v}`); }}>
           <TabsContent value="dashboard">
              <div className="space-y-6">
+               <ManusLauncher setActive={(k) => { setActive(k as ToolKey); navigate(k === "dashboard" ? "/creative" : `/creative/${k}`); }} />
                <div className="flex flex-wrap gap-4 items-end">
                  <div className="space-y-1">
                    <label className="text-xs font-medium text-muted-foreground">Filtro</label>
