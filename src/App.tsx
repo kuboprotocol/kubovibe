@@ -39,6 +39,7 @@ import AdminSkillsPage from "./pages/AdminSkillsPage";
 import DomainsPage from "./pages/DomainsPage";
 import CreativePage from "./pages/CreativePage";
 import InvestigationPage from "./pages/creative/InvestigationPage";
+import AuditTrailPage from "./pages/creative/AuditTrailPage";
 import PresetsPage from "./pages/creative/PresetsPage";
 import NotificationPreferencesPage from "./pages/creative/NotificationPreferencesPage";
 import ExportDetailsPage from "./pages/creative/ExportDetailsPage";
@@ -101,6 +102,7 @@ const App = () => (
             <Route path="/domains" element={<ProtectedRoute><DomainsPage /></ProtectedRoute>} />
             <Route path="/creative" element={<ProtectedRoute><CreativePage /></ProtectedRoute>} />
             <Route path="/creative/investigation" element={<ProtectedRoute><ErrorBoundary resourceName="InvestigationPage"><InvestigationPage /></ErrorBoundary></ProtectedRoute>} />
+            <Route path="/creative/audit" element={<ProtectedRoute><ErrorBoundary resourceName="AuditTrailPage"><AuditTrailPage /></ErrorBoundary></ProtectedRoute>} />
             <Route path="/creative/presets" element={<ProtectedRoute><ErrorBoundary resourceName="PresetsPage"><PresetsPage /></ErrorBoundary></ProtectedRoute>} />
             <Route path="/creative/notifications" element={<ProtectedRoute><NotificationPreferencesPage /></ProtectedRoute>} />
             <Route path="/creative/exports/:id" element={<ProtectedRoute><ErrorBoundary resourceName="ExportDetailsPage"><ExportDetailsPage /></ErrorBoundary></ProtectedRoute>} />

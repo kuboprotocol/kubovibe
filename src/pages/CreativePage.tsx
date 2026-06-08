@@ -268,6 +268,10 @@ export default function CreativePage() {
     setPresets(p || []);
   }
 
+  async function openAuditTrail() {
+    navigate("/creative/audit");
+  }
+
   async function renamePreset(id: string, newName: string) {
     const { error } = await supabase.from("creative_filter_presets").update({ name: newName }).eq("id", id);
     if (!error) {
@@ -1115,6 +1119,15 @@ export default function CreativePage() {
                           {isExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileDown className="h-4 w-4 mr-2" />}
                           JSON Full
                         </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={openAuditTrail}
+                          title="Ver trilha de auditoria completa"
+                        >
+                          <History className="h-4 w-4 mr-2" />
+                          Trilha
+                        </Button>
                         <div className="flex gap-1">
                           {["Selection", "Configuration", "Execution"].map((step) => (
                             <Button 
@@ -1179,7 +1192,7 @@ export default function CreativePage() {
                            </div>
                            <div className="flex items-center gap-2">
                               <Button size="sm" variant="ghost" onClick={() => navigate(`/creative/investigation?investigate=${h.id}`)}>
-                                <History className="h-4 w-4 mr-2" /> Investigar
+                                <AlertCircle className="h-4 w-4 mr-2" /> Investigar
                               </Button>
                              {(h.status === 'queued' || h.status === 'processing') && (
                                <Button 
