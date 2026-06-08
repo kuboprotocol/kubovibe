@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import {
   MessageSquare, Image as ImageIcon, Download, Scissors, User2,
   Video, Music, BookOpen, Sparkles, Loader2, Coins, ArrowLeft, RotateCw, AlertTriangle, Upload,
-  FileDown, History, Check, Search, ArrowRight
+  FileDown, History, Check, Search, ArrowRight, Settings2, X
 } from "lucide-react";
 import { ManusLauncher } from "@/components/creative/ManusLauncher";
 import { CreativeToolInterface } from "@/components/creative/CreativeToolInterface";
