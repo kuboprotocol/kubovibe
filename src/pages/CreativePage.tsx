@@ -397,7 +397,7 @@ export default function CreativePage() {
       return; 
     }
     const idemKey = `rerun:${asset.id}`;
-    if (!isBatch) setRerunning(asset.id);
+    if (!isBatch) setRerunningId(asset.id);
     try {
       const r = await authedFetch(cfg.fn, cfg.build(asset), idemKey);
       const d = await r.json().catch(() => ({}));
@@ -418,7 +418,7 @@ export default function CreativePage() {
       return false;
     } finally {
       if (!isBatch) {
-        setRerunning(null);
+        setRerunningId(null);
         refetch();
         const top = cursorStack.length === 0 ? null : cursorStack[cursorStack.length - 1];
         loadHistory(top);
@@ -779,7 +779,7 @@ export default function CreativePage() {
               onCancel={cancelExecution}
               onBatchRetry={batchRetryFailed}
               isBatchRetrying={isBatchRetrying}
-              rerunningId={rerunning}
+              rerunningId={rerunningId}
               pageIndex={cursorStack.length}
               pageSize={PAGE_SIZE}
               totalCount={totalCount}
@@ -870,8 +870,8 @@ export default function CreativePage() {
         </Tabs>
       </main>
 
-      <AssetDetailDialog asset={selected} onClose={() => setSelected(null)} onRerun={rerun} onCancel={cancelExecution} rerunning={!!rerunning && rerunning === selected?.id} />
-      <AssetInvestigationDialog asset={selectedAssetForInvestigation} onClose={() => setSelectedAssetForInvestigation(null)} onRerun={rerun} onCancel={cancelExecution} rerunning={!!rerunning && rerunning === selectedAssetForInvestigation?.id} />
+      <AssetDetailDialog asset={selected} onClose={() => setSelected(null)} onRerun={rerun} onCancel={cancelExecution} rerunning={!!rerunningId && rerunningId === selected?.id} />
+      <AssetInvestigationDialog asset={selectedAssetForInvestigation} onClose={() => setSelectedAssetForInvestigation(null)} onRerun={rerun} onCancel={cancelExecution} rerunning={!!rerunningId && rerunningId === selectedAssetForInvestigation?.id} />
       <OrgBrandingDialog />
     </div>
   );
