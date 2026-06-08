@@ -121,6 +121,8 @@ export default function CreativePage() {
   const [selected, setSelected] = useState<any | null>(null);
   const [rerunning, setRerunning] = useState<string | null>(null);
   const [isBatchRetrying, setIsBatchRetrying] = useState(false);
+  const [showExportOptions, setShowExportOptions] = useState(false);
+  const [exportColumns, setExportColumns] = useState<string[]>(["ID", "Tool", "Status", "Prompt", "Credits", "Created At", "Error Message"]);
   const alertedRef = useRef<{ low?: boolean; empty?: boolean }>({});
   const globalCooldown = useCooldown();
   const PAGE_SIZE = 20;
@@ -164,6 +166,8 @@ export default function CreativePage() {
   }, [user, active, filter]);
 
   // Realtime with reconnect handling. Channel rebuilt on user change; status reflected in UI.
+  const prevStatusRef = useRef<Record<string, string>>({});
+
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
@@ -175,7 +179,28 @@ export default function CreativePage() {
           schema: "public",
           table: "creative_assets",
           filter: `user_id=eq.${user.id}`,
-        }, () => {
+        }, (payload) => {
+          // Notification check
+          if (payload.eventType === "UPDATE" || payload.eventType === "INSERT") {
+            const newItem = payload.new as any;
+            const oldStatus = prevStatusRef.current[newItem.id];
+            if (oldStatus && oldStatus !== newItem.status) {
+              const statusMap: Record<string, string> = {
+                queued: "em fila",
+                processing: "processando",
+                completed: "concluído",
+                failed: "falhou",
+                error: "erro",
+                cancelled: "cancelado"
+              };
+              toast.info(`Status atualizado: ${statusMap[newItem.status] || newItem.status}`, {
+                description: `${TOOLS.find(t => t.key === newItem.tool)?.title || newItem.tool}: ${newItem.prompt?.slice(0, 40)}...`,
+                duration: 3000
+              });
+            }
+            prevStatusRef.current[newItem.id] = newItem.status;
+          }
+
           // refresh current page (top if no cursor, otherwise the page we're on)
           const top = cursorStack.length === 0 ? null : cursorStack[cursorStack.length - 1];
           loadHistory(top);
@@ -227,24 +252,40 @@ export default function CreativePage() {
     (editsRemaining ?? 0) <= 10 ? "bg-yellow-500/10 border-yellow-500/40 text-yellow-600 dark:text-yellow-400" :
     "bg-primary/10 border-primary/30";
 
-  async function rerun(asset: any) {
+  async function rerun(asset: any, isBatch = false) {
     const cfg = RERUN_MAP[asset.tool];
-    if (!cfg) { toast.error("Reexecução indisponível para esta ferramenta."); return; }
+    if (!cfg) { 
+      if (!isBatch) toast.error("Reexecução indisponível para esta ferramenta."); 
+      return; 
+    }
     const idemKey = `rerun:${asset.id}`;
-    setRerunning(asset.id);
+    if (!isBatch) setRerunning(asset.id);
     try {
       const r = await authedFetch(cfg.fn, cfg.build(asset), idemKey);
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) { handleFnError(d); return; }
-      toast.success(d?.replayed ? "Reexecução idempotente (sem débito duplo)" : "Reexecutado com sucesso");
-      refetch();
-      const top = cursorStack.length === 0 ? null : cursorStack[cursorStack.length - 1];
-      loadHistory(top);
-      setSelected(null);
+      if (!r.ok) { 
+        if (!isBatch) handleFnError(d); 
+        return false; 
+      }
+      if (d?.replayed) {
+        if (!isBatch) toast.success("Reexecução idempotente (sem débito duplo)");
+        console.log(`[Audit] Retry idempotente detectado: Asset ${asset.id}, Tool ${asset.tool}, User ${user?.id}`);
+      } else {
+        if (!isBatch) toast.success("Reexecutado com sucesso");
+        console.log(`[Audit] Reprocessamento iniciado: Asset ${asset.id}, Tool ${asset.tool}, User ${user?.id}, Time: ${new Date().toISOString()}`);
+      }
+      return true;
     } catch (e: any) {
-      toast.error(e?.message ?? "Falha ao reexecutar");
+      if (!isBatch) toast.error(e?.message ?? "Falha ao reexecutar");
+      return false;
     } finally {
-      setRerunning(null);
+      if (!isBatch) {
+        setRerunning(null);
+        refetch();
+        const top = cursorStack.length === 0 ? null : cursorStack[cursorStack.length - 1];
+        loadHistory(top);
+        setSelected(null);
+      }
     }
   }
 
@@ -272,14 +313,15 @@ export default function CreativePage() {
     if (!failed.length) return;
     setIsBatchRetrying(true);
     let success = 0;
+    
+    // Log audit trail start
+    console.log(`[Audit] Batch Retry iniciado por ${user?.id} as ${new Date().toISOString()}. Itens: ${failed.length}`);
+
     for (const asset of failed) {
-      const cfg = RERUN_MAP[asset.tool];
-      if (!cfg) continue;
-      try {
-        const r = await authedFetch(cfg.fn, cfg.build(asset), `rerun:${asset.id}`);
-        if (r.ok) success++;
-      } catch (e) { console.error("Batch retry failed for", asset.id, e); }
+      const ok = await rerun(asset, true);
+      if (ok) success++;
     }
+    
     setIsBatchRetrying(false);
     toast.success(`${success} itens reprocessados em lote.`);
     refetch();
@@ -291,21 +333,34 @@ export default function CreativePage() {
     const filename = `creative-history-${new Date().toISOString().split("T")[0]}.${format}`;
     let content = "";
     
+    // Ensure filters are reflected: already reflected as 'history' state is populated via loadHistory(filter)
+    
     if (format === "json") {
-      content = JSON.stringify(history, null, 2);
+      const exportData = history.map(h => {
+        const item: any = {};
+        if (exportColumns.includes("ID")) item.id = h.id;
+        if (exportColumns.includes("Tool")) item.tool = h.tool;
+        if (exportColumns.includes("Status")) item.status = h.status;
+        if (exportColumns.includes("Prompt")) item.prompt = h.prompt;
+        if (exportColumns.includes("Credits")) item.credits_spent = h.credits_spent || 0;
+        if (exportColumns.includes("Created At")) item.created_at = h.created_at;
+        if (exportColumns.includes("Error Message")) item.error_message = h.error_message;
+        return item;
+      });
+      content = JSON.stringify(exportData, null, 2);
     } else {
-      const headers = ["ID", "Tool", "Status", "Prompt", "Credits", "Created At", "Error Message", "Error Detail"];
-      const rows = history.map(h => [
-        h.id,
-        h.tool,
-        h.status,
-        `"${(h.prompt || "").replace(/"/g, '""')}"`,
-        h.credits_spent || 0,
-        h.created_at,
-        `"${(h.error_message || "").split("\n")[0].replace(/"/g, '""')}"`,
-        `"${(h.error_message || "").replace(/"/g, '""')}"`
-      ]);
-      content = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+      const rows = history.map(h => {
+        const row = [];
+        if (exportColumns.includes("ID")) row.push(h.id);
+        if (exportColumns.includes("Tool")) row.push(h.tool);
+        if (exportColumns.includes("Status")) row.push(h.status);
+        if (exportColumns.includes("Prompt")) row.push(`"${(h.prompt || "").replace(/"/g, '""')}"`);
+        if (exportColumns.includes("Credits")) row.push(h.credits_spent || 0);
+        if (exportColumns.includes("Created At")) row.push(h.created_at);
+        if (exportColumns.includes("Error Message")) row.push(`"${(h.error_message || "").replace(/"/g, '""')}"`);
+        return row.join(",");
+      });
+      content = [exportColumns.join(","), ...rows].join("\n");
     }
 
     const blob = new Blob([content], { type: format === "json" ? "application/json" : "text/csv" });
@@ -315,7 +370,8 @@ export default function CreativePage() {
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success(`Histórico exportado como ${format.toUpperCase()}`);
+    toast.success(`Histórico exportado (${exportColumns.length} colunas)`);
+    setShowExportOptions(false);
   }
 
 
@@ -390,6 +446,10 @@ export default function CreativePage() {
                 });
               }}
               onExport={exportHistory}
+              exportColumns={exportColumns}
+              setExportColumns={setExportColumns}
+              showExportOptions={showExportOptions}
+              setShowExportOptions={setShowExportOptions}
             />
 
           </TabsContent>
@@ -489,9 +549,15 @@ function AssetDetailDialog({ asset, onClose, onRerun, onCancel, rerunning }: { a
                 <span>User ID: {asset.user_id?.slice(0, 8)}...</span>
               </div>
               {asset.idempotency_key && (
-                <div className="flex justify-between text-primary/80">
-                  <span>Chave de Idempotência:</span>
-                  <span>{asset.idempotency_key}</span>
+                <div className="flex flex-col gap-1 border-t border-border/20 pt-1 mt-1">
+                  <div className="flex justify-between text-primary/80">
+                    <span>Chave de Idempotência:</span>
+                    <span>{asset.idempotency_key}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 p-1.5 bg-primary/5 rounded border border-primary/20 text-[10px] text-primary">
+                    <RotateCw className="h-3 w-3" />
+                    <span>Esta chave garante que tentativas duplicadas não cobrem créditos extras.</span>
+                  </div>
                 </div>
               )}
               {asset.status === "completed" && (
@@ -529,7 +595,7 @@ function AssetDetailDialog({ asset, onClose, onRerun, onCancel, rerunning }: { a
 }
 
 
-function Dashboard({ editsRemaining, subscription, history, filter, setFilter, onPick, onOpen, onRerun, onCancel, onBatchRetry, isBatchRetrying, rerunningId, pageIndex, pageSize, totalCount, hasNext, hasPrev, realtimeStatus, globalCooldown, onNext, onPrev, onExport }: any) {
+function Dashboard({ editsRemaining, subscription, history, filter, setFilter, onPick, onOpen, onRerun, onCancel, onBatchRetry, isBatchRetrying, rerunningId, pageIndex, pageSize, totalCount, hasNext, hasPrev, realtimeStatus, globalCooldown, onNext, onPrev, onExport, exportColumns, setExportColumns, showExportOptions, setShowExportOptions }: any) {
   const lowBalance = (editsRemaining ?? 0) <= 10;
   return (
     <div className="space-y-6">
@@ -626,12 +692,42 @@ function Dashboard({ editsRemaining, subscription, history, filter, setFilter, o
               </Button>
             )}
             <div className="flex items-center gap-1 ml-1 border-l pl-2 border-border/40">
-              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onExport("csv")} title="Exportar CSV">
-                <FileDown className="h-3.5 w-3.5" />
-              </Button>
-              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onExport("json")} title="Exportar JSON">
-                <History className="h-3.5 w-3.5" />
-              </Button>
+              <Dialog open={showExportOptions} onOpenChange={setShowExportOptions}>
+                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setShowExportOptions(true)} title="Opções de Exportação">
+                  <FileDown className="h-3.5 w-3.5" />
+                </Button>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Exportar Histórico</DialogTitle>
+                    <DialogDescription>
+                      Selecione as colunas e o formato para exportar os dados filtrados.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="py-4 space-y-4">
+                    <div className="grid grid-cols-2 gap-2">
+                      {["ID", "Tool", "Status", "Prompt", "Credits", "Created At", "Error Message"].map((col) => (
+                        <div key={col} className="flex items-center gap-2">
+                          <input 
+                            type="checkbox" 
+                            id={`col-${col}`} 
+                            checked={exportColumns.includes(col)}
+                            onChange={(e) => {
+                              if (e.target.checked) setExportColumns([...exportColumns, col]);
+                              else setExportColumns(exportColumns.filter((c: string) => c !== col));
+                            }}
+                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                          />
+                          <label htmlFor={`col-${col}`} className="text-sm cursor-pointer">{col}</label>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex gap-2 pt-2">
+                      <Button className="flex-1" onClick={() => onExport("csv")}>Exportar CSV</Button>
+                      <Button className="flex-1" variant="outline" onClick={() => onExport("json")}>Exportar JSON</Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
         </div>
