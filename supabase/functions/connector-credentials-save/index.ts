@@ -91,7 +91,8 @@ Deno.serve(async (req) => {
       }, { onConflict: 'user_id,connector_slug' })
 
     if (upsertErr) {
-      return new Response(JSON.stringify({ error: upsertErr.message }), {
+      console.error('[connector-credentials-save] api_credentials upsert error:', upsertErr);
+      return new Response(JSON.stringify({ error: 'Falha ao salvar credenciais' }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
