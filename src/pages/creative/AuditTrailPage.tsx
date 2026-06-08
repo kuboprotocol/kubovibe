@@ -132,21 +132,41 @@ export default function CreativeAuditPage() {
 
   // Recurrent failures summary
   const recurrentFailures = useMemo(() => {
-    const failures: Record<string, { count: number; lastTrace: string; lastCorrelation: string }> = {};
+    const failures: Record<string, { count: number; lastTrace: string; lastCorrelation: string; dates: string[] }> = {};
     entries.forEach(entry => {
       const isError = entry.action.toLowerCase().includes("failed") || entry.action.toLowerCase().includes("error") || entry.params?.error;
       if (isError) {
         const key = entry.params?.error?.message || entry.action;
-        if (!failures[key]) failures[key] = { count: 0, lastTrace: "", lastCorrelation: "" };
+        if (!failures[key]) failures[key] = { count: 0, lastTrace: "", lastCorrelation: "", dates: [] };
         failures[key].count++;
         failures[key].lastTrace = entry.trace_id || "";
         failures[key].lastCorrelation = entry.correlation_id || "";
+        failures[key].dates.push(entry.created_at);
       }
     });
     return Object.entries(failures)
       .filter(([_, v]) => v.count > 1)
       .sort((a, b) => b[1].count - a[1].count)
       .slice(0, 3);
+  }, [entries]);
+
+  // Failure Trends Data for Chart
+  const failureTrends = useMemo(() => {
+    const dailyData: Record<string, Record<string, number>> = {};
+    entries.forEach(entry => {
+      const isError = entry.action.toLowerCase().includes("failed") || entry.action.toLowerCase().includes("error") || entry.params?.error;
+      if (isError) {
+        const date = new Date(entry.created_at).toLocaleDateString();
+        const key = (entry.params?.error?.message || entry.action).slice(0, 20) + "...";
+        if (!dailyData[date]) dailyData[date] = {};
+        dailyData[date][key] = (dailyData[date][key] || 0) + 1;
+      }
+    });
+
+    return Object.entries(dailyData).map(([date, counts]) => ({
+      date,
+      ...counts
+    })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [entries]);
 
   // Multiple attempts detection
@@ -159,6 +179,30 @@ export default function CreativeAuditPage() {
     });
     return Object.entries(correlations).filter(([_, v]) => v > 1).length;
   }, [entries]);
+
+  const loadTimeline = async (correlationId: string) => {
+    setIsTimelineLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("creative_audit_trail")
+        .select("*")
+        .eq("correlation_id", correlationId)
+        .order("created_at", { ascending: true });
+      
+      if (error) throw error;
+      setTimelineEntries(data || []);
+    } catch (err) {
+      toast.error("Erro ao carregar linha do tempo");
+    } finally {
+      setIsTimelineLoading(false);
+    }
+  };
+
+  const shareCurrentView = () => {
+    const url = window.location.href;
+    navigator.clipboard.writeText(url);
+    toast.success("Link da consulta copiado!");
+  };
 
   const saveCurrentFilters = () => {
     const newFilter = {
