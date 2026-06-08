@@ -201,8 +201,8 @@ export async function runAgent(
   } catch (err) {
     const message = err instanceof Error ? err.message : "internal_error";
     // Sanitize error message to avoid leaking internal details
-    const safeMessage = (message.includes("database") || message.includes("sql")) 
-      ? "internal_database_error" 
+    const safeMessage = (message.includes("database") || message.includes("sql") || message.includes("/")) 
+      ? "internal_server_error" 
       : message;
 
     // reembolso simétrico (insere crédito positivo no ledger)
