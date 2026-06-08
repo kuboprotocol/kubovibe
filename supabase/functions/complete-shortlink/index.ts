@@ -1,9 +1,13 @@
 import { createClient } from "npm:@supabase/supabase-js@^2";
-
+import { z } from "npm:zod@3";
 import { corsHeaders, sanitizeError } from "../_shared/cors.ts";
 
 const MIN_WAIT_SECONDS = 5;
 const DAILY_LINK_LIMIT = 10;
+
+const BodySchema = z.object({
+  click_id: z.string().uuid(),
+});
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -17,20 +21,19 @@ Deno.serve(async (req: Request) => {
     });
 
   try {
-    // Auth via getClaims
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return json({ error: "Unauthorized" }, 401);
     }
 
-    const supabaseUser = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY")!;
+    
+    const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, { 
+      global: { headers: { Authorization: authHeader } } 
+    });
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: userRes, error: authError } = await supabaseUser.auth.getUser(token);
+    const { data: userRes, error: authError } = await supabaseUser.auth.getUser();
     if (authError || !userRes?.user) {
       return json({ error: "Unauthorized" }, 401);
     }
@@ -39,13 +42,15 @@ Deno.serve(async (req: Request) => {
     const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
                      req.headers.get("cf-connecting-ip") || "unknown";
 
-    const { click_id } = await req.json();
-    if (!click_id || typeof click_id !== "string") {
-      return json({ error: "click_id required" }, 400);
+    const body = await req.json().catch(() => ({}));
+    const parsed = BodySchema.safeParse(body);
+    if (!parsed.success) {
+      return json({ error: "invalid_input", details: parsed.error.flatten().fieldErrors }, 400);
     }
+    const { click_id } = parsed.data;
 
     const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL")!,
+      supabaseUrl,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
@@ -122,8 +127,6 @@ Deno.serve(async (req: Request) => {
 
     if (rpcErr) {
       console.error("Failed to grant credits:", rpcErr);
-      // We don't fail the request because the click was already marked completed,
-      // but we log it for manual correction if needed.
     }
 
     console.log(`✅ User ${userId} earned ${reward} credits from link ${click.shortlink_id} (IP: ${clientIp}, elapsed: ${elapsedSeconds.toFixed(1)}s)`);
