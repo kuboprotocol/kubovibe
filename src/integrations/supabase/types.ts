@@ -453,6 +453,47 @@ export type Database = {
         }
         Relationships: []
       }
+      creative_audit_logs: {
+        Row: {
+          asset_id: string | null
+          created_at: string | null
+          event_type: string
+          id: string
+          idempotency_key: string | null
+          metadata: Json | null
+          tool: string | null
+          user_id: string
+        }
+        Insert: {
+          asset_id?: string | null
+          created_at?: string | null
+          event_type: string
+          id?: string
+          idempotency_key?: string | null
+          metadata?: Json | null
+          tool?: string | null
+          user_id: string
+        }
+        Update: {
+          asset_id?: string | null
+          created_at?: string | null
+          event_type?: string
+          id?: string
+          idempotency_key?: string | null
+          metadata?: Json | null
+          tool?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creative_audit_logs_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "creative_assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       creative_audit_schedules: {
         Row: {
           created_at: string | null
@@ -495,11 +536,16 @@ export type Database = {
       creative_export_history: {
         Row: {
           created_at: string | null
+          date_range_end: string | null
+          date_range_start: string | null
           error_message: string | null
           file_url: string | null
           format: string
+          generation_time_ms: number | null
           id: string
+          included_count: number | null
           item_count: number | null
+          item_ids: string[] | null
           period_end: string | null
           period_start: string | null
           schedule_id: string | null
@@ -509,11 +555,16 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          date_range_end?: string | null
+          date_range_start?: string | null
           error_message?: string | null
           file_url?: string | null
           format: string
+          generation_time_ms?: number | null
           id?: string
+          included_count?: number | null
           item_count?: number | null
+          item_ids?: string[] | null
           period_end?: string | null
           period_start?: string | null
           schedule_id?: string | null
@@ -523,11 +574,16 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          date_range_end?: string | null
+          date_range_start?: string | null
           error_message?: string | null
           file_url?: string | null
           format?: string
+          generation_time_ms?: number | null
           id?: string
+          included_count?: number | null
           item_count?: number | null
+          item_ids?: string[] | null
           period_end?: string | null
           period_start?: string | null
           schedule_id?: string | null
