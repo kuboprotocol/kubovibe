@@ -945,9 +945,34 @@ function Dashboard({ editsRemaining, subscription, history, filter, setFilter, s
                   </div>
                 </DialogContent>
               </Dialog>
+              <Dialog open={showAuditSchedule} onOpenChange={setShowAuditSchedule}>
+                <Button size="icon" variant="ghost" className="h-7 w-7 text-green-500" onClick={() => setShowAuditSchedule(true)} title="Agendar Auditoria">
+                  <Sparkles className="h-3.5 w-3.5" />
+                </Button>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Agendar Auditoria Automática</DialogTitle>
+                    <DialogDescription>
+                      Receba a trilha de auditoria por e-mail diariamente.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="py-4 space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">E-mail para envio</label>
+                      <Input value={auditEmail} onChange={(e) => setAuditEmail(e.target.value)} placeholder="seu@email.com" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Horário (UTC)</label>
+                      <Input type="time" value={auditTime} onChange={(e) => setAuditTime(e.target.value)} />
+                    </div>
+                    <Button className="w-full" onClick={scheduleAuditExport}>Agendar Exportação</Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
         </div>
+
 
         <Card className="divide-y divide-border/40">
           {history.length === 0 && (
