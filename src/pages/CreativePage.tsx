@@ -819,6 +819,7 @@ function Dashboard({ editsRemaining, subscription, history, filter, setFilter, s
                     </div>
                   </div>
                 </DialogContent>
+              </Dialog>
               <Dialog open={showAuditExportOptions} onOpenChange={setShowAuditExportOptions}>
                 <Button size="icon" variant="ghost" className="h-7 w-7 text-primary" onClick={() => setShowAuditExportOptions(true)} title="Exportar Trilha de Auditoria (Reprocessamentos)">
                   <History className="h-3.5 w-3.5" />
