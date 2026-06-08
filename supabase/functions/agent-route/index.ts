@@ -24,6 +24,22 @@ Deno.serve(async (req) => {
     });
   }
 
+  const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  // Validate user exists and token is valid before proceeding
+  const userClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY")!, {
+    global: { headers: { Authorization: auth } },
+  });
+  const { data: userData, error: userErr } = await userClient.auth.getUser();
+  if (userErr || !userData?.user) {
+    return new Response(JSON.stringify({ error: "invalid_token" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   let body: { agent?: string; input?: unknown };
   try {
     body = await req.json();
@@ -40,9 +56,6 @@ Deno.serve(async (req) => {
     });
   }
 
-  const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
   const { data: agent, error } = await admin
     .from("agent_registry")
     .select("slug, edge_function, status")
