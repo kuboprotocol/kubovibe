@@ -126,6 +126,7 @@ export default function CreativePage() {
   const [isBatchRetrying, setIsBatchRetrying] = useState(false);
   const [showExportOptions, setShowExportOptions] = useState(false);
   const [showAuditExportOptions, setShowAuditExportOptions] = useState(false);
+  const [exportColumns, setExportColumns] = useState<string[]>(["ID", "Tool", "Status", "Prompt", "Credits", "Created At", "Error Message"]);
   const alertedRef = useRef<{ low?: boolean; empty?: boolean }>({});
   const globalCooldown = useCooldown();
   const PAGE_SIZE = 20;
@@ -148,7 +149,6 @@ export default function CreativePage() {
   const [investigationDateEnd, setInvestigationDateEnd] = useState("");
   const [exportAuditLogs, setExportAuditLogs] = useState<any[]>([]);
   const [isLoadingAudit, setIsLoadingAudit] = useState(false);
-  const [exportColumns, setExportColumns] = useState<string[]>(["ID", "Tool", "Status", "Prompt", "Credits", "Created At", "Error Message"]);
 
 
 
