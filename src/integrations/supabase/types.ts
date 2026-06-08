@@ -457,8 +457,10 @@ export type Database = {
         Row: {
           created_at: string | null
           email: string
+          export_interval_days: number | null
           id: string
           is_active: boolean | null
+          last_error_notified_at: string | null
           last_run: string | null
           schedule_time: string
           updated_at: string | null
@@ -467,8 +469,10 @@ export type Database = {
         Insert: {
           created_at?: string | null
           email: string
+          export_interval_days?: number | null
           id?: string
           is_active?: boolean | null
+          last_error_notified_at?: string | null
           last_run?: string | null
           schedule_time: string
           updated_at?: string | null
@@ -477,10 +481,130 @@ export type Database = {
         Update: {
           created_at?: string | null
           email?: string
+          export_interval_days?: number | null
           id?: string
           is_active?: boolean | null
+          last_error_notified_at?: string | null
           last_run?: string | null
           schedule_time?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      creative_export_history: {
+        Row: {
+          created_at: string | null
+          error_message: string | null
+          file_url: string | null
+          format: string
+          id: string
+          item_count: number | null
+          period_end: string | null
+          period_start: string | null
+          schedule_id: string | null
+          status: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          error_message?: string | null
+          file_url?: string | null
+          format: string
+          id?: string
+          item_count?: number | null
+          period_end?: string | null
+          period_start?: string | null
+          schedule_id?: string | null
+          status?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          error_message?: string | null
+          file_url?: string | null
+          format?: string
+          id?: string
+          item_count?: number | null
+          period_end?: string | null
+          period_start?: string | null
+          schedule_id?: string | null
+          status?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creative_export_history_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "creative_audit_schedules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      creative_export_logs: {
+        Row: {
+          created_at: string | null
+          details: Json | null
+          export_id: string | null
+          id: string
+          level: string
+          message: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          details?: Json | null
+          export_id?: string | null
+          id?: string
+          level?: string
+          message: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          details?: Json | null
+          export_id?: string | null
+          id?: string
+          level?: string
+          message?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creative_export_logs_export_id_fkey"
+            columns: ["export_id"]
+            isOneToOne: false
+            referencedRelation: "creative_export_history"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      creative_filter_presets: {
+        Row: {
+          created_at: string | null
+          filters: Json
+          id: string
+          name: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          filters?: Json
+          id?: string
+          name: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          filters?: Json
+          id?: string
+          name?: string
           updated_at?: string | null
           user_id?: string
         }

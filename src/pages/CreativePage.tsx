@@ -133,6 +133,13 @@ export default function CreativePage() {
   const [showAuditSchedule, setShowAuditSchedule] = useState(false);
   const [auditEmail, setAuditEmail] = useState("");
   const [auditTime, setAuditTime] = useState("09:00");
+  const [auditInterval, setAuditInterval] = useState(7);
+  const [presets, setPresets] = useState<any[]>([]);
+  const [showPresetDialog, setShowPresetDialog] = useState(false);
+  const [newPresetName, setNewPresetName] = useState("");
+  const [exports, setExports] = useState<any[]>([]);
+  const [exportLogs, setExportLogs] = useState<any[]>([]);
+  const [showExportHistory, setShowExportHistory] = useState(false);
 
 
   useEffect(() => {
@@ -194,18 +201,58 @@ export default function CreativePage() {
     return () => clearTimeout(t);
   }, [user, filter, searchQuery, sortOrder]);
 
-  // Load preferences
+  // Load preferences, presets and exports
   useEffect(() => {
     if (!user) return;
-    const loadPrefs = async () => {
-      const { data } = await supabase.from("creative_user_settings").select("*").eq("user_id", user.id).single();
-      if (data) {
-        setFilter(data.filter as any);
-        setSearchQuery(data.search_query);
-        setSortOrder(data.sort_order as any);
+    const loadData = async () => {
+      // Prefs
+      const { data: prefs } = await supabase.from("creative_user_settings").select("*").eq("user_id", user.id).single();
+      if (prefs) {
+        setFilter(prefs.filter as any);
+        setSearchQuery(prefs.search_query);
+        setSortOrder(prefs.sort_order as any);
+      }
+      
+      // Presets
+      const { data: p } = await supabase.from("creative_filter_presets").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
+      setPresets(p || []);
+
+      // Audit Schedule
+      const { data: sch } = await supabase.from("creative_audit_schedules").select("*").eq("user_id", user.id).single();
+      if (sch) {
+        setAuditEmail(sch.email);
+        setAuditTime(sch.schedule_time);
+        setAuditInterval(sch.export_interval_days || 7);
+      }
+
+      // Export History
+      const { data: ex } = await supabase.from("creative_export_history").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
+      setExports(ex || []);
+
+      // Alerts for failed exports
+      const { data: logs } = await supabase.from("creative_export_logs")
+        .select("*, creative_export_history(status)")
+        .eq("user_id", user.id)
+        .eq("level", "error")
+        .order("created_at", { ascending: false })
+        .limit(5);
+      
+      if (logs && logs.length > 0) {
+        setExportLogs(logs);
+        const lastLog = logs[0];
+        // Check if we already alerted in this session for the newest error
+        const storageKey = `alerted_export_error_${lastLog.id}`;
+        if (!sessionStorage.getItem(storageKey)) {
+          toast.error("Falha em Job Agendado", {
+            description: `${lastLog.message}. Clique para ver detalhes.`,
+            action: { label: "Ver", onClick: () => setShowExportHistory(true) },
+            duration: 8000
+          });
+          sessionStorage.setItem(storageKey, "true");
+        }
       }
     };
-    loadPrefs();
+    loadData();
   }, [user]);
 
   useEffect(() => {
@@ -496,6 +543,7 @@ export default function CreativePage() {
         user_id: user.id,
         email: auditEmail,
         schedule_time: auditTime,
+        export_interval_days: auditInterval,
         is_active: true
       });
       if (error) throw error;
@@ -503,6 +551,42 @@ export default function CreativePage() {
       setShowAuditSchedule(false);
     } catch (e: any) {
       toast.error("Falha ao agendar: " + e.message);
+    }
+  }
+
+  async function savePreset() {
+    if (!user || !newPresetName.trim()) return;
+    try {
+      const filters = { filter, searchQuery, sortOrder };
+      const { data, error } = await supabase.from("creative_filter_presets").insert({
+        user_id: user.id,
+        name: newPresetName,
+        filters
+      }).select().single();
+      
+      if (error) throw error;
+      setPresets([data, ...presets]);
+      setNewPresetName("");
+      setShowPresetDialog(false);
+      toast.success(`Preset "${newPresetName}" salvo!`);
+    } catch (e: any) {
+      toast.error("Erro ao salvar preset: " + e.message);
+    }
+  }
+
+  function applyPreset(p: any) {
+    const f = p.filters;
+    setFilter(f.filter || "all");
+    setSearchQuery(f.searchQuery || "");
+    setSortOrder(f.sortOrder || "desc");
+    toast.success(`Preset "${p.name}" aplicado`);
+  }
+
+  async function deletePreset(id: string) {
+    const { error } = await supabase.from("creative_filter_presets").delete().eq("id", id);
+    if (!error) {
+      setPresets(presets.filter(p => p.id !== id));
+      toast.info("Preset removido");
     }
   }
 
@@ -645,6 +729,20 @@ export default function CreativePage() {
               auditTime={auditTime}
               setAuditTime={setAuditTime}
               scheduleAuditExport={scheduleAuditExport}
+              auditInterval={auditInterval}
+              setAuditInterval={setAuditInterval}
+              presets={presets}
+              onApplyPreset={applyPreset}
+              onDeletePreset={deletePreset}
+              showPresetDialog={showPresetDialog}
+              setShowPresetDialog={setShowPresetDialog}
+              newPresetName={newPresetName}
+              setNewPresetName={setNewPresetName}
+              onSavePreset={savePreset}
+              exports={exports}
+              exportLogs={exportLogs}
+              showExportHistory={showExportHistory}
+              setShowExportHistory={setShowExportHistory}
               currentPage={currentPage}
               onReset={() => {
                 setFilter("all");
@@ -867,7 +965,7 @@ function AssetDetailDialog({ asset, onClose, onRerun, onCancel, rerunning }: { a
 }
 
 
-function Dashboard({ editsRemaining, subscription, history, filter, setFilter, searchQuery, setSearchQuery, sortOrder, setSortOrder, onPick, onOpen, onRerun, onCancel, onBatchRetry, isBatchRetrying, rerunningId, pageIndex, pageSize, totalCount, hasNext, hasPrev, realtimeStatus, globalCooldown, onNext, onPrev, onExport, exportColumns, setExportColumns, showExportOptions, setShowExportOptions, onAuditExport, showAuditExportOptions, setShowAuditExportOptions, showAuditSchedule, setShowAuditSchedule, auditEmail, setAuditEmail, auditTime, setAuditTime, scheduleAuditExport, onReset, currentPage }: any) {
+function Dashboard({ editsRemaining, subscription, history, filter, setFilter, searchQuery, setSearchQuery, sortOrder, setSortOrder, onPick, onOpen, onRerun, onCancel, onBatchRetry, isBatchRetrying, rerunningId, pageIndex, pageSize, totalCount, hasNext, hasPrev, realtimeStatus, globalCooldown, onNext, onPrev, onExport, exportColumns, setExportColumns, showExportOptions, setShowExportOptions, onAuditExport, showAuditExportOptions, setShowAuditExportOptions, showAuditSchedule, setShowAuditSchedule, auditEmail, setAuditEmail, auditTime, setAuditTime, scheduleAuditExport, onReset, currentPage, auditInterval, setAuditInterval, presets, onApplyPreset, onDeletePreset, showPresetDialog, setShowPresetDialog, newPresetName, setNewPresetName, onSavePreset, exports, exportLogs, showExportHistory, setShowExportHistory }: any) {
   const lowBalance = (editsRemaining ?? 0) <= 10;
   return (
     <div className="space-y-6">
@@ -933,6 +1031,39 @@ function Dashboard({ editsRemaining, subscription, history, filter, setFilter, s
               <RotateCw className="h-3 w-3 mr-1" />
               Reiniciar
             </Button>
+            <Dialog open={showPresetDialog} onOpenChange={setShowPresetDialog}>
+              <Button size="sm" variant="ghost" className="h-8 text-[10px]" onClick={() => setShowPresetDialog(true)}>
+                <Sparkles className="h-3 w-3 mr-1" />
+                Presets
+              </Button>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Presets de Filtros</DialogTitle>
+                  <DialogDescription>Salve sua busca e ordenação atual para usar depois.</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="flex gap-2">
+                    <Input value={newPresetName} onChange={(e) => setNewPresetName(e.target.value)} placeholder="Nome do preset..." />
+                    <Button onClick={onSavePreset} disabled={!newPresetName.trim()}>Salvar</Button>
+                  </div>
+                  <div className="space-y-2 border-t pt-4">
+                    <label className="text-xs font-semibold uppercase text-muted-foreground">Seus Presets</label>
+                    <div className="max-h-48 overflow-y-auto space-y-2">
+                      {presets.length === 0 && <p className="text-xs text-muted-foreground italic">Nenhum salvo ainda.</p>}
+                      {presets.map((p: any) => (
+                        <div key={p.id} className="flex items-center justify-between bg-muted/30 p-2 rounded text-sm">
+                          <span>{p.name}</span>
+                          <div className="flex gap-1">
+                            <Button size="sm" variant="ghost" className="h-7 text-[10px]" onClick={() => onApplyPreset(p)}>Aplicar</Button>
+                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive" onClick={() => onDeletePreset(p.id)}><AlertTriangle className="h-3 w-3" /></Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
             <div className="relative flex-1 sm:w-48">
               <Input 
                 value={searchQuery} 
@@ -1053,7 +1184,7 @@ function Dashboard({ editsRemaining, subscription, history, filter, setFilter, s
                   <DialogHeader>
                     <DialogTitle>Agendar Auditoria Automática</DialogTitle>
                     <DialogDescription>
-                      Receba a trilha de auditoria por e-mail diariamente.
+                      Receba a trilha de auditoria (itens reprocessados) por e-mail periodicamente.
                     </DialogDescription>
                   </DialogHeader>
                   <div className="py-4 space-y-4">
@@ -1065,7 +1196,78 @@ function Dashboard({ editsRemaining, subscription, history, filter, setFilter, s
                       <label className="text-sm font-medium">Horário (UTC)</label>
                       <Input type="time" value={auditTime} onChange={(e) => setAuditTime(e.target.value)} />
                     </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Intervalo (dias)</label>
+                      <select 
+                        value={auditInterval} 
+                        onChange={(e) => setAuditInterval(Number(e.target.value))}
+                        className="w-full bg-card border border-border/40 rounded px-3 py-2 text-sm outline-none focus:border-primary/50"
+                      >
+                        <option value={1}>Diário</option>
+                        <option value={7}>Semanal (7 dias)</option>
+                        <option value={15}>Quinzenal (15 dias)</option>
+                        <option value={30}>Mensal (30 dias)</option>
+                      </select>
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        O job baixará apenas itens reprocessados (retry) dentro do período selecionado.
+                      </p>
+                    </div>
                     <Button className="w-full" onClick={scheduleAuditExport}>Agendar Exportação</Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+              <Dialog open={showExportHistory} onOpenChange={setShowExportHistory}>
+                <Button size="icon" variant="ghost" className="h-7 w-7 text-orange-500" onClick={() => setShowExportHistory(true)} title="Histórico de Downloads">
+                  <Download className="h-3.5 w-3.5" />
+                </Button>
+                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                      Histórico de Exportações Agendadas
+                      {exportLogs.length > 0 && <Badge variant="destructive" className="ml-2">{exportLogs.length} Alertas</Badge>}
+                    </DialogTitle>
+                    <DialogDescription>Acompanhe o status de geração dos seus arquivos de auditoria.</DialogDescription>
+                  </DialogHeader>
+                  
+                  {exportLogs.length > 0 && (
+                    <div className="mt-4 p-3 bg-destructive/10 border border-destructive/30 rounded-lg space-y-2">
+                      <h4 className="text-xs font-bold text-destructive uppercase flex items-center gap-2">
+                        <AlertTriangle className="h-3 w-3" /> Alertas de Falha Recentes
+                      </h4>
+                      {exportLogs.map((log: any) => (
+                        <div key={log.id} className="text-[11px] text-destructive-foreground border-b border-destructive/20 pb-1 last:border-0">
+                          <span className="font-semibold">{new Date(log.created_at).toLocaleDateString()}:</span> {log.message}
+                          {log.details?.reason && <span className="block italic mt-0.5">Motivo: {log.details.reason}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="py-4 space-y-3">
+                    {exports.length === 0 && <p className="text-center text-sm text-muted-foreground py-8">Nenhum download gerado ainda.</p>}
+                    {exports.map((ex: any) => (
+                      <Card key={ex.id} className="p-3 flex items-center justify-between hover:bg-muted/30 transition-colors border-border/40">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge variant={ex.status === "completed" ? "default" : ex.status === "failed" ? "destructive" : "secondary"} className="text-[9px]">
+                              {ex.status}
+                            </Badge>
+                            <span className="text-xs font-semibold">{ex.format.toUpperCase()} · {ex.item_count} itens</span>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground truncate">
+                            Período: {ex.period_start ? new Date(ex.period_start).toLocaleDateString() : "—"} até {ex.period_end ? new Date(ex.period_end).toLocaleDateString() : "—"}
+                          </p>
+                          {ex.error_message && <p className="text-[10px] text-destructive mt-1 font-mono">{ex.error_message}</p>}
+                        </div>
+                        {ex.file_url && (
+                          <Button size="sm" variant="outline" className="h-8 gap-1.5" asChild>
+                            <a href={ex.file_url} download>
+                              <Download className="h-3 w-3" /> Baixar
+                            </a>
+                          </Button>
+                        )}
+                      </Card>
+                    ))}
                   </div>
                 </DialogContent>
               </Dialog>
