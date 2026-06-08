@@ -37,9 +37,10 @@ Deno.serve(async (req) => {
       ssl_status: "pending",
       credits_spent: 0,
     }).select().single();
-    if (ie) return new Response(JSON.stringify({ error: ie.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (ie) return new Response(JSON.stringify({ error: sanitizeError(ie) }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     return new Response(JSON.stringify({ success: true, domain: dom }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e: any) {
-    return new Response(JSON.stringify({ error: e?.message ?? "internal" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    console.error("[domain-connect] error:", e);
+    return new Response(JSON.stringify({ error: sanitizeError(e) }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });

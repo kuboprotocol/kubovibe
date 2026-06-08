@@ -248,14 +248,15 @@ Deno.serve(async (req) => {
       auth_code, current_registrar, status, ionos_transfer_id, status_message: statusMessage,
       notify_email, last_error, next_retry_at,
     }).select().single();
-    if (ie) return new Response(JSON.stringify({ error: ie.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (ie) return new Response(JSON.stringify({ error: sanitizeError(ie) }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     await logEvent(svc, transfer.id, user.id, "started", null, status, statusMessage, { ionos_transfer_id, price });
     await notifyStatus(svc, transfer, status, statusMessage);
 
     return new Response(JSON.stringify({ success: true, transfer, domain: dom, balance_after: (deduct as any)?.balance_after }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e: any) {
-    return new Response(JSON.stringify({ error: e?.message ?? "internal" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    console.error("[domain-transfer] error:", e);
+    return new Response(JSON.stringify({ error: sanitizeError(e) }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });
 

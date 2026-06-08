@@ -75,14 +75,14 @@ Deno.serve(async (req) => {
       const { data: row, error } = await svc.from("kubo_dns_records").insert({
         domain_id, user_id: userId, record_type: type, name, value, ttl, priority, ionos_record_id,
       }).select().single();
-      if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      if (error) return new Response(JSON.stringify({ error: sanitizeError(error) }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       return new Response(JSON.stringify({ record: row, synced: !!ionos_record_id }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     if (action === "delete") {
       const id = String(body?.record_id ?? "");
       const { error } = await svc.from("kubo_dns_records").delete().eq("id", id).eq("user_id", userId);
-      if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      if (error) return new Response(JSON.stringify({ error: sanitizeError(error) }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
