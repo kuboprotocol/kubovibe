@@ -8,11 +8,12 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, RotateCw, Ban, FileDown, Search, ExternalLink, AlertTriangle, ArrowUpDown, Loader2, X, Info, Package } from "lucide-react";
+import { ArrowLeft, RotateCw, Ban, FileDown, Search, ExternalLink, AlertTriangle, ArrowUpDown, Loader2, X, Info, Package, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 const isUUID = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
 
@@ -48,16 +49,9 @@ export default function InvestigationPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [params, setParams] = useSearchParams();
+  const queryClient = useQueryClient();
 
-  const [assets, setAssets] = useState<Asset[]>([]);
-  const [count, setCount] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [selected, setSelected] = useState<Asset | null>(null);
-  const [audit, setAudit] = useState<AuditEntry[]>([]);
-
-  // Filters
+  // Filters from URL/State
   const [search, setSearch] = useState(params.get("q") ?? "");
   const [status, setStatus] = useState<string>(params.get("status") ?? "failed");
   const [tool, setTool] = useState<string>(params.get("tool") ?? "all");
@@ -67,19 +61,15 @@ export default function InvestigationPage() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">((params.get("dir") as any) ?? "desc");
   const [page, setPage] = useState(Number(params.get("page") ?? "1"));
 
-
-  const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
-
   const debouncedSearch = useDebounce(search, 500);
   const debouncedStatus = useDebounce(status, 300);
   const debouncedTool = useDebounce(tool, 300);
   const debouncedStartDate = useDebounce(startDate, 300);
   const debouncedEndDate = useDebounce(endDate, 300);
 
-  // Persist filters to URL
+  // Sync state to URL - only when debounced values change
   useEffect(() => {
-    const next = new URLSearchParams(params); // Keep existing params like investigate
-    
+    const next = new URLSearchParams(params);
     if (debouncedSearch) next.set("q", debouncedSearch); else next.delete("q");
     if (debouncedStatus !== "all") next.set("status", debouncedStatus); else next.delete("status");
     if (debouncedTool !== "all") next.set("tool", debouncedTool); else next.delete("tool");
@@ -89,15 +79,18 @@ export default function InvestigationPage() {
     if (sortField !== "created_at") next.set("sort", sortField); else next.delete("sort");
     if (sortDir !== "desc") next.set("dir", sortDir); else next.delete("dir");
     
-    setParams(next, { replace: true });
-  }, [debouncedSearch, debouncedStatus, debouncedTool, debouncedStartDate, debouncedEndDate, page, sortField, sortDir, setParams]);
+    // Check if anything actually changed before updating to avoid loops
+    if (next.toString() !== params.toString()) {
+      setParams(next, { replace: true });
+    }
+  }, [debouncedSearch, debouncedStatus, debouncedTool, debouncedStartDate, debouncedEndDate, page, sortField, sortDir]);
 
-
-  const fetchAssets = useCallback(async () => {
-    if (!user) return;
-    setLoading(true);
-    setError(null);
-    try {
+  // Main Assets Query
+  const { data: assetsData, isLoading: loading, error: queryError, refetch: fetchAssets } = useQuery({
+    queryKey: ["creative-assets", user?.id, debouncedStatus, debouncedTool, debouncedSearch, debouncedStartDate, debouncedEndDate, sortField, sortDir, page],
+    queryFn: async () => {
+      if (!user) throw new Error("Não autenticado");
+      
       let q = supabase
         .from("creative_assets")
         .select("*", { count: "exact" })
@@ -112,20 +105,19 @@ export default function InvestigationPage() {
       q = q.order(sortField, { ascending: sortDir === "asc" });
       q = q.range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
 
-      const { data, count: c, error: err } = await q;
-      if (err) throw err;
-      
-      setAssets((data as Asset[]) || []);
-      setCount(c ?? 0);
-    } catch (err: any) {
-      setError(err.message);
-      toast.error("Erro ao carregar: " + err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [user, debouncedStatus, debouncedTool, debouncedSearch, debouncedStartDate, debouncedEndDate, sortField, sortDir, page]);
+      const { data, count, error } = await q;
+      if (error) throw error;
+      return { assets: (data as Asset[]) || [], count: count ?? 0 };
+    },
+    enabled: !!user,
+    staleTime: 30000,
+    retry: 2,
+  });
 
-  useEffect(() => { fetchAssets(); }, [fetchAssets]);
+  const assets = assetsData?.assets || [];
+  const count = assetsData?.count || 0;
+  const error = queryError ? (queryError as Error).message : null;
+
 
   // Realtime subscription
   useEffect(() => {
@@ -136,47 +128,50 @@ export default function InvestigationPage() {
         "postgres_changes",
         { event: "*", schema: "public", table: "creative_assets", filter: `user_id=eq.${user.id}` },
         () => {
-          fetchAssets();
+          queryClient.invalidateQueries({ queryKey: ["creative-assets"] });
           // Also refresh detail if currently open
           const investigateId = params.get("investigate");
-          if (investigateId) loadDetail(investigateId, true);
+          if (investigateId) queryClient.invalidateQueries({ queryKey: ["asset-detail", investigateId] });
         }
       )
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [user, fetchAssets, params]);
+  }, [user, queryClient, params]);
 
-  // Investigate from query param
-  useEffect(() => {
-    const investigateId = params.get("investigate");
-    if (investigateId) loadDetail(investigateId);
-  }, [params]); // eslint-disable-line
+  const investigateId = params.get("investigate");
 
-  async function loadDetail(id: string, silent = false) {
-    if (!silent) setDetailLoading(true);
-    try {
-
-      const { data: a, error: aErr } = await supabase.from("creative_assets").select("*").eq("id", id).maybeSingle();
+  // Asset Details Query
+  const { data: detailData, isLoading: detailLoading } = useQuery({
+    queryKey: ["asset-detail", investigateId],
+    queryFn: async () => {
+      if (!investigateId) return null;
+      
+      const { data: a, error: aErr } = await supabase.from("creative_assets").select("*").eq("id", investigateId).maybeSingle();
       if (aErr) throw aErr;
-      if (!a) {
-        if (!silent) toast.error("Execução não encontrada");
-        return;
-      }
+      if (!a) throw new Error("Execução não encontrada");
 
-      setSelected(a as Asset);
       const { data: logs, error: lErr } = await supabase
         .from("creative_audit_logs")
         .select("*")
-        .eq("asset_id", id)
+        .eq("asset_id", investigateId)
         .order("created_at", { ascending: false });
       if (lErr) throw lErr;
-      setAudit((logs as AuditEntry[]) || []);
-    } catch (err: any) {
-      toast.error("Erro ao carregar detalhes: " + err.message);
-    } finally {
-      setDetailLoading(false);
-    }
-  }
+      
+      return { selected: a as Asset, audit: (logs as AuditEntry[]) || [] };
+    },
+    enabled: !!investigateId,
+    retry: 2,
+  });
+
+  const selected = detailData?.selected || null;
+  const audit = detailData?.audit || [];
+
+  const loadDetail = (id: string) => {
+    const next = new URLSearchParams(params);
+    next.set("investigate", id);
+    setParams(next, { replace: true });
+  };
+
 
   async function recordAudit(assetId: string, action: string, details: any = {}) {
     if (!user) return;
