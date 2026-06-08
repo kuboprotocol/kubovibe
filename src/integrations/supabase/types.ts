@@ -407,45 +407,54 @@ export type Database = {
       }
       creative_assets: {
         Row: {
+          cancelled_by: string | null
           created_at: string
           credits_spent: number
           error_message: string | null
           id: string
           idempotency_key: string | null
+          last_retry_at: string | null
           metadata: Json
           output_text: string | null
           output_url: string | null
           prompt: string | null
+          retry_count: number | null
           status: string
           tool: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          cancelled_by?: string | null
           created_at?: string
           credits_spent?: number
           error_message?: string | null
           id?: string
           idempotency_key?: string | null
+          last_retry_at?: string | null
           metadata?: Json
           output_text?: string | null
           output_url?: string | null
           prompt?: string | null
+          retry_count?: number | null
           status?: string
           tool: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          cancelled_by?: string | null
           created_at?: string
           credits_spent?: number
           error_message?: string | null
           id?: string
           idempotency_key?: string | null
+          last_retry_at?: string | null
           metadata?: Json
           output_text?: string | null
           output_url?: string | null
           prompt?: string | null
+          retry_count?: number | null
           status?: string
           tool?: string
           updated_at?: string

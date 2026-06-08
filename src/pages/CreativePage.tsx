@@ -265,7 +265,8 @@ export default function CreativePage() {
       if (!isBatch) toast.error("Reexecução indisponível para esta ferramenta."); 
       return; 
     }
-    const idemKey = `rerun:${asset.id}`;
+    const attempt = (asset.retry_count || 0) + 1;
+    const idemKey = `rerun:${asset.id}:${attempt}`;
     if (!isBatch) setRerunningId(asset.id);
     try {
       const r = await authedFetch(cfg.fn, cfg.build(asset), idemKey);
@@ -274,6 +275,17 @@ export default function CreativePage() {
         if (!isBatch) handleFnError(d); 
         return false; 
       }
+      
+      if (!isBatch && user) {
+        await supabase.from("creative_audit_logs").insert({
+          user_id: user.id,
+          asset_id: asset.id,
+          event_type: 'retry',
+          tool: asset.tool,
+          metadata: { attempt }
+        });
+      }
+      
       return true;
     } catch (e: any) {
       if (!isBatch) toast.error(e?.message ?? "Falha ao reexecutar");
@@ -289,13 +301,29 @@ export default function CreativePage() {
   }
 
   async function cancelExecution(assetId: string) {
+    if (!user) return;
     try {
+      const asset = history.find(h => h.id === assetId);
       const { error } = await supabase
         .from("creative_assets")
-        .update({ status: "failed", error_message: "Cancelado pelo usuário", metadata: { cancelled_at: new Date().toISOString() } })
+        .update({ 
+          status: "failed", 
+          error_message: "Cancelado pelo usuário", 
+          cancelled_by: user.id,
+          metadata: { ...asset?.metadata, cancelled_at: new Date().toISOString() } 
+        })
         .eq("id", assetId);
       
       if (error) throw error;
+      
+      await supabase.from("creative_audit_logs").insert({
+        user_id: user.id,
+        asset_id: assetId,
+        event_type: 'cancel',
+        tool: asset?.tool,
+        metadata: { reason: "Cancelado via UI" }
+      });
+
       toast.success("Execução cancelada");
       loadHistory(cursorStack.length === 0 ? null : cursorStack[cursorStack.length - 1]);
     } catch (e: any) {
@@ -305,12 +333,21 @@ export default function CreativePage() {
 
   async function batchRetryFailed() {
     const failed = history.filter(h => h.status === "failed" || h.status === "error");
-    if (!failed.length) return;
+    if (!failed.length || !user) return;
     setIsBatchRetrying(true);
     let success = 0;
     for (const asset of failed) {
       const ok = await rerun(asset, true);
-      if (ok) success++;
+      if (ok) {
+        success++;
+        await supabase.from("creative_audit_logs").insert({
+          user_id: user.id,
+          asset_id: asset.id,
+          event_type: 'retry',
+          tool: asset.tool,
+          metadata: { batch: true, attempt: (asset.retry_count || 0) + 1 }
+        });
+      }
     }
     setIsBatchRetrying(false);
     toast.success(`${success} itens reprocessados em lote.`);
@@ -339,14 +376,33 @@ export default function CreativePage() {
   }
 
   async function exportAuditTrail(format: "csv" | "json") {
-    if (!user) return;
-    const retryItems = history.filter(h => h.idempotency_key?.startsWith("rerun:"));
-    if (!retryItems.length) {
-      toast.info("Nenhum item reprocessado.");
+    if (!user || !exportAuditLogs.length) {
+      toast.info("Nenhum dado de auditoria para exportar.");
       return;
     }
-    // Logic for file download
-    toast.success("Exportação de auditoria realizada.");
+    const filename = `creative-audit-trail-${new Date().toISOString().split("T")[0]}.${format}`;
+    let content = "";
+    if (format === "json") {
+      content = JSON.stringify(exportAuditLogs, null, 2);
+    } else {
+      const headers = ["ID", "Action", "Created At", "User", "Details"];
+      const rows = exportAuditLogs.map(log => [
+        log.id,
+        log.action,
+        log.created_at,
+        log.profiles?.email || log.user_id,
+        JSON.stringify(log.details).replace(/"/g, '""')
+      ].map(v => `"${v}"`).join(","));
+      content = [headers.join(","), ...rows].join("\n");
+    }
+    const blob = new Blob([content], { type: format === "json" ? "application/json" : "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Trilha de auditoria exportada");
   }
 
   async function scheduleAuditExport() {
@@ -409,7 +465,7 @@ export default function CreativePage() {
     if (!user) return;
     setIsLoadingAudit(true);
     try {
-      let q = supabase.from("creative_export_audit_log").select("*").eq("export_id", exportId);
+      let q = supabase.from("creative_export_audit_log").select("*, profiles(email)").eq("export_id", exportId);
       if (investigationSearch) q = q.or(`action.ilike.%${investigationSearch}%,details->>reason.ilike.%${investigationSearch}%,details->>error.ilike.%${investigationSearch}%`);
       if (investigationDateStart) q = q.gte("created_at", investigationDateStart);
       if (investigationDateEnd) q = q.lte("created_at", investigationDateEnd);
@@ -476,23 +532,142 @@ export default function CreativePage() {
       <main className="container max-w-7xl mx-auto px-4 py-6">
         <Tabs value={active} onValueChange={(v) => { setActive(v as ToolKey); navigate(v === "dashboard" ? "/creative" : `/creative/${v}`); }}>
           <TabsContent value="dashboard">
-             {/* Main dashboard content... */}
-             <div className="flex gap-2 mb-4">
-               <Button onClick={() => setFilter("all")}>Resetar Filtros</Button>
-               <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Buscar..." />
-             </div>
-             <Card className="divide-y divide-border/40">
-                {history.map((h: any) => (
-                  <div key={h.id} className="p-3 flex justify-between">
-                     <span>{h.tool} - {h.status}</span>
-                     <div className="flex gap-2">
-                       <Button size="sm" onClick={() => cancelExecution(h.id)}>Cancelar</Button>
-                       <Button size="sm" onClick={() => rerun(h)}>Retry</Button>
+             <div className="space-y-6">
+               <div className="flex flex-wrap gap-4 items-end">
+                 <div className="space-y-1">
+                   <label className="text-xs font-medium text-muted-foreground">Filtro</label>
+                   <select 
+                    value={filter} 
+                    onChange={(e) => setFilter(e.target.value as any)}
+                    className="flex h-10 w-[180px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                   >
+                     <option value="all">Todos os Status</option>
+                     <option value="queued">Na Fila</option>
+                     <option value="processing">Processando</option>
+                     <option value="completed">Concluído</option>
+                     <option value="failed">Falhou</option>
+                   </select>
+                 </div>
+                 <div className="flex-1 min-w-[200px] space-y-1">
+                   <label className="text-xs font-medium text-muted-foreground">Busca</label>
+                   <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Prompt, ferramenta ou erro..." />
+                 </div>
+                 <Button variant="outline" onClick={() => { setFilter("all"); setSearchQuery(""); setSortOrder("desc"); }}>
+                   Resetar
+                 </Button>
+               </div>
+
+               <Card className="divide-y divide-border/40">
+                  {history.map((h: any) => (
+                    <div key={h.id} className="p-4 flex flex-wrap items-center justify-between gap-4">
+                       <div className="space-y-1">
+                         <div className="flex items-center gap-2">
+                           <Badge variant={h.status === 'completed' ? 'default' : h.status === 'failed' ? 'destructive' : 'outline'}>
+                             {h.status}
+                           </Badge>
+                           <span className="font-semibold">{h.tool}</span>
+                         </div>
+                         <p className="text-sm text-muted-foreground line-clamp-1">{h.prompt}</p>
+                       </div>
+                       <div className="flex gap-2">
+                         <Button size="sm" variant="ghost" onClick={() => setSelectedAssetForInvestigation(h)}>
+                           <History className="h-4 w-4 mr-2" /> Investigar
+                         </Button>
+                         {(h.status === 'queued' || h.status === 'processing') && (
+                           <Button size="sm" variant="outline" onClick={() => cancelExecution(h.id)}>Cancelar</Button>
+                         )}
+                         {(h.status === 'failed' || h.status === 'error' || h.status === 'completed') && (
+                           <Button size="sm" variant="secondary" disabled={rerunningId === h.id} onClick={() => rerun(h)}>
+                             {rerunningId === h.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />}
+                           </Button>
+                         )}
+                       </div>
+                    </div>
+                  ))}
+               </Card>
+
+               {/* Investigation Modal */}
+               <Dialog open={!!selectedAssetForInvestigation} onOpenChange={() => setSelectedAssetForInvestigation(null)}>
+                 <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                   <DialogHeader>
+                     <DialogTitle>Investigação de Execução</DialogTitle>
+                     <DialogDescription>
+                       Trilha de auditoria e logs detalhados para o asset {selectedAssetForInvestigation?.id}
+                     </DialogDescription>
+                   </DialogHeader>
+                   
+                   <div className="space-y-4">
+                     <div className="flex flex-wrap gap-4 items-end bg-muted/50 p-4 rounded-lg">
+                       <div className="flex-1 min-w-[200px] space-y-1">
+                         <label className="text-xs font-medium text-muted-foreground">Filtrar Logs</label>
+                         <Input 
+                           value={investigationSearch} 
+                           onChange={(e) => setInvestigationSearch(e.target.value)} 
+                           placeholder="Buscar na trilha..." 
+                         />
+                       </div>
+                       <div className="space-y-1">
+                         <label className="text-xs font-medium text-muted-foreground">Início</label>
+                         <Input 
+                           type="date" 
+                           value={investigationDateStart} 
+                           onChange={(e) => setInvestigationDateStart(e.target.value)} 
+                         />
+                       </div>
+                       <div className="space-y-1">
+                         <label className="text-xs font-medium text-muted-foreground">Fim</label>
+                         <Input 
+                           type="date" 
+                           value={investigationDateEnd} 
+                           onChange={(e) => setInvestigationDateEnd(e.target.value)} 
+                         />
+                       </div>
+                       <div className="flex gap-2">
+                         <Button variant="outline" size="sm" onClick={() => exportAuditTrail("csv")}>
+                           <FileDown className="h-4 w-4 mr-2" /> CSV
+                         </Button>
+                         <Button variant="outline" size="sm" onClick={() => exportAuditTrail("json")}>
+                           <FileDown className="h-4 w-4 mr-2" /> JSON
+                         </Button>
+                       </div>
                      </div>
-                  </div>
-                ))}
-             </Card>
+
+                     <div className="border rounded-md overflow-hidden">
+                        <table className="w-full text-sm">
+                          <thead className="bg-muted">
+                            <tr>
+                              <th className="text-left p-3 font-medium">Data</th>
+                              <th className="text-left p-3 font-medium">Ação</th>
+                              <th className="text-left p-3 font-medium">Usuário</th>
+                              <th className="text-left p-3 font-medium">Detalhes</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y">
+                            {isLoadingAudit ? (
+                              <tr><td colSpan={4} className="p-8 text-center"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></td></tr>
+                            ) : exportAuditLogs.length === 0 ? (
+                              <tr><td colSpan={4} className="p-8 text-center text-muted-foreground">Nenhum evento registrado.</td></tr>
+                            ) : exportAuditLogs.map((log: any) => (
+                              <tr key={log.id} className="hover:bg-muted/30">
+                                <td className="p-3 whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</td>
+                                <td className="p-3">
+                                  <Badge variant="outline" className="capitalize">{log.action}</Badge>
+                                </td>
+                                <td className="p-3">{log.profiles?.email || 'Sistema'}</td>
+                                <td className="p-3 text-xs font-mono max-w-md truncate">
+                                  {JSON.stringify(log.details)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                     </div>
+                   </div>
+                 </DialogContent>
+               </Dialog>
+             </div>
           </TabsContent>
+          <TabsContent value="chat">Kubo Chat...</TabsContent>
         </Tabs>
       </main>
     </div>

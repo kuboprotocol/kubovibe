@@ -25,7 +25,8 @@ serve(async (req) => {
     failed: `❌ Falha na Execução: ${tool}`,
     error: `❌ Erro na Execução: ${tool}`,
     cancelled: `⚠️ Execução Cancelada: ${tool}`,
-    completed: `✅ Execução Concluída: ${tool}`
+    completed: `✅ Execução Concluída: ${tool}`,
+    retrying: `🔄 Reenfileirando Execução: ${tool}`
   };
 
   const themeColors: Record<string, string> = {

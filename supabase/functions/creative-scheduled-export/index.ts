@@ -7,37 +7,34 @@ const supabase = createClient(
 );
 
 serve(async (req) => {
-  const { user_id, email, audit_only_reprocessed } = await req.json();
+  const { user_id, email, start_date, end_date } = await req.json();
 
   try {
     let query = supabase
-      .from("creative_assets")
-      .select("*")
+      .from("creative_audit_logs")
+      .select("*, creative_assets(*)")
       .eq("user_id", user_id);
 
-    if (audit_only_reprocessed) {
-      // Logic for reprocessed items: usually they have metadata.reprocessed = true or specific audit logs
-      query = query.filter("metadata->reprocessed", "eq", "true");
-    }
+    if (start_date) query = query.gte("created_at", start_date);
+    if (end_date) query = query.lte("created_at", end_date);
 
-    const { data, error } = await query;
+    const { data, error } = await query.order("created_at", { ascending: false });
     if (error) throw error;
 
     if (!data || data.length === 0) {
-       // Alert if no items to export
        await supabase.from("notifications").insert({
          user_id,
-         title: "Exportação Falhou",
-         message: "Nenhum item reprocessado encontrado para o job agendado.",
-         type: "error"
+         title: "Exportação de Auditoria Vazia",
+         message: "Nenhum evento de auditoria encontrado para o período selecionado.",
+         type: "warning"
        });
-       return new Response("No items found", { status: 404 });
+       return new Response("No items found", { status: 200 });
     }
 
     const content = JSON.stringify(data, null, 2);
-    const fileName = `audit-export-${user_id}-${Date.now()}.json`;
+    const fileName = `audit-trail-${user_id}-${Date.now()}.json`;
     
-    // Upload to storage
+    // Ensure bucket exists or handle error
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from("exports")
       .upload(fileName, content, { contentType: "application/json" });
@@ -46,14 +43,24 @@ serve(async (req) => {
 
     const { data: { publicUrl } } = supabase.storage.from("exports").getPublicUrl(fileName);
 
-    // Send email with link
+    // Send email via RPC
     await supabase.rpc("enqueue_email", {
       queue_name: "auth_emails",
       payload: {
         to: email,
         from: "Kubo Vibe <noreply@kubovibe.dev>",
-        subject: "Relatório de Auditoria Agendado",
-        html: `<p>Seu relatório está pronto: <a href="${publicUrl}">Download</a></p>`,
+        subject: "Trilha de Auditoria Detalhada",
+        html: `
+          <div style="font-family: sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
+            <h2>Sua Trilha de Auditoria está pronta</h2>
+            <p>O arquivo JSON contendo a trilha de auditoria detalhada para o período solicitado foi gerado com sucesso.</p>
+            <p><strong>Itens incluídos:</strong> ${data.length}</p>
+            <div style="margin-top: 30px;">
+              <a href="${publicUrl}" style="background-color: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Baixar Arquivo</a>
+            </div>
+            <p style="font-size: 12px; color: #666; margin-top: 20px;">Este link expira em breve.</p>
+          </div>
+        `,
         purpose: "transactional"
       }
     });
@@ -63,8 +70,8 @@ serve(async (req) => {
     console.error(err);
     await supabase.from("notifications").insert({
       user_id,
-      title: "Job de Exportação Falhou",
-      message: `Erro ao exportar auditoria: ${err.message}`,
+      title: "Falha na Exportação de Auditoria",
+      message: `Erro ao gerar trilha de auditoria: ${err.message}`,
       type: "error"
     });
     return new Response(err.message, { status: 500 });
