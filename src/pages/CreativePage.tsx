@@ -808,6 +808,7 @@ export default function CreativePage() {
               retryExport={retryExport}
               selectedExport={selectedExport}
               setSelectedExport={setSelectedExport}
+              setSelectedAssetForInvestigation={setSelectedAssetForInvestigation}
 
               onReset={() => {
                 setFilter("all");
@@ -1031,7 +1032,88 @@ function AssetDetailDialog({ asset, onClose, onRerun, onCancel, rerunning }: { a
 }
 
 
-function Dashboard({ editsRemaining, subscription, history, filter, setFilter, searchQuery, setSearchQuery, sortOrder, setSortOrder, onPick, onOpen, onRerun, onCancel, onBatchRetry, isBatchRetrying, rerunningId, pageIndex, pageSize, totalCount, hasNext, hasPrev, realtimeStatus, globalCooldown, onNext, onPrev, onExport, exportColumns, setExportColumns, showExportOptions, setShowExportOptions, onAuditExport, showAuditExportOptions, setShowAuditExportOptions, showAuditSchedule, setShowAuditSchedule, auditEmail, setAuditEmail, auditTime, setAuditTime, scheduleAuditExport, onReset, currentPage, auditInterval, setAuditInterval, presets, onApplyPreset, onDeletePreset, showPresetDialog, setShowPresetDialog, newPresetName, setNewPresetName, onSavePreset, exports, exportLogs, showExportHistory, setShowExportHistory, renamePreset, auditDateStart, setAuditDateStart, auditDateEnd, setAuditDateEnd, cancelExport, retryExport, selectedExport, setSelectedExport }: any) {
+
+function AssetInvestigationDialog({ asset, onClose, onRerun, onCancel, rerunning }: any) {
+  if (!asset) return null;
+  const canRerun = !!RERUN_MAP[asset.tool];
+  return (
+    <Dialog open={!!asset} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-destructive" />
+            Investigação de Falha: {asset.id.slice(0, 8)}
+          </DialogTitle>
+          <DialogDescription>
+            Logs detalhados e diagnóstico da execução da ferramenta {asset.tool}.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-6 py-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <span className="text-[10px] uppercase font-bold text-muted-foreground">Status da Execução</span>
+              <div className="flex items-center gap-2">
+                <Badge variant="destructive">{asset.status}</Badge>
+                <span className="text-xs text-muted-foreground">{new Date(asset.updated_at || asset.created_at).toLocaleString()}</span>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <span className="text-[10px] uppercase font-bold text-muted-foreground">ID da Transação</span>
+              <div className="font-mono text-xs bg-muted/50 p-1 rounded border border-border/40">{asset.id}</div>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <h4 className="text-sm font-bold flex items-center gap-2">
+              <History className="h-4 w-4" /> Motivo da Falha e Logs
+            </h4>
+            <Card className="p-4 bg-destructive/5 border-destructive/20 font-mono text-xs text-destructive-foreground whitespace-pre-wrap">
+              {asset.error_message || "Nenhum log de erro registrado."}
+            </Card>
+          </div>
+
+          {asset.prompt && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-bold">Input/Prompt</h4>
+              <Card className="p-3 bg-muted/30 text-xs italic">"{asset.prompt}"</Card>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <h4 className="text-sm font-bold">Diagnóstico do Sistema</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="p-2 border border-border/40 rounded-lg bg-card text-center">
+                <div className="text-[10px] text-muted-foreground uppercase">Idempotência</div>
+                <div className="text-xs font-semibold">{asset.idempotency_key ? "Ativa" : "Inativa"}</div>
+              </div>
+              <div className="p-2 border border-border/40 rounded-lg bg-card text-center">
+                <div className="text-[10px] text-muted-foreground uppercase">Créditos</div>
+                <div className="text-xs font-semibold">{asset.credits_spent || 0} consumidos</div>
+              </div>
+              <div className="p-2 border border-border/40 rounded-lg bg-card text-center">
+                <div className="text-[10px] text-muted-foreground uppercase">Tool Key</div>
+                <div className="text-xs font-semibold font-mono">{asset.tool}</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-border/40">
+            <Button variant="outline" onClick={onClose}>Fechar Investigação</Button>
+            {canRerun && (
+              <Button onClick={() => { onRerun(asset); onClose(); }} disabled={rerunning}>
+                {rerunning ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RotateCw className="h-4 w-4 mr-2" />}
+                Retentar Execução
+              </Button>
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function Dashboard({ editsRemaining, subscription, history, filter, setFilter, searchQuery, setSearchQuery, sortOrder, setSortOrder, onPick, onOpen, onRerun, onCancel, onBatchRetry, isBatchRetrying, rerunningId, pageIndex, pageSize, totalCount, hasNext, hasPrev, realtimeStatus, globalCooldown, onNext, onPrev, onExport, exportColumns, setExportColumns, showExportOptions, setShowExportOptions, onAuditExport, showAuditExportOptions, setShowAuditExportOptions, showAuditSchedule, setShowAuditSchedule, auditEmail, setAuditEmail, auditTime, setAuditTime, scheduleAuditExport, onReset, currentPage, auditInterval, setAuditInterval, presets, onApplyPreset, onDeletePreset, showPresetDialog, setShowPresetDialog, newPresetName, setNewPresetName, onSavePreset, exports, exportLogs, showExportHistory, setShowExportHistory, renamePreset, auditDateStart, setAuditDateStart, auditDateEnd, setAuditDateEnd, cancelExport, retryExport, selectedExport, setSelectedExport, setSelectedAssetForInvestigation }: any) {
   const lowBalance = (editsRemaining ?? 0) <= 10;
   return (
     <div className="space-y-6">
