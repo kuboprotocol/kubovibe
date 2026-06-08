@@ -353,7 +353,7 @@ export default function CreativeAuditPage() {
                   <TableHead>Etapa</TableHead>
                   <TableHead>Ação</TableHead>
                   <TableHead>Correlation / Trace ID</TableHead>
-                  <TableHead className="text-right">Detalhes</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -376,7 +376,11 @@ export default function CreativeAuditPage() {
                   </TableRow>
                 ) : (
                   entries.map((entry) => (
-                    <TableRow key={entry.id}>
+                    <TableRow 
+                      key={entry.id} 
+                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => setSelectedEntry(entry)}
+                    >
                       <TableCell className="text-xs font-medium">
                         {new Date(entry.created_at).toLocaleString()}
                       </TableCell>
@@ -403,17 +407,8 @@ export default function CreativeAuditPage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={() => {
-                            console.log("Audit Params:", entry.params);
-                            toast.info("Parâmetros registrados", {
-                              description: JSON.stringify(entry.params).slice(0, 100) + "..."
-                            });
-                          }}
-                        >
-                          Ver Params
+                        <Button variant="ghost" size="icon">
+                          <ChevronRight className="h-4 w-4" />
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -425,34 +420,121 @@ export default function CreativeAuditPage() {
         </Card>
 
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-2 py-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-2 py-4">
             <p className="text-sm text-muted-foreground">
               Mostrando {entries.length} de {count} registros
             </p>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
-              >
-                Anterior
-              </Button>
-              <span className="text-sm font-medium">
-                Página {page} de {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-              >
-                Próxima
-              </Button>
-            </div>
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious 
+                    className="cursor-pointer"
+                    onClick={() => page > 1 && setPage(page - 1)}
+                  />
+                </PaginationItem>
+                {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => {
+                  let pageNum = page;
+                  if (page <= 3) pageNum = i + 1;
+                  else if (page >= totalPages - 2) pageNum = totalPages - 4 + i;
+                  else pageNum = page - 2 + i;
+
+                  if (pageNum <= 0 || pageNum > totalPages) return null;
+
+                  return (
+                    <PaginationItem key={pageNum}>
+                      <PaginationLink
+                        className="cursor-pointer"
+                        isActive={page === pageNum}
+                        onClick={() => setPage(pageNum)}
+                      >
+                        {pageNum}
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                })}
+                <PaginationItem>
+                  <PaginationNext 
+                    className="cursor-pointer"
+                    onClick={() => page < totalPages && setPage(page + 1)}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
           </div>
         )}
       </main>
+
+      {/* Details Side Panel */}
+      <Sheet open={!!selectedEntry} onOpenChange={() => setSelectedEntry(null)}>
+        <SheetContent className="sm:max-w-md overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <Info className="h-5 w-5 text-primary" /> Detalhes do Evento
+            </SheetTitle>
+            <SheetDescription>
+              Informações técnicas registradas para esta etapa.
+            </SheetDescription>
+          </SheetHeader>
+          
+          {selectedEntry && (
+            <div className="mt-6 space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase font-bold">Etapa</p>
+                  <Badge>{selectedEntry.step}</Badge>
+                </div>
+                <div className="space-y-1 text-right">
+                  <p className="text-xs text-muted-foreground uppercase font-bold">Data/Hora</p>
+                  <p className="text-sm">{new Date(selectedEntry.created_at).toLocaleString()}</p>
+                </div>
+              </div>
+
+              <div className="space-y-1 p-3 bg-muted rounded-md border">
+                <p className="text-xs text-muted-foreground uppercase font-bold mb-1">Ação</p>
+                <p className="text-sm font-mono break-all">{selectedEntry.action}</p>
+              </div>
+
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold border-b pb-1">Identificadores</h4>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">Correlation ID:</span>
+                    <code className="bg-accent px-1 rounded">{selectedEntry.correlation_id || "N/A"}</code>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">Trace ID:</span>
+                    <code className="bg-accent px-1 rounded">{selectedEntry.trace_id || "N/A"}</code>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <h4 className="text-sm font-semibold border-b pb-1">Parâmetros / Stack</h4>
+                <div className="bg-black/95 text-green-400 p-4 rounded-md overflow-x-auto font-mono text-xs max-h-[400px]">
+                  <pre>{JSON.stringify(selectedEntry.params, null, 2)}</pre>
+                </div>
+              </div>
+              
+              {selectedEntry.params?.error && (
+                <div className="p-3 border border-destructive/50 bg-destructive/5 rounded-md">
+                  <p className="text-xs font-bold text-destructive uppercase mb-1 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" /> Causa Detectada
+                  </p>
+                  <p className="text-sm text-destructive font-medium">
+                    {selectedEntry.params.error.message || "Erro desconhecido"}
+                  </p>
+                  {selectedEntry.params.error.stack && (
+                    <details className="mt-2">
+                      <summary className="text-[10px] cursor-pointer hover:underline text-destructive/80">Ver stack trace</summary>
+                      <pre className="mt-1 text-[10px] opacity-70 whitespace-pre-wrap">{selectedEntry.params.error.stack}</pre>
+                    </details>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
