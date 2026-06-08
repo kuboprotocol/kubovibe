@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -118,6 +118,23 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
   const [errorState, setErrorState] = useState<{ message: string; correlationId?: string; traceId?: string; stack?: string } | null>(null);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [simulationMode, setSimulationMode] = useState(false);
+
+  const logAuditAction = useCallback(async (step: string, action: string, params: any = {}, correlationId?: string, traceId?: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    try {
+      await supabase.from("creative_audit_trail").insert({
+        user_id: user.id,
+        step,
+        action,
+        params,
+        correlation_id: correlationId,
+        trace_id: traceId
+      });
+    } catch (e) {
+      console.error("Failed to log audit trail:", e);
+    }
+  }, []);
   const { subscription, editsRemaining } = useSubscription();
 
   const handleExecute = async () => {
@@ -142,7 +159,12 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     setTraceInfo(null);
     setErrorState(null);
     try {
-      if (simulationMode) throw new Error("Falha simulada na etapa de Configuração");
+      if (simulationMode) {
+        const cId = crypto.randomUUID().slice(0, 8);
+        await logAuditAction("Configuration", "execution_failed_simulated", { toolKey }, cId);
+        throw new Error("Falha simulada na etapa de Configuração");
+      }
+      await logAuditAction("Configuration", "execution_start", { toolKey });
       const { data: { session } } = await supabase.auth.getSession();
       
       const TOOL_TO_FN: Record<string, string> = {
