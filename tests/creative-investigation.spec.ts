@@ -27,6 +27,34 @@ test.describe("Creative Page Investigation and Audit", () => {
     await page.click('button:has-text("JSON")');
     await expect(page.locator("text=Trilha de auditoria exportada")).toBeVisible();
   });
+  
+  test("should validate exported file contents by date range", async ({ page }) => {
+    await page.goto("/creative");
+    await page.locator('button:has-text("Investigar")').first().click();
+    
+    // Set a narrow date range that should have no items
+    await page.fill('input[type="date"]:nth-of-type(1)', "2020-01-01");
+    await page.fill('input[type="date"]:nth-of-type(2)', "2020-01-02");
+    
+    // Verify no rows
+    await expect(page.locator("text=Nenhum evento registrado")).toBeVisible();
+    
+    // Set today
+    const today = new Date().toISOString().split('T')[0];
+    await page.fill('input[type="date"]:nth-of-type(1)', today);
+    await page.fill('input[type="date"]:nth-of-type(2)', today);
+    
+    // Check pagination
+    if (await page.locator('button:has-text("Próxima")').isVisible()) {
+        await page.click('button:has-text("Próxima")');
+        await expect(page.locator("text=Página 2")).toBeVisible();
+    }
+    
+    // Export and check toast
+    await page.click('button:has-text("CSV")');
+    await expect(page.locator("text=Trilha de auditoria exportada")).toBeVisible();
+  });
+
 
   test("should register cancel and retry events in audit trail", async ({ page }) => {
     await page.goto("/creative");

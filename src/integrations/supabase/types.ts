@@ -728,6 +728,36 @@ export type Database = {
         }
         Relationships: []
       }
+      creative_notification_preferences: {
+        Row: {
+          created_at: string | null
+          id: string
+          include_investigation_link: boolean
+          notify_cancel: boolean
+          notify_retry: boolean
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          include_investigation_link?: boolean
+          notify_cancel?: boolean
+          notify_retry?: boolean
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          include_investigation_link?: boolean
+          notify_cancel?: boolean
+          notify_retry?: boolean
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       creative_org_branding: {
         Row: {
           logo_url: string | null
