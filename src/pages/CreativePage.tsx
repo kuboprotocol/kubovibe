@@ -128,8 +128,9 @@ export default function CreativePage() {
   const [isBatchRetrying, setIsBatchRetrying] = useState(false);
   const [showExportOptions, setShowExportOptions] = useState(false);
   const [showAuditExportOptions, setShowAuditExportOptions] = useState(false);
-  const [exportColumns, setExportColumns] = useState<string[]>(["ID", "Tool", "Status", "Prompt", "Credits", "Created At", "Error Message"]);
+  const [exportColumns, setExportColumns] = useState<string[]>(["ID", "Tool", "Status", "Prompt", "Credits", "Created At", "Error Message", "Config"]);
   const alertedRef = useRef<{ low?: boolean; empty?: boolean }>({});
+  const [isExporting, setIsExporting] = useState(false);
   const globalCooldown = useCooldown();
   const PAGE_SIZE = 20;
   const [showAuditSchedule, setShowAuditSchedule] = useState(false);
@@ -410,36 +411,59 @@ export default function CreativePage() {
     loadHistory(cursorStack.length === 0 ? null : cursorStack[cursorStack.length - 1]);
   }
 
-  function exportHistory(format: "csv" | "json") {
-    if (!history.length) return;
-    const timestamp = new Date().toLocaleString('sv-SE', { timeZone: selectedTimezone }).replace(/[: ]/g, '-');
-    const correlationId = crypto.randomUUID().slice(0, 8);
-    const filename = `creative-history-${correlationId}-${timestamp}.${format}`;
-    let content = "";
-    
-    // Header indicating timezone
-    const tzHeader = `Timezone applied: ${selectedTimezone}\n`;
+  async function exportHistory(format: "csv" | "json") {
+    if (!history.length || !user) return;
+    setIsExporting(true);
+    try {
+      const timestamp = new Date().toLocaleString('sv-SE', { timeZone: selectedTimezone }).replace(/[: ]/g, '-');
+      const correlationId = crypto.randomUUID().slice(0, 8);
+      const filename = `creative-history-${correlationId}-${timestamp}.${format}`;
+      let content = "";
+      
+      const tzHeader = `Timezone applied: ${selectedTimezone}\n`;
 
-    if (format === "json") {
-      content = JSON.stringify({ metadata: { timezone: selectedTimezone, generated_at: new Date().toISOString() }, data: history }, null, 2);
-    } else {
-      const rows = history.map(h => exportColumns.map(c => {
-        const val = h[c.toLowerCase().replace(/ /g, "_")];
-        if (c === "Created At" && val) {
-          return new Date(val).toLocaleString('pt-BR', { timeZone: selectedTimezone });
-        }
-        return val || "";
-      }).join(","));
-      content = tzHeader + [exportColumns.join(","), ...rows].join("\n");
+      if (format === "json") {
+        content = JSON.stringify({ 
+          metadata: { 
+            timezone: selectedTimezone, 
+            generated_at: new Date().toISOString(),
+            user_id: user.id
+          }, 
+          data: history 
+        }, null, 2);
+      } else {
+        const headers = exportColumns.join(",");
+        const rows = history.map(h => exportColumns.map(c => {
+          let val = h[c.toLowerCase().replace(/ /g, "_")];
+          if (c === "Config") val = JSON.stringify(h.metadata || {});
+          if (c === "Created At") val = new Date(val).toLocaleString('sv-SE', { timeZone: selectedTimezone });
+          return `"${String(val ?? "").replace(/"/g, '""')}"`;
+        }).join(","));
+        content = tzHeader + headers + "\n" + rows.join("\n");
+      }
+      
+      const blob = new Blob([content], { type: format === "json" ? "application/json" : "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      await supabase.from("creative_audit_logs").insert({
+        user_id: user.id,
+        event_type: 'export',
+        metadata: { format, filename, correlationId, columns: exportColumns }
+      });
+      
+      toast.success("Relatório exportado com sucesso!");
+    } catch (e: any) {
+      toast.error("Falha ao exportar relatório: " + e.message);
+      // System logging for errors
+      console.error("[CreativePanel Export Error]", { error: e, userId: user.id });
+    } finally {
+      setIsExporting(false);
     }
-    const blob = new Blob([content], { type: format === "json" ? "application/json" : "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("Histórico exportado");
   }
 
 
