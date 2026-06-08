@@ -155,9 +155,35 @@ export default function DashboardPage() {
           <PromoCards />
         </motion.div>
 
-        {/* Smart Economy + Quantum Engine entry */}
+        {/* Creative Economy + Quantum Engine entries */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.04 }}
-          className="grid lg:grid-cols-[1fr_360px] gap-4 mb-8 mt-6">
+          className="grid lg:grid-cols-[1fr_1fr_360px] gap-4 mb-8 mt-6">
+          <div
+            onClick={() => navigate('/creative')}
+            className="glass-premium hover-glow rounded-2xl p-6 cursor-pointer relative overflow-hidden group bg-gradient-to-br from-primary/10 via-background to-accent/10"
+          >
+            <div className="absolute inset-0 dot-pattern opacity-20 pointer-events-none" />
+            <div className="relative z-10 flex items-start justify-between h-full">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-3">
+                  <Palette className="w-5 h-5 text-primary" />
+                  <span className="text-xs tracking-[0.3em] text-muted-foreground">KUBO CREATIVE STUDIO</span>
+                </div>
+                <h3 className="text-2xl font-display font-bold mb-2">
+                  Painel de <span className="neon-text">Economia Criativa</span>
+                </h3>
+                <p className="text-sm text-muted-foreground max-w-md mb-4">
+                  Chat IA · Imagens (Nano Banana) · Downloader · Clips · Avatar · Shorts · Música (Suno) · Ebooks · EMO Animate
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {['Chat', 'Imagem', 'Vídeo', 'Música', 'Ebook', '+4'].map((t) => (
+                    <span key={t} className="text-[10px] px-2 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20 font-mono">{t}</span>
+                  ))}
+                </div>
+              </div>
+              <Sparkles className="w-8 h-8 text-primary opacity-60 group-hover:opacity-100 group-hover:scale-110 transition-all" />
+            </div>
+          </div>
           <div
             onClick={() => navigate('/game')}
             className="glass-premium hover-glow rounded-2xl p-6 cursor-pointer gradient-aurora animate-aurora-shift relative overflow-hidden group"
