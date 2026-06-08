@@ -86,6 +86,9 @@ export default function DashboardPage() {
             <Button variant="ghost" size="sm" onClick={() => navigate('/emails')} className="rounded-xl gap-2 text-muted-foreground hover:text-foreground">
               <Mail className="h-4 w-4" /> Emails
             </Button>
+            <Button variant="outline" size="sm" onClick={() => navigate('/creative')} className="rounded-xl gap-2 border-primary/30 text-primary hover:bg-primary/10">
+              <Palette className="h-4 w-4" /> Economia Criativa
+            </Button>
             <Button variant="outline" size="sm" onClick={() => navigate('/shortlinks')} className="rounded-xl gap-2 border-primary/20 text-primary hover:bg-primary/10">
               <Gift className="h-4 w-4" /> Ganhar Créditos
             </Button>
