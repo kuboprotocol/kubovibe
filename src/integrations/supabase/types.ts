@@ -818,6 +818,7 @@ export type Database = {
           id: string
           search_query: string | null
           sort_order: string | null
+          timezone: string | null
           updated_at: string | null
           user_id: string
         }
@@ -826,6 +827,7 @@ export type Database = {
           id?: string
           search_query?: string | null
           sort_order?: string | null
+          timezone?: string | null
           updated_at?: string | null
           user_id: string
         }
@@ -834,6 +836,7 @@ export type Database = {
           id?: string
           search_query?: string | null
           sort_order?: string | null
+          timezone?: string | null
           updated_at?: string | null
           user_id?: string
         }
