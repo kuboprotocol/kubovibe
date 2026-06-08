@@ -602,9 +602,15 @@ export default function CreativePage() {
             <Sparkles className="h-5 w-5 text-primary" />
             Economia Criativa Kubo
           </h1>
-          <div className="flex items-center gap-4">
-             <span className="font-mono text-sm font-bold">{editsRemaining} créditos</span>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={() => navigate("/creative/investigation")}>
+              <AlertTriangle className="h-4 w-4 mr-1" /> Investigação
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => navigate("/creative/presets")}>Presets</Button>
+            <Button variant="ghost" size="sm" onClick={() => navigate("/creative/notifications")}>Notificações</Button>
+            <span className="font-mono text-sm font-bold ml-2">{editsRemaining} créditos</span>
           </div>
+
         </div>
       </header>
       <main className="container max-w-7xl mx-auto px-4 py-6">
