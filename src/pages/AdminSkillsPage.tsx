@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 
-const ADMIN_EMAIL = "kuboprotocol@gmail.com";
+
 const BUCKET = "skill-uploads";
 
 type StepKey =
@@ -148,7 +148,7 @@ export default function AdminSkillsPage() {
     currentLocalRef.current = locals;
   }, [locals]);
 
-  const isAdmin = user?.email?.toLowerCase() === ADMIN_EMAIL;
+  const { isAdmin } = useAuth();
 
   const normalize = (row: Record<string, unknown>): SkillImport => {
     const p = row.progress as { step?: string; percent?: number } | null;

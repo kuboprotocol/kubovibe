@@ -32,7 +32,7 @@ export async function enforceRateLimit(
   opts: { max?: number; windowSeconds?: number; userEmail?: string | null } = {},
 ): Promise<{ ok: true } | { ok: false; error: string; retryAfter: number }> {
   const admin = supaAdmin();
-  const { data: isAdmin } = await admin.rpc("is_kubo_admin", { _user_id: userId });
+  const { data: isAdmin } = await admin.rpc("is_admin", { p_user_id: userId });
   if (isAdmin) return { ok: true };
   const max = opts.max ?? 20;
   const windowSeconds = opts.windowSeconds ?? 60;
@@ -65,7 +65,7 @@ export async function deductCredits(
   if (amount <= 0) return { ok: true };
   // Admin bypass (rate limit + credits)
   const admin = supaAdmin();
-  const { data: isAdmin } = await admin.rpc("is_kubo_admin", { _user_id: userId });
+  const { data: isAdmin } = await admin.rpc("is_admin", { p_user_id: userId });
   if (isAdmin) return { ok: true };
 
   // Per-tool rate limit (20 req/min)
