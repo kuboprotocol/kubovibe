@@ -158,6 +158,8 @@ export default function CreativePage() {
     notify_retry: true,
     include_investigation_link: true
   });
+  const [selectedTimezone, setSelectedTimezone] = useState("UTC");
+
 
 
   useEffect(() => {
@@ -223,12 +225,15 @@ export default function CreativePage() {
         user_id: user.id,
         filter,
         search_query: debouncedSearch,
-        sort_order: sortOrder
+        sort_order: sortOrder,
+        timezone: selectedTimezone
       });
     };
     const t = setTimeout(savePrefs, 2000);
     return () => clearTimeout(t);
-  }, [user, filter, debouncedSearch, sortOrder]);
+  }, [user, filter, debouncedSearch, sortOrder, selectedTimezone]);
+
+
 
   useEffect(() => {
     if (!user) return;
@@ -238,7 +243,9 @@ export default function CreativePage() {
         setFilter(prefs.filter as any);
         setSearchQuery(prefs.search_query);
         setSortOrder(prefs.sort_order as any);
+        if (prefs.timezone) setSelectedTimezone(prefs.timezone);
       }
+
       
       const { data: p } = await supabase.from("creative_filter_presets").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
       setPresets(p || []);
@@ -405,13 +412,25 @@ export default function CreativePage() {
 
   function exportHistory(format: "csv" | "json") {
     if (!history.length) return;
-    const filename = `creative-history-${new Date().toISOString().split("T")[0]}.${format}`;
+    const timestamp = new Date().toLocaleString('sv-SE', { timeZone: selectedTimezone }).replace(/[: ]/g, '-');
+    const correlationId = crypto.randomUUID().slice(0, 8);
+    const filename = `creative-history-${correlationId}-${timestamp}.${format}`;
     let content = "";
+    
+    // Header indicating timezone
+    const tzHeader = `Timezone applied: ${selectedTimezone}\n`;
+
     if (format === "json") {
-      content = JSON.stringify(history, null, 2);
+      content = JSON.stringify({ metadata: { timezone: selectedTimezone, generated_at: new Date().toISOString() }, data: history }, null, 2);
     } else {
-      const rows = history.map(h => exportColumns.map(c => h[c.toLowerCase().replace(/ /g, "_")] || "").join(","));
-      content = [exportColumns.join(","), ...rows].join("\n");
+      const rows = history.map(h => exportColumns.map(c => {
+        const val = h[c.toLowerCase().replace(/ /g, "_")];
+        if (c === "Created At" && val) {
+          return new Date(val).toLocaleString('pt-BR', { timeZone: selectedTimezone });
+        }
+        return val || "";
+      }).join(","));
+      content = tzHeader + [exportColumns.join(","), ...rows].join("\n");
     }
     const blob = new Blob([content], { type: format === "json" ? "application/json" : "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -423,26 +442,33 @@ export default function CreativePage() {
     toast.success("Histórico exportado");
   }
 
+
   async function exportAuditTrail(format: "csv" | "json") {
     if (!user || !exportAuditLogs.length) {
       toast.info("Nenhum dado de auditoria para exportar.");
       return;
     }
-    const filename = `creative-audit-trail-${new Date().toISOString().split("T")[0]}.${format}`;
+    const timestamp = new Date().toLocaleString('sv-SE', { timeZone: selectedTimezone }).replace(/[: ]/g, '-');
+    const correlationId = crypto.randomUUID().slice(0, 8);
+    const filename = `creative-audit-trail-${correlationId}-${timestamp}.${format}`;
     let content = "";
+    
+    const tzHeader = `Timezone applied: ${selectedTimezone}\n`;
+
     if (format === "json") {
-      content = JSON.stringify(exportAuditLogs, null, 2);
+      content = JSON.stringify({ metadata: { timezone: selectedTimezone, generated_at: new Date().toISOString() }, data: exportAuditLogs }, null, 2);
     } else {
       const headers = ["ID", "Action", "Created At", "User", "Details"];
       const rows = exportAuditLogs.map(log => [
         log.id,
         log.action || log.event_type,
-        log.created_at,
+        new Date(log.created_at).toLocaleString('pt-BR', { timeZone: selectedTimezone }),
         log.profiles?.email || log.user_id,
         JSON.stringify(log.details || log.metadata).replace(/"/g, '""')
       ].map(v => `"${v}"`).join(","));
-      content = [headers.join(","), ...rows].join("\n");
+      content = tzHeader + [headers.join(","), ...rows].join("\n");
     }
+
     const blob = new Blob([content], { type: format === "json" ? "application/json" : "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -725,10 +751,24 @@ export default function CreativePage() {
                        />
                      </div>
                    </div>
-                   <div className="flex gap-2">
-                     <Button variant="outline" onClick={() => { setFilter("all"); setSearchQuery(""); setSortOrder("desc"); }}>
-                       Resetar
-                     </Button>
+                    <div className="flex gap-2">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-medium text-muted-foreground uppercase">Fuso Horário</label>
+                        <select 
+                          value={selectedTimezone} 
+                          onChange={(e) => setSelectedTimezone(e.target.value)}
+                          className="flex h-10 w-[120px] rounded-md border border-input bg-background/50 px-2 py-2 text-xs"
+                        >
+                          <option value="UTC">UTC</option>
+                          <option value="America/Sao_Paulo">Brasília (BRT)</option>
+                          <option value="Europe/London">Londres (GMT)</option>
+                          <option value="America/New_York">NY (EST)</option>
+                        </select>
+                      </div>
+                      <Button variant="outline" onClick={() => { setFilter("all"); setSearchQuery(""); setSortOrder("desc"); setSelectedTimezone("UTC"); }}>
+                        Resetar
+                      </Button>
+
                      {filter === "failed" && history.some(h => h.status === "failed") && (
                        <Button variant="secondary" onClick={batchRetryFailed} disabled={isBatchRetrying}>
                          {isBatchRetrying ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RotateCw className="h-4 w-4 mr-2" />}
