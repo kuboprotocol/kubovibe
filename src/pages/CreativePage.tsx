@@ -144,6 +144,11 @@ export default function CreativePage() {
   const [auditDateStart, setAuditDateStart] = useState("");
   const [auditDateEnd, setAuditDateEnd] = useState("");
   const [selectedAssetForInvestigation, setSelectedAssetForInvestigation] = useState<any | null>(null);
+  const [investigationSearch, setInvestigationSearch] = useState("");
+  const [investigationDateStart, setInvestigationDateStart] = useState("");
+  const [investigationDateEnd, setInvestigationDateEnd] = useState("");
+  const [exportAuditLogs, setExportAuditLogs] = useState<any[]>([]);
+  const [isLoadingAudit, setIsLoadingAudit] = useState(false);
 
 
 
