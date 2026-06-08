@@ -465,22 +465,6 @@ export default function CreativePage() {
       setIsExporting(false);
     }
   }
-        if (c === "Created At" && val) {
-          return new Date(val).toLocaleString('pt-BR', { timeZone: selectedTimezone });
-        }
-        return val || "";
-      }).join(","));
-      content = tzHeader + [exportColumns.join(","), ...rows].join("\n");
-    }
-    const blob = new Blob([content], { type: format === "json" ? "application/json" : "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("Histórico exportado");
-  }
 
 
   async function exportAuditTrail(format: "csv" | "json") {
