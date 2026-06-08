@@ -2150,6 +2150,57 @@ export type Database = {
         }
         Relationships: []
       }
+      web3_connections_safe: {
+        Row: {
+          api_key_hint: string | null
+          connection_name: string | null
+          created_at: string | null
+          explorer_url: string | null
+          id: string | null
+          last_block: number | null
+          last_checked_at: string | null
+          last_error: string | null
+          last_latency_ms: number | null
+          last_status: string | null
+          network: string | null
+          provider: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          api_key_hint?: string | null
+          connection_name?: string | null
+          created_at?: string | null
+          explorer_url?: string | null
+          id?: string | null
+          last_block?: number | null
+          last_checked_at?: string | null
+          last_error?: string | null
+          last_latency_ms?: number | null
+          last_status?: string | null
+          network?: string | null
+          provider?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          api_key_hint?: string | null
+          connection_name?: string | null
+          created_at?: string | null
+          explorer_url?: string | null
+          id?: string | null
+          last_block?: number | null
+          last_checked_at?: string | null
+          last_error?: string | null
+          last_latency_ms?: number | null
+          last_status?: string | null
+          network?: string | null
+          provider?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       admin_clear_connector_run: {
