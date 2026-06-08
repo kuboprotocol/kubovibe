@@ -217,7 +217,10 @@ Deno.serve(async (req: Request) => {
     );
   } catch (err: any) {
     console.error("unity-ad-reward error:", err);
-    return new Response(JSON.stringify({ error: err.message }), {
+    const safeMessage = (err.message?.includes("database") || err.message?.includes("sql"))
+      ? "Internal server error"
+      : err.message;
+    return new Response(JSON.stringify({ error: safeMessage }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
