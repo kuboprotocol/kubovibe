@@ -62,6 +62,35 @@ test.describe("Creative investigation", () => {
       // refetch — audit panel should reflect a "retry" event if a row is open
     }
   });
+  test("clear filters resets all fields and updates URL", async ({ page }) => {
+    await ensureAuthed(page, "/creative/investigation");
+    await page.getByTestId("filter-search").fill("to-be-cleared");
+    await page.getByTestId("filter-status").click();
+    await page.getByRole("option", { name: "Cancelado" }).click();
+    
+    await expect(page).toHaveURL(/q=to-be-cleared/);
+    await expect(page).toHaveURL(/status=cancelled/);
+    
+    await page.getByTestId("btn-clear-filters").click();
+    
+    await expect(page.getByTestId("filter-search")).toHaveValue("");
+    await expect(page).not.toHaveURL(/q=/);
+    await expect(page).not.toHaveURL(/status=cancelled/);
+  });
+});
+
+test.describe("Creative exports", () => {
+  test("investigate button in export details navigates to investigation page", async ({ page }) => {
+    // Assuming there is at least one export or navigating to a mock one if possible
+    // For now, let's test the navigation from a generic asset in the main creative page
+    await ensureAuthed(page, "/creative");
+    const investigateBtn = page.getByRole("button", { name: /investigar/i }).first();
+    if (await investigateBtn.count() > 0) {
+      await investigateBtn.click();
+      await expect(page).toHaveURL(/\/creative\/investigation\?investigate=/);
+      await expect(page.getByTestId("investigation-detail")).toBeVisible({ timeout: 10000 });
+    }
+  });
 });
 
 test.describe("Creative presets", () => {

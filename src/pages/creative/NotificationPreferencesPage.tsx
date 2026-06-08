@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function NotificationPreferencesPage() {
   const navigate = useNavigate();
@@ -19,21 +20,34 @@ export default function NotificationPreferencesPage() {
   });
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const [error, setError] = useState<string | null>(null);
+
+  async function fetchPrefs() {
     if (!user) return;
-    (async () => {
-      const { data } = await supabase
+    setLoading(true);
+    setError(null);
+    try {
+      const { data, error: err } = await supabase
         .from("creative_notification_preferences")
         .select("*")
         .eq("user_id", user.id)
         .maybeSingle();
+      if (err) throw err;
       if (data) setPrefs({
         notify_cancel: data.notify_cancel,
         notify_retry: data.notify_retry,
         include_investigation_link: data.include_investigation_link,
       });
+    } catch (err: any) {
+      setError(err.message);
+      toast.error("Erro ao carregar preferências: " + err.message);
+    } finally {
       setLoading(false);
-    })();
+    }
+  }
+
+  useEffect(() => {
+    fetchPrefs();
   }, [user]);
 
   async function save() {
@@ -57,7 +71,18 @@ export default function NotificationPreferencesPage() {
       <div className="p-4 max-w-2xl mx-auto">
         <Card className="p-6 space-y-6">
           {loading ? (
-            <p className="text-sm text-muted-foreground">Carregando…</p>
+            <div className="space-y-6">
+              <Skeleton className="h-16 w-full" />
+              <Skeleton className="h-16 w-full" />
+              <Skeleton className="h-16 w-full" />
+              <Skeleton className="h-10 w-32" />
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center gap-4">
+              <AlertTriangle className="h-10 w-10 text-destructive" />
+              <p className="text-sm text-destructive font-medium">{error}</p>
+              <Button variant="outline" size="sm" onClick={() => fetchPrefs()}>Tentar novamente</Button>
+            </div>
           ) : (
             <>
               <PrefRow
