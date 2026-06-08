@@ -458,50 +458,62 @@ export default function CreativePage() {
     loadHistory(cursorStack.length === 0 ? null : cursorStack[cursorStack.length - 1]);
   }
 
-  async function exportFullPanelReport() {
+  async function exportFullPanelReport(format: "json" | "csv" = "json") {
     if (!history.length || !user) return;
     setIsExporting(true);
     try {
       const timestamp = new Date().toLocaleString('sv-SE', { timeZone: selectedTimezone }).replace(/[: ]/g, '-');
       const correlationId = crypto.randomUUID().slice(0, 8);
-      const filename = `creative-panel-full-report-${correlationId}-${timestamp}.json`;
+      const filename = `creative-panel-full-report-${correlationId}-${timestamp}.${format}`;
       
-      const report = {
-        meta: {
-          generated_at: new Date().toISOString(),
-          timezone: selectedTimezone,
-          user_id: user.id,
-          total_items: totalCount,
-          correlation_id: correlationId
-        },
-        steps: {
-          selection: { status: "active", items_count: history.length },
-          configuration: { status: active === "dashboard" ? "pending" : "active", current_tool: active },
-          execution: { 
-            status: history.some(h => h.status === "processing") ? "active" : "idle",
-            processing_count: history.filter(h => h.status === "processing").length
-          }
-        },
-        history: history.map(h => ({
-          id: h.id,
-          tool: h.tool,
-          status: h.status,
-          prompt: h.prompt,
-          error: h.error_message,
-          created_at: h.created_at,
-          metadata: h.metadata,
-          retry_count: h.retry_count
-        }))
-      };
+      const reportData = history.map(h => ({
+        id: h.id,
+        tool: h.tool,
+        status: h.status,
+        prompt: h.prompt,
+        error: h.error_message,
+        created_at: h.created_at,
+        metadata: h.metadata,
+        retry_count: h.retry_count,
+        correlation_id: h.metadata?.correlation_id,
+        trace_id: h.metadata?.trace_id
+      }));
 
-      const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success("Relatório completo exportado");
+      if (format === "json") {
+        const report = {
+          meta: {
+            generated_at: new Date().toISOString(),
+            timezone: selectedTimezone,
+            user_id: user.id,
+            total_items: totalCount,
+            correlation_id: correlationId
+          },
+          steps: {
+            selection: { status: "active", items_count: history.length },
+            configuration: { status: active === "dashboard" ? "pending" : "active", current_tool: active },
+            execution: { 
+              status: history.some(h => h.status === "processing") ? "active" : "idle",
+              processing_count: history.filter(h => h.status === "processing").length
+            }
+          },
+          history: reportData
+        };
+        const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = filename; a.click();
+        URL.revokeObjectURL(url);
+      } else {
+        const headers = ["ID", "Tool", "Status", "Prompt", "Error", "CreatedAt", "RetryCount", "CorrelationID"];
+        const rows = reportData.map(d => [d.id, d.tool, d.status, d.prompt, d.error, d.created_at, d.retry_count, d.correlation_id]);
+        const csvContent = [headers.join(","), ...rows.map(r => r.map(v => `"${String(v || "").replace(/"/g, '""')}"`).join(","))].join("\n");
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = filename; a.click();
+        URL.revokeObjectURL(url);
+      }
+      toast.success(`Relatório completo (${format.toUpperCase()}) exportado`);
     } catch (e: any) {
       toast.error("Falha ao exportar relatório");
     } finally {
