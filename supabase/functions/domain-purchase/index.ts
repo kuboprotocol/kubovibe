@@ -1,6 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { corsHeaders, sanitizeError } from "../_shared/cors.ts";
 
 const IONOS_API = "https://api.hosting.ionos.com/domains/v1";
 const RESELLER_API = "https://api.ionos.com/reseller/v2";
@@ -171,11 +171,12 @@ Deno.serve(async (req) => {
       metadata: { credit_tx: deduct },
     }).select().single();
     if (ie) {
-      return new Response(JSON.stringify({ error: ie.message, refund_required: true, deduct }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ error: sanitizeError(ie), refund_required: true, deduct }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     return new Response(JSON.stringify({ success: true, domain: dom, contract, balance_after: (deduct as any)?.balance_after }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e: any) {
-    return new Response(JSON.stringify({ error: e?.message ?? "internal" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    console.error("[domain-purchase] error:", e);
+    return new Response(JSON.stringify({ error: sanitizeError(e) }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });
