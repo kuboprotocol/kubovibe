@@ -131,6 +131,8 @@ export default function CreativePage() {
   const [exportColumns, setExportColumns] = useState<string[]>(["ID", "Tool", "Status", "Prompt", "Credits", "Created At", "Error Message", "Config"]);
   const alertedRef = useRef<{ low?: boolean; empty?: boolean }>({});
   const [isExporting, setIsExporting] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [isCancelling, setIsCancelling] = useState<string | null>(null);
   const globalCooldown = useCooldown();
   const PAGE_SIZE = 20;
   const [showAuditSchedule, setShowAuditSchedule] = useState(false);
@@ -169,7 +171,8 @@ export default function CreativePage() {
 
   async function loadHistory(before: string | null = null) {
     if (!user) return;
-    let q = supabase.from("creative_assets")
+    setIsLoadingHistory(true);
+    try {
       .select("*", { count: "exact" })
       .eq("user_id", user.id);
     
@@ -203,6 +206,12 @@ export default function CreativePage() {
     setHistory(visible);
     setNextCursor(hasMore ? visible[visible.length - 1].created_at : null);
     setTotalCount(count ?? 0);
+    } catch (e: any) {
+      console.error("[CreativePanel:Selection] history_load_failed", { error: e.message, userId: user.id });
+      toast.error("Falha ao carregar histórico");
+    } finally {
+      setIsLoadingHistory(false);
+    }
   }
 
   async function loadPresets() {
@@ -310,6 +319,12 @@ export default function CreativePage() {
       const r = await authedFetch(cfg.fn, cfg.build(asset), idemKey);
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { 
+        console.error("[CreativePanel:Execution] tool_retry_failed", { 
+          assetId: asset.id, 
+          error: d.error, 
+          correlationId: r.headers.get("x-correlation-id"),
+          traceId: r.headers.get("x-trace-id") 
+        });
         if (!isBatch) handleFnError(d); 
         return false; 
       }
@@ -335,6 +350,7 @@ export default function CreativePage() {
       
       return true;
     } catch (e: any) {
+      console.error("[CreativePanel:Execution] tool_retry_exception", { assetId: asset.id, error: e.message, stack: e.stack });
       if (!isBatch) toast.error(e?.message ?? "Falha ao reexecutar");
       return false;
     } finally {
@@ -348,7 +364,8 @@ export default function CreativePage() {
   }
 
   async function cancelExecution(assetId: string) {
-    if (!user) return;
+    if (!user || isCancelling) return;
+    setIsCancelling(assetId);
     try {
       const asset = history.find(h => h.id === assetId);
       const { error } = await supabase
@@ -383,7 +400,10 @@ export default function CreativePage() {
       toast.success("Execução cancelada");
       loadHistory(cursorStack.length === 0 ? null : cursorStack[cursorStack.length - 1]);
     } catch (e: any) {
+      console.error("[CreativePanel:Execution] cancel_failed", { assetId, error: e.message, userId: user.id });
       toast.error("Falha ao cancelar: " + e.message);
+    } finally {
+      setIsCancelling(null);
     }
   }
 

@@ -25,6 +25,18 @@ test.describe('Creative Economy Panel E2E', () => {
     
     // Ensure state reset
     await expect(promptInput).toHaveValue('');
+    await expect(generateBtn).toBeEnabled();
+  });
+
+  test('error logging and recovery in execution', async ({ page }) => {
+    await page.goto('/creative');
+    await page.getByRole('button', { name: /Kubo Chat/i }).click();
+    
+    // Simulate empty prompt error
+    const generateBtn = page.getByRole('button', { name: /Gerar Agora/i });
+    await generateBtn.click();
+    await expect(page.getByText(/O campo de prompt\/URL é obrigatório/i)).toBeVisible();
+    await expect(generateBtn).toBeEnabled();
   });
 
   test('navigation and state preservation', async ({ page }) => {

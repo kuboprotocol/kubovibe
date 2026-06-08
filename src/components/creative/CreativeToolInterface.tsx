@@ -113,6 +113,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     config.options?.reduce((acc, opt) => ({ ...acc, [opt.key]: opt.default }), {}) || {}
   );
   const [loading, setLoading] = useState(false);
+  const [traceInfo, setTraceInfo] = useState<{ correlationId?: string; traceId?: string } | null>(null);
   const { subscription, editsRemaining } = useSubscription();
 
   const handleExecute = async () => {
@@ -134,6 +135,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     }
 
     setLoading(true);
+    setTraceInfo(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       
@@ -166,8 +168,21 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
         body: JSON.stringify(body),
       });
 
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.error || "Erro na execução");
+      const data = await r.json().catch(() => ({ error: "Resposta inválida do servidor" }));
+      
+      const cId = r.headers.get("x-correlation-id");
+      const tId = r.headers.get("x-trace-id");
+      if (cId || tId) setTraceInfo({ correlationId: cId || undefined, traceId: tId || undefined });
+
+      if (!r.ok) {
+        console.error("[CreativePanel:Configuration] execution_failed", { 
+          toolKey, 
+          error: data.error, 
+          correlationId: cId, 
+          traceId: tId 
+        });
+        throw new Error(data.error || "Erro na execução");
+      }
 
       toast.success("Solicitação enviada!", {
         description: "Você pode acompanhar o progresso no histórico.",
@@ -175,6 +190,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       setPrompt("");
       onSuccess?.();
     } catch (e: any) {
+      console.error("[CreativePanel:Configuration] execution_exception", { toolKey, error: e.message, stack: e.stack });
       toast.error(e.message);
     } finally {
       setLoading(false);
@@ -201,12 +217,21 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       </div>
 
       {(editsRemaining !== undefined && editsRemaining < config.cost) && (
-        <Alert variant="destructive" className="bg-destructive/5 border-destructive/20">
+        <Alert variant="destructive" className="bg-destructive/5 border-destructive/20 animate-in fade-in zoom-in duration-300">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Créditos Insuficientes</AlertTitle>
           <AlertDescription>
             Você precisa de {config.cost} créditos, mas possui apenas {editsRemaining}.
           </AlertDescription>
+        </Alert>
+      )}
+
+      {traceInfo && (
+        <Alert variant="default" className="bg-muted/50 border-muted-foreground/20 text-xs py-2">
+          <div className="flex flex-col gap-0.5 opacity-70">
+            {traceInfo.correlationId && <span>ID de Correlação: {traceInfo.correlationId}</span>}
+            {traceInfo.traceId && <span>ID de Rastreio: {traceInfo.traceId}</span>}
+          </div>
         </Alert>
       )}
 
