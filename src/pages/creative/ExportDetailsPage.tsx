@@ -166,11 +166,15 @@ export default function ExportDetailsPage() {
         <div className="p-8 flex flex-col items-center justify-center text-center gap-4">
           <AlertTriangle className="h-12 w-12 text-destructive" />
           <h2 className="text-lg font-semibold">{error || "Exportação não encontrada"}</h2>
-          <Button onClick={() => navigate("/creative")}>Voltar para Creative</Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => navigate("/creative")}>Voltar para Creative</Button>
+            <Button onClick={() => load()}>Tentar novamente</Button>
+          </div>
         </div>
       </div>
     );
   }
+
 
   const totalSeconds = Math.round((exportRow.generation_time_ms ?? 0) / 1000);
 

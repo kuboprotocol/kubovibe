@@ -13,6 +13,9 @@ import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
 
+const isUUID = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+
+
 type Asset = {
   id: string;
   tool: string;
@@ -476,6 +479,3 @@ function StatusBadge({ status }: { status: string }) {
   return <Badge className={map[status] ?? ""}>{status}</Badge>;
 }
 
-function isUUID(v: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
-}
