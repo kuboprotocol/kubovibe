@@ -49,20 +49,36 @@ const PAGE_SIZE = 25;
 
 export default function CreativeAuditPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   
-  const [search, setSearch] = useState("");
-  const [step, setStep] = useState("all");
-  const [status, setStatus] = useState("all");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState(searchParams.get("search") || "");
+  const [step, setStep] = useState(searchParams.get("step") || "all");
+  const [status, setStatus] = useState(searchParams.get("status") || "all");
+  const [startDate, setStartDate] = useState(searchParams.get("start") || "");
+  const [endDate, setEndDate] = useState(searchParams.get("end") || "");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">((searchParams.get("sort") as "asc" | "desc") || "desc");
+  const [page, setPage] = useState(Number(searchParams.get("page")) || 1);
   const [selectedEntry, setSelectedEntry] = useState<AuditTrail | null>(null);
+  const [timelineEntries, setTimelineEntries] = useState<AuditTrail[]>([]);
+  const [isTimelineLoading, setIsTimelineLoading] = useState(false);
   const [savedFilters, setSavedFilters] = useState<any[]>(() => {
     const saved = localStorage.getItem("creative_audit_filters");
     return saved ? JSON.parse(saved) : [];
   });
+
+  // Update URL params when filters change
+  useEffect(() => {
+    const params: Record<string, string> = {};
+    if (search) params.search = search;
+    if (step !== "all") params.step = step;
+    if (status !== "all") params.status = status;
+    if (startDate) params.start = startDate;
+    if (endDate) params.end = endDate;
+    if (sortDir !== "desc") params.sort = sortDir;
+    if (page !== 1) params.page = String(page);
+    setSearchParams(params, { replace: true });
+  }, [search, step, status, startDate, endDate, sortDir, page, setSearchParams]);
 
   const debouncedSearch = useDebounce(search, 500);
 
