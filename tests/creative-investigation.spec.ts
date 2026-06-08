@@ -152,6 +152,37 @@ test.describe("Creative investigation", () => {
     await expect(page).toHaveURL(/q=abc/);
   });
 
+  test("browser back/forward maintains filters and investigation context", async ({ page }) => {
+    const investId = "history-context";
+    await ensureAuthed(page, `/creative/investigation?investigate=${investId}`);
+
+    // Change filter
+    await page.getByTestId("filter-search").fill("first-search");
+    await page.waitForTimeout(1000);
+    await expect(page).toHaveURL(/q=first-search/);
+
+    // Change another filter
+    await page.getByTestId("filter-status").click();
+    await page.getByRole("option", { name: "Cancelado" }).click();
+    await page.waitForTimeout(1000);
+    await expect(page).toHaveURL(/status=cancelled/);
+
+    // Go back
+    await page.goBack();
+    await expect(page).toHaveURL(/q=first-search/);
+    await expect(page).not.toHaveURL(/status=cancelled/);
+    await expect(page).toHaveURL(new RegExp(`investigate=${investId}`));
+
+    // Go forward
+    await page.goForward();
+    await expect(page).toHaveURL(/status=cancelled/);
+    await expect(page).toHaveURL(new RegExp(`investigate=${investId}`));
+    
+    // Check if table reflects search from URL
+    await expect(page.getByTestId("filter-search")).toHaveValue("first-search");
+  });
+
+
   test("export audit JSON/CSV download contains only filtered range", async ({ page }) => {
     await ensureAuthed(page, "/creative/investigation");
     const rows = page.getByTestId("investigation-row");
