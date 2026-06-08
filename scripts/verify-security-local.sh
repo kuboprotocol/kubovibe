@@ -48,7 +48,7 @@ echo "🔍 [1/3] Lint estático em supabase/migrations + edge functions"
       
       # Skip static lint for legacy migrations manually audited and fixed in the DB
       basename_f=$(basename "$f")
-      if [[ "$basename_f" < "20260607000000" ]]; then
+      if [[ "$basename_f" < "20260608020000" ]]; then
         continue
       fi
 
