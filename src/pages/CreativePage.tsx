@@ -225,12 +225,14 @@ export default function CreativePage() {
         user_id: user.id,
         filter,
         search_query: debouncedSearch,
-        sort_order: sortOrder
+        sort_order: sortOrder,
+        timezone: selectedTimezone
       });
     };
     const t = setTimeout(savePrefs, 2000);
     return () => clearTimeout(t);
   }, [user, filter, debouncedSearch, sortOrder, selectedTimezone]);
+
 
 
   useEffect(() => {
