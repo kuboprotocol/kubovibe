@@ -313,14 +313,15 @@ export default function CreativePage() {
     if (!failed.length) return;
     setIsBatchRetrying(true);
     let success = 0;
+    
+    // Log audit trail start
+    console.log(`[Audit] Batch Retry iniciado por ${user?.id} as ${new Date().toISOString()}. Itens: ${failed.length}`);
+
     for (const asset of failed) {
-      const cfg = RERUN_MAP[asset.tool];
-      if (!cfg) continue;
-      try {
-        const r = await authedFetch(cfg.fn, cfg.build(asset), `rerun:${asset.id}`);
-        if (r.ok) success++;
-      } catch (e) { console.error("Batch retry failed for", asset.id, e); }
+      const ok = await rerun(asset, true);
+      if (ok) success++;
     }
+    
     setIsBatchRetrying(false);
     toast.success(`${success} itens reprocessados em lote.`);
     refetch();
@@ -332,21 +333,34 @@ export default function CreativePage() {
     const filename = `creative-history-${new Date().toISOString().split("T")[0]}.${format}`;
     let content = "";
     
+    // Ensure filters are reflected: already reflected as 'history' state is populated via loadHistory(filter)
+    
     if (format === "json") {
-      content = JSON.stringify(history, null, 2);
+      const exportData = history.map(h => {
+        const item: any = {};
+        if (exportColumns.includes("ID")) item.id = h.id;
+        if (exportColumns.includes("Tool")) item.tool = h.tool;
+        if (exportColumns.includes("Status")) item.status = h.status;
+        if (exportColumns.includes("Prompt")) item.prompt = h.prompt;
+        if (exportColumns.includes("Credits")) item.credits_spent = h.credits_spent || 0;
+        if (exportColumns.includes("Created At")) item.created_at = h.created_at;
+        if (exportColumns.includes("Error Message")) item.error_message = h.error_message;
+        return item;
+      });
+      content = JSON.stringify(exportData, null, 2);
     } else {
-      const headers = ["ID", "Tool", "Status", "Prompt", "Credits", "Created At", "Error Message", "Error Detail"];
-      const rows = history.map(h => [
-        h.id,
-        h.tool,
-        h.status,
-        `"${(h.prompt || "").replace(/"/g, '""')}"`,
-        h.credits_spent || 0,
-        h.created_at,
-        `"${(h.error_message || "").split("\n")[0].replace(/"/g, '""')}"`,
-        `"${(h.error_message || "").replace(/"/g, '""')}"`
-      ]);
-      content = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+      const rows = history.map(h => {
+        const row = [];
+        if (exportColumns.includes("ID")) row.push(h.id);
+        if (exportColumns.includes("Tool")) row.push(h.tool);
+        if (exportColumns.includes("Status")) row.push(h.status);
+        if (exportColumns.includes("Prompt")) row.push(`"${(h.prompt || "").replace(/"/g, '""')}"`);
+        if (exportColumns.includes("Credits")) row.push(h.credits_spent || 0);
+        if (exportColumns.includes("Created At")) row.push(h.created_at);
+        if (exportColumns.includes("Error Message")) row.push(`"${(h.error_message || "").replace(/"/g, '""')}"`);
+        return row.join(",");
+      });
+      content = [exportColumns.join(","), ...rows].join("\n");
     }
 
     const blob = new Blob([content], { type: format === "json" ? "application/json" : "text/csv" });
@@ -356,7 +370,8 @@ export default function CreativePage() {
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success(`Histórico exportado como ${format.toUpperCase()}`);
+    toast.success(`Histórico exportado (${exportColumns.length} colunas)`);
+    setShowExportOptions(false);
   }
 
 
