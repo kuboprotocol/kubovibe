@@ -8,21 +8,21 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Loader2, Shield, Users, Bot, FileText, ArrowLeft, ScrollText } from "lucide-react";
 
-const ADMIN_EMAIL = "kuboprotocol@gmail.com";
+
 
 interface AgentRow { slug: string; name: string; category: string; status: string; credit_cost: number; edge_function: string }
 interface JobRow { id: string; user_id: string; agent_slug: string; status: string; credits_charged: number; duration_ms: number | null; created_at: string; error_message: string | null }
 interface AuditRow { id: string; actor_user_id: string | null; actor_role: string; action: string; resource_type: string; resource_id: string | null; success: boolean; error_message: string | null; created_at: string }
 
 export default function AdminPage() {
-  const { user, loading } = useAuth();
+  const { user, loading, isAdmin } = useAuth();
   const [agents, setAgents] = useState<AgentRow[]>([]);
   const [jobs, setJobs] = useState<JobRow[]>([]);
   const [audits, setAudits] = useState<AuditRow[]>([]);
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(true);
 
-  const isAdmin = user?.email?.toLowerCase() === ADMIN_EMAIL;
+  
 
   useEffect(() => {
     if (!isAdmin) return;

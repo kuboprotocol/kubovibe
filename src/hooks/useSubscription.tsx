@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/hooks/useAuth'
 
-const ADMIN_EMAIL = 'kuboprotocol@gmail.com'
+
 
 interface Subscription {
   id: string
@@ -13,11 +13,11 @@ interface Subscription {
 }
 
 export function useSubscription() {
-  const { user } = useAuth()
+  const { user, isAdmin } = useAuth()
   const [subscription, setSubscription] = useState<Subscription | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const isAdmin = user?.email?.toLowerCase() === ADMIN_EMAIL
+  
 
   const fetchSubscription = useCallback(async () => {
     if (!user) { setLoading(false); return }

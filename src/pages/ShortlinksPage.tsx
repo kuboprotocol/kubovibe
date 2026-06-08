@@ -41,7 +41,7 @@ function getRandomVideoId() {
 
 export default function ShortlinksPage() {
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, isAdmin } = useAuth()
   const [todayCount, setTodayCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [watching, setWatching] = useState(false)
@@ -178,8 +178,6 @@ export default function ShortlinksPage() {
 
   if (!user) { navigate('/auth'); return null }
 
-  const ADMIN_EMAIL = 'kuboprotocol@gmail.com'
-  const isAdmin = user.email?.toLowerCase() === ADMIN_EMAIL
 
   if (!isAdmin) {
     return (
