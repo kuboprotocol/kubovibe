@@ -533,59 +533,109 @@ export type Database = {
         }
         Relationships: []
       }
+      creative_export_audit_log: {
+        Row: {
+          action: string
+          created_at: string | null
+          details: Json | null
+          export_id: string
+          id: string
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          details?: Json | null
+          export_id: string
+          id?: string
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          details?: Json | null
+          export_id?: string
+          id?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creative_export_audit_log_export_id_fkey"
+            columns: ["export_id"]
+            isOneToOne: false
+            referencedRelation: "creative_export_history"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       creative_export_history: {
         Row: {
+          cancelled_at: string | null
+          cancelled_by: string | null
           created_at: string | null
           date_range_end: string | null
           date_range_start: string | null
           error_message: string | null
           file_url: string | null
           format: string
+          generation_started_at: string | null
           generation_time_ms: number | null
           id: string
           included_count: number | null
           item_count: number | null
           item_ids: string[] | null
+          last_retry_at: string | null
           period_end: string | null
           period_start: string | null
+          retry_count: number | null
           schedule_id: string | null
           status: string
           updated_at: string | null
           user_id: string
         }
         Insert: {
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string | null
           date_range_end?: string | null
           date_range_start?: string | null
           error_message?: string | null
           file_url?: string | null
           format: string
+          generation_started_at?: string | null
           generation_time_ms?: number | null
           id?: string
           included_count?: number | null
           item_count?: number | null
           item_ids?: string[] | null
+          last_retry_at?: string | null
           period_end?: string | null
           period_start?: string | null
+          retry_count?: number | null
           schedule_id?: string | null
           status?: string
           updated_at?: string | null
           user_id: string
         }
         Update: {
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string | null
           date_range_end?: string | null
           date_range_start?: string | null
           error_message?: string | null
           file_url?: string | null
           format?: string
+          generation_started_at?: string | null
           generation_time_ms?: number | null
           id?: string
           included_count?: number | null
           item_count?: number | null
           item_ids?: string[] | null
+          last_retry_at?: string | null
           period_end?: string | null
           period_start?: string | null
+          retry_count?: number | null
           schedule_id?: string | null
           status?: string
           updated_at?: string | null
@@ -642,6 +692,7 @@ export type Database = {
       creative_filter_presets: {
         Row: {
           created_at: string | null
+          created_by: string | null
           filters: Json
           id: string
           name: string
@@ -650,6 +701,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          created_by?: string | null
           filters?: Json
           id?: string
           name: string
@@ -658,6 +710,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          created_by?: string | null
           filters?: Json
           id?: string
           name?: string
