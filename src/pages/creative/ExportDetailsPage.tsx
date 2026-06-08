@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Download, RotateCw, Ban, ExternalLink, Clock, Package } from "lucide-react";
+import { ArrowLeft, Download, RotateCw, Ban, ExternalLink, Clock, Package, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type Export = {
   id: string;
@@ -34,26 +35,42 @@ export default function ExportDetailsPage() {
   const [exportRow, setExportRow] = useState<Export | null>(null);
   const [executions, setExecutions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   async function load() {
     if (!user || !id) return;
-    const { data: exp } = await supabase
-      .from("creative_export_history")
-      .select("*")
-      .eq("id", id)
-      .eq("user_id", user.id)
-      .maybeSingle();
-    if (!exp) { setLoading(false); return; }
-    setExportRow(exp as Export);
+    setLoading(true);
+    setError(null);
+    try {
+      const { data: exp, error: expErr } = await supabase
+        .from("creative_export_history")
+        .select("*")
+        .eq("id", id)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      
+      if (expErr) throw expErr;
+      if (!exp) {
+        setError("Exportação não encontrada");
+        setLoading(false);
+        return;
+      }
+      setExportRow(exp as Export);
 
-    if (exp.item_ids && exp.item_ids.length > 0) {
-      const { data: items } = await supabase
-        .from("creative_assets")
-        .select("id, tool, status, prompt, created_at")
-        .in("id", exp.item_ids);
-      setExecutions(items || []);
+      if (exp.item_ids && exp.item_ids.length > 0) {
+        const { data: items, error: itemsErr } = await supabase
+          .from("creative_assets")
+          .select("id, tool, status, prompt, created_at")
+          .in("id", exp.item_ids);
+        if (itemsErr) throw itemsErr;
+        setExecutions(items || []);
+      }
+    } catch (err: any) {
+      setError(err.message);
+      toast.error("Erro ao carregar detalhes: " + err.message);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [user, id]);
@@ -106,8 +123,54 @@ export default function ExportDetailsPage() {
     load();
   }
 
-  if (loading) return <div className="p-8 text-center text-muted-foreground">Carregando…</div>;
-  if (!exportRow) return <div className="p-8 text-center text-muted-foreground">Exportação não encontrada</div>;
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background text-foreground">
+        <header className="border-b border-border p-4 flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/creative")}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <Skeleton className="h-6 w-48" />
+        </header>
+        <div className="p-4 max-w-5xl mx-auto space-y-4">
+          <Card className="p-4 space-y-4">
+            <div className="flex justify-between">
+              <Skeleton className="h-10 w-1/3" />
+              <Skeleton className="h-6 w-20" />
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Skeleton className="h-20 w-full" />
+              <Skeleton className="h-20 w-full" />
+              <Skeleton className="h-20 w-full" />
+              <Skeleton className="h-20 w-full" />
+            </div>
+          </Card>
+          <Card className="p-4 space-y-4">
+            <Skeleton className="h-6 w-full" />
+            <Skeleton className="h-40 w-full" />
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !exportRow) {
+    return (
+      <div className="min-h-screen bg-background text-foreground">
+        <header className="border-b border-border p-4 flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/creative")}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <h1 className="text-xl font-bold flex-1">Erro</h1>
+        </header>
+        <div className="p-8 flex flex-col items-center justify-center text-center gap-4">
+          <AlertTriangle className="h-12 w-12 text-destructive" />
+          <h2 className="text-lg font-semibold">{error || "Exportação não encontrada"}</h2>
+          <Button onClick={() => navigate("/creative")}>Voltar para Creative</Button>
+        </div>
+      </div>
+    );
+  }
 
   const totalSeconds = Math.round((exportRow.generation_time_ms ?? 0) / 1000);
 

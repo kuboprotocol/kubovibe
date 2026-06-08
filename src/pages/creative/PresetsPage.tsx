@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Pencil, Trash2, Save, X } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2, Save, X, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type Preset = {
   id: string;
@@ -26,17 +27,23 @@ export default function PresetsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function load() {
     if (!user) return;
     setLoading(true);
-    const { data, error } = await supabase
+    const { data, error: err } = await supabase
       .from("creative_filter_presets")
       .select("*")
       .eq("user_id", user.id)
       .order("created_at", { ascending: sortDir === "asc" });
-    if (error) toast.error(error.message);
-    else setPresets((data as Preset[]) || []);
+    if (err) {
+      setError(err.message);
+      toast.error(err.message);
+    } else {
+      setPresets((data as Preset[]) || []);
+      setError(null);
+    }
     setLoading(false);
   }
 
@@ -92,9 +99,29 @@ export default function PresetsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">Carregando…</TableCell></TableRow>}
-              {!loading && filtered.length === 0 && (
-                <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">Nenhum preset</TableCell></TableRow>
+              {loading && (
+                Array.from({ length: 3 }).map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-full" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-8 w-16 ml-auto" /></TableCell>
+                  </TableRow>
+                ))
+              )}
+              {!loading && error && (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center py-8">
+                    <div className="flex flex-col items-center gap-2 text-destructive">
+                      <AlertTriangle className="h-8 w-8" />
+                      <p>{error}</p>
+                      <Button variant="outline" size="sm" onClick={() => load()}>Tentar novamente</Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )}
+              {!loading && !error && filtered.length === 0 && (
+                <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">Nenhum preset encontrado</TableCell></TableRow>
               )}
               {filtered.map((p) => (
                 <TableRow key={p.id} data-testid="preset-row">
