@@ -13,8 +13,13 @@ serve(async (req) => {
 
   const { asset_id, status, user_id, tool } = await req.json();
   const { data: profile } = await supabase.from("profiles").select("email").eq("id", user_id).single();
+  const { data: branding } = await supabase.from("creative_org_branding").select("*").eq("user_id", user_id).single();
   
   if (!profile?.email) return new Response("No email found", { status: 400 });
+
+  const orgName = branding?.org_name || "Kubo Vibe";
+  const logoUrl = branding?.logo_url || "";
+  const primaryColor = branding?.primary_color || "#6366f1";
 
   const subjects: Record<string, string> = {
     failed: `❌ Falha na Execução: ${tool}`,
@@ -37,34 +42,35 @@ serve(async (req) => {
     completed: "Concluído"
   };
 
-  const color = themeColors[status] || "#6366f1";
+  const statusColor = themeColors[status] || primaryColor;
   const label = statusLabels[status] || status;
 
   await supabase.rpc("enqueue_email", {
     queue_name: "auth_emails",
     payload: {
       to: profile.email,
-      from: "Kubo Vibe <noreply@kubovibe.dev>",
+      from: `${orgName} <noreply@kubovibe.dev>`,
       subject: subjects[status] || `Atualização: ${tool}`,
       html: `
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
-          <div style="background-color: ${color}; padding: 20px; text-align: center; color: white;">
-            <h1 style="margin: 0; font-size: 20px;">Atualização de Status</h1>
+          <div style="background-color: ${statusColor}; padding: 20px; text-align: center; color: white;">
+            ${logoUrl ? `<img src="${logoUrl}" alt="${orgName}" style="max-height: 40px; margin-bottom: 10px;"><br>` : ""}
+            <h1 style="margin: 0; font-size: 20px;">Atualização de Status - ${orgName}</h1>
           </div>
           <div style="padding: 30px; line-height: 1.6; color: #374151;">
             <p>Olá,</p>
-            <p>A execução da ferramenta <strong>${tool}</strong> no painel Economia Criativa foi atualizada.</p>
-            <div style="background-color: #f9fafb; border-left: 4px solid ${color}; padding: 15px; margin: 20px 0;">
+            <p>A execução da ferramenta <strong>${tool}</strong> no painel Economia Criativa de <strong>${orgName}</strong> foi atualizada.</p>
+            <div style="background-color: #f9fafb; border-left: 4px solid ${statusColor}; padding: 15px; margin: 20px 0;">
               <strong>Status:</strong> ${label}<br>
               <strong>Asset ID:</strong> <code style="font-size: 12px;">${asset_id}</code>
             </div>
             <p>Você pode conferir todos os detalhes diretamente no seu painel.</p>
             <div style="text-align: center; margin-top: 30px;">
-              <a href="https://kubovibe.dev/creative" style="background-color: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Ver no Painel</a>
+              <a href="${Deno.env.get("SITE_URL") || "https://kubovibe.dev"}/creative" style="background-color: ${primaryColor}; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Ver no Painel</a>
             </div>
           </div>
           <div style="background-color: #f3f4f6; padding: 15px; text-align: center; font-size: 12px; color: #6b7280;">
-            Kubo Vibe &copy; 2026 - Inteligência Artificial para Criadores
+            ${orgName} &copy; 2026 - Inteligência Artificial para Criadores
           </div>
         </div>
       `,

@@ -116,6 +116,7 @@ export default function CreativePage() {
   const [filter, setFilter] = useState<"all" | "queued" | "processing" | "completed" | "failed">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
+  const [currentPage, setCurrentPage] = useState(1);
   const [cursorStack, setCursorStack] = useState<string[]>([]); // created_at cursors for prev navigation
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
@@ -209,6 +210,7 @@ export default function CreativePage() {
 
   useEffect(() => {
     setCursorStack([]);
+    setCurrentPage(1);
     loadHistory(null);
   }, [user, active, filter, searchQuery, sortOrder]);
 
