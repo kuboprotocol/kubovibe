@@ -53,18 +53,18 @@ export function ManusLauncher({ setActive }: Props) {
     { key: "file", label: "Arquivo", icon: Paperclip, onClick: () => fileRef.current?.click() },
   ];
 
-  const handleFile = (kind: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFile = (kind: string, toolKey: string = "nano_banana") => (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
-    toast.success(`${kind} pronto: ${f.name}`, { description: "Encaminhando para o fluxo criativo..." });
-    setActive("nano_banana");
+    toast.success(`${kind} pronto: ${f.name}`, { description: "Iniciando processamento com IA..." });
+    setActive(toolKey);
   };
 
   return (
     <div className="space-y-4">
-      <input ref={cameraRef} type="file" accept="image/*" capture="environment" hidden onChange={handleFile("Câmera")} />
-      <input ref={imageRef} type="file" accept="image/*" hidden onChange={handleFile("Imagem")} />
-      <input ref={fileRef} type="file" hidden onChange={handleFile("Arquivo")} />
+      <input ref={cameraRef} type="file" accept="image/*" capture="environment" hidden onChange={handleFile("Foto capturada", "nano_banana")} />
+      <input ref={imageRef} type="file" accept="image/*" hidden onChange={handleFile("Imagem selecionada", "nano_banana")} />
+      <input ref={fileRef} type="file" hidden onChange={handleFile("Arquivo carregado", "chat")} />
 
       <div className="grid grid-cols-3 gap-3">
         {tiles.map((t) => (
