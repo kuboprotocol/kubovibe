@@ -1,6 +1,14 @@
 // Streaming chat for Kubo Chat. Primary: OpenRouter (gpt-4o-mini), Fallback: Lovable AI.
 import { corsHeaders } from "../_shared/cors.ts";
-import { getUser, deductCredits, recordAsset } from "../_shared/creative.ts";
+import { getUser, deductCredits, recordAsset, sanitizeError } from "../_shared/creative.ts";
+import { z } from "npm:zod@3";
+
+const InputSchema = z.object({
+  messages: z.array(z.object({
+    role: z.enum(["system", "user", "assistant"]),
+    content: z.string().min(1).max(5000),
+  })).min(1),
+});
 
 const COST = 1;
 
