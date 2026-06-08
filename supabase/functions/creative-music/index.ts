@@ -1,5 +1,5 @@
 // Kubo Music AI — Suno API integration. Async: start + status.
-import { corsHeaders } from "../_shared/cors.ts";
+import { corsHeaders, sanitizeError } from "../_shared/cors.ts";
 import { getUser, deductCredits, recordAsset, supaAdmin } from "../_shared/creative.ts";
 
 const COST_GEN = 1;            // rounded from 0.001
