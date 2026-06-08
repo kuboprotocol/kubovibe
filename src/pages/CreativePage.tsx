@@ -173,39 +173,40 @@ export default function CreativePage() {
     if (!user) return;
     setIsLoadingHistory(true);
     try {
-      .select("*", { count: "exact" })
-      .eq("user_id", user.id);
-    
-    if (filter !== "all") {
-      if (filter === "failed") {
-        q = q.in("status", ["failed", "error"]);
-      } else {
-        q = q.eq("status", filter);
+      let q = supabase.from("creative_assets")
+        .select("*", { count: "exact" })
+        .eq("user_id", user.id);
+      
+      if (filter !== "all") {
+        if (filter === "failed") {
+          q = q.in("status", ["failed", "error"]);
+        } else {
+          q = q.eq("status", filter);
+        }
       }
-    }
 
-    if (debouncedSearch) {
-      q = q.or(`prompt.ilike.%${debouncedSearch}%,tool.ilike.%${debouncedSearch}%,error_message.ilike.%${debouncedSearch}%`);
-    }
-
-    q = q.order("created_at", { ascending: sortOrder === "asc" })
-      .limit(PAGE_SIZE + 1);
-    
-    if (before) {
-      if (sortOrder === "desc") {
-        q = q.lt("created_at", before);
-      } else {
-        q = q.gt("created_at", before);
+      if (debouncedSearch) {
+        q = q.or(`prompt.ilike.%${debouncedSearch}%,tool.ilike.%${debouncedSearch}%,error_message.ilike.%${debouncedSearch}%`);
       }
-    }
 
-    const { data, count } = await q;
-    const rows = data ?? [];
-    const hasMore = rows.length > PAGE_SIZE;
-    const visible = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
-    setHistory(visible);
-    setNextCursor(hasMore ? visible[visible.length - 1].created_at : null);
-    setTotalCount(count ?? 0);
+      q = q.order("created_at", { ascending: sortOrder === "asc" })
+        .limit(PAGE_SIZE + 1);
+      
+      if (before) {
+        if (sortOrder === "desc") {
+          q = q.lt("created_at", before);
+        } else {
+          q = q.gt("created_at", before);
+        }
+      }
+
+      const { data, count } = await q;
+      const rows = data ?? [];
+      const hasMore = rows.length > PAGE_SIZE;
+      const visible = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
+      setHistory(visible);
+      setNextCursor(hasMore ? visible[visible.length - 1].created_at : null);
+      setTotalCount(count ?? 0);
     } catch (e: any) {
       console.error("[CreativePanel:Selection] history_load_failed", { error: e.message, userId: user.id });
       toast.error("Falha ao carregar histórico");
