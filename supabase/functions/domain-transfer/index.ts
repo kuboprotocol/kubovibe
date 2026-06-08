@@ -1,6 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { corsHeaders, sanitizeError } from "../_shared/cors.ts";
 
 const IONOS_API = "https://api.hosting.ionos.com/domains/v1";
 const MAX_RETRIES = 8;

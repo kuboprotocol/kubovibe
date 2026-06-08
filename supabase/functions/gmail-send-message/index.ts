@@ -70,6 +70,7 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({ success: true, id: json.id, threadId: json.threadId ?? threadId ?? null }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   } catch (e) {
-    return new Response(JSON.stringify({ error: (e as Error).message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    console.error('[gmail-send-message] error:', e);
+    return new Response(JSON.stringify({ error: sanitizeError(e) }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   }
 })

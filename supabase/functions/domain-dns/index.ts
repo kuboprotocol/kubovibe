@@ -1,6 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { corsHeaders, sanitizeError } from "../_shared/cors.ts";
 
 const DNS_API = "https://api.hosting.ionos.com/dns/v1";
 const VALID_TYPES = ["A", "AAAA", "CNAME", "TXT", "MX", "SRV", "NS"];
@@ -88,6 +88,7 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({ error: "unknown action" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e: any) {
-    return new Response(JSON.stringify({ error: e?.message ?? "internal" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    console.error("[domain-dns] error:", e);
+    return new Response(JSON.stringify({ error: sanitizeError(e) }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });
