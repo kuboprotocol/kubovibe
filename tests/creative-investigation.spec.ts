@@ -87,12 +87,12 @@ test.describe("Creative investigation", () => {
     await expect(page).toHaveURL(/to=2025-12-31/);
   });
 
-  test("debounce reduces requests", async ({ page }) => {
-    await ensureAuthed(page, "/creative/investigation");
+  test("debounce reduces requests and syncs URL with investigate context", async ({ page }) => {
+    const investId = "debounce-context";
+    await ensureAuthed(page, `/creative/investigation?investigate=${investId}`);
     
     let requestCount = 0;
     page.on("request", (req) => {
-      // Filter for Supabase PostgREST requests to creative_assets
       if (req.url().includes("creative_assets") && req.method() === "GET") {
         requestCount++;
       }
@@ -107,7 +107,9 @@ test.describe("Creative investigation", () => {
     // 6 characters typed rapidly should only trigger 1-2 requests due to 500ms debounce
     expect(requestCount).toBeLessThan(4); 
     await expect(page).toHaveURL(/q=abcdef/);
+    await expect(page).toHaveURL(new RegExp(`investigate=${investId}`));
   });
+
 
   test("pagination and sorting persist across reloads and filter changes", async ({ page }) => {
     await ensureAuthed(page, "/creative/investigation");
@@ -127,15 +129,25 @@ test.describe("Creative investigation", () => {
       await expect(page).toHaveURL(/page=2/);
     }
 
+    // Include investigate param to simulate context
+    const investId = "00000000-0000-0000-0000-000000000000";
+    await page.goto(`${BASE}/creative/investigation?investigate=${investId}&page=2&sort=tool`);
+    await expect(page).toHaveURL(new RegExp(`investigate=${investId}`));
+    await expect(page).toHaveURL(/page=2/);
+    await expect(page).toHaveURL(/sort=tool/);
+
     // Apply a filter
     await page.getByTestId("filter-search").fill("abc");
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(1000); // debounce
     
-    // Verify sort and page (page often resets to 1 when filters change, which is correct behavior)
+    // Verify sort and investigate still there
+    await expect(page).toHaveURL(new RegExp(`investigate=${investId}`));
     await expect(page).toHaveURL(/sort=tool/);
+    await expect(page).toHaveURL(/q=abc/);
     
     // Reload
     await page.reload();
+    await expect(page).toHaveURL(new RegExp(`investigate=${investId}`));
     await expect(page).toHaveURL(/sort=tool/);
     await expect(page).toHaveURL(/q=abc/);
   });
@@ -160,39 +172,65 @@ test.describe("Creative investigation", () => {
   });
 });
 
-test.describe("Error and Retry Flows", () => {
+test.describe("Error and Retry Flows with investigation context", () => {
   test("ExportDetails retry preserves investigation context", async ({ page }) => {
     const investId = "some-investigate-id";
-    // Force an error by going to a non-existent ID but with investigate param
     await ensureAuthed(page, `/creative/export/non-existent-id?investigate=${investId}`);
     
-    await expect(page.getByText(/não encontrada/i)).toBeVisible();
-    
-    // Check if investigation context is still in URL (implied by path if handled via searchParams)
+    await expect(page.getByText(/não encontrada/i).or(page.getByText(/erro/i))).toBeVisible();
     await expect(page).toHaveURL(new RegExp(`investigate=${investId}`));
     
     const retryBtn = page.getByRole("button", { name: /tentar novamente/i });
     await expect(retryBtn).toBeVisible();
     
-    // Click retry - should stay on same URL and show loading then error again (since ID is fake)
     await retryBtn.click();
-    await expect(page.locator(".skeleton")).toBeVisible();
+    await expect(page.locator(".skeleton, .animate-pulse").first()).toBeVisible();
     await expect(page).toHaveURL(new RegExp(`investigate=${investId}`));
   });
 
-  test("InvestigationPage shows empty states and error messages", async ({ page }) => {
-    await ensureAuthed(page, "/creative/investigation");
+  test("InvestigationPage shows empty states and retry works", async ({ page }) => {
+    const investId = "context-id";
+    await ensureAuthed(page, `/creative/investigation?investigate=${investId}`);
     
     // Filter for something that returns nothing
     await page.getByTestId("filter-search").fill("non-existent-search-term-12345");
     await page.waitForTimeout(1000);
     await expect(page.getByText(/Nenhuma execução encontrada/i)).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`investigate=${investId}`));
     
-    // Verify "Clear filters" button works from empty state
+    // Verify "Clear filters" button works from empty state and keeps investigation context
     await page.getByTestId("btn-clear-filters").click();
     await expect(page.getByTestId("filter-search")).toHaveValue("");
+    await expect(page).toHaveURL(new RegExp(`investigate=${investId}`));
+  });
+
+  test("simulated API timeout shows error and retry works", async ({ page }) => {
+    const investId = "timeout-test-id";
+    await ensureAuthed(page, `/creative/investigation?investigate=${investId}`);
+
+    // Abort requests to simulate timeout/error
+    await page.route("**/rest/v1/creative_assets*", (route) => route.abort("timedout"));
+    
+    // Trigger a refresh or filter change
+    await page.getByTestId("filter-search").fill("trigger-error");
+    await page.waitForTimeout(1000);
+
+    // Should show error message
+    await expect(page.getByText(/Erro ao carregar/i).or(page.getByText(/timedout/i))).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`investigate=${investId}`));
+
+    // Remove route interception to allow retry to succeed
+    await page.unroute("**/rest/v1/creative_assets*");
+
+    const retryBtn = page.getByRole("button", { name: /tentar novamente/i });
+    await retryBtn.click();
+
+    // Should return to loading or data state
+    await expect(page.locator(".skeleton, .animate-pulse").first().or(page.getByTestId("investigation-row").first())).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`investigate=${investId}`));
   });
 });
+
 
 test.describe("Creative exports navigation", () => {
   test("investigate button in export details navigates with query param", async ({ page }) => {
