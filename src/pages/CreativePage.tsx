@@ -1115,14 +1115,25 @@ function Dashboard({ editsRemaining, subscription, history, filter, setFilter, s
                     <div className="max-h-48 overflow-y-auto space-y-2">
                       {presets.length === 0 && <p className="text-xs text-muted-foreground italic">Nenhum salvo ainda.</p>}
                       {presets.map((p: any) => (
-                        <div key={p.id} className="flex items-center justify-between bg-muted/30 p-2 rounded text-sm">
-                          <span>{p.name}</span>
-                          <div className="flex gap-1">
-                            <Button size="sm" variant="ghost" className="h-7 text-[10px]" onClick={() => onApplyPreset(p)}>Aplicar</Button>
-                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive" onClick={() => onDeletePreset(p.id)}><AlertTriangle className="h-3 w-3" /></Button>
+                        <div key={p.id} className="flex flex-col gap-2 bg-muted/30 p-3 rounded text-sm border border-border/20">
+                          <div className="flex items-center justify-between">
+                            <input 
+                              className="bg-transparent border-none outline-none font-semibold focus:ring-0 p-0 h-auto" 
+                              defaultValue={p.name}
+                              onBlur={(e) => e.target.value !== p.name && renamePreset(p.id, e.target.value)}
+                            />
+                            <div className="flex gap-1">
+                              <Button size="sm" variant="ghost" className="h-7 text-[10px]" onClick={() => onApplyPreset(p)}>Aplicar</Button>
+                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive" onClick={() => onDeletePreset(p.id)}><AlertTriangle className="h-3 w-3" /></Button>
+                            </div>
+                          </div>
+                          <div className="text-[10px] text-muted-foreground flex gap-2">
+                             <span>Filtro: {p.filters?.filter || "all"}</span>
+                             {p.filters?.searchQuery && <span>Busca: {p.filters.searchQuery}</span>}
                           </div>
                         </div>
                       ))}
+
                     </div>
                   </div>
                 </div>
