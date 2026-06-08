@@ -794,7 +794,7 @@ export default function CreativePage() {
                     Fechar
                   </Button>
                 </div>
-              </div >
+              </AlertDescription>
             </div>
           </Alert>
         )}
