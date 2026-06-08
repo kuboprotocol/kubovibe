@@ -121,11 +121,26 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     setLoading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const fnName = `creative-${toolKey.replace("_", "-")}`;
       
-      // Special case for some tools if needed
+      const TOOL_TO_FN: Record<string, string> = {
+        chat: "creative-chat",
+        nano_banana: "creative-image",
+        downloader: "creative-download",
+        clips: "creative-clips",
+        avatar: "creative-video",
+        shorts: "creative-video",
+        music: "creative-music",
+        ebook: "creative-ebook",
+        emo: "emo-animate"
+      };
+
+      const fnName = TOOL_TO_FN[toolKey];
+      
       const body: any = { prompt, metadata };
       if (toolKey === "chat") body.messages = [{ role: "user", content: prompt }];
+      if (toolKey === "avatar") body.mode = "avatar";
+      if (toolKey === "shorts") body.mode = "shorts";
+      if (toolKey === "ebook") body.topic = prompt;
       
       const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${fnName}`, {
         method: "POST",
