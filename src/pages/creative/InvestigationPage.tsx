@@ -8,8 +8,9 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, RotateCw, Ban, FileDown, Search, ExternalLink, AlertTriangle, ArrowUpDown } from "lucide-react";
+import { ArrowLeft, RotateCw, Ban, FileDown, Search, ExternalLink, AlertTriangle, ArrowUpDown, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type Asset = {
   id: string;
@@ -45,6 +46,8 @@ export default function InvestigationPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Asset | null>(null);
   const [audit, setAudit] = useState<AuditEntry[]>([]);
 
@@ -75,27 +78,33 @@ export default function InvestigationPage() {
   const fetchAssets = useCallback(async () => {
     if (!user) return;
     setLoading(true);
-    let q = supabase
-      .from("creative_assets")
-      .select("*", { count: "exact" })
-      .eq("user_id", user.id);
+    setError(null);
+    try {
+      let q = supabase
+        .from("creative_assets")
+        .select("*", { count: "exact" })
+        .eq("user_id", user.id);
 
-    if (status !== "all") q = q.eq("status", status);
-    if (tool !== "all") q = q.eq("tool", tool);
-    if (search) q = q.or(`prompt.ilike.%${search}%,id.eq.${isUUID(search) ? search : "00000000-0000-0000-0000-000000000000"}`);
-    if (startDate) q = q.gte("created_at", startDate);
-    if (endDate) q = q.lte("created_at", endDate + "T23:59:59");
+      if (status !== "all") q = q.eq("status", status);
+      if (tool !== "all") q = q.eq("tool", tool);
+      if (search) q = q.or(`prompt.ilike.%${search}%,id.eq.${isUUID(search) ? search : "00000000-0000-0000-0000-000000000000"}`);
+      if (startDate) q = q.gte("created_at", startDate);
+      if (endDate) q = q.lte("created_at", endDate + "T23:59:59");
 
-    q = q.order(sortField, { ascending: sortDir === "asc" });
-    q = q.range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
+      q = q.order(sortField, { ascending: sortDir === "asc" });
+      q = q.range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
 
-    const { data, count: c, error } = await q;
-    if (error) toast.error("Erro ao carregar: " + error.message);
-    else {
+      const { data, count: c, error: err } = await q;
+      if (err) throw err;
+      
       setAssets((data as Asset[]) || []);
       setCount(c ?? 0);
+    } catch (err: any) {
+      setError(err.message);
+      toast.error("Erro ao carregar: " + err.message);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [user, status, tool, search, startDate, endDate, sortField, sortDir, page]);
 
   useEffect(() => { fetchAssets(); }, [fetchAssets]);
@@ -121,15 +130,27 @@ export default function InvestigationPage() {
   }, [params]); // eslint-disable-line
 
   async function loadDetail(id: string) {
-    const { data: a } = await supabase.from("creative_assets").select("*").eq("id", id).maybeSingle();
-    if (!a) return;
-    setSelected(a as Asset);
-    const { data: logs } = await supabase
-      .from("creative_audit_logs")
-      .select("*")
-      .eq("asset_id", id)
-      .order("created_at", { ascending: false });
-    setAudit((logs as AuditEntry[]) || []);
+    setDetailLoading(true);
+    try {
+      const { data: a, error: aErr } = await supabase.from("creative_assets").select("*").eq("id", id).maybeSingle();
+      if (aErr) throw aErr;
+      if (!a) {
+        toast.error("Execução não encontrada");
+        return;
+      }
+      setSelected(a as Asset);
+      const { data: logs, error: lErr } = await supabase
+        .from("creative_audit_logs")
+        .select("*")
+        .eq("asset_id", id)
+        .order("created_at", { ascending: false });
+      if (lErr) throw lErr;
+      setAudit((logs as AuditEntry[]) || []);
+    } catch (err: any) {
+      toast.error("Erro ao carregar detalhes: " + err.message);
+    } finally {
+      setDetailLoading(false);
+    }
   }
 
   async function recordAudit(assetId: string, action: string, details: any = {}) {
@@ -267,9 +288,17 @@ export default function InvestigationPage() {
                     .map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                 </SelectContent>
               </Select>
-              <Button variant="ghost" size="sm" onClick={() => {
-                setSearch(""); setStatus("failed"); setTool("all"); setStartDate(""); setEndDate(""); setPage(1);
-              }}>Limpar</Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                data-testid="btn-clear-filters"
+                onClick={() => {
+                  setSearch(""); setStatus("all"); setTool("all"); setStartDate(""); setEndDate(""); setPage(1);
+                  toast.info("Filtros limpos");
+                }}
+              >
+                <X className="h-4 w-4 mr-1" /> Limpar filtros
+              </Button>
             </div>
           </Card>
 
@@ -286,10 +315,34 @@ export default function InvestigationPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {loading && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Carregando…</TableCell></TableRow>}
-                {!loading && assets.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Nenhuma execução com os filtros atuais</TableCell></TableRow>}
-                {assets.map((a) => (
-                  <TableRow key={a.id} data-testid="investigation-row" className="cursor-pointer" onClick={() => loadDetail(a.id)}>
+                {loading && (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-full" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                      <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
+                    </TableRow>
+                  ))
+                )}
+                {!loading && error && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8">
+                      <div className="flex flex-col items-center gap-2 text-destructive">
+                        <AlertTriangle className="h-8 w-8" />
+                        <p>{error}</p>
+                        <Button variant="outline" size="sm" onClick={() => fetchAssets()}>Tentar novamente</Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+                {!loading && !error && assets.length === 0 && (
+                  <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhuma execução com os filtros atuais</TableCell></TableRow>
+                )}
+                {!loading && !error && assets.map((a) => (
+                  <TableRow key={a.id} data-testid="investigation-row" className={`cursor-pointer transition-colors ${selected?.id === a.id ? 'bg-muted/50' : 'hover:bg-muted/30'}`} onClick={() => loadDetail(a.id)}>
                     <TableCell><Badge variant="outline">{a.tool}</Badge></TableCell>
                     <TableCell className="font-mono text-xs">{a.id.slice(0, 8)}</TableCell>
                     <TableCell><StatusBadge status={a.status} /></TableCell>
@@ -297,10 +350,10 @@ export default function InvestigationPage() {
                     <TableCell className="text-xs">{new Date(a.created_at).toLocaleString()}</TableCell>
                     <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                       {(a.status === "processing" || a.status === "queued") && (
-                        <Button data-testid="btn-cancel" variant="ghost" size="sm" onClick={() => cancelAsset(a)}><Ban className="h-4 w-4" /></Button>
+                        <Button data-testid="btn-cancel" variant="ghost" size="sm" onClick={() => cancelAsset(a)} title="Cancelar"><Ban className="h-4 w-4" /></Button>
                       )}
                       {(a.status === "failed" || a.status === "error" || a.status === "cancelled") && (
-                        <Button data-testid="btn-requeue" variant="ghost" size="sm" onClick={() => requeueAsset(a)}><RotateCw className="h-4 w-4" /></Button>
+                        <Button data-testid="btn-requeue" variant="ghost" size="sm" onClick={() => requeueAsset(a)} title="Reenfileirar"><RotateCw className="h-4 w-4" /></Button>
                       )}
                     </TableCell>
                   </TableRow>
@@ -318,10 +371,30 @@ export default function InvestigationPage() {
         </div>
 
         <Card className="p-4 h-fit sticky top-4">
-          {!selected ? (
-            <p className="text-sm text-muted-foreground">Selecione uma execução para ver detalhes, logs e trilha de auditoria.</p>
+          {detailLoading ? (
+            <div className="space-y-4">
+              <div className="flex justify-between">
+                <Skeleton className="h-10 w-2/3" />
+                <Skeleton className="h-6 w-20" />
+              </div>
+              <Skeleton className="h-20 w-full" />
+              <div className="flex gap-2">
+                <Skeleton className="h-9 w-24" />
+                <Skeleton className="h-9 w-24" />
+              </div>
+              <div className="space-y-2 pt-4">
+                <Skeleton className="h-6 w-1/2" />
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+              </div>
+            </div>
+          ) : !selected ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
+              <Search className="h-12 w-12 mb-4 opacity-20" />
+              <p className="text-sm">Selecione uma execução para ver detalhes, logs e trilha de auditoria.</p>
+            </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-3" data-testid="investigation-detail">
               <div className="flex items-start justify-between">
                 <div>
                   <div className="text-xs text-muted-foreground">Execução</div>
@@ -331,16 +404,16 @@ export default function InvestigationPage() {
               </div>
               <div className="text-sm">
                 <div className="text-xs text-muted-foreground">Prompt</div>
-                <div className="line-clamp-3">{selected.prompt || "—"}</div>
+                <div className="line-clamp-3 bg-muted/30 p-2 rounded">{selected.prompt || "—"}</div>
               </div>
               {selected.metadata?.error && (
                 <div className="text-sm border-l-2 border-destructive pl-2">
                   <div className="text-xs text-muted-foreground">Motivo do erro</div>
-                  <div className="text-destructive">{selected.metadata.error}</div>
+                  <div className="text-destructive font-medium">{selected.metadata.error}</div>
                 </div>
               )}
 
-              <div className="flex gap-2">
+              <div className="flex gap-2 pt-2">
                 {(selected.status === "failed" || selected.status === "error" || selected.status === "cancelled") && (
                   <Button data-testid="detail-requeue" size="sm" onClick={() => requeueAsset(selected)}><RotateCw className="h-3 w-3 mr-1"/>Reenfileirar</Button>
                 )}
@@ -348,8 +421,8 @@ export default function InvestigationPage() {
                   <Button data-testid="detail-cancel" size="sm" variant="destructive" onClick={() => cancelAsset(selected)}><Ban className="h-3 w-3 mr-1"/>Cancelar</Button>
                 )}
                 {selected.output_url && (
-                  <a href={selected.output_url} target="_blank" rel="noreferrer">
-                    <Button size="sm" variant="outline"><ExternalLink className="h-3 w-3 mr-1"/>Logs</Button>
+                  <a href={selected.output_url} target="_blank" rel="noreferrer" className="flex-1">
+                    <Button size="sm" variant="outline" className="w-full"><ExternalLink className="h-3 w-3 mr-1"/>Logs</Button>
                   </a>
                 )}
               </div>
@@ -358,20 +431,26 @@ export default function InvestigationPage() {
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-sm font-semibold">Trilha de auditoria ({audit.length})</h3>
                   <div className="flex gap-1">
-                    <Button data-testid="export-audit-json" size="sm" variant="outline" onClick={() => exportAudit("json")}><FileDown className="h-3 w-3 mr-1"/>JSON</Button>
-                    <Button data-testid="export-audit-csv" size="sm" variant="outline" onClick={() => exportAudit("csv")}><FileDown className="h-3 w-3 mr-1"/>CSV</Button>
+                    <Button data-testid="export-audit-json" size="sm" variant="ghost" className="h-7 px-2" onClick={() => exportAudit("json")}><FileDown className="h-3 w-3 mr-1"/>JSON</Button>
+                    <Button data-testid="export-audit-csv" size="sm" variant="ghost" className="h-7 px-2" onClick={() => exportAudit("csv")}><FileDown className="h-3 w-3 mr-1"/>CSV</Button>
                   </div>
                 </div>
-                <div className="max-h-80 overflow-y-auto space-y-2">
-                  {audit.length === 0 && <p className="text-xs text-muted-foreground">Nenhum evento registrado</p>}
+                <div className="max-h-[400px] overflow-y-auto space-y-2 pr-1">
+                  {audit.length === 0 && <p className="text-xs text-muted-foreground py-4 text-center">Nenhum evento registrado</p>}
                   {audit.map((e) => (
-                    <div key={e.id} className="text-xs border-l-2 border-primary/40 pl-2">
+                    <div key={e.id} className="text-xs border-l-2 border-primary/40 pl-2 py-1 bg-muted/20 rounded-r">
                       <div className="flex items-center justify-between">
-                        <span className="font-semibold">{e.event_type ?? e.action}</span>
-                        <span className="text-muted-foreground">{new Date(e.created_at).toLocaleString()}</span>
+                        <span className="font-semibold text-primary">{e.event_type ?? e.action}</span>
+                        <span className="text-[10px] text-muted-foreground">{new Date(e.created_at).toLocaleString()}</span>
                       </div>
                       <div className="text-muted-foreground">por {e.metadata?.actor_email ?? e.user_id?.slice(0,8) ?? "sistema"}</div>
-                      {e.metadata?.reason && <div>Motivo: {e.metadata.reason}</div>}
+                      {e.metadata?.reason && <div className="mt-1 italic">Motivo: {e.metadata.reason}</div>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
                     </div>
                   ))}
                 </div>
