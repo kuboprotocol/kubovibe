@@ -35,7 +35,7 @@ export default function ConnectorSetupPage() {
     let cancelled = false
     ;(async () => {
       const { data } = await supabase
-        .from('api_credentials')
+        .from('api_credentials_safe')
         .select('masked_hint, updated_at')
         .eq('connector_slug', slug)
         .maybeSingle()
@@ -46,7 +46,7 @@ export default function ConnectorSetupPage() {
 
       if (slug === 'github') {
         const { data: gh } = await supabase
-          .from('github_connections')
+          .from('github_connections_safe')
           .select('github_username, github_avatar_url')
           .maybeSingle()
         if (!cancelled && gh?.github_username) {
@@ -94,7 +94,7 @@ export default function ConnectorSetupPage() {
         setApiKey('')
         // refresh existing badge
         const { data: cred } = await supabase
-          .from('api_credentials')
+          .from('api_credentials_safe')
           .select('masked_hint, updated_at')
           .eq('connector_slug', slug)
           .maybeSingle()

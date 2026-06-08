@@ -1,15 +1,20 @@
 // Image Editor — geração de imagem via Lovable AI Gateway (gemini image preview).
 import { runAgent, getSecret } from "../_shared/agentRuntime.ts";
+import { z } from "npm:zod@3";
 
-interface ImgInput {
-  prompt?: string;
-  size?: "1024x1024" | "1024x1792" | "1792x1024";
-  style?: string;
-}
+const InputSchema = z.object({
+  prompt: z.string().min(1).max(5000),
+  size: z.enum(["1024x1024", "1024x1792", "1792x1024"]).optional().default("1024x1024"),
+  style: z.string().max(100).optional(),
+});
 
 Deno.serve((req) =>
   runAgent("image-editor", req, async ({ input }) => {
-    const { prompt, size = "1024x1024", style } = input as ImgInput;
+    const parsed = InputSchema.safeParse(input);
+    if (!parsed.success) {
+      throw new Error(`invalid_input: ${JSON.stringify(parsed.error.flatten().fieldErrors)}`);
+    }
+    const { prompt, size, style } = parsed.data;
     if (!prompt) throw new Error("invalid_prompt");
 
     const finalPrompt = style ? `${prompt}. Estilo: ${style}.` : prompt;

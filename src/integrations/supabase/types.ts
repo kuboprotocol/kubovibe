@@ -2074,7 +2074,6 @@ export type Database = {
       }
       gmail_accounts_safe: {
         Row: {
-          access_token_cache: string | null
           access_token_expires_at: string | null
           avatar_url: string | null
           created_at: string | null
@@ -2087,7 +2086,6 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
-          access_token_cache?: string | null
           access_token_expires_at?: string | null
           avatar_url?: string | null
           created_at?: string | null
@@ -2100,7 +2098,6 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
-          access_token_cache?: string | null
           access_token_expires_at?: string | null
           avatar_url?: string | null
           created_at?: string | null
@@ -2148,6 +2145,57 @@ export type Database = {
           published_at?: string | null
           published_url?: string | null
           title?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      web3_connections_safe: {
+        Row: {
+          api_key_hint: string | null
+          connection_name: string | null
+          created_at: string | null
+          explorer_url: string | null
+          id: string | null
+          last_block: number | null
+          last_checked_at: string | null
+          last_error: string | null
+          last_latency_ms: number | null
+          last_status: string | null
+          network: string | null
+          provider: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          api_key_hint?: string | null
+          connection_name?: string | null
+          created_at?: string | null
+          explorer_url?: string | null
+          id?: string | null
+          last_block?: number | null
+          last_checked_at?: string | null
+          last_error?: string | null
+          last_latency_ms?: number | null
+          last_status?: string | null
+          network?: string | null
+          provider?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          api_key_hint?: string | null
+          connection_name?: string | null
+          created_at?: string | null
+          explorer_url?: string | null
+          id?: string | null
+          last_block?: number | null
+          last_checked_at?: string | null
+          last_error?: string | null
+          last_latency_ms?: number | null
+          last_status?: string | null
+          network?: string | null
+          provider?: string | null
           updated_at?: string | null
           user_id?: string | null
         }

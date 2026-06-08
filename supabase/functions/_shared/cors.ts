@@ -13,6 +13,12 @@ export function sanitizeError(err: unknown): string {
     message.includes("sql") ||
     message.includes("pg_") ||
     message.includes("relation") ||
+    message.includes("table") ||
+    message.includes("column") ||
+    message.includes("schema") ||
+    message.includes("secret") ||
+    message.includes("token") ||
+    message.includes("key") ||
     message.includes("/") ||
     message.includes("\\")
   ) {

@@ -21,7 +21,7 @@ export function useGitHubConnection() {
   const fetchConnection = useCallback(async () => {
     if (!user) { setLoading(false); return }
     const { data } = await supabase
-      .from('github_connections')
+      .from('github_connections_safe')
       .select('id, github_username, github_avatar_url, scope, connected_at')
       .eq('user_id', user.id)
       .maybeSingle()

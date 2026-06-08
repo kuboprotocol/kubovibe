@@ -1,25 +1,26 @@
 // Nano Banana — gerador rápido de conteúdo (legendas, posts, ideias).
 // Usa Lovable AI Gateway (gemini-flash) — ultra barato, ultra rápido.
 import { runAgent, getSecret } from "../_shared/agentRuntime.ts";
+import { z } from "npm:zod@3";
 
-interface NanoInput {
-  prompt?: string;
-  format?: "caption" | "post" | "ideas" | "tagline";
-  count?: number;
-  language?: string;
-}
+const InputSchema = z.object({
+  prompt: z.string().min(1).max(5000),
+  format: z.enum(["caption", "post", "ideas", "tagline"]).optional().default("post"),
+  count: z.number().int().min(1).max(20).optional().default(5),
+  language: z.string().max(20).optional().default("pt-BR"),
+});
 
 const FORMAT_PROMPTS: Record<string, string> = {
-  caption: "Gere legendas curtas e impactantes para redes sociais.",
-  post: "Gere posts completos prontos para publicar (até 280 caracteres).",
-  ideas: "Gere ideias de conteúdo numeradas, criativas e acionáveis.",
-  tagline: "Gere taglines memoráveis e curtas (máx. 8 palavras).",
+...
 };
 
 Deno.serve((req) =>
   runAgent("nano-banana", req, async ({ input }) => {
-    const { prompt, format = "post", count = 5, language = "pt-BR" } =
-      input as NanoInput;
+    const parsed = InputSchema.safeParse(input);
+    if (!parsed.success) {
+      throw new Error(`invalid_input: ${JSON.stringify(parsed.error.flatten().fieldErrors)}`);
+    }
+    const { prompt, format, count, language } = parsed.data;
     if (!prompt || typeof prompt !== "string") {
       throw new Error("invalid_prompt");
     }
