@@ -13,7 +13,8 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
   MessageSquare, Image as ImageIcon, Download, Scissors, User2,
-  Video, Music, BookOpen, Sparkles, Loader2, Coins, ArrowLeft, RotateCw, AlertTriangle, Upload
+  Video, Music, BookOpen, Sparkles, Loader2, Coins, ArrowLeft, RotateCw, AlertTriangle, Upload,
+  FileDown, History
 } from "lucide-react";
 
 type ToolKey = "dashboard" | "chat" | "nano_banana" | "downloader" | "clips" | "avatar" | "shorts" | "music" | "ebook" | "emo";
@@ -246,6 +247,38 @@ export default function CreativePage() {
     }
   }
 
+  function exportHistory(format: "csv" | "json") {
+    if (!history.length) return;
+    let content = "";
+    const filename = `creative-history-${new Date().toISOString().split("T")[0]}.${format}`;
+    
+    if (format === "json") {
+      content = JSON.stringify(history, null, 2);
+    } else {
+      const headers = ["ID", "Tool", "Status", "Prompt", "Credits", "Created At", "Error"];
+      const rows = history.map(h => [
+        h.id,
+        h.tool,
+        h.status,
+        `"${(h.prompt || "").replace(/"/g, '""')}"`,
+        h.credits_spent || 0,
+        h.created_at,
+        `"${(h.error_message || "").replace(/"/g, '""')}"`
+      ]);
+      content = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+    }
+
+    const blob = new Blob([content], { type: format === "json" ? "application/json" : "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Histórico exportado como ${format.toUpperCase()}`);
+  }
+
+
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -313,7 +346,9 @@ export default function CreativePage() {
                   return next;
                 });
               }}
+              onExport={exportHistory}
             />
+
           </TabsContent>
 
 
@@ -397,6 +432,41 @@ function AssetDetailDialog({ asset, onClose, onRerun, rerunning }: { asset: any;
             </div>
           )}
 
+          <div className="pt-4 border-t border-border/40">
+            <div className="text-xs font-semibold text-muted-foreground uppercase mb-2 flex items-center gap-2">
+              <History className="h-3 w-3" /> Trilha de Auditoria
+            </div>
+            <div className="space-y-2 text-[11px] font-mono text-muted-foreground bg-muted/20 p-2 rounded">
+              <div className="flex justify-between">
+                <span>Evento: Criação</span>
+                <span>{new Date(asset.created_at).toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Ferramenta: {asset.tool}</span>
+                <span>User ID: {asset.user_id?.slice(0, 8)}...</span>
+              </div>
+              {asset.idempotency_key && (
+                <div className="flex justify-between text-primary/80">
+                  <span>Chave de Idempotência:</span>
+                  <span>{asset.idempotency_key}</span>
+                </div>
+              )}
+              {asset.status === "completed" && (
+                <div className="flex justify-between text-green-500/80">
+                  <span>Resultado: Sucesso (IDEM verificado)</span>
+                  <span>{asset.updated_at ? new Date(asset.updated_at).toLocaleString() : "—"}</span>
+                </div>
+              )}
+              {(asset.status === "failed" || asset.status === "error") && (
+                <div className="flex justify-between text-destructive/80">
+                  <span>Resultado: Falhou (Rastreável)</span>
+                  <span>{asset.updated_at ? new Date(asset.updated_at).toLocaleString() : "—"}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={onClose}>Fechar</Button>
             <Button onClick={() => onRerun(asset)} disabled={!canRerun || rerunning}>
@@ -411,7 +481,7 @@ function AssetDetailDialog({ asset, onClose, onRerun, rerunning }: { asset: any;
 }
 
 
-function Dashboard({ editsRemaining, subscription, history, filter, setFilter, onPick, onOpen, onRerun, rerunningId, pageIndex, pageSize, totalCount, hasNext, hasPrev, realtimeStatus, globalCooldown, onNext, onPrev }: any) {
+function Dashboard({ editsRemaining, subscription, history, filter, setFilter, onPick, onOpen, onRerun, rerunningId, pageIndex, pageSize, totalCount, hasNext, hasPrev, realtimeStatus, globalCooldown, onNext, onPrev, onExport }: any) {
   const lowBalance = (editsRemaining ?? 0) <= 10;
   return (
     <div className="space-y-6">
@@ -495,8 +565,17 @@ function Dashboard({ editsRemaining, subscription, history, filter, setFilter, o
                realtimeStatus === "reconnecting" ? "reconectando…" :
                realtimeStatus === "offline" ? "offline" : "conectando…"}
             </Badge>
+            <div className="flex items-center gap-1 ml-1 border-l pl-2 border-border/40">
+              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onExport("csv")} title="Exportar CSV">
+                <FileDown className="h-3.5 w-3.5" />
+              </Button>
+              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onExport("json")} title="Exportar JSON">
+                <History className="h-3.5 w-3.5" />
+              </Button>
+            </div>
           </div>
         </div>
+
         <Card className="divide-y divide-border/40">
           {history.length === 0 && (
             <div className="p-6 text-center text-sm text-muted-foreground">Nenhuma geração nesta página.</div>
