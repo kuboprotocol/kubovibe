@@ -108,8 +108,7 @@ export default function InvestigationPage() {
 
       // Support abort signal to cancel previous requests
       if (signal) {
-        // Unfortunately PostgREST client doesn't directly support signal in .select() yet,
-        // but react-query will handle the logic of ignoring stale results.
+        q = q.abortSignal(signal);
       }
 
       const { data, count, error } = await q;
