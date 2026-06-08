@@ -1,8 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
-import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
+import { corsHeaders, sanitizeError } from '../_shared/cors.ts'
 import { z } from 'npm:zod@3'
 import { validatePublicUrl } from '../_shared/security.ts'
-
 
 const BodySchema = z.object({
   id: z.string().uuid().optional(),
@@ -105,11 +104,11 @@ Deno.serve(async (req) => {
     let saved
     if (id) {
       const { data, error } = await admin.from('web3_connections').update(row).eq('id', id).eq('user_id', userId).select('id, provider, network, connection_name, explorer_url, api_key_hint, last_status, updated_at').single()
-      if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      if (error) return new Response(JSON.stringify({ error: sanitizeError(error) }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       saved = data
     } else {
       const { data, error } = await admin.from('web3_connections').upsert(row, { onConflict: 'user_id,provider,network,connection_name' }).select('id, provider, network, connection_name, explorer_url, api_key_hint, last_status, updated_at').single()
-      if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      if (error) return new Response(JSON.stringify({ error: sanitizeError(error) }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       saved = data
     }
 
@@ -124,6 +123,7 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({ success: true, connection: saved }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   } catch (e) {
-    return new Response(JSON.stringify({ error: (e as Error).message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    console.error('[web3-connection-save] error:', e);
+    return new Response(JSON.stringify({ error: sanitizeError(e) }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   }
-})
+});

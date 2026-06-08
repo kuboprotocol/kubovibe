@@ -1,5 +1,5 @@
 // Quantum Game Engine — NPC dialogue/decision AI via Lovable AI Gateway.
-import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
+import { corsHeaders, sanitizeError } from '../_shared/cors.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
 interface NPCRequest {
@@ -100,8 +100,8 @@ Regras:
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (e) {
-    console.error('[game-npc-ai]', e);
-    return new Response(JSON.stringify({ error: (e as Error).message }), {
+    console.error('[game-npc-ai] error:', e);
+    return new Response(JSON.stringify({ error: sanitizeError(e) }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }

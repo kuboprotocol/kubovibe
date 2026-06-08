@@ -25,11 +25,7 @@ function isAllowedRedirect(u: string | undefined): boolean {
 
 import Stripe from "npm:stripe@^18";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+import { corsHeaders, sanitizeError } from "../_shared/cors.ts";
 
 const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
 if (!stripeKey) throw new Error("Missing STRIPE_SECRET_KEY.");
@@ -127,7 +123,7 @@ Deno.serve(async (req: Request) => {
     });
   } catch (err: any) {
     console.error("stripe-connect-checkout error:", err);
-    return new Response(JSON.stringify({ error: err.message }), {
+    return new Response(JSON.stringify({ error: sanitizeError(err) }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

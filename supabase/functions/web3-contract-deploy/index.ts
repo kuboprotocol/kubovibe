@@ -6,13 +6,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.45.0'
 import { ethers } from 'npm:ethers@6.13.4'
 // @ts-ignore solc has no types
 import solc from 'npm:solc@0.8.26'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers':
-    'authorization, x-client-info, apikey, content-type',
-  'Content-Type': 'application/json',
-}
+import { corsHeaders, sanitizeError } from '../_shared/cors.ts'
 
 type Body = { contract_id: string; constructor_args?: unknown[] }
 
@@ -158,7 +152,7 @@ Deno.serve(async (req) => {
       events,
     }), { status: 200, headers: corsHeaders })
   } catch (e) {
-    console.error('deploy error', e)
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }), { status: 500, headers: corsHeaders })
+    console.error('deploy error:', e)
+    return new Response(JSON.stringify({ error: sanitizeError(e) }), { status: 500, headers: corsHeaders })
   }
 })

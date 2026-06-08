@@ -1,6 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { corsHeaders, sanitizeError } from "../_shared/cors.ts";
 
 const DNS_API = "https://api.hosting.ionos.com/dns/v1";
 const VALID_TYPES = ["A", "AAAA", "CNAME", "TXT", "MX", "SRV", "NS"];
@@ -75,19 +75,20 @@ Deno.serve(async (req) => {
       const { data: row, error } = await svc.from("kubo_dns_records").insert({
         domain_id, user_id: userId, record_type: type, name, value, ttl, priority, ionos_record_id,
       }).select().single();
-      if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      if (error) return new Response(JSON.stringify({ error: sanitizeError(error) }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       return new Response(JSON.stringify({ record: row, synced: !!ionos_record_id }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     if (action === "delete") {
       const id = String(body?.record_id ?? "");
       const { error } = await svc.from("kubo_dns_records").delete().eq("id", id).eq("user_id", userId);
-      if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      if (error) return new Response(JSON.stringify({ error: sanitizeError(error) }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     return new Response(JSON.stringify({ error: "unknown action" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e: any) {
-    return new Response(JSON.stringify({ error: e?.message ?? "internal" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    console.error("[domain-dns] error:", e);
+    return new Response(JSON.stringify({ error: sanitizeError(e) }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });
