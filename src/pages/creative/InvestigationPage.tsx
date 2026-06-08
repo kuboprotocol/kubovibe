@@ -117,6 +117,8 @@ export default function InvestigationPage() {
   const assets = assetsData?.assets || [];
   const count = assetsData?.count || 0;
   const error = queryError ? (queryError as Error).message : null;
+  const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
+
 
 
   // Realtime subscription
@@ -192,7 +194,7 @@ export default function InvestigationPage() {
     if (error) return toast.error(error.message);
     await recordAudit(a.id, "cancel", { reason: "user_request" });
     toast.success("Execução cancelada");
-    if (selected?.id === a.id) loadDetail(a.id);
+    if (selected?.id === a.id) queryClient.invalidateQueries({ queryKey: ["asset-detail", a.id] });
   }
 
   async function requeueAsset(a: Asset) {
@@ -203,7 +205,7 @@ export default function InvestigationPage() {
     if (error) return toast.error(error.message);
     await recordAudit(a.id, "retry", { previous_status: a.status });
     toast.success("Reenfileirado para nova tentativa");
-    if (selected?.id === a.id) loadDetail(a.id);
+    if (selected?.id === a.id) queryClient.invalidateQueries({ queryKey: ["asset-detail", a.id] });
   }
 
   function exportAudit(format: "json" | "csv") {
@@ -428,7 +430,7 @@ export default function InvestigationPage() {
                   </h2>
                   <p className="text-xs text-muted-foreground">{new Date(selected.created_at).toLocaleString()}</p>
                 </div>
-                <Button variant="ghost" size="icon" onClick={() => { setSelected(null); setParams((p) => { p.delete("investigate"); return p; }); }}>
+                <Button variant="ghost" size="icon" onClick={() => { setParams((p) => { p.delete("investigate"); return p; }); }}>
                   <X className="h-4 w-4" />
                 </Button>
               </div>
