@@ -113,10 +113,62 @@ export default function CreativeAuditPage() {
   const count = data?.count || 0;
   const totalPages = Math.ceil(count / PAGE_SIZE);
 
+  // Recurrent failures summary
+  const recurrentFailures = useMemo(() => {
+    const failures: Record<string, { count: number; lastTrace: string; lastCorrelation: string }> = {};
+    entries.forEach(entry => {
+      const isError = entry.action.toLowerCase().includes("failed") || entry.action.toLowerCase().includes("error") || entry.params?.error;
+      if (isError) {
+        const key = entry.params?.error?.message || entry.action;
+        if (!failures[key]) failures[key] = { count: 0, lastTrace: "", lastCorrelation: "" };
+        failures[key].count++;
+        failures[key].lastTrace = entry.trace_id || "";
+        failures[key].lastCorrelation = entry.correlation_id || "";
+      }
+    });
+    return Object.entries(failures)
+      .filter(([_, v]) => v.count > 1)
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, 3);
+  }, [entries]);
+
+  // Multiple attempts detection
+  const multipleAttempts = useMemo(() => {
+    const correlations: Record<string, number> = {};
+    entries.forEach(entry => {
+      if (entry.correlation_id) {
+        correlations[entry.correlation_id] = (correlations[entry.correlation_id] || 0) + 1;
+      }
+    });
+    return Object.entries(correlations).filter(([_, v]) => v > 1).length;
+  }, [entries]);
+
+  const saveCurrentFilters = () => {
+    const newFilter = {
+      id: Date.now(),
+      name: `Busca ${new Date().toLocaleTimeString()}`,
+      filters: { search, step, status, startDate, endDate }
+    };
+    const updated = [newFilter, ...savedFilters].slice(0, 5);
+    setSavedFilters(updated);
+    localStorage.setItem("creative_audit_filters", JSON.stringify(updated));
+    toast.success("Filtros salvos localmente");
+  };
+
+  const applySavedFilter = (f: any) => {
+    setSearch(f.filters.search);
+    setStep(f.filters.step);
+    setStatus(f.filters.status);
+    setStartDate(f.filters.startDate);
+    setEndDate(f.filters.endDate);
+    setPage(1);
+    toast.info(`Filtro "${f.name}" aplicado`);
+  };
+
   const exportData = (format: "json" | "csv") => {
     if (entries.length === 0) return toast.error("Sem dados para exportar");
     
-    const filename = `creative-audit-${new Date().toISOString()}.${format}`;
+    const filename = `creative-audit-filtered-${new Date().toISOString()}.${format}`;
     let content: string;
     let mime: string;
 
@@ -147,7 +199,7 @@ export default function CreativeAuditPage() {
     link.download = filename;
     link.click();
     URL.revokeObjectURL(url);
-    toast.success(`Exportado com sucesso (${entries.length} registros)`);
+    toast.success(`Exportado (${entries.length} registros filtrados)`);
   };
 
   return (
