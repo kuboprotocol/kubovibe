@@ -193,10 +193,15 @@ export default function CreativePage() {
                 error: "erro",
                 cancelled: "cancelado"
               };
+              
+              const toolTitle = TOOLS.find(t => t.key === newItem.tool)?.title || newItem.tool;
               toast.info(`Status atualizado: ${statusMap[newItem.status] || newItem.status}`, {
-                description: `${TOOLS.find(t => t.key === newItem.tool)?.title || newItem.tool}: ${newItem.prompt?.slice(0, 40)}...`,
-                duration: 3000
+                description: `${toolTitle}: ${newItem.prompt?.slice(0, 40) || "Sem descrição"}...`,
+                duration: 4000
               });
+
+              // Audit logging for real-time transitions
+              console.log(`[Audit] Mudança de status detectada: Asset ${newItem.id}, De ${oldStatus} para ${newItem.status}, User ${user.id}, Time: ${new Date().toISOString()}`);
             }
             prevStatusRef.current[newItem.id] = newItem.status;
           }
@@ -318,6 +323,8 @@ export default function CreativePage() {
     console.log(`[Audit] Batch Retry iniciado por ${user?.id} as ${new Date().toISOString()}. Itens: ${failed.length}`);
 
     for (const asset of failed) {
+      // Detailed audit before each item processing
+      console.log(`[Audit] Reprocessando item (Batch): Asset ${asset.id}, Tool ${asset.tool}, User ${user?.id}, RequestTime: ${new Date().toISOString()}`);
       const ok = await rerun(asset, true);
       if (ok) success++;
     }
@@ -745,6 +752,12 @@ function Dashboard({ editsRemaining, subscription, history, filter, setFilter, o
                   <div className="flex-1 truncate text-muted-foreground">{h.prompt || h.metadata?.title || h.output_url || "—"}</div>
                   <div className="text-xs text-muted-foreground hidden sm:block whitespace-nowrap">{new Date(h.created_at).toLocaleString("pt-BR")}</div>
                   <Badge variant="secondary" className="text-[10px] shrink-0">{h.credits_spent ?? 0}c</Badge>
+                  {h.idempotency_key && h.status === "completed" && (
+                    <div className="flex items-center gap-1 text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20 animate-in fade-in zoom-in duration-300" title="Idempotência ativa: Créditos preservados">
+                      <RotateCw className="h-2.5 w-2.5" />
+                      <span className="hidden md:inline">IDEM</span>
+                    </div>
+                  )}
                   <Badge 
                     variant={h.status === "completed" ? "default" : h.status === "failed" || h.status === "error" ? "destructive" : "secondary"} 
                     className={`text-[10px] shrink-0 ${h.status === "processing" ? "animate-pulse" : ""}`}
