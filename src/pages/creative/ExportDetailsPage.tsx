@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,8 @@ type Export = {
 export default function ExportDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const investigateId = searchParams.get("investigate");
   const { user } = useAuth();
   const [exportRow, setExportRow] = useState<Export | null>(null);
   const [executions, setExecutions] = useState<any[]>([]);
@@ -127,7 +129,10 @@ export default function ExportDetailsPage() {
     return (
       <div className="min-h-screen bg-background text-foreground">
         <header className="border-b border-border p-4 flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/creative")}>
+          <Button variant="ghost" size="icon" onClick={() => {
+            const params = new URLSearchParams(searchParams);
+            navigate({ pathname: "/creative", search: params.toString() });
+          }}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <Skeleton className="h-6 w-48" />
@@ -158,7 +163,10 @@ export default function ExportDetailsPage() {
     return (
       <div className="min-h-screen bg-background text-foreground">
         <header className="border-b border-border p-4 flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/creative")}>
+          <Button variant="ghost" size="icon" onClick={() => {
+            const params = new URLSearchParams(searchParams);
+            navigate({ pathname: "/creative", search: params.toString() });
+          }}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <h1 className="text-xl font-bold flex-1">Erro</h1>
@@ -181,7 +189,10 @@ export default function ExportDetailsPage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="border-b border-border p-4 flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/creative")}>
+        <Button variant="ghost" size="icon" onClick={() => {
+          const params = new URLSearchParams(searchParams);
+          navigate({ pathname: "/creative", search: params.toString() });
+        }}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <h1 className="text-xl font-bold flex-1">Detalhes da Exportação</h1>
@@ -251,7 +262,11 @@ export default function ExportDetailsPage() {
                   <TableCell><Badge>{e.status}</Badge></TableCell>
                   <TableCell className="text-xs">{new Date(e.created_at).toLocaleString()}</TableCell>
                   <TableCell className="text-right">
-                    <Button size="sm" variant="ghost" onClick={() => navigate(`/creative/investigation?investigate=${e.id}`)}>
+                    <Button size="sm" variant="ghost" onClick={() => {
+                      const params = new URLSearchParams(searchParams);
+                      params.set("investigate", e.id);
+                      navigate(`/creative/investigation?${params.toString()}`);
+                    }}>
                       <ExternalLink className="h-3 w-3 mr-1"/>Investigar
                     </Button>
                   </TableCell>
