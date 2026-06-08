@@ -556,7 +556,19 @@ export default function CreativeAuditPage() {
               </div>
 
               <div className="space-y-3">
-                <h4 className="text-sm font-semibold border-b pb-1">Identificadores</h4>
+                <div className="flex justify-between items-center border-b pb-1">
+                  <h4 className="text-sm font-semibold">Identificadores</h4>
+                  {selectedEntry.correlation_id && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-7 text-[10px]"
+                      onClick={() => loadTimeline(selectedEntry.correlation_id!)}
+                    >
+                      <Clock className="h-3 w-3 mr-1" /> Ver Linha do Tempo
+                    </Button>
+                  )}
+                </div>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-muted-foreground">Correlation ID:</span>
@@ -569,9 +581,29 @@ export default function CreativeAuditPage() {
                 </div>
               </div>
 
+              {/* Timeline Section */}
+              {timelineEntries.length > 0 && (
+                <div className="space-y-3 bg-accent/20 p-3 rounded-md border border-accent">
+                  <h4 className="text-sm font-semibold flex items-center gap-2">
+                    <Clock className="h-4 w-4" /> Histórico de Correlação
+                  </h4>
+                  <div className="space-y-3 relative before:absolute before:left-2 before:top-2 before:bottom-2 before:w-px before:bg-muted-foreground/30">
+                    {timelineEntries.map((te, i) => (
+                      <div key={te.id} className="relative pl-6 text-xs">
+                        <div className={`absolute left-0 top-1 w-4 h-4 rounded-full border-2 bg-background z-10 ${
+                          te.action.toLowerCase().includes('fail') ? 'border-destructive' : 'border-primary'
+                        }`} />
+                        <p className="font-bold opacity-70">{new Date(te.created_at).toLocaleTimeString()}</p>
+                        <p className="font-mono text-[10px] truncate">{te.action}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <h4 className="text-sm font-semibold border-b pb-1">Parâmetros / Stack</h4>
-                <div className="bg-black/95 text-green-400 p-4 rounded-md overflow-x-auto font-mono text-xs max-h-[400px]">
+                <div className="bg-black/95 text-green-400 p-4 rounded-md overflow-x-auto font-mono text-xs max-h-[300px]">
                   <pre>{JSON.stringify(selectedEntry.params, null, 2)}</pre>
                 </div>
               </div>
