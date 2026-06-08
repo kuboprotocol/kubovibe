@@ -631,7 +631,15 @@ export default function CreativePage() {
               onAuditExport={exportAuditTrail}
               showAuditExportOptions={showAuditExportOptions}
               setShowAuditExportOptions={setShowAuditExportOptions}
+              showAuditSchedule={showAuditSchedule}
+              setShowAuditSchedule={setShowAuditSchedule}
+              auditEmail={auditEmail}
+              setAuditEmail={setAuditEmail}
+              auditTime={auditTime}
+              setAuditTime={setAuditTime}
+              scheduleAuditExport={scheduleAuditExport}
             />
+
 
           </TabsContent>
 
