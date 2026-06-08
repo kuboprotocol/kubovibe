@@ -507,7 +507,6 @@ export default function CreativePage() {
       
       if (error) throw error;
       setExportAuditLogs((data as any[]) || []);
-      setExportAuditLogs(data || []);
     } catch (e: any) {
       toast.error("Erro ao carregar logs: " + e.message);
     } finally {
