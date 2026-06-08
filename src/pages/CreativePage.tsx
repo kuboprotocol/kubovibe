@@ -654,9 +654,9 @@ export default function CreativePage() {
                          <p className="text-sm text-muted-foreground line-clamp-1">{h.prompt}</p>
                        </div>
                        <div className="flex gap-2">
-                         <Button size="sm" variant="ghost" onClick={() => setSelectedAssetForInvestigation(h)}>
-                           <History className="h-4 w-4 mr-2" /> Investigar
-                         </Button>
+                          <Button size="sm" variant="ghost" onClick={() => navigate(`/creative/investigation?investigate=${h.id}`)}>
+                            <History className="h-4 w-4 mr-2" /> Investigar
+                          </Button>
                          {(h.status === 'queued' || h.status === 'processing') && (
                            <Button size="sm" variant="outline" onClick={() => cancelExecution(h.id)}>Cancelar</Button>
                          )}
@@ -670,129 +670,7 @@ export default function CreativePage() {
                   ))}
                </Card>
 
-               {/* Investigation Modal */}
-               <Dialog open={!!selectedAssetForInvestigation} onOpenChange={() => setSelectedAssetForInvestigation(null)}>
-                 <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                   <DialogHeader>
-                     <DialogTitle>Investigação de Execução</DialogTitle>
-                     <DialogDescription>
-                       Trilha de auditoria e logs detalhados para o asset {selectedAssetForInvestigation?.id}
-                     </DialogDescription>
-                   </DialogHeader>
-                   
-                   <div className="space-y-4">
-                     <div className="flex flex-wrap gap-4 items-end bg-muted/50 p-4 rounded-lg">
-                       <div className="flex-1 min-w-[200px] space-y-1">
-                         <label className="text-xs font-medium text-muted-foreground">Filtrar Logs</label>
-                         <Input 
-                           value={investigationSearch} 
-                           onChange={(e) => setInvestigationSearch(e.target.value)} 
-                           placeholder="Buscar na trilha..." 
-                         />
-                       </div>
-                       <div className="space-y-1">
-                         <label className="text-xs font-medium text-muted-foreground">Início</label>
-                         <Input 
-                           type="date" 
-                           value={investigationDateStart} 
-                           onChange={(e) => setInvestigationDateStart(e.target.value)} 
-                         />
-                       </div>
-                       <div className="space-y-1">
-                         <label className="text-xs font-medium text-muted-foreground">Fim</label>
-                         <Input 
-                           type="date" 
-                           value={investigationDateEnd} 
-                           onChange={(e) => setInvestigationDateEnd(e.target.value)} 
-                         />
-                       </div>
-                        <div className="space-y-1">
-                          <label className="text-xs font-medium text-muted-foreground">Ordem</label>
-                          <select 
-                            value={auditSortOrder} 
-                            onChange={(e) => setAuditSortOrder(e.target.value as any)}
-                            className="flex h-10 w-[120px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
-                          >
-                            <option value="desc">Recentes</option>
-                            <option value="asc">Antigos</option>
-                          </select>
-                        </div>
-                        <div className="flex gap-2">
-
-                         <Button variant="outline" size="sm" onClick={() => exportAuditTrail("csv")}>
-                           <FileDown className="h-4 w-4 mr-2" /> CSV
-                         </Button>
-                         <Button variant="outline" size="sm" onClick={() => exportAuditTrail("json")}>
-                           <FileDown className="h-4 w-4 mr-2" /> JSON
-                         </Button>
-                       </div>
-                     </div>
-
-                     <div className="border rounded-md overflow-hidden">
-                        <table className="w-full text-sm">
-                          <thead className="bg-muted">
-                            <tr>
-                              <th className="text-left p-3 font-medium">Data</th>
-                              <th className="text-left p-3 font-medium">Ação</th>
-                              <th className="text-left p-3 font-medium">Usuário</th>
-                              <th className="text-left p-3 font-medium">Detalhes</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y">
-                            {isLoadingAudit ? (
-                              <tr><td colSpan={4} className="p-8 text-center"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></td></tr>
-                            ) : paginatedAuditLogs.length === 0 ? (
-                              <tr><td colSpan={4} className="p-8 text-center text-muted-foreground">Nenhum evento registrado.</td></tr>
-                            ) : paginatedAuditLogs.map((log: any) => (
-
-                              <tr key={log.id} className="hover:bg-muted/30">
-                                <td className="p-3 whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</td>
-                                <td className="p-3">
-                                  <Badge variant="outline" className="capitalize">{log.action || log.event_type}</Badge>
-                                </td>
-                                <td className="p-3">{log.profiles?.email || 'Sistema'}</td>
-                                <td className="p-3 text-xs font-mono max-w-md truncate">
-                                  {JSON.stringify(log.details || log.metadata)}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                     </div>
-                      
-                      {exportAuditLogs.length > AUDIT_PAGE_SIZE && (
-                        <div className="flex items-center justify-between py-2 border-t">
-                          <span className="text-xs text-muted-foreground">Página {auditPage} de {Math.ceil(exportAuditLogs.length / AUDIT_PAGE_SIZE)}</span>
-                          <div className="flex gap-2">
-                            <Button size="sm" variant="outline" disabled={auditPage === 1} onClick={() => setAuditPage(p => p - 1)}>Anterior</Button>
-                            <Button size="sm" variant="outline" disabled={auditPage >= Math.ceil(exportAuditLogs.length / AUDIT_PAGE_SIZE)} onClick={() => setAuditPage(p => p + 1)}>Próxima</Button>
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="space-y-4 pt-4 border-t">
-                        <h4 className="font-semibold text-sm flex items-center gap-2">
-                          Configurações de Notificação
-                        </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-muted/30 p-4 rounded-lg">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm">Notificar Cancelamentos</span>
-                            <input type="checkbox" checked={notificationPrefs.notify_cancel} onChange={(e) => updateNotificationPrefs('notify_cancel', e.target.checked)} className="h-4 w-4" />
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm">Notificar Retentativas</span>
-                            <input type="checkbox" checked={notificationPrefs.notify_retry} onChange={(e) => updateNotificationPrefs('notify_retry', e.target.checked)} className="h-4 w-4" />
-                          </div>
-                          <div className="flex items-center justify-between md:col-span-2">
-                            <span className="text-sm">Incluir link para investigação no e-mail</span>
-                            <input type="checkbox" checked={notificationPrefs.include_investigation_link} onChange={(e) => updateNotificationPrefs('include_investigation_link', e.target.checked)} className="h-4 w-4" />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                 </DialogContent>
-               </Dialog>
+               {/* Investigation Dialog removed in favor of dedicated /creative/investigation page */}
              </div>
           </TabsContent>
           <TabsContent value="chat">Kubo Chat...</TabsContent>
