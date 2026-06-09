@@ -535,44 +535,69 @@ export default function CreativeAuditPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  entries.map((entry) => (
-                    <TableRow 
-                      key={entry.id} 
-                      className="cursor-pointer hover:bg-muted/50 transition-colors"
-                      onClick={() => setSelectedEntry(entry)}
-                    >
-                      <TableCell className="text-xs font-medium">
-                        {new Date(entry.created_at).toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-xs truncate max-w-[150px]" title={entry.user_email}>
-                        {entry.user_email || "Usuário não identificado"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{entry.step}</Badge>
-                      </TableCell>
-                      <TableCell className="text-xs font-mono">
-                        {entry.action}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col gap-0.5">
-                          {entry.correlation_id && (
-                            <span className="text-[10px] text-muted-foreground">C: {entry.correlation_id}</span>
-                          )}
-                          {entry.trace_id && (
-                            <span className="text-[10px] text-muted-foreground">T: {entry.trace_id}</span>
-                          )}
-                          {!entry.correlation_id && !entry.trace_id && (
-                            <span className="text-[10px] text-muted-foreground italic">N/A</span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="icon">
-                          <ChevronRight className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  entries.map((entry) => {
+                    const retries = entry.correlation_id ? retryCountByCorrelation[entry.correlation_id] : 0;
+                    const isSelectedForCompare = !!compareEntries.find(e => e.id === entry.id);
+                    
+                    return (
+                      <TableRow 
+                        key={entry.id} 
+                        className={`cursor-pointer transition-colors ${isSelectedForCompare ? 'bg-primary/10' : 'hover:bg-muted/50'}`}
+                        onClick={() => setSelectedEntry(entry)}
+                      >
+                        <TableCell className="text-xs font-medium">
+                          {new Date(entry.created_at).toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-xs truncate max-w-[150px]" title={entry.user_email}>
+                          {entry.user_email || "Usuário não identificado"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{entry.step}</Badge>
+                        </TableCell>
+                        <TableCell className="text-xs font-mono">
+                          {entry.action}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-0.5">
+                            <div className="flex items-center gap-2">
+                              {entry.correlation_id && (
+                                <span className="text-[10px] text-muted-foreground">C: {entry.correlation_id}</span>
+                              )}
+                              {retries > 1 && (
+                                <Badge variant="secondary" className="h-4 px-1 text-[8px] bg-yellow-500/10 text-yellow-600 border-yellow-500/20">
+                                  {retries}x
+                                </Badge>
+                              )}
+                            </div>
+                            {entry.trace_id && (
+                              <span className="text-[10px] text-muted-foreground">T: {entry.trace_id}</span>
+                            )}
+                            {!entry.correlation_id && !entry.trace_id && (
+                              <span className="text-[10px] text-muted-foreground italic">N/A</span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Button 
+                            variant={isSelectedForCompare ? "default" : "ghost"} 
+                            size="icon" 
+                            className="h-7 w-7"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleComparison(entry);
+                            }}
+                          >
+                            <Copy className="h-3.5 w-3.5" />
+                          </Button>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="icon">
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
