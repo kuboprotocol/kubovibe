@@ -155,12 +155,13 @@ export function AvatarCropDialog({ open, imageUrl, onCancel, onConfirm, onSavePr
   const handleConflictResolve = (preset: { name: string; zoom: number; aspect: number }, action: "overwrite" | "keep" | "rename") => {
     let newPresets = [...presets];
     if (action === "overwrite") {
-      newPresets = newPresets.map(p => p.name.toLowerCase() === preset.name.toLowerCase() ? preset : p);
+      newPresets = newPresets.filter(p => p.name.toLowerCase() !== preset.name.toLowerCase());
+      newPresets.push(preset);
       toast.info(`Preset "${preset.name}" sobrescrito`);
     } else if (action === "rename") {
       let newName = `${preset.name} (Importado)`;
       let counter = 1;
-      while (newPresets.find(p => p.name === newName) || importConflicts.find(p => p.name === newName)) {
+      while (newPresets.find(p => p.name.toLowerCase() === newName.toLowerCase()) || importConflicts.find(p => p.name.toLowerCase() === newName.toLowerCase() && p.name !== preset.name)) {
         newName = `${preset.name} (Importado ${counter})`;
         counter++;
       }

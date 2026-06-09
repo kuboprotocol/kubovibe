@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Sparkles, Send, Coins, Settings2, Info, AlertCircle, Wallet, RotateCw, Upload, X, Image as ImageIcon, Download, Crop as CropIcon, Trash2, Sliders, History, FileText, FileCode, Play, Search, Filter, PlayCircle } from "lucide-react";
+import { Loader2, Sparkles, Send, Coins, Settings2, Info, AlertCircle, Wallet, RotateCw, Upload, X, Image as ImageIcon, Download, Crop as CropIcon, Trash2, Sliders, History, FileText, FileCode, Play, Search, Filter, PlayCircle, Package } from "lucide-react";
 import { useSubscription } from "@/hooks/useSubscription";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
@@ -113,6 +113,8 @@ const TOOL_CONFIGS: Record<ToolKey, {
   }
 };
 
+import { DeliveryFlow } from "./DeliveryFlow";
+
 export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
   const config = TOOL_CONFIGS[toolKey];
   const [prompt, setPrompt] = useState("");
@@ -149,6 +151,8 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
   const [reexecuteDialogOpen, setReexecuteDialogOpen] = useState(false);
   const [reexecuteItem, setReexecuteItem] = useState<any>(null);
   const [startAtStep, setStartAtStep] = useState<AvatarStepKey>("upload");
+
+  const [showDelivery, setShowDelivery] = useState(false);
 
   const buildSteps = (needsConvert: boolean, initialDetails?: Record<string, any>, currentSteps?: AvatarStepState[]): AvatarStepState[] => {
     const now = new Date().toLocaleTimeString();
@@ -205,6 +209,8 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
   }, [sessionHistory, toolKey]);
 
   const logAuditAction = useCallback(async (step: string, action: string, params: any = {}, correlationId?: string, traceId?: string) => {
+    // Audit logs for deployment and agent improvements
+    console.log(`[Audit] Step: ${step}, Action: ${action}`, params);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     try {
@@ -1190,6 +1196,25 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
         </div>
       </Card>
 
+      {/* Delivery Flow Section */}
+      <div className="mt-8 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+            <Package className="h-4 w-4" /> Gestão de Release
+          </h3>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => setShowDelivery(!showDelivery)}
+            className="text-[10px] h-7"
+          >
+            {showDelivery ? "Ocultar Release" : "Ver Status de Deploy"}
+          </Button>
+        </div>
+        
+        {showDelivery && <DeliveryFlow />}
+      </div>
+
       <AvatarCropDialog
         open={cropOpen}
         imageUrl={cropSourceUrl}
@@ -1209,44 +1234,83 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
           <DialogHeader>
             <DialogTitle>Retomar Geração</DialogTitle>
             <DialogDescription>
-              Escolha a partir de qual etapa você deseja retomar a execução para economizar tempo.
+              Revise os parâmetros e escolha a etapa para retomar a execução.
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-6 py-4">
-            <div className="relative flex flex-col gap-4">
+            <div className="space-y-3 p-3 bg-muted/30 rounded-lg border border-border/20">
+              <Label className="text-[10px] uppercase font-bold text-muted-foreground">Revisar Parâmetros</Label>
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Prompt</Label>
+                  <Textarea 
+                    value={reexecuteItem?.prompt || ""} 
+                    onChange={(e) => setReexecuteItem({ ...reexecuteItem, prompt: e.target.value })}
+                    className="text-xs min-h-[60px]"
+                  />
+                </div>
+                {reexecuteItem?.metadata && Object.keys(reexecuteItem.metadata).length > 0 && (
+                  <div className="space-y-2">
+                    <Label className="text-xs">Metadados</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {Object.entries(reexecuteItem.metadata).map(([k, v]: [string, any]) => (
+                        <div key={k} className="space-y-1">
+                          <Label className="text-[10px] opacity-60 uppercase">{k}</Label>
+                          <Input 
+                            value={String(v)} 
+                            onChange={(e) => {
+                              const newMeta = { ...reexecuteItem.metadata, [k]: e.target.value };
+                              setReexecuteItem({ ...reexecuteItem, metadata: newMeta });
+                            }}
+                            className="h-7 text-[10px]"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="relative flex flex-col gap-4 px-1">
                {(["upload", "convert", "generate", "render"] as AvatarStepKey[]).map((step, idx, arr) => {
                  const isCompleted = reexecuteItem?.logs?.find((s: any) => s.key === step)?.status === "done";
+                 const isSelected = startAtStep === step;
+                 
                  return (
                    <div key={step} className="flex items-center gap-4 relative">
                      {idx < arr.length - 1 && (
-                       <div className="absolute left-[15px] top-[30px] w-[2px] h-[20px] bg-border" />
+                       <div className="absolute left-[15px] top-[32px] w-[2px] h-[24px] bg-border/40" />
                      )}
-                     <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 shrink-0 ${isCompleted ? 'bg-primary/10 border-primary text-primary' : 'border-muted text-muted-foreground'}`}>
-                        {idx + 1}
+                     <div 
+                       className={cn(
+                         "w-8 h-8 rounded-full flex items-center justify-center border-2 shrink-0 transition-all cursor-pointer",
+                         isSelected ? "bg-primary border-primary text-primary-foreground scale-110 shadow-lg" : 
+                         isCompleted ? "bg-primary/10 border-primary/50 text-primary" : "border-muted text-muted-foreground"
+                       )}
+                       onClick={() => setStartAtStep(step)}
+                     >
+                        {isSelected ? <Play className="h-3 w-3 fill-current" /> : idx + 1}
                      </div>
-                     <div className="flex-1 flex justify-between items-center">
+                     <div 
+                       className={cn(
+                         "flex-1 flex justify-between items-center p-2 rounded-md transition-colors cursor-pointer",
+                         isSelected ? "bg-primary/5 border border-primary/20" : "hover:bg-muted/30"
+                       )}
+                       onClick={() => setStartAtStep(step)}
+                     >
                        <div>
-                         <p className="text-sm font-medium capitalize">{step}</p>
-                         <p className="text-[10px] text-muted-foreground">{isCompleted ? "Concluído anteriormente" : "Pendente"}</p>
+                         <p className={cn("text-sm font-medium capitalize", isSelected && "text-primary")}>{step}</p>
+                         <p className="text-[10px] text-muted-foreground">
+                           {isCompleted ? "Status anterior: Concluído" : "Status anterior: Pendente"}
+                         </p>
                        </div>
-                       <Button 
-                        size="sm" 
-                        variant={startAtStep === step ? "default" : "outline"}
-                        className="h-7 text-[10px]"
-                        onClick={() => setStartAtStep(step)}
-                       >
-                         {startAtStep === step ? "Selecionado" : "Iniciar aqui"}
-                       </Button>
+                       {isSelected && <Badge variant="outline" className="text-[9px] bg-primary/10 text-primary border-primary/20">RETOMAR AQUI</Badge>}
                      </div>
                    </div>
                  );
                })}
-            </div>
-            
-            <div className="p-3 bg-muted/50 rounded-lg text-xs space-y-1">
-              <p className="font-bold">Parâmetros originais:</p>
-              <p className="opacity-70 truncate">Prompt: {reexecuteItem?.prompt}</p>
             </div>
           </div>
 
@@ -1258,7 +1322,6 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                 setPrompt(reexecuteItem.prompt);
                 setMetadata(reexecuteItem.metadata || {});
                 
-                // Se retomar, usamos os logs anteriores como base para persistir status de 'done'
                 const initialSteps = startAtStep !== "upload" ? reexecuteItem.logs : undefined;
                 const needsConvert = reexecuteItem.logs?.find((s: any) => s.key === "convert")?.status !== "skipped";
                 
@@ -1270,7 +1333,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                 setLoading(false);
               }
             }}>
-              <PlayCircle className="h-4 w-4 mr-2" /> Iniciar Retomada
+              <PlayCircle className="h-4 w-4 mr-2" /> Confirmar e Iniciar
             </Button>
           </DialogFooter>
         </DialogContent>
