@@ -691,7 +691,7 @@ export default function CreativeAuditPage() {
                               {child.user_email || "---"}
                             </TableCell>
                             <TableCell>
-                              <Badge variant="ghost" className="text-[10px] h-4">{child.step}</Badge>
+                              <Badge variant="outline" className="text-[10px] h-4">{child.step}</Badge>
                             </TableCell>
                             <TableCell className="text-[10px] font-mono opacity-70">
                               {child.action}
