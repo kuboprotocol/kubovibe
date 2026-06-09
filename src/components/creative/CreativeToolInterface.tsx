@@ -132,16 +132,23 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
   const [cropSourceUrl, setCropSourceUrl] = useState<string | null>(null);
   const [cropOpen, setCropOpen] = useState(false);
   const [progressSteps, setProgressSteps] = useState<AvatarStepState[]>([]);
+  const [avatarPreset, setAvatarPreset] = useState<{ zoom: number; aspect: number }>(() => {
+    const saved = localStorage.getItem("creative_avatar_preset");
+    return saved ? JSON.parse(saved) : { zoom: 1, aspect: 1 };
+  });
 
-  const buildSteps = (needsConvert: boolean): AvatarStepState[] => [
-    { key: "upload", label: "Upload da imagem", status: "pending" },
-    { key: "convert", label: "Conversão HEIC/SVG", status: needsConvert ? "pending" : "skipped" },
-    { key: "generate", label: "Geração do avatar falante", status: "pending" },
-    { key: "render", label: "Renderização final", status: "pending" },
-  ];
+  const buildSteps = (needsConvert: boolean): AvatarStepState[] => {
+    const now = new Date().toLocaleTimeString();
+    return [
+      { key: "upload", label: "Upload da imagem", status: "pending", timestamp: now },
+      { key: "convert", label: "Conversão HEIC/SVG", status: needsConvert ? "pending" : "skipped", timestamp: needsConvert ? now : undefined },
+      { key: "generate", label: "Geração do avatar falante", status: "pending" },
+      { key: "render", label: "Renderização final", status: "pending" },
+    ];
+  };
 
-  const updateStep = (key: AvatarStepKey, status: AvatarStepState["status"]) => {
-    setProgressSteps((prev) => prev.map((s) => (s.key === key ? { ...s, status } : s)));
+  const updateStep = (key: AvatarStepKey, status: AvatarStepState["status"], errorMessage?: string) => {
+    setProgressSteps((prev) => prev.map((s) => (s.key === key ? { ...s, status, errorMessage, timestamp: new Date().toLocaleTimeString() } : s)));
   };
 
   const fetchLastResult = useCallback(async () => {
@@ -216,49 +223,63 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
 
       // Convert HEIC → JPG
       if (file.type === "image/heic" || file.name.toLowerCase().endsWith(".heic")) {
-        if (toolKey === "avatar") updateStep("convert", "active");
-        toast.info("Convertendo formato HEIC...");
-        const convertedBlob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.85 });
-        file = new File(
-          [Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob],
-          file.name.replace(/\.[^/.]+$/, ".jpg"),
-          { type: "image/jpeg" }
-        );
-        if (toolKey === "avatar") updateStep("convert", "done");
+        try {
+            if (toolKey === "avatar") updateStep("convert", "active");
+            toast.info("Convertendo formato HEIC...");
+            const convertedBlob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.85 });
+            file = new File(
+            [Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob],
+            file.name.replace(/\.[^/.]+$/, ".jpg"),
+            { type: "image/jpeg" }
+            );
+            if (toolKey === "avatar") updateStep("convert", "done");
+        } catch (err: any) {
+            if (toolKey === "avatar") updateStep("convert", "error", "Falha na conversão HEIC. O arquivo pode estar corrompido.");
+            throw new Error("Não foi possível processar o arquivo HEIC.");
+        }
       } else if (file.type === "image/svg+xml") {
-        // Convert SVG → PNG via canvas
-        if (toolKey === "avatar") updateStep("convert", "active");
-        toast.info("Convertendo SVG para PNG...");
-        const svgText = await file.text();
-        const blobUrl = URL.createObjectURL(new Blob([svgText], { type: "image/svg+xml" }));
-        const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-          const i = new Image();
-          i.onload = () => resolve(i);
-          i.onerror = reject;
-          i.src = blobUrl;
-        });
-        const size = Math.max(img.width || 512, img.height || 512, 512);
-        const canvas = document.createElement("canvas");
-        canvas.width = size;
-        canvas.height = size;
-        const ctx = canvas.getContext("2d")!;
-        ctx.drawImage(img, 0, 0, size, size);
-        URL.revokeObjectURL(blobUrl);
-        const pngBlob: Blob = await new Promise((r) => canvas.toBlob((b) => r(b!), "image/png", 0.95));
-        file = new File([pngBlob], file.name.replace(/\.[^/.]+$/, ".png"), { type: "image/png" });
-        if (toolKey === "avatar") updateStep("convert", "done");
+        try {
+            // Convert SVG → PNG via canvas
+            if (toolKey === "avatar") updateStep("convert", "active");
+            toast.info("Convertendo SVG para PNG...");
+            const svgText = await file.text();
+            const blobUrl = URL.createObjectURL(new Blob([svgText], { type: "image/svg+xml" }));
+            const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+            const i = new Image();
+            i.onload = () => resolve(i);
+            i.onerror = reject;
+            i.src = blobUrl;
+            });
+            const size = Math.max(img.width || 512, img.height || 512, 512);
+            const canvas = document.createElement("canvas");
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext("2d")!;
+            ctx.drawImage(img, 0, 0, size, size);
+            URL.revokeObjectURL(blobUrl);
+            const pngBlob: Blob = await new Promise((r) => canvas.toBlob((b) => r(b!), "image/png", 0.95));
+            file = new File([pngBlob], file.name.replace(/\.[^/.]+$/, ".png"), { type: "image/png" });
+            if (toolKey === "avatar") updateStep("convert", "done");
+        } catch (err: any) {
+            if (toolKey === "avatar") updateStep("convert", "error", "Falha na conversão SVG. Verifique se o arquivo é um SVG válido.");
+            throw new Error("Não foi possível processar o arquivo SVG.");
+        }
       }
 
       const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
       const maxSize = 10 * 1024 * 1024;
 
       if (!validTypes.includes(file.type)) {
-        toast.error("Formato inválido", { description: "Formatos aceitos: JPG, PNG, WEBP, SVG ou HEIC." });
+        const errorMsg = "Formato aceito: JPG, PNG, WEBP, SVG ou HEIC.";
+        if (toolKey === "avatar") updateStep("upload", "error", errorMsg);
+        toast.error("Formato inválido", { description: errorMsg });
         setIsUploading(false);
         return;
       }
       if (file.size > maxSize) {
-        toast.error("Arquivo muito grande", { description: "O tamanho máximo permitido é 10MB." });
+        const errorMsg = "O tamanho máximo permitido é 10MB.";
+        if (toolKey === "avatar") updateStep("upload", "error", errorMsg);
+        toast.error("Arquivo muito grande", { description: errorMsg });
         setIsUploading(false);
         return;
       }
@@ -279,22 +300,29 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     } catch (error: any) {
       console.error("Upload error:", error);
       toast.error("Falha ao carregar imagem: " + error.message);
-      if (toolKey === "avatar") updateStep("upload", "pending");
+      if (toolKey === "avatar" && progressSteps.find(s => s.key === "convert")?.status === "active") {
+          // Handled above, but ensuring fallback
+      } else if (toolKey === "avatar") {
+          updateStep("upload", "error", error.message);
+      }
     } finally {
       setIsUploading(false);
     }
   };
 
-  const handleCropConfirm = async (blob: Blob) => {
+  const handleCropConfirm = async (blob: Blob, preset: { zoom: number; aspect: number }) => {
     try {
       const publicUrl = await uploadBlobToStorage(blob, "png");
       setUploadedImageUrl(publicUrl);
+      setAvatarPreset(preset);
+      localStorage.setItem("creative_avatar_preset", JSON.stringify(preset));
       updateStep("upload", "done");
       setCropOpen(false);
       if (cropSourceUrl) URL.revokeObjectURL(cropSourceUrl);
       setCropSourceUrl(null);
       toast.success("Avatar ajustado e salvo!");
     } catch (error: any) {
+      updateStep("upload", "error", error.message);
       toast.error("Falha ao salvar recorte: " + error.message);
     }
   };
@@ -306,14 +334,36 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     toast.success("Avatar padrão da sessão removido.");
   };
 
-  const handleDownloadResult = async () => {
+  const handleDownloadResult = async (format: "png" | "jpg" = "png") => {
     if (!lastResult?.asset_url) return;
     try {
       const res = await fetch(lastResult.asset_url);
       const blob = await res.blob();
       const isVideo = lastResult.asset_url.endsWith(".mp4");
-      const ext = isVideo ? "mp4" : (blob.type.includes("png") ? "png" : "jpg");
-      const url = URL.createObjectURL(blob);
+      
+      let finalBlob = blob;
+      let ext = isVideo ? "mp4" : format;
+
+      if (!isVideo && format === "jpg") {
+        // Convert PNG/WebP blob to JPG via canvas if needed
+        const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+            const i = new Image();
+            i.onload = () => resolve(i);
+            i.onerror = reject;
+            i.src = URL.createObjectURL(blob);
+        });
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d")!;
+        ctx.fillStyle = "white"; // JPG doesn't support transparency
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0);
+        finalBlob = await new Promise((r) => canvas.toBlob((b) => r(b!), "image/jpeg", 0.90)) as Blob;
+        URL.revokeObjectURL(img.src);
+      }
+
+      const url = URL.createObjectURL(finalBlob);
       const a = document.createElement("a");
       a.href = url;
       a.download = `kubo-avatar-${Date.now()}.${ext}`;
@@ -696,15 +746,28 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                 Atualizar Comparação
               </Button>
               {lastResult.asset_url && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="text-[10px] h-7"
-                  onClick={handleDownloadResult}
-                >
-                  <Download className="h-3 w-3 mr-1.5" />
-                  Baixar {lastResult.asset_url.endsWith('.mp4') ? 'MP4' : 'PNG/JPG'}
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-[10px] h-7"
+                    onClick={() => handleDownloadResult("png")}
+                  >
+                    <Download className="h-3 w-3 mr-1.5" />
+                    Baixar {lastResult.asset_url.endsWith('.mp4') ? 'MP4' : 'PNG'}
+                  </Button>
+                  {!lastResult.asset_url.endsWith('.mp4') && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-[10px] h-7"
+                      onClick={() => handleDownloadResult("jpg")}
+                    >
+                      <Download className="h-3 w-3 mr-1.5" />
+                      Baixar JPG
+                    </Button>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -782,6 +845,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       <AvatarCropDialog
         open={cropOpen}
         imageUrl={cropSourceUrl}
+        initialPreset={avatarPreset}
         onCancel={() => {
           setCropOpen(false);
           if (cropSourceUrl && cropSourceUrl.startsWith("blob:")) URL.revokeObjectURL(cropSourceUrl);
