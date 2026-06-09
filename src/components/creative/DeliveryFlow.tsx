@@ -281,14 +281,27 @@ function AuditHistoryManager({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Download className="h-5 w-5 text-primary" />
-              Pré-visualização da Exportação ({exportFormat.toUpperCase()})
+              Opções de Exportação ({exportFormat.toUpperCase()})
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase text-muted-foreground">Escopo da Exportação</label>
+              <Select value={exportMode} onValueChange={(v: any) => setExportMode(v)}>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="filtered">Todos os resultados filtrados ({filteredLogs.length})</SelectItem>
+                  <SelectItem value="current_page">Apenas a página atual ({paginatedLogs.length})</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="p-4 rounded-lg bg-muted/50 border border-border/40 space-y-2">
               <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Total de registros:</span>
-                <span className="font-bold">{filteredLogs.length}</span>
+                <span className="text-muted-foreground">Registros a exportar:</span>
+                <span className="font-bold">{exportMode === "current_page" ? paginatedLogs.length : filteredLogs.length}</span>
               </div>
               <div className="flex justify-between text-xs">
                 <span className="text-muted-foreground">Filtro de busca:</span>
@@ -302,23 +315,12 @@ function AuditHistoryManager({
                 <span className="text-muted-foreground">Ordenação:</span>
                 <span className="font-bold uppercase text-[9px]">{sortField} ({sortOrder})</span>
               </div>
-              {filteredLogs.length > MAX_EXPORT_LIMIT && (
+              {(exportMode === "filtered" ? filteredLogs.length : paginatedLogs.length) > MAX_EXPORT_LIMIT && (
                 <div className="pt-2 mt-2 border-t border-destructive/20 text-destructive text-[10px] font-bold">
-                  * Apenas os primeiros {MAX_EXPORT_LIMIT} registros serão exportados.
+                  * Apenas os primeiros {MAX_EXPORT_LIMIT} registros selecionados serão exportados.
                 </div>
               )}
             </div>
-            
-            <ScrollArea className="h-32 border rounded-md p-2 bg-background/50">
-              <div className="space-y-1">
-                {filteredLogs.slice(0, 5).map(log => (
-                  <div key={log.id} className="text-[9px] text-muted-foreground border-b border-border/10 pb-1">
-                    {new Date(log.timestamp).toLocaleDateString()} - {log.user} - {log.attachmentName}
-                  </div>
-                ))}
-                {filteredLogs.length > 5 && <div className="text-[9px] text-muted-foreground italic">... e outros {filteredLogs.length - 5} registros</div>}
-              </div>
-            </ScrollArea>
           </div>
           <DialogFooter className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => setIsExportDialogOpen(false)}>Cancelar</Button>
@@ -326,6 +328,22 @@ function AuditHistoryManager({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <div className="bg-muted/30 p-2.5 rounded-lg border border-border/20 flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-1.5">
+          <Filter className="h-3 w-3 text-primary" />
+          <span className="text-[10px] font-bold uppercase text-muted-foreground">Resumo:</span>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {searchTerm && <Badge variant="secondary" className="text-[9px] h-4">Busca: "{searchTerm}"</Badge>}
+          {statusFilter !== "all" && <Badge variant="secondary" className="text-[9px] h-4">Status: {statusFilter}</Badge>}
+          {userFilter !== "all" && <Badge variant="secondary" className="text-[9px] h-4">Usuário: {userFilter}</Badge>}
+          {attachmentFilter !== "all" && <Badge variant="secondary" className="text-[9px] h-4">Anexo: {attachmentFilter}</Badge>}
+          {filterByAttachment && <Badge variant="secondary" className="text-[9px] h-4">Contexto: {filterByAttachment}</Badge>}
+          <Badge variant="outline" className="text-[9px] h-4 border-primary/20 bg-primary/5">Ordem: {sortField} ({sortOrder === "asc" ? "Cresc" : "Decresc"})</Badge>
+          <Badge variant="outline" className="text-[9px] h-4">Exibindo {paginatedLogs.length} de {filteredLogs.length}</Badge>
+        </div>
+      </div>
 
       {showFilters && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
