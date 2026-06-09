@@ -360,7 +360,7 @@ export function DeliveryFlow() {
       });
     }
 
-    if (!isDryRun) notifyResult(finalStatus, environment, 1, newItem.pwaUrl);
+    if (!isDryRun) notifyResult(finalStatus, environment, 1, newItem.pwaUrl, newItem.evidence);
   };
 
   const downloadLogs = (historyItem: DeployHistoryItem, format: "json" | "csv") => {
