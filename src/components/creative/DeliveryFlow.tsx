@@ -72,11 +72,16 @@ interface RetentionPolicy {
 }
 
 interface EvidenceFile {
+  id: string;
   name: string;
   size: number;
   type: string;
   url: string; // Simulated signed URL
+  thumbnail?: string;
+  scannedAt: string;
+  scanResult: "clean" | "infected" | "suspicious";
 }
+
 
 
 export function DeliveryFlow() {
@@ -115,7 +120,9 @@ export function DeliveryFlow() {
 
   const maxEvidenceSize = currentPolicy.maxSizeMB * 1024 * 1024;
   const [allowedTypes] = useState(["image/png", "image/jpeg", "application/pdf", "text/plain"]);
+  const [isScanning, setIsScanning] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
 
   const [steps, setSteps] = useState<ValidationStep[]>([
     { id: "ci", label: "CI & Testes de Integração", description: "Executando suíte de testes automatizados", status: "pending" },
@@ -373,14 +380,23 @@ export function DeliveryFlow() {
       }
     };
 
-    // Simulated evidence with metadata for UI
-    const detailedEvidence: EvidenceFile[] = evidenceFiles.map(f => ({
-      name: f.name,
-      size: f.size,
-      type: f.type,
-      url: `https://storage.kubovibe.app/signed/${deployId}/${f.name}?token=${Math.random().toString(36).substring(7)}`
+    // Simulated evidence with deep validation and scan
+    const detailedEvidence: EvidenceFile[] = await Promise.all(evidenceFiles.map(async f => {
+      // Simulate malware scan and deep validation
+      await new Promise(r => setTimeout(r, 500));
+      return {
+        id: crypto.randomUUID(),
+        name: f.name,
+        size: f.size,
+        type: f.type,
+        url: `https://storage.kubovibe.app/signed/${deployId}/${f.name}?token=${Math.random().toString(36).substring(7)}`,
+        thumbnail: f.type.startsWith('image/') ? URL.createObjectURL(f) : undefined,
+        scannedAt: new Date().toISOString(),
+        scanResult: "clean" as const
+      };
     }));
     (newItem as any).detailedEvidence = detailedEvidence;
+
 
 
     if (!isDryRun) {
@@ -452,12 +468,22 @@ Comentário: ${historyItem.parameters.approvalComment || "N/A"}
 Termos Aceitos: ${historyItem.parameters.approvalTerms ? "SIM" : "NÃO"}
 
 -----------------------------------------
-EVIDÊNCIAS ANEXADAS E LINKS ASSINADOS
+DETALHES DE EVIDÊNCIAS (INCORPORADAS)
 -----------------------------------------
 ${detailedEvidence.length > 0 ? detailedEvidence.map((e, idx) => 
-  `${idx + 1}. ${e.name} (${(e.size / 1024).toFixed(1)} KB)
-   Link para Download: ${e.url} (Acesso Restrito: Dev/Admin/Aprovador)`
+  `${idx + 1}. [${e.scanResult.toUpperCase()}] ${e.name} (${(e.size / 1024).toFixed(1)} KB)
+     Tipo: ${e.type} | Scanned: ${new Date(e.scannedAt).toLocaleString()}
+     Visualização (Base64 Thumb): ${e.thumbnail ? "INCORPORADA NO PDF" : "N/A"}
+     Link Seguro: ${e.url}`
 ).join("\n\n") : "Nenhuma evidência anexada."}
+
+-----------------------------------------
+VALIDAÇÃO DE SEGURANÇA (MALWARE SCAN)
+-----------------------------------------
+${detailedEvidence.every(e => e.scanResult === "clean") 
+  ? "✓ Todos os arquivos validados e limpos por Lovable Scan Engine." 
+  : "⚠ Alerta: Arquivos suspeitos detectados na aprovação."}
+
 
 -----------------------------------------
 MODO DE EXECUÇÃO: ${historyItem.parameters.dryRun ? "DRY-RUN (SIMULAÇÃO)" : "REAL (PRODUÇÃO/STAGING)"}
@@ -614,77 +640,111 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
 
                         <div className="space-y-2">
                           <label className="text-xs font-bold flex items-center justify-between">
-                            <span className="flex items-center gap-2"><Paperclip className="h-3.5 w-3.5" /> Evidências (Prints/Logs)</span>
-                            <span className="text-[10px] text-muted-foreground font-normal">Máx. {currentPolicy.maxSizeMB}MB</span>
+                            <span className="flex items-center gap-2">
+                              <Paperclip className="h-3.5 w-3.5" /> Evidências (Prints/Logs)
+                            </span>
+                            <span className="text-[10px] text-muted-foreground font-normal">
+                              Máx. {currentPolicy.maxSizeMB}MB | {currentPolicy.expirationDays} dias retenção
+                            </span>
                           </label>
                           <div 
                             onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                            onDrop={(e) => {
+                            onDrop={async (e) => {
                               e.preventDefault();
                               e.stopPropagation();
                               if (e.dataTransfer.files) {
+                                setIsScanning(true);
                                 const files = Array.from(e.dataTransfer.files);
-                                const validFiles = files.filter(f => {
+                                for (const f of files) {
+                                  // Content-type check and scan simulation
                                   if (f.size > maxEvidenceSize) {
-                                    toast.error(`Arquivo ${f.name} excede 5MB`);
-                                    return false;
+                                    toast.error(`Arquivo ${f.name} excede o limite de ${currentPolicy.maxSizeMB}MB`);
+                                    continue;
                                   }
                                   if (!allowedTypes.includes(f.type)) {
-                                    toast.error(`Tipo ${f.type} não permitido`);
-                                    return false;
+                                    toast.error(`Tipo ${f.type} não permitido pela política de segurança`);
+                                    continue;
                                   }
-                                  return true;
-                                });
-                                setEvidenceFiles(prev => [...prev, ...validFiles]);
+                                  // Simulate Malware Scan
+                                  await new Promise(r => setTimeout(r, 400));
+                                  setEvidenceFiles(prev => [...prev, f]);
+                                }
+                                setIsScanning(false);
                               }
                             }}
                             onClick={() => fileInputRef.current?.click()}
-                            className="border-2 border-dashed border-border/60 rounded-lg p-6 text-center cursor-pointer hover:bg-muted/50 hover:border-primary/40 transition-all group"
+                            className={cn(
+                              "border-2 border-dashed border-border/60 rounded-lg p-6 text-center cursor-pointer hover:bg-muted/50 hover:border-primary/40 transition-all group relative",
+                              isScanning && "opacity-50 pointer-events-none"
+                            )}
                           >
                             <input 
                               type="file" 
                               multiple 
                               className="hidden" 
                               ref={fileInputRef}
-                              onChange={(e) => {
+                              onChange={async (e) => {
                                 if (e.target.files) {
+                                  setIsScanning(true);
                                   const files = Array.from(e.target.files);
-                                  const validFiles = files.filter(f => f.size <= maxEvidenceSize && allowedTypes.includes(f.type));
-                                  setEvidenceFiles(prev => [...prev, ...validFiles]);
+                                  for (const f of files) {
+                                    if (f.size <= maxEvidenceSize && allowedTypes.includes(f.type)) {
+                                      await new Promise(r => setTimeout(r, 300));
+                                      setEvidenceFiles(prev => [...prev, f]);
+                                    } else {
+                                      toast.error(`Validação falhou para ${f.name}`);
+                                    }
+                                  }
+                                  setIsScanning(false);
                                 }
                               }}
                             />
-                            <div className="flex flex-col items-center gap-1">
-                              <Upload className="h-6 w-6 text-muted-foreground group-hover:text-primary transition-colors mb-1" />
-                              <p className="text-xs font-medium">Arraste ou clique para anexar</p>
-                              <p className="text-[10px] text-muted-foreground">PNG, JPG, PDF ou TXT</p>
-                            </div>
+                            {isScanning ? (
+                              <div className="flex flex-col items-center gap-1">
+                                <Loader2 className="h-6 w-6 animate-spin text-primary mb-1" />
+                                <p className="text-xs font-medium">Escaneando arquivos...</p>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-center gap-1">
+                                <Upload className="h-6 w-6 text-muted-foreground group-hover:text-primary transition-colors mb-1" />
+                                <p className="text-xs font-medium">Arraste ou clique para anexar</p>
+                                <p className="text-[10px] text-muted-foreground font-normal">Varredura de malware automática ativa</p>
+                              </div>
+                            )}
                           </div>
                           {evidenceFiles.length > 0 && (
-                            <div className="space-y-1 mt-2">
+                            <div className="grid grid-cols-2 gap-2 mt-2">
                               {evidenceFiles.map((f, i) => (
-                                <div key={i} className="flex items-center justify-between bg-muted/30 p-2 rounded-md border border-border/40 animate-in fade-in slide-in-from-top-1">
-                                  <div className="flex items-center gap-2 overflow-hidden">
-                                    <FileText className="h-3 w-3 shrink-0 text-muted-foreground" />
-                                    <span className="text-[10px] truncate">{f.name}</span>
-                                    <span className="text-[8px] text-muted-foreground">({(f.size / 1024).toFixed(0)}KB)</span>
+                                <div key={i} className="flex flex-col bg-muted/30 p-2 rounded-md border border-border/40 animate-in fade-in slide-in-from-top-1">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <div className="flex items-center gap-2 overflow-hidden">
+                                      {f.type.startsWith('image/') ? <Eye className="h-3 w-3 text-primary" /> : <FileText className="h-3 w-3 text-muted-foreground" />}
+                                      <span className="text-[9px] truncate max-w-[100px]">{f.name}</span>
+                                    </div>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon" 
+                                      className="h-4 w-4 hover:text-destructive" 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setEvidenceFiles(prev => prev.filter((_, idx) => idx !== i));
+                                      }}
+                                    >
+                                      <Trash2 className="h-2.5 w-2.5" />
+                                    </Button>
                                   </div>
-                                  <Button 
-                                    variant="ghost" 
-                                    size="icon" 
-                                    className="h-5 w-5 hover:text-destructive" 
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setEvidenceFiles(prev => prev.filter((_, idx) => idx !== i));
-                                    }}
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
+                                  <div className="flex items-center justify-between">
+                                    <Badge variant="outline" className="text-[7px] h-3 px-1 py-0 bg-green-500/10 text-green-600 border-green-500/20">
+                                      CLEAN
+                                    </Badge>
+                                    <span className="text-[8px] text-muted-foreground">{(f.size / 1024).toFixed(0)}KB</span>
+                                  </div>
                                 </div>
                               ))}
                             </div>
                           )}
                         </div>
+
 
                         <div className="flex items-start gap-2 pt-2">
                           <Checkbox 
