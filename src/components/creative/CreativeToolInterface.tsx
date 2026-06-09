@@ -6,12 +6,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Sparkles, Send, Coins, Settings2, Info, AlertCircle, Wallet, RotateCw, Upload, X, Image as ImageIcon } from "lucide-react";
+import { Loader2, Sparkles, Send, Coins, Settings2, Info, AlertCircle, Wallet, RotateCw, Upload, X, Image as ImageIcon, Download, Crop as CropIcon, Trash2 } from "lucide-react";
 import { useSubscription } from "@/hooks/useSubscription";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { AvatarCropDialog } from "./AvatarCropDialog";
+import { AvatarProgressSteps, type AvatarStepState, type AvatarStepKey } from "./AvatarProgressSteps";
 
 type ToolKey = "chat" | "nano_banana" | "downloader" | "clips" | "avatar" | "shorts" | "music" | "ebook" | "emo";
 
@@ -127,6 +129,20 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     }
     return null;
   });
+  const [cropSourceUrl, setCropSourceUrl] = useState<string | null>(null);
+  const [cropOpen, setCropOpen] = useState(false);
+  const [progressSteps, setProgressSteps] = useState<AvatarStepState[]>([]);
+
+  const buildSteps = (needsConvert: boolean): AvatarStepState[] => [
+    { key: "upload", label: "Upload da imagem", status: "pending" },
+    { key: "convert", label: "Conversão HEIC/SVG", status: needsConvert ? "pending" : "skipped" },
+    { key: "generate", label: "Geração do avatar falante", status: "pending" },
+    { key: "render", label: "Renderização final", status: "pending" },
+  ];
+
+  const updateStep = (key: AvatarStepKey, status: AvatarStepState["status"]) => {
+    setProgressSteps((prev) => prev.map((s) => (s.key === key ? { ...s, status } : s)));
+  };
 
   const fetchLastResult = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -173,73 +189,143 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
   }, []);
   const { subscription, editsRemaining } = useSubscription();
 
+  const uploadBlobToStorage = async (blob: Blob, extension: string): Promise<string> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Usuário não autenticado");
+    const filePath = `${user.id}/creative/${crypto.randomUUID()}.${extension}`;
+    const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, blob);
+    if (uploadError) throw uploadError;
+    const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath);
+    return publicUrl;
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     let file = e.target.files?.[0];
+    // Reset input so selecting the same file again triggers change
+    e.target.value = "";
     if (!file) return;
 
     setIsUploading(true);
+    const needsConvert =
+      file.type === "image/heic" ||
+      file.name.toLowerCase().endsWith(".heic") ||
+      file.type === "image/svg+xml";
+    if (toolKey === "avatar") setProgressSteps(buildSteps(needsConvert));
     try {
-      // Support for HEIC conversion
+      if (toolKey === "avatar") updateStep("upload", "active");
+
+      // Convert HEIC → JPG
       if (file.type === "image/heic" || file.name.toLowerCase().endsWith(".heic")) {
+        if (toolKey === "avatar") updateStep("convert", "active");
         toast.info("Convertendo formato HEIC...");
-        const convertedBlob = await heic2any({ 
-          blob: file, 
-          toType: "image/jpeg",
-          quality: 0.8
-        });
-        const convertedFile = new File(
-          [Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob], 
-          file.name.replace(/\.[^/.]+$/, ".jpg"), 
+        const convertedBlob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.85 });
+        file = new File(
+          [Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob],
+          file.name.replace(/\.[^/.]+$/, ".jpg"),
           { type: "image/jpeg" }
         );
-        file = convertedFile;
+        if (toolKey === "avatar") updateStep("convert", "done");
+      } else if (file.type === "image/svg+xml") {
+        // Convert SVG → PNG via canvas
+        if (toolKey === "avatar") updateStep("convert", "active");
+        toast.info("Convertendo SVG para PNG...");
+        const svgText = await file.text();
+        const blobUrl = URL.createObjectURL(new Blob([svgText], { type: "image/svg+xml" }));
+        const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+          const i = new Image();
+          i.onload = () => resolve(i);
+          i.onerror = reject;
+          i.src = blobUrl;
+        });
+        const size = Math.max(img.width || 512, img.height || 512, 512);
+        const canvas = document.createElement("canvas");
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext("2d")!;
+        ctx.drawImage(img, 0, 0, size, size);
+        URL.revokeObjectURL(blobUrl);
+        const pngBlob: Blob = await new Promise((r) => canvas.toBlob((b) => r(b!), "image/png", 0.95));
+        file = new File([pngBlob], file.name.replace(/\.[^/.]+$/, ".png"), { type: "image/png" });
+        if (toolKey === "avatar") updateStep("convert", "done");
       }
 
-      // Validate type and size (max 10MB for support of more formats)
-      const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml', 'image/heic'];
-      const maxSize = 10 * 1024 * 1024; // 10MB
+      const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+      const maxSize = 10 * 1024 * 1024;
 
-      if (!validTypes.includes(file.type) && !file.name.toLowerCase().endsWith('.heic')) {
-        toast.error("Formato inválido", {
-          description: "Formatos aceitos: JPG, PNG, WEBP, SVG ou HEIC."
-        });
+      if (!validTypes.includes(file.type)) {
+        toast.error("Formato inválido", { description: "Formatos aceitos: JPG, PNG, WEBP, SVG ou HEIC." });
         setIsUploading(false);
         return;
       }
-
       if (file.size > maxSize) {
-        toast.error("Arquivo muito grande", {
-          description: "O tamanho máximo permitido é 10MB."
-        });
+        toast.error("Arquivo muito grande", { description: "O tamanho máximo permitido é 10MB." });
         setIsUploading(false);
         return;
       }
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuário não autenticado");
+      // For avatar, open crop dialog using a local object URL (don't upload yet)
+      if (toolKey === "avatar") {
+        const localUrl = URL.createObjectURL(file);
+        setCropSourceUrl(localUrl);
+        setCropOpen(true);
+        setIsUploading(false);
+        return;
+      }
 
-      const fileExt = file.name.split('.').pop();
-      const filePath = `${user.id}/creative/${crypto.randomUUID()}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(filePath);
-
+      const fileExt = file.name.split('.').pop() || "png";
+      const publicUrl = await uploadBlobToStorage(file, fileExt);
       setUploadedImageUrl(publicUrl);
       toast.success("Imagem carregada com sucesso!");
     } catch (error: any) {
       console.error("Upload error:", error);
       toast.error("Falha ao carregar imagem: " + error.message);
+      if (toolKey === "avatar") updateStep("upload", "pending");
     } finally {
       setIsUploading(false);
     }
   };
+
+  const handleCropConfirm = async (blob: Blob) => {
+    try {
+      const publicUrl = await uploadBlobToStorage(blob, "png");
+      setUploadedImageUrl(publicUrl);
+      updateStep("upload", "done");
+      setCropOpen(false);
+      if (cropSourceUrl) URL.revokeObjectURL(cropSourceUrl);
+      setCropSourceUrl(null);
+      toast.success("Avatar ajustado e salvo!");
+    } catch (error: any) {
+      toast.error("Falha ao salvar recorte: " + error.message);
+    }
+  };
+
+  const handleResetSessionAvatar = () => {
+    localStorage.removeItem("creative_last_avatar_image");
+    setUploadedImageUrl(null);
+    setProgressSteps([]);
+    toast.success("Avatar padrão da sessão removido.");
+  };
+
+  const handleDownloadResult = async () => {
+    if (!lastResult?.asset_url) return;
+    try {
+      const res = await fetch(lastResult.asset_url);
+      const blob = await res.blob();
+      const isVideo = lastResult.asset_url.endsWith(".mp4");
+      const ext = isVideo ? "mp4" : (blob.type.includes("png") ? "png" : "jpg");
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `kubo-avatar-${Date.now()}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      toast.error("Falha ao baixar: " + e.message);
+    }
+  };
+
 
   const handleExecute = async () => {
     if (loading) return;
@@ -267,6 +353,17 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     setLoading(true);
     setTraceInfo(null);
     setErrorState(null);
+    if (toolKey === "avatar") {
+      // Ensure steps reflect generation phase (upload is already done)
+      setProgressSteps((prev) => {
+        const base = prev.length ? prev : buildSteps(false);
+        return base.map((s) => {
+          if (s.key === "upload") return { ...s, status: "done" };
+          if (s.key === "generate") return { ...s, status: "active" };
+          return s;
+        });
+      });
+    }
     try {
       if (simulationMode) {
         const cId = crypto.randomUUID().slice(0, 8);
@@ -324,11 +421,22 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
         throw new Error(data.error || "Erro na execução");
       }
 
+      if (toolKey === "avatar") {
+        updateStep("generate", "done");
+        updateStep("render", "active");
+      }
       toast.success("Solicitação enviada!", {
         description: "Você pode acompanhar o progresso no histórico.",
       });
       setPrompt("");
       onSuccess?.();
+      if (toolKey === "avatar") {
+        // Re-fetch result and finalize render step shortly after
+        setTimeout(async () => {
+          await fetchLastResult();
+          updateStep("render", "done");
+        }, 1500);
+      }
     } catch (e: any) {
       console.error("[CreativePanel:Configuration] execution_exception", { toolKey, error: e.message, stack: e.stack });
       setErrorState({
@@ -337,6 +445,13 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
         traceId: traceInfo?.traceId,
         stack: e.stack
       });
+      if (toolKey === "avatar") {
+        setProgressSteps((prev) =>
+          prev.map((s) =>
+            s.status === "active" ? { ...s, status: "pending" } : s
+          )
+        );
+      }
       toast.error(e.message);
     } finally {
       setLoading(false);
@@ -482,16 +597,33 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                     </Button>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="h-8 text-xs" 
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs"
                     onClick={() => document.getElementById('avatar-upload')?.click()}
                   >
-                    <Upload className="h-3 w-3 mr-1.5" /> Trocar Imagem
+                    <Upload className="h-3 w-3 mr-1.5" /> Trocar
                   </Button>
-                  <input type="file" id="avatar-upload" className="hidden" accept="image/jpeg,image/png,image/webp" onChange={handleFileUpload} disabled={isUploading} />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs"
+                    onClick={() => { setCropSourceUrl(uploadedImageUrl); setCropOpen(true); }}
+                  >
+                    <CropIcon className="h-3 w-3 mr-1.5" /> Ajustar / Zoom
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 text-xs text-destructive hover:text-destructive"
+                    onClick={handleResetSessionAvatar}
+                    title="Limpa o localStorage e remove o avatar padrão da sessão"
+                  >
+                    <Trash2 className="h-3 w-3 mr-1.5" /> Redefinir padrão
+                  </Button>
+                  <input type="file" id="avatar-upload" className="hidden" accept="image/jpeg,image/png,image/webp,image/svg+xml,image/heic,.heic" onChange={handleFileUpload} disabled={isUploading} />
                 </div>
               </div>
             ) : (
@@ -507,7 +639,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                       </>
                     )}
                   </div>
-                  <input type="file" className="hidden" accept="image/jpeg,image/png,image/webp" onChange={handleFileUpload} disabled={isUploading} />
+                  <input type="file" className="hidden" accept="image/jpeg,image/png,image/webp,image/svg+xml,image/heic,.heic" onChange={handleFileUpload} disabled={isUploading} />
                 </label>
                 <div className="space-y-1">
                   <p className="text-xs text-muted-foreground font-medium">Requisitos da Imagem:</p>
@@ -520,6 +652,10 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
               </div>
             )}
           </div>
+        )}
+
+        {toolKey === "avatar" && progressSteps.length > 0 && (
+          <AvatarProgressSteps steps={progressSteps} />
         )}
 
         {/* Comparison Section (Before vs After) */}
@@ -550,15 +686,26 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                 </div>
               </div>
             </div>
-            <div className="flex justify-center">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="text-[10px] h-6 opacity-60 hover:opacity-100"
+            <div className="flex justify-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-[10px] h-7 opacity-60 hover:opacity-100"
                 onClick={fetchLastResult}
               >
                 Atualizar Comparação
               </Button>
+              {lastResult.asset_url && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-[10px] h-7"
+                  onClick={handleDownloadResult}
+                >
+                  <Download className="h-3 w-3 mr-1.5" />
+                  Baixar {lastResult.asset_url.endsWith('.mp4') ? 'MP4' : 'PNG/JPG'}
+                </Button>
+              )}
             </div>
           </div>
         )}
@@ -631,6 +778,17 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
           </Button>
         </div>
       </Card>
+
+      <AvatarCropDialog
+        open={cropOpen}
+        imageUrl={cropSourceUrl}
+        onCancel={() => {
+          setCropOpen(false);
+          if (cropSourceUrl && cropSourceUrl.startsWith("blob:")) URL.revokeObjectURL(cropSourceUrl);
+          setCropSourceUrl(null);
+        }}
+        onConfirm={handleCropConfirm}
+      />
     </div>
   );
 }
