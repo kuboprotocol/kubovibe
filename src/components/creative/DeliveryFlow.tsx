@@ -1,4 +1,4 @@
-import { Check, X, Loader2, PlayCircle, Globe, ShieldCheck, Smartphone, Package, Code, AlertCircle, Terminal, History, Download, ExternalLink, QrCode, Filter, Search, Mail, Bell, FileJson, FileSpreadsheet, FileText, UserCheck, RotateCcw, FileBadge, Lock, MessageSquare, ShieldAlert, Activity, Cpu, Upload, Paperclip, Eye, Clock } from "lucide-react";
+import { Check, X, Loader2, PlayCircle, Globe, ShieldCheck, Smartphone, Package, Code, AlertCircle, Terminal, History, Download, ExternalLink, QrCode, Filter, Search, Mail, Bell, FileJson, FileSpreadsheet, FileText, UserCheck, RotateCcw, FileBadge, Lock, MessageSquare, ShieldAlert, Activity, Cpu, Upload, Paperclip, Eye, Clock, Trash2 } from "lucide-react";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -70,7 +70,11 @@ export function DeliveryFlow() {
   const [logs, setLogs] = useState<DeployLog[]>([]);
   const [activeTab, setActiveTab] = useState("current");
   const [historySearch, setHistorySearch] = useState("");
+  const [historyUserSearch, setHistoryUserSearch] = useState("");
   const [historyFilter, setHistoryFilter] = useState("all");
+  const [historyStatusFilter, setHistoryStatusFilter] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
   const [showQR, setShowQR] = useState(false);
   const [notifications, setNotifications] = useState({ email: true, webhook: false });
   const [currentUserRole, setCurrentUserRole] = useState<string>("admin"); // Mock role: 'admin', 'developer', 'viewer'
@@ -81,6 +85,8 @@ export function DeliveryFlow() {
   const [isDryRun, setIsDryRun] = useState(false);
   const [activeDeploys, setActiveDeploys] = useState<ActiveDeploy[]>([]);
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
+  const [maxEvidenceSize] = useState(5 * 1024 * 1024); // 5MB limit
+  const [allowedTypes] = useState(["image/png", "image/jpeg", "application/pdf", "text/plain"]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [steps, setSteps] = useState<ValidationStep[]>([
@@ -117,18 +123,19 @@ export function DeliveryFlow() {
     return newLog;
   };
 
-  const notifyResult = async (status: "success" | "error", env: string, attempt = 1, pwaUrl?: string) => {
+  const notifyResult = async (status: "success" | "error", env: string, attempt = 1, pwaUrl?: string, evidence?: string[]) => {
     // Retry logic & Deduplication (simulated)
     const notificationPayload = {
       status,
       environment: env,
       timestamp: new Date().toISOString(),
       pwaUrl: pwaUrl || "https://kubovibe.app",
-      steps: steps.map(s => ({ id: s.id, label: s.label, status: s.status }))
+      steps: steps.map(s => ({ id: s.id, label: s.label, status: s.status })),
+      evidenceReferences: evidence || []
     };
 
     if (notifications.email) {
-      console.log(`[Notification] Enviando e-mail (Tentativa ${attempt})...`, notificationPayload);
+      console.log(`[Notification] Enviando e-mail de resumo (Tentativa ${attempt})...`, notificationPayload);
       try {
         // Mock success with 90% chance
         if (Math.random() < 0.9) {
@@ -137,7 +144,7 @@ export function DeliveryFlow() {
       } catch (err) {
         if (attempt < 3) {
           console.warn("Retrying email notification...");
-          setTimeout(() => notifyResult(status, env, attempt + 1, pwaUrl), 2000);
+          setTimeout(() => notifyResult(status, env, attempt + 1, pwaUrl, evidence), 2000);
         } else {
           toast.error("Falha ao enviar e-mail após 3 tentativas");
         }
@@ -357,7 +364,7 @@ export function DeliveryFlow() {
       });
     }
 
-    if (!isDryRun) notifyResult(finalStatus, environment, 1, newItem.pwaUrl);
+    if (!isDryRun) notifyResult(finalStatus, environment, 1, newItem.pwaUrl, newItem.evidence);
   };
 
   const downloadLogs = (historyItem: DeployHistoryItem, format: "json" | "csv") => {
@@ -435,11 +442,22 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
     toast.success("Relatório de auditoria gerado e baixado");
   };
 
-  const filteredHistory = history.filter(item => {
-    const matchesSearch = item.commit.toLowerCase().includes(historySearch.toLowerCase());
-    const matchesFilter = historyFilter === "all" || item.environment === historyFilter;
-    return matchesSearch && matchesFilter;
-  });
+  const filteredHistory = useMemo(() => {
+    return history.filter(item => {
+      const matchesCommit = item.commit.toLowerCase().includes(historySearch.toLowerCase());
+      const matchesUser = (item.user || "admin").toLowerCase().includes(historyUserSearch.toLowerCase());
+      const matchesEnv = historyFilter === "all" || item.environment === historyFilter;
+      const matchesStatus = historyStatusFilter === "all" || item.status === historyStatusFilter;
+      return matchesCommit && matchesUser && matchesEnv && matchesStatus;
+    });
+  }, [history, historySearch, historyUserSearch, historyFilter, historyStatusFilter]);
+
+  const paginatedHistory = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredHistory.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredHistory, currentPage]);
+
+  const totalPages = Math.ceil(filteredHistory.length / itemsPerPage);
 
   return (
     <Card className="p-6 bg-card/50 backdrop-blur-xl border-primary/20 shadow-2xl overflow-hidden">
@@ -546,12 +564,33 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
                         </div>
 
                         <div className="space-y-2">
-                          <label className="text-xs font-bold flex items-center gap-2">
-                            <Paperclip className="h-3.5 w-3.5" /> Evidências (Prints/Logs)
+                          <label className="text-xs font-bold flex items-center justify-between">
+                            <span className="flex items-center gap-2"><Paperclip className="h-3.5 w-3.5" /> Evidências (Prints/Logs)</span>
+                            <span className="text-[10px] text-muted-foreground font-normal">Máx. 5MB</span>
                           </label>
                           <div 
+                            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              if (e.dataTransfer.files) {
+                                const files = Array.from(e.dataTransfer.files);
+                                const validFiles = files.filter(f => {
+                                  if (f.size > maxEvidenceSize) {
+                                    toast.error(`Arquivo ${f.name} excede 5MB`);
+                                    return false;
+                                  }
+                                  if (!allowedTypes.includes(f.type)) {
+                                    toast.error(`Tipo ${f.type} não permitido`);
+                                    return false;
+                                  }
+                                  return true;
+                                });
+                                setEvidenceFiles(prev => [...prev, ...validFiles]);
+                              }
+                            }}
                             onClick={() => fileInputRef.current?.click()}
-                            className="border-2 border-dashed border-border/60 rounded-lg p-4 text-center cursor-pointer hover:bg-muted/50 transition-colors"
+                            className="border-2 border-dashed border-border/60 rounded-lg p-6 text-center cursor-pointer hover:bg-muted/50 hover:border-primary/40 transition-all group"
                           >
                             <input 
                               type="file" 
@@ -560,23 +599,39 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
                               ref={fileInputRef}
                               onChange={(e) => {
                                 if (e.target.files) {
-                                  setEvidenceFiles(Array.from(e.target.files));
+                                  const files = Array.from(e.target.files);
+                                  const validFiles = files.filter(f => f.size <= maxEvidenceSize && allowedTypes.includes(f.type));
+                                  setEvidenceFiles(prev => [...prev, ...validFiles]);
                                 }
                               }}
                             />
-                            <Upload className="h-4 w-4 mx-auto mb-2 text-muted-foreground" />
-                            <p className="text-[10px] text-muted-foreground">
-                              {evidenceFiles.length > 0 
-                                ? `${evidenceFiles.length} arquivos selecionados` 
-                                : "Clique para anexar prints de testes ou logs"}
-                            </p>
+                            <div className="flex flex-col items-center gap-1">
+                              <Upload className="h-6 w-6 text-muted-foreground group-hover:text-primary transition-colors mb-1" />
+                              <p className="text-xs font-medium">Arraste ou clique para anexar</p>
+                              <p className="text-[10px] text-muted-foreground">PNG, JPG, PDF ou TXT</p>
+                            </div>
                           </div>
                           {evidenceFiles.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
+                            <div className="space-y-1 mt-2">
                               {evidenceFiles.map((f, i) => (
-                                <Badge key={i} variant="outline" className="text-[8px] py-0 h-4">
-                                  {f.name}
-                                </Badge>
+                                <div key={i} className="flex items-center justify-between bg-muted/30 p-2 rounded-md border border-border/40 animate-in fade-in slide-in-from-top-1">
+                                  <div className="flex items-center gap-2 overflow-hidden">
+                                    <FileText className="h-3 w-3 shrink-0 text-muted-foreground" />
+                                    <span className="text-[10px] truncate">{f.name}</span>
+                                    <span className="text-[8px] text-muted-foreground">({(f.size / 1024).toFixed(0)}KB)</span>
+                                  </div>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-5 w-5 hover:text-destructive" 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setEvidenceFiles(prev => prev.filter((_, idx) => idx !== i));
+                                    }}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
                               ))}
                             </div>
                           )}
@@ -775,25 +830,46 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
         </TabsContent>
 
         <TabsContent value="history" className="space-y-4 mt-0">
-          <div className="flex gap-2">
-            <div className="relative flex-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+            <div className="relative">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input 
-                placeholder="Buscar por commit..." 
-                className="pl-9 h-9"
+                placeholder="Commit..." 
+                className="pl-9 h-9 text-xs"
                 value={historySearch}
-                onChange={(e) => setHistorySearch(e.target.value)}
+                onChange={(e) => { setHistorySearch(e.target.value); setCurrentPage(1); }}
               />
             </div>
-            <Select value={historyFilter} onValueChange={setHistoryFilter}>
-              <SelectTrigger className="w-[130px] h-9">
+            <div className="relative">
+              <UserCheck className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Usuário..." 
+                className="pl-9 h-9 text-xs"
+                value={historyUserSearch}
+                onChange={(e) => { setHistoryUserSearch(e.target.value); setCurrentPage(1); }}
+              />
+            </div>
+            <Select value={historyFilter} onValueChange={(v) => { setHistoryFilter(v); setCurrentPage(1); }}>
+              <SelectTrigger className="h-9 text-xs">
                 <Filter className="h-3.5 w-3.5 mr-2" />
-                <SelectValue />
+                <SelectValue placeholder="Ambiente" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="all">Todos Ambientes</SelectItem>
                 <SelectItem value="staging">Staging</SelectItem>
                 <SelectItem value="production">Produção</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={historyStatusFilter} onValueChange={(v) => { setHistoryStatusFilter(v); setCurrentPage(1); }}>
+              <SelectTrigger className="h-9 text-xs">
+                <Activity className="h-3.5 w-3.5 mr-2" />
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos Status</SelectItem>
+                <SelectItem value="success">Sucesso</SelectItem>
+                <SelectItem value="error">Falha</SelectItem>
+                <SelectItem value="blocked">Bloqueado</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -806,7 +882,7 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
                   <p className="text-xs">Nenhum deploy encontrado</p>
                 </div>
               )}
-              {filteredHistory.map((item) => (
+              {paginatedHistory.map((item) => (
                 <div key={item.id} className={cn(
                   "p-4 rounded-xl border transition-colors",
                   item.status === "blocked" ? "border-destructive/30 bg-destructive/5" : "border-border/20 bg-muted/20 hover:bg-muted/30"
@@ -906,9 +982,14 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
                               </div>
                               <div className="space-y-1">
                                 <p className="text-[10px] uppercase text-muted-foreground font-bold">Evidências ({item.evidence?.length || 0})</p>
-                                <div className="flex flex-wrap gap-1">
+                                <div className="space-y-1">
                                   {item.evidence?.map((f, idx) => (
-                                    <Badge key={idx} variant="secondary" className="text-[9px]">{f}</Badge>
+                                    <div key={idx} className="flex items-center justify-between bg-muted/30 p-1.5 rounded border border-border/40">
+                                      <span className="text-[10px] truncate max-w-[150px]">{f}</span>
+                                      <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => toast.info(`Iniciando download de ${f}`)}>
+                                        <Download className="h-3 w-3" />
+                                      </Button>
+                                    </div>
                                   )) || <span className="text-[10px] text-muted-foreground">Nenhuma evidência anexada</span>}
                                 </div>
                               </div>
@@ -974,6 +1055,30 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
               ))}
             </div>
           </ScrollArea>
+          
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 mt-4">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(prev => prev - 1)}
+              >
+                Anterior
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                Página {currentPage} de {totalPages}
+              </span>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(prev => prev + 1)}
+              >
+                Próxima
+              </Button>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </Card>
