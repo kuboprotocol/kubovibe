@@ -70,7 +70,11 @@ export function DeliveryFlow() {
   const [logs, setLogs] = useState<DeployLog[]>([]);
   const [activeTab, setActiveTab] = useState("current");
   const [historySearch, setHistorySearch] = useState("");
+  const [historyUserSearch, setHistoryUserSearch] = useState("");
   const [historyFilter, setHistoryFilter] = useState("all");
+  const [historyStatusFilter, setHistoryStatusFilter] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
   const [showQR, setShowQR] = useState(false);
   const [notifications, setNotifications] = useState({ email: true, webhook: false });
   const [currentUserRole, setCurrentUserRole] = useState<string>("admin"); // Mock role: 'admin', 'developer', 'viewer'
