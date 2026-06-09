@@ -223,49 +223,63 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
 
       // Convert HEIC → JPG
       if (file.type === "image/heic" || file.name.toLowerCase().endsWith(".heic")) {
-        if (toolKey === "avatar") updateStep("convert", "active");
-        toast.info("Convertendo formato HEIC...");
-        const convertedBlob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.85 });
-        file = new File(
-          [Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob],
-          file.name.replace(/\.[^/.]+$/, ".jpg"),
-          { type: "image/jpeg" }
-        );
-        if (toolKey === "avatar") updateStep("convert", "done");
+        try {
+            if (toolKey === "avatar") updateStep("convert", "active");
+            toast.info("Convertendo formato HEIC...");
+            const convertedBlob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.85 });
+            file = new File(
+            [Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob],
+            file.name.replace(/\.[^/.]+$/, ".jpg"),
+            { type: "image/jpeg" }
+            );
+            if (toolKey === "avatar") updateStep("convert", "done");
+        } catch (err: any) {
+            if (toolKey === "avatar") updateStep("convert", "error", "Falha na conversão HEIC. O arquivo pode estar corrompido.");
+            throw new Error("Não foi possível processar o arquivo HEIC.");
+        }
       } else if (file.type === "image/svg+xml") {
-        // Convert SVG → PNG via canvas
-        if (toolKey === "avatar") updateStep("convert", "active");
-        toast.info("Convertendo SVG para PNG...");
-        const svgText = await file.text();
-        const blobUrl = URL.createObjectURL(new Blob([svgText], { type: "image/svg+xml" }));
-        const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-          const i = new Image();
-          i.onload = () => resolve(i);
-          i.onerror = reject;
-          i.src = blobUrl;
-        });
-        const size = Math.max(img.width || 512, img.height || 512, 512);
-        const canvas = document.createElement("canvas");
-        canvas.width = size;
-        canvas.height = size;
-        const ctx = canvas.getContext("2d")!;
-        ctx.drawImage(img, 0, 0, size, size);
-        URL.revokeObjectURL(blobUrl);
-        const pngBlob: Blob = await new Promise((r) => canvas.toBlob((b) => r(b!), "image/png", 0.95));
-        file = new File([pngBlob], file.name.replace(/\.[^/.]+$/, ".png"), { type: "image/png" });
-        if (toolKey === "avatar") updateStep("convert", "done");
+        try {
+            // Convert SVG → PNG via canvas
+            if (toolKey === "avatar") updateStep("convert", "active");
+            toast.info("Convertendo SVG para PNG...");
+            const svgText = await file.text();
+            const blobUrl = URL.createObjectURL(new Blob([svgText], { type: "image/svg+xml" }));
+            const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+            const i = new Image();
+            i.onload = () => resolve(i);
+            i.onerror = reject;
+            i.src = blobUrl;
+            });
+            const size = Math.max(img.width || 512, img.height || 512, 512);
+            const canvas = document.createElement("canvas");
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext("2d")!;
+            ctx.drawImage(img, 0, 0, size, size);
+            URL.revokeObjectURL(blobUrl);
+            const pngBlob: Blob = await new Promise((r) => canvas.toBlob((b) => r(b!), "image/png", 0.95));
+            file = new File([pngBlob], file.name.replace(/\.[^/.]+$/, ".png"), { type: "image/png" });
+            if (toolKey === "avatar") updateStep("convert", "done");
+        } catch (err: any) {
+            if (toolKey === "avatar") updateStep("convert", "error", "Falha na conversão SVG. Verifique se o arquivo é um SVG válido.");
+            throw new Error("Não foi possível processar o arquivo SVG.");
+        }
       }
 
       const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
       const maxSize = 10 * 1024 * 1024;
 
       if (!validTypes.includes(file.type)) {
-        toast.error("Formato inválido", { description: "Formatos aceitos: JPG, PNG, WEBP, SVG ou HEIC." });
+        const errorMsg = "Formato aceito: JPG, PNG, WEBP, SVG ou HEIC.";
+        if (toolKey === "avatar") updateStep("upload", "error", errorMsg);
+        toast.error("Formato inválido", { description: errorMsg });
         setIsUploading(false);
         return;
       }
       if (file.size > maxSize) {
-        toast.error("Arquivo muito grande", { description: "O tamanho máximo permitido é 10MB." });
+        const errorMsg = "O tamanho máximo permitido é 10MB.";
+        if (toolKey === "avatar") updateStep("upload", "error", errorMsg);
+        toast.error("Arquivo muito grande", { description: errorMsg });
         setIsUploading(false);
         return;
       }
@@ -286,7 +300,11 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     } catch (error: any) {
       console.error("Upload error:", error);
       toast.error("Falha ao carregar imagem: " + error.message);
-      if (toolKey === "avatar") updateStep("upload", "pending");
+      if (toolKey === "avatar" && progressSteps.find(s => s.key === "convert")?.status === "active") {
+          // Handled above, but ensuring fallback
+      } else if (toolKey === "avatar") {
+          updateStep("upload", "error", error.message);
+      }
     } finally {
       setIsUploading(false);
     }
