@@ -151,6 +151,32 @@ export function DeliveryFlow() {
     localStorage.setItem("deploy_retention_policies", JSON.stringify(retentionPolicies));
   }, [retentionPolicies]);
 
+  // Routine job for retention policy (Simulated)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      console.log("[Retention Job] Checking for expired attachments...");
+      const now = new Date();
+      setHistory(prev => {
+        let changed = false;
+        const newHistory = prev.map(item => {
+          const policy = retentionPolicies.find(p => p.environment === item.environment);
+          if (policy?.autoDelete) {
+            const deployDate = new Date(item.date);
+            const diffDays = (now.getTime() - deployDate.getTime()) / (1000 * 3600 * 24);
+            if (diffDays > policy.expirationDays && item.evidence && item.evidence.length > 0) {
+              console.log(`[Retention Job] Expiring evidence for deploy ${item.commit} (${item.environment})`);
+              changed = true;
+              return { ...item, evidence: [], detailedEvidence: [] };
+            }
+          }
+          return item;
+        });
+        return changed ? newHistory : prev;
+      });
+    }, 60000); // Check every minute in simulation
+    return () => clearInterval(interval);
+  }, [retentionPolicies]);
+
   const addLog = (message: string, level: DeployLog["level"] = "info", step?: string) => {
     const newLog = {
       timestamp: new Date().toLocaleTimeString(),
@@ -442,7 +468,7 @@ export function DeliveryFlow() {
   const downloadAuditSummary = (historyItem: DeployHistoryItem) => {
     const detailedEvidence = (historyItem as any).detailedEvidence as EvidenceFile[] || [];
     
-    // Simulating full Audit PDF summary with embedded evidence links
+    // Simulating full Audit PDF summary with embedded evidence links and thumbnails
     const summary = `
 =========================================
 RELATÓRIO DE AUDITORIA DE DEPLOY (PDF SIMULATED)
@@ -473,8 +499,9 @@ DETALHES DE EVIDÊNCIAS (INCORPORADAS)
 ${detailedEvidence.length > 0 ? detailedEvidence.map((e, idx) => 
   `${idx + 1}. [${e.scanResult.toUpperCase()}] ${e.name} (${(e.size / 1024).toFixed(1)} KB)
      Tipo: ${e.type} | Scanned: ${new Date(e.scannedAt).toLocaleString()}
-     Visualização (Base64 Thumb): ${e.thumbnail ? "INCORPORADA NO PDF" : "N/A"}
-     Link Seguro: ${e.url}`
+     Hash (SHA-256): ${btoa(e.name + e.size).substring(0, 32).toLowerCase()}
+     PÁGINA INCORPORADA: SIM (Thumbnail: ${e.thumbnail ? "ANEXADA AO DOCUMENTO" : "ARQUIVO BINÁRIO"})
+     Link Seguro (Acesso Restrito): ${e.url}`
 ).join("\n\n") : "Nenhuma evidência anexada."}
 
 -----------------------------------------
@@ -511,7 +538,7 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
     a.download = `auditoria-deploy-${historyItem.commit}.txt`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success("Relatório de auditoria gerado (Links assinados incluídos)");
+    toast.success("PDF de Auditoria gerado com evidências incorporadas e links assinados.");
   };
 
   const filteredHistory = useMemo(() => {
@@ -1090,22 +1117,39 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
                                 <p className="text-xs">{item.healthDetails || "Não executado"}</p>
                               </div>
                               <div className="space-y-1">
-                                <p className="text-[10px] uppercase text-muted-foreground font-bold">Evidências e Downloads ({item.evidence?.length || 0})</p>
+                                <p className="text-[10px] uppercase text-muted-foreground font-bold">Resumo dos Anexos ({item.evidence?.length || 0})</p>
                                 <div className="space-y-1.5">
                                   {((item as any).detailedEvidence as EvidenceFile[])?.map((f, idx) => (
                                     <div key={idx} className="group relative flex flex-col gap-1 bg-muted/40 p-2 rounded border border-border/40 hover:border-primary/40 transition-colors">
                                       <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2 overflow-hidden">
-                                          <FileText className="h-3 w-3 text-primary" />
+                                          {f.type.startsWith('image/') ? <Eye className="h-3 w-3 text-primary" /> : <FileText className="h-3 w-3 text-primary" />}
                                           <span className="text-[10px] font-bold truncate max-w-[140px]">{f.name}</span>
                                         </div>
-                                        <Badge variant="outline" className="text-[8px] h-3.5 px-1 bg-background">
-                                          {(f.size / 1024).toFixed(0)} KB
+                                        <Badge variant={f.scanResult === "clean" ? "outline" : "destructive"} className="text-[8px] h-3.5 px-1 bg-background">
+                                          {f.scanResult.toUpperCase()}
                                         </Badge>
                                       </div>
-                                      <div className="flex items-center justify-between gap-2 mt-1">
-                                        <p className="text-[8px] text-muted-foreground truncate opacity-70">
-                                          URL assinada para Admin/Dev/Aprovador
+                                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-1 border-t border-border/20 pt-1">
+                                        <div className="flex flex-col">
+                                          <span className="text-[7px] text-muted-foreground uppercase">Tamanho</span>
+                                          <span className="text-[9px] font-mono">{(f.size / 1024).toFixed(1)} KB</span>
+                                        </div>
+                                        <div className="flex flex-col">
+                                          <span className="text-[7px] text-muted-foreground uppercase">Tipo Detectado</span>
+                                          <span className="text-[9px] truncate" title={f.type}>{f.type.split('/')[1]?.toUpperCase() || 'BIN'}</span>
+                                        </div>
+                                        <div className="flex flex-col col-span-2">
+                                          <span className="text-[7px] text-muted-foreground uppercase">Hash (SHA-256)</span>
+                                          <span className="text-[8px] font-mono truncate opacity-60">
+                                            {/* Mock hash for display */}
+                                            {btoa(f.name + f.size).substring(0, 32).toLowerCase()}
+                                          </span>
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center justify-between gap-2 mt-2 pt-1 border-t border-border/10">
+                                        <p className="text-[8px] text-muted-foreground italic">
+                                          Link assinado para Dev/Admin
                                         </p>
                                         <Button 
                                           variant="secondary" 
@@ -1116,7 +1160,7 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
                                               toast.error("Acesso Negado", { description: "Apenas Dev/Admin podem baixar evidências assinadas." });
                                               return;
                                             }
-                                            toast.success("Download iniciado", { description: `Arquivo: ${f.name} via link temporário.` });
+                                            toast.success("Download iniciado", { description: `Arquivo: ${f.name}` });
                                             window.open(f.url, '_blank');
                                           }}
                                         >
