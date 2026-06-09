@@ -1,4 +1,4 @@
-import { Check, X, Loader2, PlayCircle, Globe, ShieldCheck, Smartphone, Package, Code } from "lucide-react";
+import { Check, X, Loader2, PlayCircle, Globe, ShieldCheck, Smartphone, Package, Code, AlertCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -33,7 +33,7 @@ export function DeliveryFlow() {
 
     for (let i = 0; i < newSteps.length; i++) {
       const step = newSteps[i];
-      step.status = "validating";
+      (step as any).status = "validating";
       setSteps([...newSteps]);
       
       // Simulate real validation work
@@ -41,7 +41,7 @@ export function DeliveryFlow() {
       
       // Artificial logic check for "APK" step to demonstrate error handling if something is missing
       if (step.id === "apk" && !window.location.protocol.includes("https") && window.location.hostname !== "localhost") {
-        step.status = "error";
+        (step as any).status = "error";
         step.error = "HTTPS obrigatório para geração de APK seguro.";
         setSteps([...newSteps]);
         toast.error("Erro no fluxo de entrega", { description: step.error });
@@ -49,7 +49,7 @@ export function DeliveryFlow() {
         return;
       }
 
-      step.status = "success";
+      (step as any).status = "success";
       setProgress(((i + 1) / newSteps.length) * 100);
       setSteps([...newSteps]);
     }
