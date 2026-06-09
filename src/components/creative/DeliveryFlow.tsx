@@ -1756,49 +1756,11 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
               <Badge variant="outline" className="text-[10px]">Últimas 100 atividades</Badge>
             </div>
             
-            <ScrollArea className="h-[450px]">
-              <div className="space-y-2">
-                {auditLogs.length === 0 && (
-                  <div className="p-12 text-center text-muted-foreground">
-                    <ShieldAlert className="h-8 w-8 mx-auto mb-2 opacity-20" />
-                    <p className="text-xs">Nenhum registro de auditoria disponível</p>
-                  </div>
-                )}
-                {auditLogs.map((log) => (
-                  <div key={log.id} className="flex items-start gap-3 p-3 rounded-lg border border-border/20 bg-background/50 text-[11px]">
-                    <div className={cn(
-                      "p-1.5 rounded-full mt-0.5",
-                      log.status === "success" ? "bg-green-500/10 text-green-500" : 
-                      log.status === "denied" ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"
-                    )}>
-                      {log.status === "success" ? <Check className="h-3 w-3" /> : 
-                       log.status === "denied" ? <Lock className="h-3 w-3" /> : <Activity className="h-3 w-3" />}
-                    </div>
-                    <div className="flex-1 space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-primary">
-                          {log.action === "download_authorized" ? "Download Autorizado" : 
-                           log.action === "download_denied" ? "Acesso Negado" : 
-                           log.action === "retention_cleanup" ? "Limpeza de Retenção" : "Solicitação de Download"}
-                        </span>
-                        <span className="text-[9px] text-muted-foreground">
-                          {new Date(log.timestamp).toLocaleString()}
-                        </span>
-                      </div>
-                      <p className="text-muted-foreground leading-relaxed">
-                        Usuário <span className="text-foreground font-mono">{log.user}</span> 
-                        {log.action.includes("download") ? ` tentou acessar "${log.attachmentName}"` : ` processou "${log.attachmentName}"`}.
-                      </p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge variant="outline" className="text-[9px] h-3.5 px-1 py-0 border-border/40">
-                          MOTIVO: {log.reason}
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
+            <AuditHistoryManager 
+              logs={auditLogs}
+              userRole={currentUserRole}
+              title="Relatório Geral de Auditoria de Acessos"
+            />
           </Card>
         </TabsContent>
       </Tabs>
