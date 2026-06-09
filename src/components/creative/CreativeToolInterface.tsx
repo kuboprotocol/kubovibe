@@ -391,6 +391,49 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
           />
         </div>
 
+        {toolKey === "avatar" && (
+          <div className="space-y-3 pb-2 border-b border-border/20">
+            <Label className="text-sm font-semibold flex items-center gap-2">
+              <ImageIcon className="h-4 w-4 text-primary" /> Imagem do Avatar (Obrigatório)
+            </Label>
+            
+            {uploadedImageUrl ? (
+              <div className="relative w-24 h-24 group">
+                <img 
+                  src={uploadedImageUrl} 
+                  alt="Avatar" 
+                  className="w-full h-full object-cover rounded-lg border border-border" 
+                />
+                <button 
+                  onClick={() => setUploadedImageUrl(null)}
+                  className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-4">
+                <label className="flex flex-col items-center justify-center w-24 h-24 border-2 border-dashed border-border/60 rounded-lg cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition-all">
+                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                    {isUploading ? (
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    ) : (
+                      <>
+                        <Upload className="h-6 w-6 text-muted-foreground mb-1" />
+                        <span className="text-[10px] text-muted-foreground font-medium uppercase">Upload</span>
+                      </>
+                    )}
+                  </div>
+                  <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} disabled={isUploading} />
+                </label>
+                <div className="text-xs text-muted-foreground italic">
+                  Escolha uma foto clara do rosto para melhores resultados.
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {config.options && config.options.length > 0 && (
           <div className="space-y-4 pt-2">
             <div className="flex items-center gap-2 text-sm font-semibold text-foreground/80">
