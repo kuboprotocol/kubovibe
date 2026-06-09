@@ -119,18 +119,19 @@ export function DeliveryFlow() {
     return newLog;
   };
 
-  const notifyResult = async (status: "success" | "error", env: string, attempt = 1, pwaUrl?: string) => {
+  const notifyResult = async (status: "success" | "error", env: string, attempt = 1, pwaUrl?: string, evidence?: string[]) => {
     // Retry logic & Deduplication (simulated)
     const notificationPayload = {
       status,
       environment: env,
       timestamp: new Date().toISOString(),
       pwaUrl: pwaUrl || "https://kubovibe.app",
-      steps: steps.map(s => ({ id: s.id, label: s.label, status: s.status }))
+      steps: steps.map(s => ({ id: s.id, label: s.label, status: s.status })),
+      evidenceReferences: evidence || []
     };
 
     if (notifications.email) {
-      console.log(`[Notification] Enviando e-mail (Tentativa ${attempt})...`, notificationPayload);
+      console.log(`[Notification] Enviando e-mail de resumo (Tentativa ${attempt})...`, notificationPayload);
       try {
         // Mock success with 90% chance
         if (Math.random() < 0.9) {
@@ -139,7 +140,7 @@ export function DeliveryFlow() {
       } catch (err) {
         if (attempt < 3) {
           console.warn("Retrying email notification...");
-          setTimeout(() => notifyResult(status, env, attempt + 1, pwaUrl), 2000);
+          setTimeout(() => notifyResult(status, env, attempt + 1, pwaUrl, evidence), 2000);
         } else {
           toast.error("Falha ao enviar e-mail após 3 tentativas");
         }
