@@ -162,9 +162,24 @@ export function DeliveryFlow() {
       toast.error("Bloqueio de Ambiente", { 
         description: `O ambiente ${environment.toUpperCase()} já está em deploy por ${environmentLock.user}. Aguarde a conclusão.` 
       });
+      
+      const blockedItem: DeployHistoryItem = {
+        id: crypto.randomUUID(),
+        date: new Date().toISOString(),
+        environment,
+        status: "blocked",
+        commit: currentCommit,
+        pwaUrl: "",
+        apkUrl: "",
+        logs: [{ timestamp: new Date().toLocaleTimeString(), level: "warning", message: `Tentativa de deploy bloqueada por concorrência (Usuário: ${currentUserRole})` }],
+        user: currentUserRole,
+        parameters: { environment, notifications, commit: currentCommit }
+      };
+      setHistory(prev => [blockedItem, ...prev]);
       addLog(`Tentativa de deploy bloqueada por concorrência em ${environment.toUpperCase()} (Usuário: ${currentUserRole})`, "warning");
       return;
     }
+
 
     // Require approval for production if not admin
     if (environment === "production" && currentUserRole !== "admin" && !pendingApproval) {
