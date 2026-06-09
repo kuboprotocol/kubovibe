@@ -61,12 +61,15 @@ export default function CreativeAuditPage() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">((searchParams.get("sort") as "asc" | "desc") || "desc");
   const [page, setPage] = useState(Number(searchParams.get("page")) || 1);
   const [selectedEntry, setSelectedEntry] = useState<AuditTrail | null>(null);
+  const [compareEntries, setCompareEntries] = useState<AuditTrail[]>([]);
+  const [isComparing, setIsComparing] = useState(false);
   const [timelineEntries, setTimelineEntries] = useState<AuditTrail[]>([]);
   const [isTimelineLoading, setIsTimelineLoading] = useState(false);
   const [savedFilters, setSavedFilters] = useState<any[]>(() => {
     const saved = localStorage.getItem("creative_audit_filters");
     return saved ? JSON.parse(saved) : [];
   });
+  const [recurrenceThreshold, setRecurrenceThreshold] = useState(2);
 
   // Update URL params when filters change
   useEffect(() => {
