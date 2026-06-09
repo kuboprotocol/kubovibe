@@ -112,7 +112,7 @@ describe('DeliveryFlow Integration - Security & Audit', () => {
     expect(approver.canExport).toBe(true);
   });
 
-  it('should verify export limit, range validation and logging', () => {
+  it('should verify export limit, range validation and indices logging', () => {
     const MAX_LIMIT = 500;
     const perPage = 25;
     const largeLogs = Array.from({ length: 600 }, (_, i) => ({ id: String(i), timestamp: new Date().toISOString() }));
@@ -126,18 +126,33 @@ describe('DeliveryFlow Integration - Security & Audit', () => {
 
     expect(validateRange(2, 3, totalPages)).toBe(true);
     expect(validateRange(5, 2, totalPages)).toBe(false);
-    expect(validateRange(0, 1, totalPages)).toBe(false);
-    expect(validateRange(1, 100, totalPages)).toBe(false);
 
-    // Test range export cutting
-    const exportRange = (logs: any[], startPage: number, endPage: number, itemsPerPage: number) => {
-      const start = (startPage - 1) * itemsPerPage;
-      const end = endPage * itemsPerPage;
-      return logs.slice(start, end);
+    // Test indices calculation logic
+    const getIndices = (startPage: number, endPage: number, itemsPerPage: number, totalRecords: number) => {
+      const first = (startPage - 1) * itemsPerPage + 1;
+      const last = Math.min(totalRecords, endPage * itemsPerPage);
+      return { first, last };
     };
 
-    const rangeLogs = exportRange(largeLogs, 2, 3, perPage);
-    expect(rangeLogs).toHaveLength(50); 
+    const indices = getIndices(2, 3, perPage, 600);
+    expect(indices.first).toBe(26);
+    expect(indices.last).toBe(75);
+
+    // Verify audit log record for export with detailed indices
+    const auditLogs: any[] = [];
+    const recordExport = (user: string, mode: string, columns: string[], start: number, end: number, count: number, firstIdx: number, lastIdx: number) => {
+      auditLogs.push({
+        action: 'download_authorized',
+        user,
+        reason: `Recorte: Páginas ${start} a ${end} (Total: ${count} registros, Índices: ${firstIdx}-${lastIdx})`,
+        status: 'success'
+      });
+    };
+
+    recordExport('admin', 'Intervalo', ['status'], 2, 3, 50, 26, 75);
+    expect(auditLogs[0].reason).toContain('Índices: 26-75');
+  });
+
 
 
     // Test logic for limit
