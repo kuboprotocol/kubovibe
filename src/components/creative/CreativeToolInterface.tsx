@@ -534,8 +534,17 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       }
 
       if (toolKey === "avatar") {
-        updateStep("generate", "done");
-        updateStep("render", "active", undefined, { fnName, correlationId: cId || "N/A" });
+        updateStep("generate", "done", undefined, { 
+          promptLength: prompt.length,
+          startTime: executionStartTime,
+          metadataKeys: Object.keys(metadata).join(", "),
+          status: "Solicitação processada"
+        });
+        updateStep("render", "active", undefined, { 
+          fnName, 
+          correlationId: cId || "N/A",
+          traceId: tId || "N/A"
+        });
       }
       toast.success("Solicitação enviada!", {
         description: "Você pode acompanhar o progresso no histórico.",
