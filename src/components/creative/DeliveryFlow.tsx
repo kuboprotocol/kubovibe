@@ -43,7 +43,19 @@ interface DeployHistoryItem {
     environment: "staging" | "production";
     notifications: { email: boolean; webhook: boolean };
     commit: string;
+    dryRun?: boolean;
+    approvalComment?: string;
+    approvalTerms?: boolean;
+    healthCheck?: boolean;
   };
+  healthStatus?: "up" | "down" | "unchecked";
+}
+
+interface ActiveDeploy {
+  id: string;
+  environment: string;
+  user: string;
+  timestamp: string;
 }
 
 export function DeliveryFlow() {
