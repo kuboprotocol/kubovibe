@@ -2681,6 +2681,7 @@ export type Database = {
         }
         Returns: Json
       }
+      find_referrer_by_code: { Args: { _code: string }; Returns: string }
       get_creative_audit_logs: {
         Args: {
           p_end_date?: string
@@ -2692,6 +2693,7 @@ export type Database = {
         }
         Returns: Json
       }
+      get_my_referral_code: { Args: never; Returns: string }
       grant_credits: {
         Args: { p_amount: number; p_user_id: string }
         Returns: undefined
