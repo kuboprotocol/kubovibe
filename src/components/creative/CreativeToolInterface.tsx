@@ -686,15 +686,26 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                 </div>
               </div>
             </div>
-            <div className="flex justify-center">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="text-[10px] h-6 opacity-60 hover:opacity-100"
+            <div className="flex justify-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-[10px] h-7 opacity-60 hover:opacity-100"
                 onClick={fetchLastResult}
               >
                 Atualizar Comparação
               </Button>
+              {lastResult.asset_url && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-[10px] h-7"
+                  onClick={handleDownloadResult}
+                >
+                  <Download className="h-3 w-3 mr-1.5" />
+                  Baixar {lastResult.asset_url.endsWith('.mp4') ? 'MP4' : 'PNG/JPG'}
+                </Button>
+              )}
             </div>
           </div>
         )}
