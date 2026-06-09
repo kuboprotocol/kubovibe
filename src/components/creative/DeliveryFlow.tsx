@@ -624,7 +624,10 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
             <TabsTrigger value="current" className="text-xs">Atual</TabsTrigger>
             <TabsTrigger value="history" className="text-xs">Histórico</TabsTrigger>
             <TabsTrigger value="settings" className="text-xs">
-              <Settings className="h-3 w-3 mr-1.5" /> Configurações
+              <Settings className="h-3 w-3 mr-1.5" /> Políticas
+            </TabsTrigger>
+            <TabsTrigger value="audit" className="text-xs">
+              <Shield className="h-3 w-3 mr-1.5" /> Auditoria
             </TabsTrigger>
           </TabsList>
         </div>
