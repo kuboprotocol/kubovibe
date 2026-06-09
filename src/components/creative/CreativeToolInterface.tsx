@@ -174,29 +174,47 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
   const { subscription, editsRemaining } = useSubscription();
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    let file = e.target.files?.[0];
     if (!file) return;
-
-    // Validate type and size (max 5MB)
-    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
-    const maxSize = 5 * 1024 * 1024; // 5MB
-
-    if (!validTypes.includes(file.type)) {
-      toast.error("Formato inválido", {
-        description: "Apenas JPG, PNG ou WEBP são aceitos."
-      });
-      return;
-    }
-
-    if (file.size > maxSize) {
-      toast.error("Arquivo muito grande", {
-        description: "O tamanho máximo permitido é 5MB."
-      });
-      return;
-    }
 
     setIsUploading(true);
     try {
+      // Support for HEIC conversion
+      if (file.type === "image/heic" || file.name.toLowerCase().endsWith(".heic")) {
+        toast.info("Convertendo formato HEIC...");
+        const convertedBlob = await heic2any({ 
+          blob: file, 
+          toType: "image/jpeg",
+          quality: 0.8
+        });
+        const convertedFile = new File(
+          [Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob], 
+          file.name.replace(/\.[^/.]+$/, ".jpg"), 
+          { type: "image/jpeg" }
+        );
+        file = convertedFile;
+      }
+
+      // Validate type and size (max 10MB for support of more formats)
+      const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml', 'image/heic'];
+      const maxSize = 10 * 1024 * 1024; // 10MB
+
+      if (!validTypes.includes(file.type) && !file.name.toLowerCase().endsWith('.heic')) {
+        toast.error("Formato inválido", {
+          description: "Formatos aceitos: JPG, PNG, WEBP, SVG ou HEIC."
+        });
+        setIsUploading(false);
+        return;
+      }
+
+      if (file.size > maxSize) {
+        toast.error("Arquivo muito grande", {
+          description: "O tamanho máximo permitido é 10MB."
+        });
+        setIsUploading(false);
+        return;
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
 
