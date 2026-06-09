@@ -4,15 +4,17 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Loader2, Crop as CropIcon, ZoomIn, Square, Maximize } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Loader2, Crop as CropIcon, ZoomIn, Square, Maximize, Save, Trash2, List } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "sonner";
 
 interface Props {
   open: boolean;
   imageUrl: string | null;
   onCancel: () => void;
   onConfirm: (croppedBlob: Blob, preset: { zoom: number; aspect: number }) => void | Promise<void>;
-  onSavePreset: (preset: { zoom: number; aspect: number }) => void;
+  onSavePreset: (name: string, preset: { zoom: number; aspect: number }) => void;
   initialPreset?: { zoom: number; aspect: number };
 }
 
@@ -48,6 +50,33 @@ export function AvatarCropDialog({ open, imageUrl, onCancel, onConfirm, onSavePr
   const [aspect, setAspect] = useState(initialPreset?.aspect || 1);
   const [croppedArea, setCroppedArea] = useState<Area | null>(null);
   const [processing, setProcessing] = useState(false);
+  const [presetName, setPresetName] = useState("");
+  const [presets, setPresets] = useState<{ name: string; zoom: number; aspect: number }[]>(() => {
+    const saved = localStorage.getItem("creative_avatar_presets_list");
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  useEffect(() => {
+    if (initialPreset) {
+      setZoom(initialPreset.zoom);
+      setAspect(initialPreset.aspect);
+    }
+  }, [initialPreset]);
+
+  const saveToPresetsList = (name: string, p: { zoom: number; aspect: number }) => {
+    const newPresets = [...presets.filter(x => x.name !== name), { name, ...p }];
+    setPresets(newPresets);
+    localStorage.setItem("creative_avatar_presets_list", JSON.stringify(newPresets));
+    onSavePreset(name, p);
+    setPresetName("");
+  };
+
+  const deletePreset = (name: string) => {
+    const newPresets = presets.filter(p => p.name !== name);
+    setPresets(newPresets);
+    localStorage.setItem("creative_avatar_presets_list", JSON.stringify(newPresets));
+    toast.success("Preset removido");
+  };
 
   const onCropComplete = useCallback((_: Area, areaPixels: Area) => {
     setCroppedArea(areaPixels);
@@ -112,12 +141,56 @@ export function AvatarCropDialog({ open, imageUrl, onCancel, onConfirm, onSavePr
                 </Select>
             </div>
             <div className="flex-1 space-y-2">
-                <Label className="text-xs text-muted-foreground flex items-center gap-1"><Maximize className="h-3 w-3"/> Ajustar à área</Label>
+                <Label className="text-xs text-muted-foreground flex items-center gap-1"><Maximize className="h-3 w-3"/> Ajustar & Presets</Label>
                 <div className="flex gap-2">
-                  <Button variant="outline" className="flex-1" onClick={() => { setZoom(1); setCrop({ x: 0, y: 0 }); }}>Ajustar</Button>
-                  <Button variant="secondary" className="flex-1 font-semibold" onClick={() => onSavePreset({ zoom, aspect })}>Salvar Preset</Button>
+                  <Button variant="outline" size="sm" className="flex-1 text-[10px] h-8" onClick={() => { setZoom(1); setCrop({ x: 0, y: 0 }); }}>Resetar</Button>
+                  <Select onValueChange={(v) => {
+                    const p = presets.find(x => x.name === v);
+                    if (p) { setZoom(p.zoom); setAspect(p.aspect); }
+                  }}>
+                    <SelectTrigger className="flex-1 text-[10px] h-8">
+                      <List className="h-3 w-3 mr-1" />
+                      <SelectValue placeholder="Presets" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {presets.length === 0 && <div className="p-2 text-[10px] text-center opacity-50">Nenhum salvo</div>}
+                      {presets.map(p => (
+                        <div key={p.name} className="flex items-center justify-between group">
+                          <SelectItem value={p.name} className="flex-1">{p.name}</SelectItem>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-6 w-6 opacity-0 group-hover:opacity-100" 
+                            onClick={(e) => { e.stopPropagation(); deletePreset(p.name); }}
+                          >
+                            <Trash2 className="h-3 w-3 text-destructive" />
+                          </Button>
+                        </div>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
             </div>
+          </div>
+
+          <div className="flex items-end gap-2 p-2 rounded bg-primary/5 border border-primary/10">
+            <div className="flex-1 space-y-1.5">
+              <Label className="text-[10px] uppercase font-bold text-primary/70">Novo Preset</Label>
+              <Input 
+                placeholder="Nome do ajuste..." 
+                value={presetName} 
+                onChange={(e) => setPresetName(e.target.value)}
+                className="h-8 text-xs bg-background"
+              />
+            </div>
+            <Button 
+              size="sm" 
+              className="h-8 text-xs" 
+              disabled={!presetName.trim()}
+              onClick={() => saveToPresetsList(presetName, { zoom, aspect })}
+            >
+              <Save className="h-3 w-3 mr-1" /> Salvar
+            </Button>
           </div>
           <div className="space-y-2">
             <Label className="text-xs flex items-center gap-2 text-muted-foreground">

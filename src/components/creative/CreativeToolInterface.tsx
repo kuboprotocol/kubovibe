@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Sparkles, Send, Coins, Settings2, Info, AlertCircle, Wallet, RotateCw, Upload, X, Image as ImageIcon, Download, Crop as CropIcon, Trash2, Sliders } from "lucide-react";
+import { Loader2, Sparkles, Send, Coins, Settings2, Info, AlertCircle, Wallet, RotateCw, Upload, X, Image as ImageIcon, Download, Crop as CropIcon, Trash2, Sliders, History, FileText, FileCode, Play } from "lucide-react";
 import { useSubscription } from "@/hooks/useSubscription";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
@@ -126,6 +126,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
   const [simulationMode, setSimulationMode] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [lastResult, setLastResult] = useState<any>(null);
+  const [sessionHistory, setSessionHistory] = useState<{ id: string; timestamp: string; prompt: string; status: "success" | "error"; assetUrl?: string; metadata?: any }[]>([]);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(() => {
     if (toolKey === "avatar") {
       return localStorage.getItem("creative_last_avatar_image");
@@ -139,7 +140,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     const saved = localStorage.getItem("creative_avatar_preset");
     return saved ? JSON.parse(saved) : { zoom: 1, aspect: 1 };
   });
-  const [downloadOptions, setDownloadOptions] = useState({ quality: 0.90, resolution: "original" as any });
+  const [downloadOptions, setDownloadOptions] = useState({ quality: 0.90, resolution: "original" as any, pngQuality: 1 });
 
   const buildSteps = (needsConvert: boolean, initialDetails?: Record<string, any>): AvatarStepState[] => {
     const now = new Date().toLocaleTimeString();
@@ -356,10 +357,10 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     }
   };
 
-  const handleSaveAvatarPreset = (preset: { zoom: number; aspect: number }) => {
+  const handleSaveAvatarPreset = (name: string, preset: { zoom: number; aspect: number }) => {
     setAvatarPreset(preset);
     localStorage.setItem("creative_avatar_preset", JSON.stringify(preset));
-    toast.success("Preset de enquadramento salvo!");
+    toast.success(`Preset "${name}" salvo!`);
   };
 
   const handleResetSessionAvatar = () => {
@@ -415,6 +416,8 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       if (format === "jpg") {
         ctx.fillStyle = "white";
         ctx.fillRect(0, 0, width, height);
+      } else {
+        ctx.clearRect(0, 0, width, height);
       }
       
       ctx.drawImage(img, 0, 0, width, height);
@@ -435,6 +438,40 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     } catch (e: any) {
       toast.error("Falha ao baixar: " + e.message);
     }
+  };
+
+  const exportLogs = (format: "txt" | "json") => {
+    const data = {
+      tool: toolKey,
+      timestamp: new Date().toISOString(),
+      steps: progressSteps,
+      error: errorState,
+      trace: traceInfo
+    };
+    
+    let content = "";
+    if (format === "json") {
+      content = JSON.stringify(data, null, 2);
+    } else {
+      content = `LOG DE EXECUÇÃO - ${config.title}\n`;
+      content += `Data: ${data.timestamp}\n\n`;
+      content += `ETAPAS:\n`;
+      progressSteps.forEach(s => {
+        content += `[${s.status.toUpperCase()}] ${s.label} (${s.timestamp || "N/A"})\n`;
+        if (s.errorMessage) content += `  ERRO: ${s.errorMessage}\n`;
+        if (s.details) content += `  DETALHES: ${JSON.stringify(s.details)}\n`;
+      });
+      if (errorState) content += `\nERRO GERAL: ${errorState.message}\nTrace: ${errorState.stack}\n`;
+    }
+
+    const blob = new Blob([content], { type: format === "json" ? "application/json" : "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `logs-${toolKey}-${Date.now()}.${format}`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Logs exportados em .${format}`);
   };
 
 
@@ -533,6 +570,15 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
         throw new Error(data.error || "Erro na execução");
       }
 
+      setSessionHistory(prev => [{
+        id: crypto.randomUUID(),
+        timestamp: new Date().toLocaleTimeString(),
+        prompt,
+        status: "success",
+        assetUrl: data?.asset_url,
+        metadata: { ...metadata, uploadedImageUrl }
+      }, ...prev]);
+
       if (toolKey === "avatar") {
         updateStep("generate", "done", undefined, { 
           promptLength: prompt.length,
@@ -563,6 +609,13 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       }
     } catch (e: any) {
       console.error("[CreativePanel:Configuration] execution_exception", { toolKey, error: e.message, stack: e.stack });
+      setSessionHistory(prev => [{
+        id: crypto.randomUUID(),
+        timestamp: new Date().toLocaleTimeString(),
+        prompt,
+        status: "error",
+        metadata: { ...metadata, uploadedImageUrl }
+      }, ...prev]);
       setErrorState({
         message: e.message,
         correlationId: traceInfo?.correlationId,
@@ -585,6 +638,12 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleReplay = (item: typeof sessionHistory[0]) => {
+    setPrompt(item.prompt);
+    if (item.metadata?.uploadedImageUrl) setUploadedImageUrl(item.metadata.uploadedImageUrl);
+    toast.info("Parâmetros carregados!");
   };
 
   return (
@@ -799,6 +858,45 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
           <AvatarProgressSteps steps={progressSteps} />
         )}
 
+        {progressSteps.length > 0 && (
+          <div className="space-y-2">
+            <AvatarProgressSteps steps={progressSteps} />
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" size="sm" className="h-6 text-[9px] uppercase font-bold" onClick={() => exportLogs("txt")}>
+                <FileText className="h-3 w-3 mr-1" /> Exportar TXT
+              </Button>
+              <Button variant="ghost" size="sm" className="h-6 text-[9px] uppercase font-bold" onClick={() => exportLogs("json")}>
+                <FileCode className="h-3 w-3 mr-1" /> Exportar JSON
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {sessionHistory.length > 0 && (
+          <div className="pt-4 border-t border-border/20 space-y-3">
+             <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+              <History className="h-3 w-3" /> Histórico da Sessão
+            </h4>
+            <div className="space-y-2 max-h-[200px] overflow-auto pr-2 custom-scrollbar">
+              {sessionHistory.map((item) => (
+                <div key={item.id} className="flex items-center justify-between p-2 rounded bg-muted/20 border border-border/10 group">
+                  <div className="flex flex-col gap-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-mono opacity-50">{item.timestamp}</span>
+                      <Badge variant={item.status === "success" ? "secondary" : "destructive"} className="text-[8px] h-3.5 px-1 py-0">
+                        {item.status === "success" ? "Sucesso" : "Erro"}
+                      </Badge>
+                    </div>
+                    <p className="text-[11px] truncate max-w-[400px] text-foreground/80">{item.prompt || "(Sem texto)"}</p>
+                  </div>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100" onClick={() => handleReplay(item)} title="Reaplicar parâmetros">
+                    <Play className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+
         {/* Comparison Section (Before vs After) */}
         {toolKey === "avatar" && lastResult && (
           <div className="pt-4 border-t border-border/20 space-y-3">
@@ -848,10 +946,10 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                       </PopoverTrigger>
                       <PopoverContent className="w-64 space-y-4">
                         <div className="space-y-2">
-                          <Label className="text-xs uppercase font-bold text-muted-foreground">Formato & Qualidade</Label>
+                          <Label className="text-xs uppercase font-bold text-muted-foreground">Qualidade JPG / PNG</Label>
                           <div className="grid grid-cols-2 gap-2">
-                            <Button size="sm" variant={downloadOptions.quality > 0.8 ? "default" : "outline"} onClick={() => setDownloadOptions({ ...downloadOptions, quality: 0.95 })}>Alta (JPG)</Button>
-                            <Button size="sm" variant={downloadOptions.quality <= 0.8 ? "default" : "outline"} onClick={() => setDownloadOptions({ ...downloadOptions, quality: 0.60 })}>Média (JPG)</Button>
+                            <Button size="sm" variant={downloadOptions.quality > 0.8 ? "default" : "outline"} onClick={() => setDownloadOptions({ ...downloadOptions, quality: 0.95, pngQuality: 1 })}>Alta</Button>
+                            <Button size="sm" variant={downloadOptions.quality <= 0.8 ? "default" : "outline"} onClick={() => setDownloadOptions({ ...downloadOptions, quality: 0.60, pngQuality: 0.7 })}>Média</Button>
                           </div>
                         </div>
                         <div className="space-y-2">
@@ -869,7 +967,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                         </div>
                         <div className="grid grid-cols-2 gap-2 pt-2 border-t">
                           <Button size="sm" className="w-full" onClick={() => handleDownloadResult("jpg", downloadOptions.quality, downloadOptions.resolution)}>Baixar JPG</Button>
-                          <Button size="sm" variant="secondary" className="w-full" onClick={() => handleDownloadResult("png", 1, downloadOptions.resolution)}>Baixar PNG</Button>
+                          <Button size="sm" variant="secondary" className="w-full" onClick={() => handleDownloadResult("png", downloadOptions.pngQuality, downloadOptions.resolution)}>Baixar PNG</Button>
                         </div>
                       </PopoverContent>
                     </Popover>
