@@ -946,9 +946,14 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
                               </div>
                               <div className="space-y-1">
                                 <p className="text-[10px] uppercase text-muted-foreground font-bold">Evidências ({item.evidence?.length || 0})</p>
-                                <div className="flex flex-wrap gap-1">
+                                <div className="space-y-1">
                                   {item.evidence?.map((f, idx) => (
-                                    <Badge key={idx} variant="secondary" className="text-[9px]">{f}</Badge>
+                                    <div key={idx} className="flex items-center justify-between bg-muted/30 p-1.5 rounded border border-border/40">
+                                      <span className="text-[10px] truncate max-w-[150px]">{f}</span>
+                                      <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => toast.info(`Iniciando download de ${f}`)}>
+                                        <Download className="h-3 w-3" />
+                                      </Button>
+                                    </div>
                                   )) || <span className="text-[10px] text-muted-foreground">Nenhuma evidência anexada</span>}
                                 </div>
                               </div>
