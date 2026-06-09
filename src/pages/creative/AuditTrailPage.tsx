@@ -274,20 +274,57 @@ export default function CreativeAuditPage() {
   const exportComparison = (format: "json" | "csv") => {
     if (compareEntries.length !== 2) return;
     
-    const content = format === "json" 
-      ? JSON.stringify({ comparison: compareEntries, timestamp: new Date().toISOString() }, null, 2)
-      : [
-          ["ID", "Step", "Action", "Correlation", "Params"],
-          ...compareEntries.map(e => [e.id, e.step, e.action, e.correlation_id || "", JSON.stringify(e.params)])
-        ].map(row => row.join(",")).join("\n");
+    // Load full timelines for both entries if they have correlation IDs
+    const getTimeline = async (entry: AuditTrail) => {
+      if (!entry.correlation_id) return [entry];
+      const { data } = await supabase
+        .from("creative_audit_trail")
+        .select("*")
+        .eq("correlation_id", entry.correlation_id)
+        .order("created_at", { ascending: true });
+      return data || [entry];
+    };
 
-    const blob = new Blob([content], { type: format === "json" ? "application/json" : "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `audit-comparison-${Date.now()}.${format}`;
-    link.click();
-    toast.success("Comparação exportada");
+    const handleExport = async () => {
+      const timeline1 = await getTimeline(compareEntries[0]);
+      const timeline2 = await getTimeline(compareEntries[1]);
+      const causes = getDiffProbableCauses();
+
+      let content: string;
+      let mime: string;
+
+      if (format === "json") {
+        content = JSON.stringify({ 
+          comparison: {
+            event1: { ...compareEntries[0], full_timeline: timeline1 },
+            event2: { ...compareEntries[1], full_timeline: timeline2 }
+          }, 
+          probable_causes: causes,
+          timestamp: new Date().toISOString() 
+        }, null, 2);
+        mime = "application/json";
+      } else {
+        const headers = ["Source", "ID", "Step", "Action", "Correlation", "Params", "Created At"];
+        const rows = [
+          ...timeline1.map(e => ["Event 1 Timeline", e.id, e.step, e.action, e.correlation_id || "", JSON.stringify(e.params).replace(/"/g, '""'), e.created_at]),
+          ...timeline2.map(e => ["Event 2 Timeline", e.id, e.step, e.action, e.correlation_id || "", JSON.stringify(e.params).replace(/"/g, '""'), e.created_at]),
+          ["PROBABLE CAUSES", causes.join("; "), "", "", "", "", ""]
+        ].map(row => row.map(v => `"${v}"`).join(","));
+
+        content = [headers.join(","), ...rows].join("\n");
+        mime = "text/csv";
+      }
+
+      const blob = new Blob([content], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `audit-comparison-full-${Date.now()}.${format}`;
+      link.click();
+      toast.success("Comparação detalhada exportada");
+    };
+
+    handleExport();
   };
 
   const getDiffProbableCauses = () => {
