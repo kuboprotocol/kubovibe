@@ -752,6 +752,55 @@ export default function CreativeAuditPage() {
           )}
         </SheetContent>
       </Sheet>
+
+      {/* Comparison Modal */}
+      <Sheet open={isComparing} onOpenChange={() => setIsComparing(false)}>
+        <SheetContent className="sm:max-w-4xl overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <ArrowLeftRight className="h-5 w-5 text-primary" /> Comparação Técnica
+            </SheetTitle>
+            <SheetDescription>
+              Comparando dois eventos selecionados para identificar discrepâncias.
+            </SheetDescription>
+          </SheetHeader>
+          
+          <div className="mt-8 grid grid-cols-2 gap-6">
+            {compareEntries.map((entry, idx) => (
+              <div key={entry.id} className="space-y-6">
+                <div className="p-3 bg-accent/20 rounded-md border flex justify-between items-center">
+                  <h4 className="font-bold text-sm">Evento #{idx + 1}</h4>
+                  <Badge variant="outline">{new Date(entry.created_at).toLocaleTimeString()}</Badge>
+                </div>
+                
+                <div className="space-y-1">
+                  <p className="text-[10px] text-muted-foreground uppercase font-bold">Ação</p>
+                  <p className="text-xs font-mono bg-muted p-2 rounded truncate" title={entry.action}>{entry.action}</p>
+                </div>
+
+                <div className="space-y-1">
+                  <p className="text-[10px] text-muted-foreground uppercase font-bold">Correlation ID</p>
+                  <code className="text-[10px] block bg-accent/50 p-1 rounded">{entry.correlation_id || "N/A"}</code>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-[10px] text-muted-foreground uppercase font-bold">Parâmetros Principais</p>
+                  <div className="bg-black/95 text-green-400 p-3 rounded-md overflow-x-auto font-mono text-[10px] h-[300px]">
+                    <pre>{JSON.stringify(entry.params, null, 2)}</pre>
+                  </div>
+                </div>
+
+                {entry.params?.error && (
+                  <div className="p-2 border border-destructive/30 bg-destructive/5 rounded-md">
+                    <p className="text-[10px] font-bold text-destructive uppercase">Erro Detectado</p>
+                    <p className="text-xs text-destructive">{entry.params.error.message}</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
