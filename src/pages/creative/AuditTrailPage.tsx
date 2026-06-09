@@ -695,7 +695,19 @@ export default function CreativeAuditPage() {
                             <Badge variant="outline">{entry.step}</Badge>
                           </TableCell>
                           <TableCell className="text-xs font-mono">
-                            {entry.action}
+                            {entry.isGroup ? (
+                              <div className="flex flex-wrap gap-1 items-center">
+                                <span className="font-bold">{entry.action}</span>
+                                <Badge variant="secondary" className="h-4 px-1 text-[8px] bg-green-500/10 text-green-600 border-green-500/20">
+                                  {entry.statusCounts?.success} sucessos
+                                </Badge>
+                                <Badge variant="secondary" className="h-4 px-1 text-[8px] bg-destructive/10 text-destructive border-destructive/20">
+                                  {entry.statusCounts?.error} falhas
+                                </Badge>
+                              </div>
+                            ) : (
+                              entry.action
+                            )}
                           </TableCell>
                           <TableCell>
                             <div className="flex flex-col gap-0.5">
