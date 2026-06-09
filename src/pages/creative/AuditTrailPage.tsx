@@ -210,13 +210,26 @@ export default function CreativeAuditPage() {
 
   // Group entries by correlation_id for the UI list
   const groupedEntries = useMemo(() => {
-    const cidMap: Record<string, AuditTrail[]> = {};
-    const flat: (AuditTrail & { isGroup?: boolean; children?: AuditTrail[] })[] = [];
+    const cidMap: Record<string, { entries: AuditTrail[], statusCounts: { success: number, error: number, retry: number } }> = {};
+    const flat: (AuditTrail & { isGroup?: boolean; children?: AuditTrail[]; statusCounts?: { success: number, error: number, retry: number } })[] = [];
 
     entries.forEach(entry => {
       if (entry.correlation_id) {
-        if (!cidMap[entry.correlation_id]) cidMap[entry.correlation_id] = [];
-        cidMap[entry.correlation_id].push(entry);
+        if (!cidMap[entry.correlation_id]) {
+          cidMap[entry.correlation_id] = { 
+            entries: [], 
+            statusCounts: { success: 0, error: 0, retry: 0 } 
+          };
+        }
+        
+        cidMap[entry.correlation_id].entries.push(entry);
+        
+        const isError = entry.action.toLowerCase().includes("failed") || 
+                        entry.action.toLowerCase().includes("error") || 
+                        entry.params?.error;
+        
+        if (isError) cidMap[entry.correlation_id].statusCounts.error++;
+        else cidMap[entry.correlation_id].statusCounts.success++;
       } else {
         flat.push(entry);
       }
@@ -224,11 +237,17 @@ export default function CreativeAuditPage() {
 
     // For each group, the representative is the most recent one
     Object.keys(cidMap).forEach(cid => {
-      const sorted = [...cidMap[cid]].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      const groupData = cidMap[cid];
+      const sorted = [...groupData.entries].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      
+      // Update retry count in statusCounts
+      groupData.statusCounts.retry = sorted.length > 1 ? sorted.length - 1 : 0;
+
       flat.push({
         ...sorted[0],
         isGroup: sorted.length > 1,
-        children: sorted
+        children: sorted,
+        statusCounts: groupData.statusCounts
       });
     });
 
