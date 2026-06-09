@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Sparkles, Send, Coins, Settings2, Info, AlertCircle, Wallet, RotateCw, Upload, X, Image as ImageIcon, Download, Crop as CropIcon, Trash2, Sliders, History, FileText, FileCode, Play } from "lucide-react";
+import { Loader2, Sparkles, Send, Coins, Settings2, Info, AlertCircle, Wallet, RotateCw, Upload, X, Image as ImageIcon, Download, Crop as CropIcon, Trash2, Sliders, History, FileText, FileCode, Play, Search, Filter, PlayCircle } from "lucide-react";
 import { useSubscription } from "@/hooks/useSubscription";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
@@ -144,6 +144,11 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     return saved ? JSON.parse(saved) : { zoom: 1, aspect: 1 };
   });
   const [downloadOptions, setDownloadOptions] = useState({ quality: 0.90, resolution: "original" as any, pngQuality: 1 });
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyStatusFilter, setHistoryStatusFilter] = useState<string>("all");
+  const [reexecuteDialogOpen, setReexecuteDialogOpen] = useState(false);
+  const [reexecuteItem, setReexecuteItem] = useState<any>(null);
+  const [startAtStep, setStartAtStep] = useState<AvatarStepKey>("upload");
 
   const buildSteps = (needsConvert: boolean, initialDetails?: Record<string, any>): AvatarStepState[] => {
     const now = new Date().toLocaleTimeString();
