@@ -129,6 +129,20 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     }
     return null;
   });
+  const [cropSourceUrl, setCropSourceUrl] = useState<string | null>(null);
+  const [cropOpen, setCropOpen] = useState(false);
+  const [progressSteps, setProgressSteps] = useState<AvatarStepState[]>([]);
+
+  const buildSteps = (needsConvert: boolean): AvatarStepState[] => [
+    { key: "upload", label: "Upload da imagem", status: "pending" },
+    { key: "convert", label: "Conversão HEIC/SVG", status: needsConvert ? "pending" : "skipped" },
+    { key: "generate", label: "Geração do avatar falante", status: "pending" },
+    { key: "render", label: "Renderização final", status: "pending" },
+  ];
+
+  const updateStep = (key: AvatarStepKey, status: AvatarStepState["status"]) => {
+    setProgressSteps((prev) => prev.map((s) => (s.key === key ? { ...s, status } : s)));
+  };
 
   const fetchLastResult = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
