@@ -165,73 +165,90 @@ function AuditHistoryManager({
   const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
   const paginatedLogs = filteredLogs.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  const exportToCSV = () => {
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [exportFormat, setExportFormat] = useState<"csv" | "pdf">("csv");
+  const MAX_EXPORT_LIMIT = 500;
+
+  const handleExport = async (format: "csv" | "pdf") => {
     if (!canViewHistory) {
-      toast.error("Permissão negada para exportação");
+      const errorMsg = "ERR_AUTH_DENIED: Acesso Negado: Apenas Dev, Admin ou o Aprovador original podem visualizar ou exportar este histórico.";
+      toast.error("Permissão negada", { description: errorMsg });
       return;
     }
 
-    const headers = ["ID", "Timestamp", "Ação", "Usuário", "Anexo", "Motivo", "Status"];
-    const rows = filteredLogs.map(log => [
-      log.id,
-      new Date(log.timestamp).toLocaleString(),
-      log.action,
-      log.user,
-      log.attachmentName,
-      log.reason,
-      log.status
-    ]);
-    
-    const csvContent = [headers, ...rows].map(e => e.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `audit_log_filtered_${new Date().toISOString()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success("Histórico exportado (respeitando filtros)");
-  };
-
-  const exportToPDF = async () => {
-    if (!canViewHistory) {
-      toast.error("Permissão negada para exportação");
-      return;
+    if (filteredLogs.length > MAX_EXPORT_LIMIT) {
+      toast.warning("Limite de exportação atingido", { 
+        description: `O arquivo conterá apenas os primeiros ${MAX_EXPORT_LIMIT} registros filtrados.` 
+      });
     }
 
-    try {
-      const { default: jsPDF } = await import("jspdf");
-      const { default: autoTable } = await import("jspdf-autotable");
-      
-      const doc = new jsPDF();
-      doc.setFontSize(16);
-      doc.text(title || "Relatório de Auditoria Filtrado", 14, 15);
-      doc.setFontSize(10);
-      doc.text(`Filtros aplicados: ${searchTerm || "Nenhum"} | Status: ${statusFilter} | Total: ${filteredLogs.length}`, 14, 22);
-      
-      const tableData = filteredLogs.map(log => [
+    const logsToExport = filteredLogs.slice(0, MAX_EXPORT_LIMIT);
+
+    if (format === "csv") {
+      const headers = ["ID", "Timestamp", "Ação", "Usuário", "Anexo", "Motivo", "Status"];
+      const rows = logsToExport.map(log => [
+        log.id,
         new Date(log.timestamp).toLocaleString(),
+        log.action,
         log.user,
         log.attachmentName,
-        log.action,
+        log.reason,
         log.status
       ]);
-
-      (autoTable as any)(doc, {
-        head: [['Timestamp', 'Usuário', 'Anexo', 'Ação', 'Status']],
-        body: tableData,
-        startY: 28,
-        styles: { fontSize: 8 },
-        headStyles: { fillColor: [0, 102, 204] }
-      });
       
-      doc.save(`audit_log_filtered_${new Date().toISOString()}.pdf`);
-      toast.success("Relatório PDF exportado (respeitando filtros)");
-    } catch (error) {
-      console.error("PDF export error:", error);
-      toast.error("Erro ao gerar PDF");
+      const csvContent = [headers, ...rows].map(e => e.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `audit_log_filtered_${new Date().toISOString()}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      try {
+        const { default: jsPDF } = await import("jspdf");
+        const { default: autoTable } = await import("jspdf-autotable");
+        
+        const doc = new jsPDF();
+        doc.setFontSize(16);
+        doc.text(title || "Relatório de Auditoria Filtrado", 14, 15);
+        doc.setFontSize(10);
+        doc.text(`Filtros: ${searchTerm || "Nenhum"} | Status: ${statusFilter} | Total Exportado: ${logsToExport.length}`, 14, 22);
+        
+        const tableData = logsToExport.map(log => [
+          new Date(log.timestamp).toLocaleString(),
+          log.user,
+          log.attachmentName,
+          log.action,
+          log.status
+        ]);
+
+        (autoTable as any)(doc, {
+          head: [['Timestamp', 'Usuário', 'Anexo', 'Ação', 'Status']],
+          body: tableData,
+          startY: 28,
+          styles: { fontSize: 8 },
+          headStyles: { fillColor: [0, 102, 204] }
+        });
+        
+        doc.save(`audit_log_filtered_${new Date().toISOString()}.pdf`);
+      } catch (error) {
+        toast.error("Erro ao gerar PDF");
+        return;
+      }
     }
+
+    addAuditLog({
+      action: "download_authorized", // Using existing action for simplicity or could be "export_requested"
+      user: userRole,
+      attachmentName: `Exportação ${format.toUpperCase()}`,
+      reason: `Filtros: ${searchTerm || "Nenhum"}, Status: ${statusFilter}, Ordenação: ${sortField} ${sortOrder}, Qtd: ${logsToExport.length}`,
+      status: "success"
+    });
+    
+    toast.success("Histórico exportado com sucesso");
+    setIsExportDialogOpen(false);
   };
 
   const uniqueUsers = Array.from(new Set(logs.map(l => l.user)));
