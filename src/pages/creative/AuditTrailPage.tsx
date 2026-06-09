@@ -69,7 +69,11 @@ export default function CreativeAuditPage() {
     const saved = localStorage.getItem("creative_audit_filters");
     return saved ? JSON.parse(saved) : [];
   });
-  const [recurrenceThreshold, setRecurrenceThreshold] = useState(2);
+  const [recurrenceThreshold, setRecurrenceThreshold] = useState(() => {
+    const saved = localStorage.getItem("creative_audit_recurrence_threshold");
+    return saved ? Number(saved) : 2;
+  });
+  const [expandedCorrelations, setExpandedCorrelations] = useState<Set<string>>(new Set());
 
   // Update URL params when filters change
   useEffect(() => {
