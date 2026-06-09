@@ -96,6 +96,310 @@ interface AuditLog {
 
 
 
+interface AuditHistoryManagerProps {
+  logs: AuditLog[];
+  filterByAttachment?: string;
+  title?: string;
+  showFilters?: boolean;
+  userRole: string;
+  originalApprover?: string;
+}
+
+function AuditHistoryManager({ 
+  logs, 
+  filterByAttachment, 
+  title, 
+  showFilters = true, 
+  userRole,
+  originalApprover 
+}: AuditHistoryManagerProps) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [userFilter, setUserFilter] = useState<string>("all");
+  const [attachmentFilter, setAttachmentFilter] = useState<string>("all");
+  const [sortField, setSortField] = useState<"timestamp" | "attachmentName" | "status">("timestamp");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  const isAdmin = userRole === "admin";
+  const isDev = userRole === "developer";
+  const isOriginalApprover = originalApprover && userRole === originalApprover;
+  const canViewHistory = isAdmin || isDev || isOriginalApprover;
+
+  const filteredLogs = useMemo(() => {
+    if (!canViewHistory) return [];
+    
+    return logs
+      .filter(log => {
+        const matchesSearch = searchTerm === "" || 
+          log.user.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          log.attachmentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          log.reason.toLowerCase().includes(searchTerm.toLowerCase());
+        
+        const matchesStatus = statusFilter === "all" || log.status === statusFilter;
+        const matchesUser = userFilter === "all" || log.user === userFilter;
+        const matchesAttachment = (filterByAttachment ? log.attachmentName === filterByAttachment : true) && 
+                                  (attachmentFilter === "all" || log.attachmentName === attachmentFilter);
+        
+        return matchesSearch && matchesStatus && matchesUser && matchesAttachment;
+      })
+      .sort((a, b) => {
+        let comparison = 0;
+        if (sortField === "timestamp") {
+          comparison = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+        } else if (sortField === "attachmentName") {
+          comparison = a.attachmentName.localeCompare(b.attachmentName);
+        } else if (sortField === "status") {
+          comparison = a.status.localeCompare(b.status);
+        }
+        return sortOrder === "desc" ? -comparison : comparison;
+      });
+  }, [logs, searchTerm, statusFilter, userFilter, attachmentFilter, sortField, sortOrder, filterByAttachment, canViewHistory]);
+
+  const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
+  const paginatedLogs = filteredLogs.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  const exportToCSV = () => {
+    const headers = ["ID", "Timestamp", "Ação", "Usuário", "Anexo", "Motivo", "Status"];
+    const rows = filteredLogs.map(log => [
+      log.id,
+      new Date(log.timestamp).toLocaleString(),
+      log.action,
+      log.user,
+      log.attachmentName,
+      log.reason,
+      log.status
+    ]);
+    
+    const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `audit_log_${new Date().toISOString()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Histórico exportado para CSV");
+  };
+
+  const exportToPDF = async () => {
+    try {
+      const { default: jsPDF } = await import("jspdf");
+      const { default: autoTable } = await import("jspdf-autotable");
+      
+      const doc = new jsPDF();
+      doc.text(title || "Relatório de Auditoria", 14, 15);
+      
+      const tableData = filteredLogs.map(log => [
+        new Date(log.timestamp).toLocaleString(),
+        log.user,
+        log.attachmentName,
+        log.action,
+        log.status
+      ]);
+
+      (autoTable as any)(doc, {
+        head: [['Timestamp', 'Usuário', 'Anexo', 'Ação', 'Status']],
+        body: tableData,
+        startY: 20,
+      });
+      
+      doc.save(`audit_log_${new Date().toISOString()}.pdf`);
+      toast.success("Relatório PDF gerado com sucesso");
+    } catch (error) {
+      console.error("PDF export error:", error);
+      toast.error("Erro ao gerar PDF");
+    }
+  };
+
+  const uniqueUsers = Array.from(new Set(logs.map(l => l.user)));
+  const uniqueAttachments = Array.from(new Set(logs.map(l => l.attachmentName)));
+
+  if (!canViewHistory) {
+    return (
+      <div className="p-8 text-center border rounded-lg bg-destructive/5 border-destructive/20">
+        <ShieldAlert className="h-8 w-8 mx-auto mb-2 text-destructive" />
+        <h4 className="text-sm font-bold text-destructive">Acesso Restrito</h4>
+        <p className="text-xs text-muted-foreground">Você não tem permissão para visualizar este histórico de auditoria.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {showFilters && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+          <div className="relative md:col-span-2">
+            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por usuário, anexo ou motivo..."
+              className="pl-8 h-8 text-[11px]"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="h-8 text-[11px]">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos Status</SelectItem>
+              <SelectItem value="success">Sucesso</SelectItem>
+              <SelectItem value="denied">Negado</SelectItem>
+              <SelectItem value="info">Info</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="flex gap-1">
+            <Button variant="outline" size="sm" className="h-8 px-2" onClick={exportToCSV} title="CSV">
+              <FileSpreadsheet className="h-3.5 w-3.5" />
+            </Button>
+            <Button variant="outline" size="sm" className="h-8 px-2" onClick={exportToPDF} title="PDF">
+              <FileText className="h-3.5 w-3.5" />
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 px-2">
+                  <Filter className="h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Filtros Avançados</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <div className="p-2 space-y-2">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase">Usuário</p>
+                    <Select value={userFilter} onValueChange={setUserFilter}>
+                      <SelectTrigger className="h-7 text-[10px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos Usuários</SelectItem>
+                        {uniqueUsers.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {!filterByAttachment && (
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-medium text-muted-foreground uppercase">Anexo</p>
+                      <Select value={attachmentFilter} onValueChange={setAttachmentFilter}>
+                        <SelectTrigger className="h-7 text-[10px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos Anexos</SelectItem>
+                          {uniqueAttachments.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase">Ordenar por</p>
+                    <div className="flex gap-1">
+                      <Select value={sortField} onValueChange={(v: any) => setSortField(v)}>
+                        <SelectTrigger className="h-7 text-[10px] flex-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="timestamp">Data</SelectItem>
+                          <SelectItem value="attachmentName">Anexo</SelectItem>
+                          <SelectItem value="status">Status</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-7 w-7 p-0" 
+                        onClick={() => setSortOrder(prev => prev === "asc" ? "desc" : "asc")}
+                      >
+                        {sortOrder === "asc" ? "↑" : "↓"}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      )}
+
+      <ScrollArea className={cn("rounded-md border border-border/20 bg-background/50", showFilters ? "h-[350px]" : "h-40")}>
+        <div className="p-2 space-y-2">
+          {paginatedLogs.length === 0 && (
+            <p className="text-[10px] text-center text-muted-foreground italic py-8">Nenhum registro encontrado.</p>
+          )}
+          {paginatedLogs.map((log) => (
+            <div
+              key={log.id}
+              className={`text-[10px] rounded border p-2 flex items-start gap-2 ${
+                log.status === "success" ? "border-emerald-500/20 bg-emerald-500/5" :
+                log.status === "denied" ? "border-red-500/20 bg-red-500/5" : "border-border/30 bg-muted/20"
+              }`}
+            >
+              <div className={cn(
+                "h-5 w-5 rounded-full flex items-center justify-center shrink-0",
+                log.status === "success" ? "bg-emerald-500/10 text-emerald-500" :
+                log.status === "denied" ? "bg-red-500/10 text-red-500" : "bg-primary/10 text-primary"
+              )}>
+                {log.status === "success" ? <Check className="h-3 w-3" /> :
+                 log.status === "denied" ? <Lock className="h-3 w-3" /> : <Activity className="h-3 w-3" />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-bold">
+                    {log.action === "download_authorized" ? "Download Autorizado" :
+                     log.action === "download_denied" ? "Acesso Negado" : 
+                     log.action === "retention_cleanup" ? "Limpeza" : "Solicitado"}
+                    {" · "}
+                    <span className="text-muted-foreground font-mono">{log.user}</span>
+                  </span>
+                  <span className="text-[9px] text-muted-foreground shrink-0 flex items-center gap-1">
+                    <Clock className="h-2.5 w-2.5" /> {new Date(log.timestamp).toLocaleString()}
+                  </span>
+                </div>
+                <div className="text-muted-foreground truncate mt-0.5">
+                  <span className="font-medium text-foreground">{log.attachmentName}</span>
+                </div>
+                <div className="text-[9px] text-muted-foreground italic mt-0.5">
+                  {log.reason}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </ScrollArea>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between px-1">
+          <p className="text-[9px] text-muted-foreground">Mostrando {paginatedLogs.length} de {filteredLogs.length} registros</p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 px-2 text-[10px]"
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(p => p - 1)}
+            >
+              Anterior
+            </Button>
+            <span className="text-[10px]">Pág {currentPage} / {totalPages}</span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 px-2 text-[10px]"
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage(p => p + 1)}
+            >
+              Próxima
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function DeliveryFlow() {
   const [isDeploying, setIsDeploying] = useState(false);
   const [progress, setProgress] = useState(0);
