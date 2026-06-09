@@ -5,7 +5,7 @@ import { Slider } from "@/components/ui/slider";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Loader2, Crop as CropIcon, ZoomIn, Square, Maximize, Save, Trash2, List } from "lucide-react";
+import { Loader2, Crop as CropIcon, ZoomIn, Square, Maximize, Save, Trash2, List, Pencil, Copy } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 
@@ -51,6 +51,7 @@ export function AvatarCropDialog({ open, imageUrl, onCancel, onConfirm, onSavePr
   const [croppedArea, setCroppedArea] = useState<Area | null>(null);
   const [processing, setProcessing] = useState(false);
   const [presetName, setPresetName] = useState("");
+  const [editingPreset, setEditingPreset] = useState<string | null>(null);
   const [presets, setPresets] = useState<{ name: string; zoom: number; aspect: number }[]>(() => {
     const saved = localStorage.getItem("creative_avatar_presets_list");
     return saved ? JSON.parse(saved) : [];
@@ -64,11 +65,50 @@ export function AvatarCropDialog({ open, imageUrl, onCancel, onConfirm, onSavePr
   }, [initialPreset]);
 
   const saveToPresetsList = (name: string, p: { zoom: number; aspect: number }) => {
-    const newPresets = [...presets.filter(x => x.name !== name), { name, ...p }];
+    if (!name.trim()) return;
+    
+    const exists = presets.find(x => x.name.toLowerCase() === name.toLowerCase() && x.name !== editingPreset);
+    if (exists) {
+      toast.error("Já existe um preset com este nome");
+      return;
+    }
+
+    let newPresets;
+    if (editingPreset) {
+      newPresets = presets.map(x => x.name === editingPreset ? { ...x, name, ...p } : x);
+      setEditingPreset(null);
+      toast.success("Preset renomeado");
+    } else {
+      newPresets = [...presets, { name, ...p }];
+      toast.success("Preset salvo");
+    }
+
     setPresets(newPresets);
     localStorage.setItem("creative_avatar_presets_list", JSON.stringify(newPresets));
     onSavePreset(name, p);
     setPresetName("");
+  };
+
+  const duplicatePreset = (name: string) => {
+    const original = presets.find(p => p.name === name);
+    if (!original) return;
+    
+    let newName = `${name} (Cópia)`;
+    let counter = 1;
+    while (presets.find(p => p.name === newName)) {
+      newName = `${name} (Cópia ${counter})`;
+      counter++;
+    }
+    
+    const newPresets = [...presets, { ...original, name: newName }];
+    setPresets(newPresets);
+    localStorage.setItem("creative_avatar_presets_list", JSON.stringify(newPresets));
+    toast.success("Preset duplicado");
+  };
+
+  const startEditing = (preset: typeof presets[0]) => {
+    setPresetName(preset.name);
+    setEditingPreset(preset.name);
   };
 
   const deletePreset = (name: string) => {
@@ -155,16 +195,37 @@ export function AvatarCropDialog({ open, imageUrl, onCancel, onConfirm, onSavePr
                     <SelectContent>
                       {presets.length === 0 && <div className="p-2 text-[10px] text-center opacity-50">Nenhum salvo</div>}
                       {presets.map(p => (
-                        <div key={p.name} className="flex items-center justify-between group">
-                          <SelectItem value={p.name} className="flex-1">{p.name}</SelectItem>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-6 w-6 opacity-0 group-hover:opacity-100" 
-                            onClick={(e) => { e.stopPropagation(); deletePreset(p.name); }}
-                          >
-                            <Trash2 className="h-3 w-3 text-destructive" />
-                          </Button>
+                        <div key={p.name} className="flex items-center justify-between group px-2 py-1 hover:bg-muted/50 rounded-sm">
+                          <SelectItem value={p.name} className="flex-1 cursor-pointer">{p.name}</SelectItem>
+                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-6 w-6" 
+                              onClick={(e) => { e.stopPropagation(); startEditing(p); }}
+                              title="Renomear"
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-6 w-6" 
+                              onClick={(e) => { e.stopPropagation(); duplicatePreset(p.name); }}
+                              title="Duplicar"
+                            >
+                              <Copy className="h-3 w-3" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-6 w-6" 
+                              onClick={(e) => { e.stopPropagation(); deletePreset(p.name); }}
+                              title="Excluir"
+                            >
+                              <Trash2 className="h-3 w-3 text-destructive" />
+                            </Button>
+                          </div>
                         </div>
                       ))}
                     </SelectContent>
@@ -175,7 +236,7 @@ export function AvatarCropDialog({ open, imageUrl, onCancel, onConfirm, onSavePr
 
           <div className="flex items-end gap-2 p-2 rounded bg-primary/5 border border-primary/10">
             <div className="flex-1 space-y-1.5">
-              <Label className="text-[10px] uppercase font-bold text-primary/70">Novo Preset</Label>
+              <Label className="text-[10px] uppercase font-bold text-primary/70">{editingPreset ? "Renomear Preset" : "Novo Preset"}</Label>
               <Input 
                 placeholder="Nome do ajuste..." 
                 value={presetName} 
@@ -189,7 +250,7 @@ export function AvatarCropDialog({ open, imageUrl, onCancel, onConfirm, onSavePr
               disabled={!presetName.trim()}
               onClick={() => saveToPresetsList(presetName, { zoom, aspect })}
             >
-              <Save className="h-3 w-3 mr-1" /> Salvar
+              <Save className="h-3 w-3 mr-1" /> {editingPreset ? "Atualizar" : "Salvar"}
             </Button>
           </div>
           <div className="space-y-2">

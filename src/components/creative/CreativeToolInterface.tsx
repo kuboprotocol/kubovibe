@@ -126,7 +126,10 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
   const [simulationMode, setSimulationMode] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [lastResult, setLastResult] = useState<any>(null);
-  const [sessionHistory, setSessionHistory] = useState<{ id: string; timestamp: string; prompt: string; status: "success" | "error"; assetUrl?: string; metadata?: any }[]>([]);
+  const [sessionHistory, setSessionHistory] = useState<{ id: string; timestamp: string; prompt: string; status: "success" | "error"; assetUrl?: string; metadata?: any; logs?: AvatarStepState[] }[]>(() => {
+    const saved = localStorage.getItem(`creative_history_${toolKey}`);
+    return saved ? JSON.parse(saved) : [];
+  });
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(() => {
     if (toolKey === "avatar") {
       return localStorage.getItem("creative_last_avatar_image");
@@ -182,6 +185,10 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       localStorage.setItem("creative_last_avatar_image", uploadedImageUrl);
     }
   }, [uploadedImageUrl, toolKey]);
+
+  useEffect(() => {
+    localStorage.setItem(`creative_history_${toolKey}`, JSON.stringify(sessionHistory));
+  }, [sessionHistory, toolKey]);
 
   const logAuditAction = useCallback(async (step: string, action: string, params: any = {}, correlationId?: string, traceId?: string) => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -440,11 +447,12 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     }
   };
 
-  const exportLogs = (format: "txt" | "json") => {
+  const exportLogs = (format: "txt" | "json", stepsToExport?: AvatarStepState[]) => {
+    const steps = stepsToExport || progressSteps;
     const data = {
       tool: toolKey,
       timestamp: new Date().toISOString(),
-      steps: progressSteps,
+      steps: steps,
       error: errorState,
       trace: traceInfo
     };
@@ -456,7 +464,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       content = `LOG DE EXECUÇÃO - ${config.title}\n`;
       content += `Data: ${data.timestamp}\n\n`;
       content += `ETAPAS:\n`;
-      progressSteps.forEach(s => {
+      steps.forEach(s => {
         content += `[${s.status.toUpperCase()}] ${s.label} (${s.timestamp || "N/A"})\n`;
         if (s.errorMessage) content += `  ERRO: ${s.errorMessage}\n`;
         if (s.details) content += `  DETALHES: ${JSON.stringify(s.details)}\n`;
@@ -576,7 +584,8 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
         prompt,
         status: "success",
         assetUrl: data?.asset_url,
-        metadata: { ...metadata, uploadedImageUrl }
+        metadata: { ...metadata, uploadedImageUrl },
+        logs: progressSteps // Capture current logs
       }, ...prev]);
 
       if (toolKey === "avatar") {
@@ -614,7 +623,8 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
         timestamp: new Date().toLocaleTimeString(),
         prompt,
         status: "error",
-        metadata: { ...metadata, uploadedImageUrl }
+        metadata: { ...metadata, uploadedImageUrl },
+        logs: progressSteps // Capture current logs even on error
       }, ...prev]);
       setErrorState({
         message: e.message,
@@ -643,7 +653,19 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
   const handleReplay = (item: typeof sessionHistory[0]) => {
     setPrompt(item.prompt);
     if (item.metadata?.uploadedImageUrl) setUploadedImageUrl(item.metadata.uploadedImageUrl);
+    if (item.metadata) {
+      const { uploadedImageUrl, ...rest } = item.metadata;
+      setMetadata(rest);
+    }
     toast.info("Parâmetros carregados!");
+  };
+
+  const handleRerunFromHistory = (item: typeof sessionHistory[0]) => {
+    handleReplay(item);
+    // Use a timeout to ensure state is updated before execution
+    setTimeout(() => {
+      handleExecute();
+    }, 100);
   };
 
   return (
@@ -889,9 +911,38 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                     </div>
                     <p className="text-[11px] truncate max-w-[400px] text-foreground/80">{item.prompt || "(Sem texto)"}</p>
                   </div>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100" onClick={() => handleReplay(item)} title="Reaplicar parâmetros">
-                    <Play className="h-3.5 w-3.5" />
-                  </Button>
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReplay(item)} title="Carregar parâmetros">
+                      <Settings2 className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-primary" onClick={() => handleRerunFromHistory(item)} title="Reexecutar agora">
+                      <Play className="h-3.5 w-3.5" />
+                    </Button>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-7 w-7">
+                          <FileCode className="h-3.5 w-3.5" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-32 p-1" align="end">
+                        <Button variant="ghost" size="sm" className="w-full justify-start text-[10px]" onClick={() => exportLogs("txt", item.logs)}>
+                          <FileText className="h-3 w-3 mr-2" /> .TXT
+                        </Button>
+                        <Button variant="ghost" size="sm" className="w-full justify-start text-[10px]" onClick={() => exportLogs("json", item.logs)}>
+                          <FileCode className="h-3 w-3 mr-2" /> .JSON
+                        </Button>
+                      </PopoverContent>
+                    </Popover>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-7 w-7 text-destructive" 
+                      onClick={() => setSessionHistory(prev => prev.filter(h => h.id !== item.id))}
+                      title="Excluir do histórico"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
