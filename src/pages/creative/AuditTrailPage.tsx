@@ -10,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { 
   ArrowLeft, Search, FileDown, ArrowUpDown, Loader2, X, Filter, 
-  AlertTriangle, Save, History, ChevronRight, Info, AlertCircle, Share2, TrendingUp, Clock
+  AlertTriangle, Save, History, ChevronRight, Info, AlertCircle, Share2, TrendingUp, Clock,
+  Layers, Copy, ArrowLeftRight
 } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -60,12 +61,15 @@ export default function CreativeAuditPage() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">((searchParams.get("sort") as "asc" | "desc") || "desc");
   const [page, setPage] = useState(Number(searchParams.get("page")) || 1);
   const [selectedEntry, setSelectedEntry] = useState<AuditTrail | null>(null);
+  const [compareEntries, setCompareEntries] = useState<AuditTrail[]>([]);
+  const [isComparing, setIsComparing] = useState(false);
   const [timelineEntries, setTimelineEntries] = useState<AuditTrail[]>([]);
   const [isTimelineLoading, setIsTimelineLoading] = useState(false);
   const [savedFilters, setSavedFilters] = useState<any[]>(() => {
     const saved = localStorage.getItem("creative_audit_filters");
     return saved ? JSON.parse(saved) : [];
   });
+  const [recurrenceThreshold, setRecurrenceThreshold] = useState(2);
 
   // Update URL params when filters change
   useEffect(() => {
@@ -145,10 +149,41 @@ export default function CreativeAuditPage() {
       }
     });
     return Object.entries(failures)
-      .filter(([_, v]) => v.count > 1)
+      .filter(([_, v]) => v.count >= recurrenceThreshold)
       .sort((a, b) => b[1].count - a[1].count)
-      .slice(0, 3);
+      .slice(0, 5);
+  }, [entries, recurrenceThreshold]);
+
+  // Detected retries for alert indicators in table
+  const retryCountByCorrelation = useMemo(() => {
+    const counts: Record<string, number> = {};
+    entries.forEach(entry => {
+      if (entry.correlation_id) {
+        counts[entry.correlation_id] = (counts[entry.correlation_id] || 0) + 1;
+      }
+    });
+    return counts;
   }, [entries]);
+
+  const toggleComparison = (entry: AuditTrail) => {
+    setCompareEntries(prev => {
+      const exists = prev.find(e => e.id === entry.id);
+      if (exists) return prev.filter(e => e.id !== entry.id);
+      if (prev.length >= 2) {
+        toast.warning("Selecione apenas 2 eventos para comparar");
+        return prev;
+      }
+      return [...prev, entry];
+    });
+  };
+
+  const startComparison = () => {
+    if (compareEntries.length !== 2) {
+      toast.error("Selecione exatamente 2 eventos para comparar");
+      return;
+    }
+    setIsComparing(true);
+  };
 
   // Failure Trends Data for Chart
   const failureTrends = useMemo(() => {
@@ -395,6 +430,40 @@ export default function CreativeAuditPage() {
               onChange={(e) => { setEndDate(e.target.value); setPage(1); }}
             />
           </div>
+
+          <div className="flex flex-wrap items-center gap-4 mb-4">
+            <div className="flex items-center gap-2 bg-accent/20 px-3 py-1 rounded-full border">
+              <span className="text-xs font-medium">Limite de Recorrência:</span>
+              <input 
+                type="number" 
+                min="1" 
+                value={recurrenceThreshold}
+                onChange={(e) => setRecurrenceThreshold(Number(e.target.value))}
+                className="w-12 bg-transparent text-xs font-bold border-none focus:ring-0"
+              />
+            </div>
+            {recurrentFailures.length > 0 && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="text-xs h-8"
+                onClick={() => setSearch(recurrentFailures[0][0])}
+              >
+                <Layers className="h-3 w-3 mr-1" /> Ver falhas mais recorrentes
+              </Button>
+            )}
+            {compareEntries.length > 0 && (
+              <div className="flex items-center gap-2 ml-auto">
+                <span className="text-xs font-medium">{compareEntries.length}/2 selecionados</span>
+                <Button size="sm" className="h-8" disabled={compareEntries.length !== 2} onClick={startComparison}>
+                  <ArrowLeftRight className="h-3 w-3 mr-1" /> Comparar
+                </Button>
+                <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => setCompareEntries([])}>
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            )}
+          </div>
           
           <div className="flex flex-wrap items-center justify-between gap-4 pt-2 border-t">
             <div className="flex gap-2">
@@ -443,6 +512,7 @@ export default function CreativeAuditPage() {
                   <TableHead>Etapa</TableHead>
                   <TableHead>Ação</TableHead>
                   <TableHead>Correlation / Trace ID</TableHead>
+                  <TableHead className="text-center">Comparar</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -465,44 +535,69 @@ export default function CreativeAuditPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  entries.map((entry) => (
-                    <TableRow 
-                      key={entry.id} 
-                      className="cursor-pointer hover:bg-muted/50 transition-colors"
-                      onClick={() => setSelectedEntry(entry)}
-                    >
-                      <TableCell className="text-xs font-medium">
-                        {new Date(entry.created_at).toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-xs truncate max-w-[150px]" title={entry.user_email}>
-                        {entry.user_email || "Usuário não identificado"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{entry.step}</Badge>
-                      </TableCell>
-                      <TableCell className="text-xs font-mono">
-                        {entry.action}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col gap-0.5">
-                          {entry.correlation_id && (
-                            <span className="text-[10px] text-muted-foreground">C: {entry.correlation_id}</span>
-                          )}
-                          {entry.trace_id && (
-                            <span className="text-[10px] text-muted-foreground">T: {entry.trace_id}</span>
-                          )}
-                          {!entry.correlation_id && !entry.trace_id && (
-                            <span className="text-[10px] text-muted-foreground italic">N/A</span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="icon">
-                          <ChevronRight className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  entries.map((entry) => {
+                    const retries = entry.correlation_id ? retryCountByCorrelation[entry.correlation_id] : 0;
+                    const isSelectedForCompare = !!compareEntries.find(e => e.id === entry.id);
+                    
+                    return (
+                      <TableRow 
+                        key={entry.id} 
+                        className={`cursor-pointer transition-colors ${isSelectedForCompare ? 'bg-primary/10' : 'hover:bg-muted/50'}`}
+                        onClick={() => setSelectedEntry(entry)}
+                      >
+                        <TableCell className="text-xs font-medium">
+                          {new Date(entry.created_at).toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-xs truncate max-w-[150px]" title={entry.user_email}>
+                          {entry.user_email || "Usuário não identificado"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{entry.step}</Badge>
+                        </TableCell>
+                        <TableCell className="text-xs font-mono">
+                          {entry.action}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-0.5">
+                            <div className="flex items-center gap-2">
+                              {entry.correlation_id && (
+                                <span className="text-[10px] text-muted-foreground">C: {entry.correlation_id}</span>
+                              )}
+                              {retries > 1 && (
+                                <Badge variant="secondary" className="h-4 px-1 text-[8px] bg-yellow-500/10 text-yellow-600 border-yellow-500/20">
+                                  {retries}x
+                                </Badge>
+                              )}
+                            </div>
+                            {entry.trace_id && (
+                              <span className="text-[10px] text-muted-foreground">T: {entry.trace_id}</span>
+                            )}
+                            {!entry.correlation_id && !entry.trace_id && (
+                              <span className="text-[10px] text-muted-foreground italic">N/A</span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Button 
+                            variant={isSelectedForCompare ? "default" : "ghost"} 
+                            size="icon" 
+                            className="h-7 w-7"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleComparison(entry);
+                            }}
+                          >
+                            <Copy className="h-3.5 w-3.5" />
+                          </Button>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="icon">
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
@@ -655,6 +750,55 @@ export default function CreativeAuditPage() {
               )}
             </div>
           )}
+        </SheetContent>
+      </Sheet>
+
+      {/* Comparison Modal */}
+      <Sheet open={isComparing} onOpenChange={() => setIsComparing(false)}>
+        <SheetContent className="sm:max-w-4xl overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <ArrowLeftRight className="h-5 w-5 text-primary" /> Comparação Técnica
+            </SheetTitle>
+            <SheetDescription>
+              Comparando dois eventos selecionados para identificar discrepâncias.
+            </SheetDescription>
+          </SheetHeader>
+          
+          <div className="mt-8 grid grid-cols-2 gap-6">
+            {compareEntries.map((entry, idx) => (
+              <div key={entry.id} className="space-y-6">
+                <div className="p-3 bg-accent/20 rounded-md border flex justify-between items-center">
+                  <h4 className="font-bold text-sm">Evento #{idx + 1}</h4>
+                  <Badge variant="outline">{new Date(entry.created_at).toLocaleTimeString()}</Badge>
+                </div>
+                
+                <div className="space-y-1">
+                  <p className="text-[10px] text-muted-foreground uppercase font-bold">Ação</p>
+                  <p className="text-xs font-mono bg-muted p-2 rounded truncate" title={entry.action}>{entry.action}</p>
+                </div>
+
+                <div className="space-y-1">
+                  <p className="text-[10px] text-muted-foreground uppercase font-bold">Correlation ID</p>
+                  <code className="text-[10px] block bg-accent/50 p-1 rounded">{entry.correlation_id || "N/A"}</code>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-[10px] text-muted-foreground uppercase font-bold">Parâmetros Principais</p>
+                  <div className="bg-black/95 text-green-400 p-3 rounded-md overflow-x-auto font-mono text-[10px] h-[300px]">
+                    <pre>{JSON.stringify(entry.params, null, 2)}</pre>
+                  </div>
+                </div>
+
+                {entry.params?.error && (
+                  <div className="p-2 border border-destructive/30 bg-destructive/5 rounded-md">
+                    <p className="text-[10px] font-bold text-destructive uppercase">Erro Detectado</p>
+                    <p className="text-xs text-destructive">{entry.params.error.message}</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </SheetContent>
       </Sheet>
     </div>
