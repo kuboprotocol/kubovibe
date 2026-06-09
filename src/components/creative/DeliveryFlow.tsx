@@ -436,22 +436,10 @@ function AuditHistoryManager({
                 </div>
               )}
             </div>
-          </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Status:</span>
-                <Badge variant="outline" className="h-4 text-[9px] uppercase">{statusFilter}</Badge>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Ordenação:</span>
-                <span className="font-bold uppercase text-[9px]">{sortField} ({sortOrder})</span>
-              </div>
-              {(exportMode === "filtered" ? filteredLogs.length : paginatedLogs.length) > MAX_EXPORT_LIMIT && (
-                <div className="pt-2 mt-2 border-t border-destructive/20 text-destructive text-[10px] font-bold">
-                  * Apenas os primeiros {MAX_EXPORT_LIMIT} registros selecionados serão exportados.
-                </div>
-              )}
-            </div>
-          </div>
+          <DialogFooter className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => setIsExportDialogOpen(false)}>Cancelar</Button>
+            <Button size="sm" onClick={() => handleExport(exportFormat)}>Confirmar Download</Button>
+          </DialogFooter>
           <DialogFooter className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => setIsExportDialogOpen(false)}>Cancelar</Button>
             <Button size="sm" onClick={() => handleExport(exportFormat)}>Confirmar Download</Button>
