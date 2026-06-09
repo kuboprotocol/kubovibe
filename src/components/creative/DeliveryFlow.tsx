@@ -71,6 +71,10 @@ export function DeliveryFlow() {
   const [currentUserRole, setCurrentUserRole] = useState<string>("admin"); // Mock role: 'admin', 'developer', 'viewer'
   const [pendingApproval, setPendingApproval] = useState<boolean>(false);
   const [currentCommit, setCurrentCommit] = useState<string>(() => Math.random().toString(36).substring(7));
+  const [approvalComment, setApprovalComment] = useState("");
+  const [approvalTerms, setApprovalTerms] = useState(false);
+  const [isDryRun, setIsDryRun] = useState(false);
+  const [activeDeploys, setActiveDeploys] = useState<ActiveDeploy[]>([]);
 
 
   const [steps, setSteps] = useState<ValidationStep[]>([
