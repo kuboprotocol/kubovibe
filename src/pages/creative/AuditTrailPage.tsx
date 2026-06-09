@@ -623,14 +623,8 @@ export default function CreativeAuditPage() {
           <div className="flex flex-wrap items-center gap-4 mb-4">
             <div className="flex items-center gap-2 bg-accent/20 px-3 py-1 rounded-full border">
               <span className="text-xs font-medium">Limite de Recorrência:</span>
-              <input 
-                type="number" 
-                min="1" 
-                value={recurrenceThreshold}
-                onChange={(e) => setRecurrenceThreshold(Number(e.target.value))}
-                className="w-12 bg-transparent text-xs font-bold border-none focus:ring-0"
-              />
-              <Button variant="ghost" size="icon" className="h-5 w-5 ml-1" onClick={saveRecurrenceThreshold} title="Salvar como padrão">
+              <span className="text-xs font-bold">{recurrenceThreshold}x</span>
+              <Button variant="ghost" size="icon" className="h-5 w-5 ml-1" onClick={() => setShowConfig(true)} title="Configurar limite padrão">
                 <Save className="h-3 w-3" />
               </Button>
             </div>
