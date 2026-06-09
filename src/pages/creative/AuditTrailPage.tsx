@@ -612,67 +612,112 @@ export default function CreativeAuditPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  entries.map((entry) => {
+                  groupedEntries.map((entry) => {
                     const retries = entry.correlation_id ? retryCountByCorrelation[entry.correlation_id] : 0;
                     const isSelectedForCompare = !!compareEntries.find(e => e.id === entry.id);
+                    const isExpanded = entry.correlation_id && expandedCorrelations.has(entry.correlation_id);
                     
                     return (
-                      <TableRow 
-                        key={entry.id} 
-                        className={`cursor-pointer transition-colors ${isSelectedForCompare ? 'bg-primary/10' : 'hover:bg-muted/50'}`}
-                        onClick={() => setSelectedEntry(entry)}
-                      >
-                        <TableCell className="text-xs font-medium">
-                          {new Date(entry.created_at).toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-xs truncate max-w-[150px]" title={entry.user_email}>
-                          {entry.user_email || "Usuário não identificado"}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{entry.step}</Badge>
-                        </TableCell>
-                        <TableCell className="text-xs font-mono">
-                          {entry.action}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col gap-0.5">
+                      <>
+                        <TableRow 
+                          key={entry.id} 
+                          className={`cursor-pointer transition-colors ${isSelectedForCompare ? 'bg-primary/10' : 'hover:bg-muted/50'} ${entry.isGroup ? 'bg-accent/5' : ''}`}
+                          onClick={() => entry.isGroup ? toggleCorrelationExpansion(entry.correlation_id!) : setSelectedEntry(entry)}
+                        >
+                          <TableCell className="text-xs font-medium">
                             <div className="flex items-center gap-2">
-                              {entry.correlation_id && (
-                                <span className="text-[10px] text-muted-foreground">C: {entry.correlation_id}</span>
+                              {entry.isGroup && (
+                                <ChevronRight className={`h-3 w-3 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
                               )}
-                              {retries > 1 && (
-                                <Badge variant="secondary" className="h-4 px-1 text-[8px] bg-yellow-500/10 text-yellow-600 border-yellow-500/20">
-                                  {retries}x
-                                </Badge>
+                              {new Date(entry.created_at).toLocaleString()}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-xs truncate max-w-[150px]" title={entry.user_email}>
+                            {entry.user_email || "Usuário não identificado"}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{entry.step}</Badge>
+                          </TableCell>
+                          <TableCell className="text-xs font-mono">
+                            {entry.action}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col gap-0.5">
+                              <div className="flex items-center gap-2">
+                                {entry.correlation_id && (
+                                  <span className="text-[10px] text-muted-foreground">C: {entry.correlation_id}</span>
+                                )}
+                                {retries > 1 && (
+                                  <Badge variant="secondary" className="h-4 px-1 text-[8px] bg-yellow-500/10 text-yellow-600 border-yellow-500/20">
+                                    {retries}x tentativas
+                                  </Badge>
+                                )}
+                              </div>
+                              {entry.trace_id && (
+                                <span className="text-[10px] text-muted-foreground">T: {entry.trace_id}</span>
                               )}
                             </div>
-                            {entry.trace_id && (
-                              <span className="text-[10px] text-muted-foreground">T: {entry.trace_id}</span>
-                            )}
-                            {!entry.correlation_id && !entry.trace_id && (
-                              <span className="text-[10px] text-muted-foreground italic">N/A</span>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Button 
-                            variant={isSelectedForCompare ? "default" : "ghost"} 
-                            size="icon" 
-                            className="h-7 w-7"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleComparison(entry);
-                            }}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Button 
+                              variant={isSelectedForCompare ? "default" : "ghost"} 
+                              size="icon" 
+                              className="h-7 w-7"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleComparison(entry);
+                              }}
+                            >
+                              <Copy className="h-3.5 w-3.5" />
+                            </Button>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button variant="ghost" size="icon">
+                              <ChevronRight className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                        
+                        {isExpanded && entry.children && entry.children.slice(1).map(child => (
+                          <TableRow 
+                            key={child.id} 
+                            className="bg-accent/5 hover:bg-muted/30 border-l-2 border-l-primary/30"
+                            onClick={() => setSelectedEntry(child)}
                           >
-                            <Copy className="h-3.5 w-3.5" />
-                          </Button>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="icon">
-                            <ChevronRight className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
+                            <TableCell className="pl-8 text-[10px] font-medium opacity-70">
+                              {new Date(child.created_at).toLocaleString()}
+                            </TableCell>
+                            <TableCell className="text-[10px] opacity-70 truncate max-w-[150px]">
+                              {child.user_email || "---"}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="ghost" className="text-[10px] h-4">{child.step}</Badge>
+                            </TableCell>
+                            <TableCell className="text-[10px] font-mono opacity-70">
+                              {child.action}
+                            </TableCell>
+                            <TableCell>
+                              <span className="text-[10px] opacity-50">T: {child.trace_id}</span>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Button 
+                                variant={!!compareEntries.find(e => e.id === child.id) ? "default" : "ghost"} 
+                                size="icon" 
+                                className="h-6 w-6"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleComparison(child);
+                                }}
+                              >
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <ChevronRight className="h-3 w-3 ml-auto opacity-30" />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </>
                     );
                   })
                 )}
