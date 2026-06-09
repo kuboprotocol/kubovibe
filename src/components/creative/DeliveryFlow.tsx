@@ -435,41 +435,111 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
                   </Select>
                 </div>
                 <div className="flex items-end gap-2">
-                  <Button 
-                    onClick={() => runValidation()} 
-                    disabled={isDeploying || (!canExecuteDeploy && !pendingApproval)}
-                    className={cn(
-                      "h-9 shadow-lg",
-                      pendingApproval ? "bg-orange-500 hover:bg-orange-600 animate-pulse" : "shadow-primary/20"
-                    )}
-                  >
-                    {isDeploying ? <Loader2 className="h-4 w-4 animate-spin" /> : 
-                     pendingApproval ? <Lock className="h-4 w-4 mr-2" /> :
-                     <PlayCircle className="h-4 w-4 mr-2" />}
-                    {isDeploying ? "Publicando..." : 
-                     pendingApproval ? "Aguardando Aprovação" : "Deploy Agora"}
-                  </Button>
-                  {pendingApproval && currentUserRole === "admin" && (
-                    <Button 
-                      variant="outline" 
-                      className="h-9 border-orange-500 text-orange-500 hover:bg-orange-500/10"
-                      onClick={() => {
-                        setPendingApproval(false);
-                        runValidation();
-                      }}
-                    >
-                      Aprovar Agora
-                    </Button>
-                  )}
+                  <Dialog open={pendingApproval} onOpenChange={setPendingApproval}>
+                    <DialogTrigger asChild>
+                      <Button 
+                        disabled={isDeploying || !canExecuteDeploy}
+                        className={cn(
+                          "h-9 shadow-lg",
+                          environment === "production" ? "bg-primary hover:bg-primary/90" : "bg-primary shadow-primary/20"
+                        )}
+                      >
+                        {isDeploying ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : 
+                         isDryRun ? <Activity className="h-4 w-4 mr-2" /> :
+                         <PlayCircle className="h-4 w-4 mr-2" />}
+                        {isDeploying ? "Publicando..." : 
+                         isDryRun ? "Simular Deploy" : "Deploy Agora"}
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[500px]">
+                      <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                          <ShieldAlert className="h-5 w-5 text-primary" />
+                          Aprovação de Deploy - {environment.toUpperCase()}
+                        </DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="p-3 bg-muted/50 rounded-lg border border-border/40 text-[11px] space-y-2">
+                          <p className="font-bold flex items-center gap-2">
+                            <Lock className="h-3.5 w-3.5" /> Política de Segurança
+                          </p>
+                          <p>O deploy em {environment.toUpperCase()} exige justificativa e aceitação dos termos de integridade.</p>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold flex items-center gap-2">
+                            <MessageSquare className="h-3.5 w-3.5" /> Comentários e Justificativa
+                          </label>
+                          <Textarea 
+                            placeholder="Descreva as alterações e evidências de testes..."
+                            value={approvalComment}
+                            onChange={(e) => setApprovalComment(e.target.value)}
+                            className="text-xs min-h-[100px]"
+                          />
+                        </div>
+
+                        <div className="flex items-start gap-2 pt-2">
+                          <Checkbox 
+                            id="terms" 
+                            checked={approvalTerms}
+                            onCheckedChange={(v) => setApprovalTerms(!!v)}
+                            className="mt-0.5"
+                          />
+                          <label htmlFor="terms" className="text-[11px] leading-tight cursor-pointer">
+                            Eu confirmo que validei as APIs, realizei testes de fumaça e assumo a responsabilidade por este deploy em {environment.toUpperCase()}.
+                          </label>
+                        </div>
+                        
+                        <div className="flex items-center justify-between p-2 bg-primary/5 rounded-lg border border-primary/20">
+                          <div className="flex items-center gap-2">
+                            <Activity className="h-4 w-4 text-primary" />
+                            <span className="text-[11px] font-bold">Modo Dry-Run</span>
+                          </div>
+                          <Checkbox 
+                            checked={isDryRun}
+                            onCheckedChange={(v) => setIsDryRun(!!v)}
+                          />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setPendingApproval(false)}>Cancelar</Button>
+                        <Button 
+                          onClick={() => runValidation()}
+                          disabled={environment === "production" && (!approvalComment.trim() || !approvalTerms)}
+                        >
+                          Confirmar e Iniciar
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </div>
               </div>
               
-              {!canExecuteDeploy && (
-                <div className="flex items-center gap-2 text-[10px] text-destructive font-bold p-2 bg-destructive/10 rounded-lg">
-                  <AlertCircle className="h-3.5 w-3.5" />
-                  Seu cargo ({currentUserRole}) não permite deploy em {environment.toUpperCase()}
+              <div className="flex items-center justify-between mt-1">
+                {!canExecuteDeploy ? (
+                  <div className="flex items-center gap-2 text-[10px] text-destructive font-bold p-2 bg-destructive/10 rounded-lg flex-1 mr-4">
+                    <AlertCircle className="h-3.5 w-3.5" />
+                    Seu cargo ({currentUserRole}) não permite deploy em {environment.toUpperCase()}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-[10px] text-primary font-bold p-2 bg-primary/5 rounded-lg flex-1 mr-4">
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                    Acesso autorizado para {environment.toUpperCase()}
+                  </div>
+                )}
+                
+                <div className="flex items-center gap-4 shrink-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase">Simulação</span>
+                    <Checkbox checked={isDryRun} onCheckedChange={(v) => setIsDryRun(!!v)} />
+                  </div>
+                  {activeDeploys.length > 0 && (
+                    <Badge variant="destructive" className="animate-pulse gap-1 text-[9px]">
+                      <Cpu className="h-2.5 w-2.5" /> DEPLOY CONCORRENTE ATIVO
+                    </Badge>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
 
             <div className="bg-muted/30 p-4 rounded-xl border border-border/20 space-y-3">
