@@ -424,14 +424,16 @@ export function DeliveryFlow() {
   };
 
   const downloadAuditSummary = (historyItem: DeployHistoryItem) => {
-    // Simulating full Audit PDF summary
+    const detailedEvidence = (historyItem as any).detailedEvidence as EvidenceFile[] || [];
+    
+    // Simulating full Audit PDF summary with embedded evidence links
     const summary = `
 =========================================
 RELATÓRIO DE AUDITORIA DE DEPLOY (PDF SIMULATED)
 =========================================
 Identificador Único: ${historyItem.id}
 Data e Hora: ${new Date(historyItem.date).toLocaleString()}
-Responsável: ${currentUserRole.toUpperCase()}
+Responsável: ${historyItem.user?.toUpperCase() || "ADMIN"}
 -----------------------------------------
 RESUMO DA EXECUÇÃO
 -----------------------------------------
@@ -447,8 +449,15 @@ DETALHES DE APROVAÇÃO (PRODUÇÃO)
 -----------------------------------------
 Responsável: ${historyItem.user || "Admin"}
 Comentário: ${historyItem.parameters.approvalComment || "N/A"}
-Evidências Anexadas: ${historyItem.evidence?.join(", ") || "Nenhuma"}
 Termos Aceitos: ${historyItem.parameters.approvalTerms ? "SIM" : "NÃO"}
+
+-----------------------------------------
+EVIDÊNCIAS ANEXADAS E LINKS ASSINADOS
+-----------------------------------------
+${detailedEvidence.length > 0 ? detailedEvidence.map((e, idx) => 
+  `${idx + 1}. ${e.name} (${(e.size / 1024).toFixed(1)} KB)
+   Link para Download: ${e.url} (Acesso Restrito: Dev/Admin/Aprovador)`
+).join("\n\n") : "Nenhuma evidência anexada."}
 
 -----------------------------------------
 MODO DE EXECUÇÃO: ${historyItem.parameters.dryRun ? "DRY-RUN (SIMULAÇÃO)" : "REAL (PRODUÇÃO/STAGING)"}
@@ -457,19 +466,15 @@ TIMELINE DE ETAPAS
 -----------------------------------------
 ${steps.map(s => {
   const isFailed = historyItem.failedStepId === s.id;
-  return `[${isFailed ? "FALHA" : "OK"}] ${s.label}: ${s.description}`;
+  const isSuccess = !historyItem.failedStepId || steps.findIndex(st => st.id === historyItem.failedStepId) > steps.findIndex(st => st.id === s.id);
+  return `[${isFailed ? "FALHA" : isSuccess ? "OK" : "SKIP"}] ${s.label}: ${s.description}`;
 }).join("\n")}
------------------------------------------
-PARÂMETROS UTILIZADOS
------------------------------------------
-Notificações E-mail: ${historyItem.parameters.notifications.email ? "SIM" : "NÃO"}
-Notificações Webhook: ${historyItem.parameters.notifications.webhook ? "SIM" : "NÃO"}
-Retomado de etapa anterior: ${historyItem.failedStepId ? "SIM" : "NÃO"}
 -----------------------------------------
 LOGS DE ACESSO
 -----------------------------------------
 Link para logs JSON: /api/logs/${historyItem.id}.json
 Link para logs CSV: /api/logs/${historyItem.id}.csv
+
 =========================================
 Documento assinado digitalmente por Lovable Cloud Deploy Engine.
     `;
@@ -480,7 +485,7 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
     a.download = `auditoria-deploy-${historyItem.commit}.txt`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success("Relatório de auditoria gerado e baixado");
+    toast.success("Relatório de auditoria gerado (Links assinados incluídos)");
   };
 
   const filteredHistory = useMemo(() => {
