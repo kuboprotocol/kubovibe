@@ -154,8 +154,21 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
-      toast.error("Por favor, selecione uma imagem.");
+    // Validate type and size (max 5MB)
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    const maxSize = 5 * 1024 * 1024; // 5MB
+
+    if (!validTypes.includes(file.type)) {
+      toast.error("Formato inválido", {
+        description: "Apenas JPG, PNG ou WEBP são aceitos."
+      });
+      return;
+    }
+
+    if (file.size > maxSize) {
+      toast.error("Arquivo muito grande", {
+        description: "O tamanho máximo permitido é 5MB."
+      });
       return;
     }
 
