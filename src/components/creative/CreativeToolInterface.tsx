@@ -464,7 +464,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       content = `LOG DE EXECUÇÃO - ${config.title}\n`;
       content += `Data: ${data.timestamp}\n\n`;
       content += `ETAPAS:\n`;
-      progressSteps.forEach(s => {
+      steps.forEach(s => {
         content += `[${s.status.toUpperCase()}] ${s.label} (${s.timestamp || "N/A"})\n`;
         if (s.errorMessage) content += `  ERRO: ${s.errorMessage}\n`;
         if (s.details) content += `  DETALHES: ${JSON.stringify(s.details)}\n`;

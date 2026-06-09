@@ -195,16 +195,37 @@ export function AvatarCropDialog({ open, imageUrl, onCancel, onConfirm, onSavePr
                     <SelectContent>
                       {presets.length === 0 && <div className="p-2 text-[10px] text-center opacity-50">Nenhum salvo</div>}
                       {presets.map(p => (
-                        <div key={p.name} className="flex items-center justify-between group">
-                          <SelectItem value={p.name} className="flex-1">{p.name}</SelectItem>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-6 w-6 opacity-0 group-hover:opacity-100" 
-                            onClick={(e) => { e.stopPropagation(); deletePreset(p.name); }}
-                          >
-                            <Trash2 className="h-3 w-3 text-destructive" />
-                          </Button>
+                        <div key={p.name} className="flex items-center justify-between group px-2 py-1 hover:bg-muted/50 rounded-sm">
+                          <SelectItem value={p.name} className="flex-1 cursor-pointer">{p.name}</SelectItem>
+                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-6 w-6" 
+                              onClick={(e) => { e.stopPropagation(); startEditing(p); }}
+                              title="Renomear"
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-6 w-6" 
+                              onClick={(e) => { e.stopPropagation(); duplicatePreset(p.name); }}
+                              title="Duplicar"
+                            >
+                              <Copy className="h-3 w-3" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-6 w-6" 
+                              onClick={(e) => { e.stopPropagation(); deletePreset(p.name); }}
+                              title="Excluir"
+                            >
+                              <Trash2 className="h-3 w-3 text-destructive" />
+                            </Button>
+                          </div>
                         </div>
                       ))}
                     </SelectContent>
