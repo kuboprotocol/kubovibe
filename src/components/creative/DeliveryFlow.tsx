@@ -549,12 +549,33 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
                         </div>
 
                         <div className="space-y-2">
-                          <label className="text-xs font-bold flex items-center gap-2">
-                            <Paperclip className="h-3.5 w-3.5" /> Evidências (Prints/Logs)
+                          <label className="text-xs font-bold flex items-center justify-between">
+                            <span className="flex items-center gap-2"><Paperclip className="h-3.5 w-3.5" /> Evidências (Prints/Logs)</span>
+                            <span className="text-[10px] text-muted-foreground font-normal">Máx. 5MB</span>
                           </label>
                           <div 
+                            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              if (e.dataTransfer.files) {
+                                const files = Array.from(e.dataTransfer.files);
+                                const validFiles = files.filter(f => {
+                                  if (f.size > maxEvidenceSize) {
+                                    toast.error(`Arquivo ${f.name} excede 5MB`);
+                                    return false;
+                                  }
+                                  if (!allowedTypes.includes(f.type)) {
+                                    toast.error(`Tipo ${f.type} não permitido`);
+                                    return false;
+                                  }
+                                  return true;
+                                });
+                                setEvidenceFiles(prev => [...prev, ...validFiles]);
+                              }
+                            }}
                             onClick={() => fileInputRef.current?.click()}
-                            className="border-2 border-dashed border-border/60 rounded-lg p-4 text-center cursor-pointer hover:bg-muted/50 transition-colors"
+                            className="border-2 border-dashed border-border/60 rounded-lg p-6 text-center cursor-pointer hover:bg-muted/50 hover:border-primary/40 transition-all group"
                           >
                             <input 
                               type="file" 
@@ -563,23 +584,39 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
                               ref={fileInputRef}
                               onChange={(e) => {
                                 if (e.target.files) {
-                                  setEvidenceFiles(Array.from(e.target.files));
+                                  const files = Array.from(e.target.files);
+                                  const validFiles = files.filter(f => f.size <= maxEvidenceSize && allowedTypes.includes(f.type));
+                                  setEvidenceFiles(prev => [...prev, ...validFiles]);
                                 }
                               }}
                             />
-                            <Upload className="h-4 w-4 mx-auto mb-2 text-muted-foreground" />
-                            <p className="text-[10px] text-muted-foreground">
-                              {evidenceFiles.length > 0 
-                                ? `${evidenceFiles.length} arquivos selecionados` 
-                                : "Clique para anexar prints de testes ou logs"}
-                            </p>
+                            <div className="flex flex-col items-center gap-1">
+                              <Upload className="h-6 w-6 text-muted-foreground group-hover:text-primary transition-colors mb-1" />
+                              <p className="text-xs font-medium">Arraste ou clique para anexar</p>
+                              <p className="text-[10px] text-muted-foreground">PNG, JPG, PDF ou TXT</p>
+                            </div>
                           </div>
                           {evidenceFiles.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
+                            <div className="space-y-1 mt-2">
                               {evidenceFiles.map((f, i) => (
-                                <Badge key={i} variant="outline" className="text-[8px] py-0 h-4">
-                                  {f.name}
-                                </Badge>
+                                <div key={i} className="flex items-center justify-between bg-muted/30 p-2 rounded-md border border-border/40 animate-in fade-in slide-in-from-top-1">
+                                  <div className="flex items-center gap-2 overflow-hidden">
+                                    <FileText className="h-3 w-3 shrink-0 text-muted-foreground" />
+                                    <span className="text-[10px] truncate">{f.name}</span>
+                                    <span className="text-[8px] text-muted-foreground">({(f.size / 1024).toFixed(0)}KB)</span>
+                                  </div>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-5 w-5 hover:text-destructive" 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setEvidenceFiles(prev => prev.filter((_, idx) => idx !== i));
+                                    }}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
                               ))}
                             </div>
                           )}
