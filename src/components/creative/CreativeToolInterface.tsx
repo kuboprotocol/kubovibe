@@ -119,7 +119,18 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [simulationMode, setSimulationMode] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(() => {
+    if (toolKey === "avatar") {
+      return localStorage.getItem("creative_last_avatar_image");
+    }
+    return null;
+  });
+
+  useEffect(() => {
+    if (toolKey === "avatar" && uploadedImageUrl) {
+      localStorage.setItem("creative_last_avatar_image", uploadedImageUrl);
+    }
+  }, [uploadedImageUrl, toolKey]);
 
   const logAuditAction = useCallback(async (step: string, action: string, params: any = {}, correlationId?: string, traceId?: string) => {
     const { data: { user } } = await supabase.auth.getUser();
