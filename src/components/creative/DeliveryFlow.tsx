@@ -436,10 +436,7 @@ function AuditHistoryManager({
                 </div>
               )}
             </div>
-          <DialogFooter className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => setIsExportDialogOpen(false)}>Cancelar</Button>
-            <Button size="sm" onClick={() => handleExport(exportFormat)}>Confirmar Download</Button>
-          </DialogFooter>
+          </div>
           <DialogFooter className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => setIsExportDialogOpen(false)}>Cancelar</Button>
             <Button size="sm" onClick={() => handleExport(exportFormat)}>Confirmar Download</Button>

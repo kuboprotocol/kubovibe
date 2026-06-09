@@ -153,29 +153,6 @@ describe('DeliveryFlow Integration - Security & Audit', () => {
     expect(auditLogs[0].reason).toContain('Índices: 26-75');
   });
 
-
-
-    // Test logic for limit
-    const logsToExport = result.fullExport.slice(0, MAX_LIMIT);
-    expect(logsToExport).toHaveLength(MAX_LIMIT);
-
-    // Verify audit log record for export with columns
-    const auditLogs: any[] = [];
-    const recordExport = (user: string, format: string, count: number, filters: string, mode: string, columns: string[]) => {
-      auditLogs.push({
-        action: 'download_authorized',
-        user,
-        attachmentName: `Exportação ${format.toUpperCase()} (${mode})`,
-        reason: `Filtros: ${filters}, Colunas: ${columns.join(",")}, Qtd: ${count}`,
-        status: 'success'
-      });
-    };
-
-    recordExport('admin', 'CSV', 500, 'searchTerm=test', 'Intervalo 2-3', ['timestamp', 'user', 'status']);
-    expect(auditLogs[0].attachmentName).toContain('Intervalo 2-3');
-    expect(auditLogs[0].reason).toContain('Colunas: timestamp,user,status');
-  });
-
   it('should verify persistent preferences (mock storage)', () => {
     const mockStorage: Record<string, string> = {};
     const savePref = (key: string, val: any) => mockStorage[key] = JSON.stringify(val);
