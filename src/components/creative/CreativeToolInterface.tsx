@@ -1133,6 +1133,55 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
         onConfirm={handleCropConfirm}
         onSavePreset={handleSaveAvatarPreset}
       />
+
+      {/* Reexecute Dialog */}
+      <Dialog open={reexecuteDialogOpen} onOpenChange={setReexecuteDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Retomar Execução</DialogTitle>
+            <DialogDescription>
+              Escolha a partir de qual etapa você deseja retomar a geração.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <Label className="text-xs">Etapa de início</Label>
+              <Select value={startAtStep} onValueChange={(v: AvatarStepKey) => setStartAtStep(v)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="upload">Upload (Reiniciar tudo)</SelectItem>
+                  <SelectItem value="convert">Conversão (Processar arquivo)</SelectItem>
+                  <SelectItem value="generate">Geração (Pedir à IA)</SelectItem>
+                  <SelectItem value="render">Renderização (Finalizar)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-[10px] text-muted-foreground italic">
+                * Retomar de etapas avançadas economiza tempo se o arquivo e parâmetros forem os mesmos.
+              </p>
+            </div>
+            <div className="p-3 bg-muted/50 rounded-lg text-xs space-y-1">
+              <p className="font-bold">Parâmetros originais:</p>
+              <p className="opacity-70">Prompt: {reexecuteItem?.prompt}</p>
+              {reexecuteItem?.metadata?.preset && <p className="opacity-70">Preset: {reexecuteItem.metadata.preset.name}</p>}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setReexecuteDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={() => {
+              if (reexecuteItem) {
+                setPrompt(reexecuteItem.prompt);
+                if (reexecuteItem.metadata?.preset) setAvatarPreset(reexecuteItem.metadata.preset);
+                handleExecute();
+                setReexecuteDialogOpen(false);
+              }
+            }}>
+              Confirmar Retomada
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
