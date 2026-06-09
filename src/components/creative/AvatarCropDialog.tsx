@@ -1,16 +1,18 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Cropper, { Area } from "react-easy-crop";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Loader2, Crop as CropIcon, ZoomIn } from "lucide-react";
+import { Loader2, Crop as CropIcon, ZoomIn, Square, Maximize } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Props {
   open: boolean;
   imageUrl: string | null;
   onCancel: () => void;
-  onConfirm: (croppedBlob: Blob) => void | Promise<void>;
+  onConfirm: (croppedBlob: Blob, preset: { zoom: number; aspect: number }) => void | Promise<void>;
+  initialPreset?: { zoom: number; aspect: number };
 }
 
 async function getCroppedBlob(imageSrc: string, area: Area): Promise<Blob> {
@@ -39,10 +41,10 @@ async function getCroppedBlob(imageSrc: string, area: Area): Promise<Blob> {
   });
 }
 
-export function AvatarCropDialog({ open, imageUrl, onCancel, onConfirm }: Props) {
+export function AvatarCropDialog({ open, imageUrl, onCancel, onConfirm, initialPreset }: Props) {
   const [crop, setCrop] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
-  const [rotation, setRotation] = useState(0);
+  const [zoom, setZoom] = useState(initialPreset?.zoom || 1);
+  const [aspect, setAspect] = useState(initialPreset?.aspect || 1);
   const [croppedArea, setCroppedArea] = useState<Area | null>(null);
   const [processing, setProcessing] = useState(false);
 
@@ -55,11 +57,17 @@ export function AvatarCropDialog({ open, imageUrl, onCancel, onConfirm }: Props)
     setProcessing(true);
     try {
       const blob = await getCroppedBlob(imageUrl, croppedArea);
-      await onConfirm(blob);
+      await onConfirm(blob, { zoom, aspect });
     } finally {
       setProcessing(false);
     }
   };
+
+  const aspectOptions = [
+    { label: "1:1 (Quadrado)", value: 1 },
+    { label: "4:5 (Retrato)", value: 0.8 },
+    { label: "9:16 (Story)", value: 0.5625 },
+  ];
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onCancel()}>
@@ -69,7 +77,7 @@ export function AvatarCropDialog({ open, imageUrl, onCancel, onConfirm }: Props)
             <CropIcon className="h-5 w-5 text-primary" /> Ajustar Avatar
           </DialogTitle>
           <DialogDescription>
-            Use o zoom e arraste para enquadrar o rosto. Recomendado: rosto centralizado.
+            Prepare seu avatar com zoom e proporção de recorte ideal.
           </DialogDescription>
         </DialogHeader>
 
@@ -79,28 +87,39 @@ export function AvatarCropDialog({ open, imageUrl, onCancel, onConfirm }: Props)
               image={imageUrl}
               crop={crop}
               zoom={zoom}
-              rotation={rotation}
-              aspect={1}
-              cropShape="round"
-              showGrid={false}
+              aspect={aspect}
+              cropShape="rect"
+              showGrid={true}
               onCropChange={setCrop}
               onZoomChange={setZoom}
-              onRotationChange={setRotation}
               onCropComplete={onCropComplete}
             />
           )}
         </div>
 
         <div className="space-y-4 pt-2">
+          <div className="flex gap-4">
+            <div className="flex-1 space-y-2">
+                <Label className="text-xs text-muted-foreground">Proporção</Label>
+                <Select value={aspect.toString()} onValueChange={(v) => setAspect(parseFloat(v))}>
+                    <SelectTrigger>
+                        <SelectValue placeholder="Escolha proporção" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {aspectOptions.map(o => <SelectItem key={o.value} value={o.value.toString()}>{o.label}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+            </div>
+            <div className="flex-1 space-y-2">
+                <Label className="text-xs text-muted-foreground flex items-center gap-1"><Maximize className="h-3 w-3"/> Ajustar à área</Label>
+                <Button variant="outline" className="w-full" onClick={() => setZoom(1)}>Resetar Zoom</Button>
+            </div>
+          </div>
           <div className="space-y-2">
             <Label className="text-xs flex items-center gap-2 text-muted-foreground">
               <ZoomIn className="h-3 w-3" /> Zoom ({zoom.toFixed(1)}x)
             </Label>
             <Slider value={[zoom]} min={1} max={4} step={0.05} onValueChange={(v) => setZoom(v[0])} />
-          </div>
-          <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Rotação ({rotation}°)</Label>
-            <Slider value={[rotation]} min={0} max={360} step={1} onValueChange={(v) => setRotation(v[0])} />
           </div>
         </div>
 
@@ -110,7 +129,7 @@ export function AvatarCropDialog({ open, imageUrl, onCancel, onConfirm }: Props)
           </Button>
           <Button onClick={handleConfirm} disabled={processing || !croppedArea}>
             {processing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CropIcon className="h-4 w-4 mr-2" />}
-            Aplicar recorte
+            Confirmar e salvar
           </Button>
         </DialogFooter>
       </DialogContent>
