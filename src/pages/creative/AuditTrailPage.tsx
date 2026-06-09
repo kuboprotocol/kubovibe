@@ -208,16 +208,86 @@ export default function CreativeAuditPage() {
     })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [entries]);
 
-  // Multiple attempts detection
-  const multipleAttempts = useMemo(() => {
-    const correlations: Record<string, number> = {};
+  // Group entries by correlation_id for the UI list
+  const groupedEntries = useMemo(() => {
+    const cidMap: Record<string, AuditTrail[]> = {};
+    const flat: (AuditTrail & { isGroup?: boolean; children?: AuditTrail[] })[] = [];
+
     entries.forEach(entry => {
       if (entry.correlation_id) {
-        correlations[entry.correlation_id] = (correlations[entry.correlation_id] || 0) + 1;
+        if (!cidMap[entry.correlation_id]) cidMap[entry.correlation_id] = [];
+        cidMap[entry.correlation_id].push(entry);
+      } else {
+        flat.push(entry);
       }
     });
-    return Object.entries(correlations).filter(([_, v]) => v > 1).length;
+
+    // For each group, the representative is the most recent one
+    Object.keys(cidMap).forEach(cid => {
+      const sorted = [...cidMap[cid]].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      flat.push({
+        ...sorted[0],
+        isGroup: sorted.length > 1,
+        children: sorted
+      });
+    });
+
+    return flat.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }, [entries]);
+
+  // Multiple attempts detection
+  const multipleAttempts = useMemo(() => {
+    return Object.values(retryCountByCorrelation).filter(v => v > 1).length;
+  }, [retryCountByCorrelation]);
+
+  const saveRecurrenceThreshold = () => {
+    localStorage.setItem("creative_audit_recurrence_threshold", String(recurrenceThreshold));
+    toast.success(`Limite de recorrência padrão salvo como ${recurrenceThreshold}`);
+  };
+
+  const toggleCorrelationExpansion = (cid: string) => {
+    const next = new Set(expandedCorrelations);
+    if (next.has(cid)) next.delete(cid);
+    else next.add(cid);
+    setExpandedCorrelations(next);
+  };
+
+  const exportComparison = (format: "json" | "csv") => {
+    if (compareEntries.length !== 2) return;
+    
+    const content = format === "json" 
+      ? JSON.stringify({ comparison: compareEntries, timestamp: new Date().toISOString() }, null, 2)
+      : [
+          ["ID", "Step", "Action", "Correlation", "Params"],
+          ...compareEntries.map(e => [e.id, e.step, e.action, e.correlation_id || "", JSON.stringify(e.params)])
+        ].map(row => row.join(",")).join("\n");
+
+    const blob = new Blob([content], { type: format === "json" ? "application/json" : "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `audit-comparison-${Date.now()}.${format}`;
+    link.click();
+    toast.success("Comparação exportada");
+  };
+
+  const getDiffProbableCauses = () => {
+    if (compareEntries.length !== 2) return [];
+    const [a, b] = compareEntries;
+    const causes = [];
+    
+    if (JSON.stringify(a.params) !== JSON.stringify(b.params)) {
+      causes.push("Diferença nos parâmetros de entrada detectada.");
+    }
+    if (a.step !== b.step) {
+      causes.push("Eventos ocorridos em etapas diferentes do fluxo.");
+    }
+    if (a.params?.error && b.params?.error && a.params.error.message !== b.params.error.message) {
+      causes.push("Mensagens de erro distintas sugerem falhas em sub-processos diferentes.");
+    }
+    
+    return causes.length > 0 ? causes : ["Padrões técnicos idênticos - possível falha intermitente de ambiente."];
+  };
 
   const loadTimeline = async (correlationId: string) => {
     setIsTimelineLoading(true);
