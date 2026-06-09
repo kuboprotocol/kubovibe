@@ -122,6 +122,11 @@ function AuditHistoryManager({
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
+  // Reset page when filters or sort change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, userFilter, attachmentFilter, sortField, sortOrder]);
+
   const isAdmin = userRole === "admin";
   const isDev = userRole === "developer";
   const isOriginalApprover = originalApprover && userRole === originalApprover;
@@ -161,6 +166,11 @@ function AuditHistoryManager({
   const paginatedLogs = filteredLogs.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const exportToCSV = () => {
+    if (!canViewHistory) {
+      toast.error("Permissão negada para exportação");
+      return;
+    }
+
     const headers = ["ID", "Timestamp", "Ação", "Usuário", "Anexo", "Motivo", "Status"];
     const rows = filteredLogs.map(log => [
       log.id,
@@ -172,25 +182,33 @@ function AuditHistoryManager({
       log.status
     ]);
     
-    const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+    const csvContent = [headers, ...rows].map(e => e.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `audit_log_${new Date().toISOString()}.csv`);
+    link.setAttribute("download", `audit_log_filtered_${new Date().toISOString()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    toast.success("Histórico exportado para CSV");
+    toast.success("Histórico exportado (respeitando filtros)");
   };
 
   const exportToPDF = async () => {
+    if (!canViewHistory) {
+      toast.error("Permissão negada para exportação");
+      return;
+    }
+
     try {
       const { default: jsPDF } = await import("jspdf");
       const { default: autoTable } = await import("jspdf-autotable");
       
       const doc = new jsPDF();
-      doc.text(title || "Relatório de Auditoria", 14, 15);
+      doc.setFontSize(16);
+      doc.text(title || "Relatório de Auditoria Filtrado", 14, 15);
+      doc.setFontSize(10);
+      doc.text(`Filtros aplicados: ${searchTerm || "Nenhum"} | Status: ${statusFilter} | Total: ${filteredLogs.length}`, 14, 22);
       
       const tableData = filteredLogs.map(log => [
         new Date(log.timestamp).toLocaleString(),
@@ -203,11 +221,13 @@ function AuditHistoryManager({
       (autoTable as any)(doc, {
         head: [['Timestamp', 'Usuário', 'Anexo', 'Ação', 'Status']],
         body: tableData,
-        startY: 20,
+        startY: 28,
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [0, 102, 204] }
       });
       
-      doc.save(`audit_log_${new Date().toISOString()}.pdf`);
-      toast.success("Relatório PDF gerado com sucesso");
+      doc.save(`audit_log_filtered_${new Date().toISOString()}.pdf`);
+      toast.success("Relatório PDF exportado (respeitando filtros)");
     } catch (error) {
       console.error("PDF export error:", error);
       toast.error("Erro ao gerar PDF");

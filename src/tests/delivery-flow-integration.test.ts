@@ -12,21 +12,33 @@ const validateAttachment = (file: { size: number; type: string; name: string }, 
 const checkAccess = (userRole: string, itemUser: string | undefined, currentUser: string) => {
   const isAdmin = userRole === 'admin';
   const isDev = userRole === 'developer';
-  const isApprover = itemUser === userRole; // In the component it's item.user === currentUserRole
+  const isApprover = itemUser === userRole;
   return {
     authorized: isAdmin || isDev || isApprover,
-    error: !(isAdmin || isDev || isApprover) ? 'Acesso Negado: Apenas Dev, Admin ou o Aprovador original podem baixar esta evidência.' : null
+    canExport: isAdmin || isDev || isApprover,
+    error: !(isAdmin || isDev || isApprover) ? 'Acesso Negado: Apenas Dev, Admin ou o Aprovador original podem visualizar ou exportar este histórico.' : null
   };
 };
 
-const paginateAndSort = (logs: any[], page: number, perPage: number, sortField: string, sortOrder: 'asc' | 'desc') => {
-  const sorted = [...logs].sort((a, b) => {
+const paginateAndSort = (logs: any[], page: number, perPage: number, sortField: string, sortOrder: 'asc' | 'desc', filters: any = {}) => {
+  let filtered = logs.filter(log => {
+    const matchesSearch = !filters.search || JSON.stringify(log).toLowerCase().includes(filters.search.toLowerCase());
+    const matchesStatus = !filters.status || filters.status === 'all' || log.status === filters.status;
+    return matchesSearch && matchesStatus;
+  });
+
+  const sorted = [...filtered].sort((a, b) => {
     let comparison = 0;
     if (sortField === 'timestamp') comparison = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
-    else if (sortField === 'status') comparison = a.status.localeCompare(b.status);
+    else if (sortField === 'status') comparison = String(a.status).localeCompare(String(b.status));
+    else if (sortField === 'attachmentName') comparison = String(a.attachmentName).localeCompare(String(b.attachmentName));
     return sortOrder === 'desc' ? -comparison : comparison;
   });
-  return sorted.slice((page - 1) * perPage, page * perPage);
+  return {
+    paginated: sorted.slice((page - 1) * perPage, page * perPage),
+    totalFiltered: sorted.length,
+    fullExport: sorted // Export should contain all filtered and sorted records, not just current page
+  };
 };
 
 const simulateRetentionJob = (history: any[], policies: any[], now: Date) => {
@@ -66,20 +78,38 @@ describe('DeliveryFlow Integration - Security & Audit', () => {
     expect(approver.authorized).toBe(true);
   });
 
-  it('should implement pagination and sorting for audit logs', () => {
+  it('should implement pagination, filtering and sorting for audit logs', () => {
     const logs = [
-      { id: '1', timestamp: '2023-01-01T10:00:00Z', status: 'success' },
-      { id: '2', timestamp: '2023-01-01T09:00:00Z', status: 'denied' },
-      { id: '3', timestamp: '2023-01-01T11:00:00Z', status: 'success' }
+      { id: '1', timestamp: '2023-01-01T10:00:00Z', status: 'success', attachmentName: 'B.pdf' },
+      { id: '2', timestamp: '2023-01-01T09:00:00Z', status: 'denied', attachmentName: 'A.pdf' },
+      { id: '3', timestamp: '2023-01-01T11:00:00Z', status: 'success', attachmentName: 'C.pdf' }
     ];
 
-    const sortedDesc = paginateAndSort(logs, 1, 2, 'timestamp', 'desc');
-    expect(sortedDesc[0].id).toBe('3');
-    expect(sortedDesc[1].id).toBe('1');
-    expect(sortedDesc).toHaveLength(2);
+    // Test search filter
+    const searchResult = paginateAndSort(logs, 1, 10, 'timestamp', 'desc', { search: 'A.pdf' });
+    expect(searchResult.totalFiltered).toBe(1);
+    expect(searchResult.paginated[0].id).toBe('2');
 
-    const sortedStatus = paginateAndSort(logs, 1, 10, 'status', 'asc');
-    expect(sortedStatus[0].status).toBe('denied');
+    // Test sort by attachmentName ASC
+    const sortResult = paginateAndSort(logs, 1, 10, 'attachmentName', 'asc');
+    expect(sortResult.paginated[0].attachmentName).toBe('A.pdf');
+    expect(sortResult.paginated[2].attachmentName).toBe('C.pdf');
+
+    // Test export content (should be all filtered records in correct order)
+    const exportResult = paginateAndSort(logs, 1, 2, 'timestamp', 'desc'); // page 1, perPage 2
+    expect(exportResult.paginated).toHaveLength(2);
+    expect(exportResult.fullExport).toHaveLength(3); // Export gets everything filtered
+    expect(exportResult.fullExport[0].id).toBe('3');
+    expect(exportResult.fullExport[2].id).toBe('2');
+  });
+
+  it('should restrict export access and return correct error', () => {
+    const viewer = checkAccess('viewer', 'admin', 'viewer');
+    expect(viewer.canExport).toBe(false);
+    expect(viewer.error).toContain('Acesso Negado');
+
+    const approver = checkAccess('approver_1', 'approver_1', 'approver_1');
+    expect(approver.canExport).toBe(true);
   });
 
   it('should record audit log for every download attempt', () => {
