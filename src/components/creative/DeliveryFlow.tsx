@@ -723,12 +723,21 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
                       <div>
                         <span className="text-xs font-medium block">
                           {item.status === "success" ? "Deploy realizado com sucesso" : "Deploy falhou"}
+                          {item.parameters.dryRun && <Badge variant="outline" className="ml-2 text-[8px] h-3 border-orange-500 text-orange-500">DRY-RUN</Badge>}
                         </span>
-                        {item.failedStepId && (
-                          <span className="text-[10px] text-destructive">
-                            Falha na etapa: {steps.find(s => s.id === item.failedStepId)?.label}
-                          </span>
-                        )}
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {item.failedStepId && (
+                            <span className="text-[10px] text-destructive">
+                              Falha na etapa: {steps.find(s => s.id === item.failedStepId)?.label}
+                            </span>
+                          )}
+                          {item.healthStatus && item.healthStatus !== "unchecked" && (
+                            <Badge variant={item.healthStatus === "up" ? "outline" : "destructive"} className="text-[8px] h-3 gap-1">
+                              {item.healthStatus === "up" ? <Check className="h-2 w-2" /> : <X className="h-2 w-2" />}
+                              HEALTH: {item.healthStatus.toUpperCase()}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     </div>
                     <div className="flex gap-2">
