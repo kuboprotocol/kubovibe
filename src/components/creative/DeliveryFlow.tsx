@@ -86,7 +86,7 @@ export function DeliveryFlow() {
     setIsDeploying(true);
     setProgress(0);
     setLogs([]);
-    const newSteps = steps.map(s => ({ ...s, status: "pending" as const, error: undefined }));
+    const newSteps: ValidationStep[] = steps.map(s => ({ ...s, status: "pending", error: undefined }));
     setSteps(newSteps);
 
     addLog(`Iniciando deploy em ambiente: ${environment.toUpperCase()}`, "info");
