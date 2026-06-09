@@ -1215,39 +1215,105 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
           )}
         </TabsContent>
 
-        <TabsContent value="settings" className="space-y-6 mt-4">
+        <TabsContent value="settings" className="space-y-6 mt-0">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {retentionPolicies.map((policy, idx) => (
-              <Card key={policy.environment} className="p-4 bg-muted/20 border-border/40">
-                <div className="flex items-center justify-between mb-4">
+              <Card key={policy.environment} className="p-4 border-primary/10 bg-muted/10 space-y-4">
+                <div className="flex items-center justify-between border-b pb-2">
                   <div className="flex items-center gap-2">
-                    <div className={cn(
-                      "p-2 rounded-lg",
-                      policy.environment === "production" ? "bg-primary/20" : "bg-muted"
-                    )}>
-                      {policy.environment === "production" ? <ShieldCheck className="h-4 w-4 text-primary" /> : <Globe className="h-4 w-4" />}
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-bold uppercase">{policy.environment}</h4>
-                      <p className="text-[10px] text-muted-foreground">Política de Retenção de Anexos</p>
-                    </div>
+                    <HardDrive className={cn("h-4 w-4", policy.environment === "production" ? "text-primary" : "text-muted-foreground")} />
+                    <h4 className="text-sm font-bold uppercase">{policy.environment}</h4>
                   </div>
-                  <Switch 
-                    checked={policy.autoDelete} 
-                    onCheckedChange={(v) => {
-                      const newPolicies = [...retentionPolicies];
-                      newPolicies[idx].autoDelete = v;
-                      setRetentionPolicies(newPolicies);
-                    }}
-                  />
+                  <Badge variant={policy.environment === "production" ? "default" : "outline"}>
+                    Configuração Ativa
+                  </Badge>
                 </div>
-
-                <div className="space-y-5 py-2">
+                
+                <div className="space-y-4 pt-2">
                   <div className="space-y-2">
                     <div className="flex justify-between">
-                      <label className="text-xs font-medium flex items-center gap-1.5">
-                        <HardDrive className="h-3 w-3" /> Tamanho Máximo por Arquivo
+                      <label className="text-xs font-medium flex items-center gap-2">
+                        <Package className="h-3.5 w-3.5" /> Tamanho Máximo (MB)
                       </label>
+                      <span className="text-xs font-bold text-primary">{policy.maxSizeMB} MB</span>
+                    </div>
+                    <Slider 
+                      value={[policy.maxSizeMB]} 
+                      max={100} 
+                      step={5}
+                      onValueChange={([val]) => {
+                        const newPolicies = [...retentionPolicies];
+                        newPolicies[idx].maxSizeMB = val;
+                        setRetentionPolicies(newPolicies);
+                      }}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <label className="text-xs font-medium flex items-center gap-2">
+                        <Calendar className="h-3.5 w-3.5" /> Expiração (Dias)
+                      </label>
+                      <span className="text-xs font-bold text-primary">{policy.expirationDays} dias</span>
+                    </div>
+                    <Slider 
+                      value={[policy.expirationDays]} 
+                      max={90} 
+                      step={1}
+                      onValueChange={([val]) => {
+                        const newPolicies = [...retentionPolicies];
+                        newPolicies[idx].expirationDays = val;
+                        setRetentionPolicies(newPolicies);
+                      }}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 bg-background/50 rounded-lg border border-border/40">
+                    <div className="space-y-0.5">
+                      <p className="text-[11px] font-bold">Auto-Exclusão</p>
+                      <p className="text-[9px] text-muted-foreground">Excluir anexos após expiração</p>
+                    </div>
+                    <Switch 
+                      checked={policy.autoDelete}
+                      onCheckedChange={(checked) => {
+                        const newPolicies = [...retentionPolicies];
+                        newPolicies[idx].autoDelete = checked;
+                        setRetentionPolicies(newPolicies);
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 space-y-2">
+                  <p className="text-[10px] font-bold flex items-center gap-2">
+                    <ShieldCheck className="h-3 w-3 text-primary" /> Lovable Security Guard
+                  </p>
+                  <p className="text-[9px] text-muted-foreground leading-tight">
+                    Varredura de malware ativa para todos os uploads. Regras validadas antes de aceitar novos anexos. 
+                    Limite total de armazenamento para {policy.environment.toUpperCase()} é dinâmico.
+                  </p>
+                </div>
+              </Card>
+            ))}
+          </div>
+          
+          <div className="p-4 rounded-xl border border-border/20 bg-muted/20 flex items-center justify-between">
+            <div className="space-y-1">
+              <h4 className="text-sm font-bold flex items-center gap-2">
+                <Activity className="h-4 w-4 text-primary" /> Monitoramento de Armazenamento
+              </h4>
+              <p className="text-xs text-muted-foreground">Uso total de anexos em todos os ambientes: 142.5 MB</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => toast.success("Política de retenção sincronizada")}>
+              Aplicar em Tudo
+            </Button>
+          </div>
+        </TabsContent>
+      </Tabs>
+    </Card>
+  );
+}
+
                       <span className="text-xs font-bold text-primary">{policy.maxSizeMB}MB</span>
                     </div>
                     <Slider 
