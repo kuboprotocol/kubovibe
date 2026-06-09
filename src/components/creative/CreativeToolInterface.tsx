@@ -421,11 +421,22 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
         throw new Error(data.error || "Erro na execução");
       }
 
+      if (toolKey === "avatar") {
+        updateStep("generate", "done");
+        updateStep("render", "active");
+      }
       toast.success("Solicitação enviada!", {
         description: "Você pode acompanhar o progresso no histórico.",
       });
       setPrompt("");
       onSuccess?.();
+      if (toolKey === "avatar") {
+        // Re-fetch result and finalize render step shortly after
+        setTimeout(async () => {
+          await fetchLastResult();
+          updateStep("render", "done");
+        }, 1500);
+      }
     } catch (e: any) {
       console.error("[CreativePanel:Configuration] execution_exception", { toolKey, error: e.message, stack: e.stack });
       setErrorState({
