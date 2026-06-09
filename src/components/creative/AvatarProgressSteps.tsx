@@ -1,4 +1,4 @@
-import { Check, Loader2, Circle } from "lucide-react";
+import { Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type AvatarStepKey = "upload" | "convert" | "generate" | "render";
