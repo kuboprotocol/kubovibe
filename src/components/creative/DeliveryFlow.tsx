@@ -329,6 +329,14 @@ Status Final: ${historyItem.status.toUpperCase()}
 Versão (Commit): ${historyItem.commit}
 URL Pública: ${historyItem.pwaUrl}
 HTTPS: HABILITADO E VERIFICADO
+Health-Check: ${historyItem.healthStatus?.toUpperCase() || "NÃO EXECUTADO"}
+-----------------------------------------
+DETALHES DE APROVAÇÃO (PRODUÇÃO)
+-----------------------------------------
+Comentário: ${historyItem.parameters.approvalComment || "N/A"}
+Termos Aceitos: ${historyItem.parameters.approvalTerms ? "SIM" : "NÃO"}
+-----------------------------------------
+MODO DE EXECUÇÃO: ${historyItem.parameters.dryRun ? "DRY-RUN (SIMULAÇÃO)" : "REAL (PRODUÇÃO/STAGING)"}
 -----------------------------------------
 TIMELINE DE ETAPAS
 -----------------------------------------
