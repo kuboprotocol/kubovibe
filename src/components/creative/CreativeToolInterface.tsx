@@ -727,6 +727,18 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                     <CropIcon className="h-3 w-3 mr-1.5" /> Ajustar / Zoom
                   </Button>
                   <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs bg-primary/5 hover:bg-primary/10 border-primary/20"
+                    onClick={() => { 
+                      setCropSourceUrl(uploadedImageUrl); 
+                      setCropOpen(true); 
+                    }}
+                    title="Aplica o último zoom e enquadramento salvo"
+                  >
+                    <Sliders className="h-3 w-3 mr-1.5" /> Reaplicar Ajustes
+                  </Button>
+                  <Button
                     variant="ghost"
                     size="sm"
                     className="h-8 text-xs text-destructive hover:text-destructive"
