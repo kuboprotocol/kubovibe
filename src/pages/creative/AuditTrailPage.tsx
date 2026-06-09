@@ -44,6 +44,39 @@ type AuditTrail = {
   trace_id: string | null;
   created_at: string;
   user_email?: string;
+  statusCounts?: { success: number, error: number, retry: number };
+};
+
+const TimelineViewer = ({ correlationId, currentId }: { correlationId: string, currentId?: string }) => {
+  const { data: timeline, isLoading } = useQuery({
+    queryKey: ["audit-timeline", correlationId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("creative_audit_trail")
+        .select("*")
+        .eq("correlation_id", correlationId)
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return data as AuditTrail[];
+    }
+  });
+
+  if (isLoading) return <Skeleton className="h-20 w-full" />;
+  if (!timeline || timeline.length === 0) return <p className="text-[10px] text-muted-foreground">Nenhum histórico encontrado.</p>;
+
+  return (
+    <div className="space-y-2 relative before:absolute before:left-2 before:top-2 before:bottom-2 before:w-px before:bg-muted-foreground/30 pl-6">
+      {timeline.map((te) => (
+        <div key={te.id} className={`relative text-[10px] p-1 rounded ${te.id === currentId ? 'bg-primary/10 border border-primary/20' : ''}`}>
+          <div className={`absolute -left-6 top-1.5 w-3 h-3 rounded-full border bg-background z-10 ${
+            te.action.toLowerCase().includes('fail') || te.action.toLowerCase().includes('error') ? 'border-destructive' : 'border-primary'
+          }`} />
+          <p className="font-bold opacity-70">{new Date(te.created_at).toLocaleTimeString()}</p>
+          <p className="font-mono truncate" title={te.action}>{te.action}</p>
+        </div>
+      ))}
+    </div>
+  );
 };
 
 const PAGE_SIZE = 25;
