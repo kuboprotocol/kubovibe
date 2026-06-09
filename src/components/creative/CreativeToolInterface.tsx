@@ -778,6 +778,17 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
           </Button>
         </div>
       </Card>
+
+      <AvatarCropDialog
+        open={cropOpen}
+        imageUrl={cropSourceUrl}
+        onCancel={() => {
+          setCropOpen(false);
+          if (cropSourceUrl && cropSourceUrl.startsWith("blob:")) URL.revokeObjectURL(cropSourceUrl);
+          setCropSourceUrl(null);
+        }}
+        onConfirm={handleCropConfirm}
+      />
     </div>
   );
 }
