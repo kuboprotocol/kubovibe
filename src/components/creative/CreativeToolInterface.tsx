@@ -118,6 +118,8 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
   const [errorState, setErrorState] = useState<{ message: string; correlationId?: string; traceId?: string; stack?: string } | null>(null);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [simulationMode, setSimulationMode] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
 
   const logAuditAction = useCallback(async (step: string, action: string, params: any = {}, correlationId?: string, traceId?: string) => {
     const { data: { user } } = await supabase.auth.getUser();
