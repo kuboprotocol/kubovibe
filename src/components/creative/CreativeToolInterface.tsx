@@ -365,43 +365,69 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     toast.success("Avatar padrão da sessão removido.");
   };
 
-  const handleDownloadResult = async (format: "png" | "jpg" = "png", quality: number = 0.90) => {
+  const handleDownloadResult = async (format: "png" | "jpg" = "png", quality: number = 0.90, resolution?: "original" | "1080p" | "720p") => {
     if (!lastResult?.asset_url) return;
     try {
       const res = await fetch(lastResult.asset_url);
       const blob = await res.blob();
       const isVideo = lastResult.asset_url.endsWith(".mp4");
       
-      let finalBlob = blob;
-      let ext = isVideo ? "mp4" : format;
-
-      if (!isVideo && format === "jpg") {
-        // Convert PNG/WebP blob to JPG via canvas if needed
-        const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-            const i = new Image();
-            i.onload = () => resolve(i);
-            i.onerror = reject;
-            i.src = URL.createObjectURL(blob);
-        });
-        const canvas = document.createElement("canvas");
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext("2d")!;
-        ctx.fillStyle = "white"; // JPG doesn't support transparency
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0);
-        finalBlob = await new Promise((r) => canvas.toBlob((b) => r(b!), "image/jpeg", quality)) as Blob;
-        URL.revokeObjectURL(img.src);
+      if (isVideo) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `kubo-avatar-${Date.now()}.mp4`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        return;
       }
+
+      // Image processing
+      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+          const i = new Image();
+          i.onload = () => resolve(i);
+          i.onerror = reject;
+          i.src = URL.createObjectURL(blob);
+      });
+
+      const canvas = document.createElement("canvas");
+      let width = img.width;
+      let height = img.height;
+
+      if (resolution === "1080p") {
+        const ratio = Math.min(1920 / width, 1080 / height);
+        if (ratio < 1) { width *= ratio; height *= ratio; }
+      } else if (resolution === "720p") {
+        const ratio = Math.min(1280 / width, 720 / height);
+        if (ratio < 1) { width *= ratio; height *= ratio; }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d")!;
+      
+      if (format === "jpg") {
+        ctx.fillStyle = "white";
+        ctx.fillRect(0, 0, width, height);
+      }
+      
+      ctx.drawImage(img, 0, 0, width, height);
+      
+      const finalBlob = await new Promise<Blob>((r) => 
+        canvas.toBlob((b) => r(b!), format === "jpg" ? "image/jpeg" : "image/png", quality)
+      );
 
       const url = URL.createObjectURL(finalBlob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `kubo-avatar-${Date.now()}.${ext}`;
+      a.download = `kubo-avatar-${Date.now()}.${format}`;
       document.body.appendChild(a);
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
+      URL.revokeObjectURL(img.src);
     } catch (e: any) {
       toast.error("Falha ao baixar: " + e.message);
     }
