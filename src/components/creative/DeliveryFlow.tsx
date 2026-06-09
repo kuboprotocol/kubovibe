@@ -1,4 +1,4 @@
-import { Check, X, Loader2, PlayCircle, Globe, ShieldCheck, Smartphone, Package, Code, AlertCircle, Terminal, History, Download, ExternalLink, QrCode, Filter, Search, Mail, Bell, FileJson, FileSpreadsheet, FileText, UserCheck, RotateCcw } from "lucide-react";
+import { Check, X, Loader2, PlayCircle, Globe, ShieldCheck, Smartphone, Package, Code, AlertCircle, Terminal, History, Download, ExternalLink, QrCode, Filter, Search, Mail, Bell, FileJson, FileSpreadsheet, FileText, UserCheck, RotateCcw, FileBadge, Lock } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -41,6 +41,7 @@ interface DeployHistoryItem {
   parameters: {
     environment: "staging" | "production";
     notifications: { email: boolean; webhook: boolean };
+    commit: string;
   };
 }
 
@@ -55,6 +56,9 @@ export function DeliveryFlow() {
   const [showQR, setShowQR] = useState(false);
   const [notifications, setNotifications] = useState({ email: true, webhook: false });
   const [currentUserRole, setCurrentUserRole] = useState<string>("admin"); // Mock role: 'admin', 'developer', 'viewer'
+  const [pendingApproval, setPendingApproval] = useState<boolean>(false);
+  const [currentCommit, setCurrentCommit] = useState<string>(() => Math.random().toString(36).substring(7));
+
 
   const [steps, setSteps] = useState<ValidationStep[]>([
     { id: "build", label: "Build & Minificação", description: "Otimizando código e recursos para produção", status: "pending" },
@@ -88,33 +92,65 @@ export function DeliveryFlow() {
     return newLog;
   };
 
-  const notifyResult = async (status: "success" | "error", env: string) => {
+  const notifyResult = async (status: "success" | "error", env: string, attempt = 1, pwaUrl?: string) => {
+    // Retry logic & Deduplication (simulated)
+    const notificationPayload = {
+      status,
+      environment: env,
+      timestamp: new Date().toISOString(),
+      pwaUrl: pwaUrl || "https://kubovibe.app",
+      steps: steps.map(s => ({ id: s.id, label: s.label, status: s.status }))
+    };
+
     if (notifications.email) {
-      console.log(`[Notification] Enviando e-mail de ${status} para o ambiente ${env}`);
-      toast.info(`E-mail de notificação enviado (${status})`);
+      console.log(`[Notification] Enviando e-mail (Tentativa ${attempt})...`, notificationPayload);
+      try {
+        // Mock success with 90% chance
+        if (Math.random() < 0.9) {
+          toast.success(`E-mail de notificação enviado (${status})`);
+        } else throw new Error("Falha no servidor de e-mail");
+      } catch (err) {
+        if (attempt < 3) {
+          console.warn("Retrying email notification...");
+          setTimeout(() => notifyResult(status, env, attempt + 1, pwaUrl), 2000);
+        } else {
+          toast.error("Falha ao enviar e-mail após 3 tentativas");
+        }
+      }
     }
+
     if (notifications.webhook) {
-      console.log(`[Notification] Disparando webhook para Slack/Teams (${status})`);
+      console.log(`[Notification] Disparando webhook para Slack/Teams (Tentativa ${attempt})...`, notificationPayload);
       toast.info(`Webhook disparado para o ambiente ${env}`);
     }
   };
 
-  const runValidation = async (resumeFromStepId?: string, previousLogs: DeployLog[] = []) => {
+  const runValidation = async (resumeFromStepId?: string, previousLogs: DeployLog[] = [], forcedCommit?: string) => {
     if (!canExecuteDeploy) {
       toast.error("Permissão negada", { description: "Você não tem permissão para realizar deploy neste ambiente." });
       return;
     }
 
+    // Require approval for production if not admin
+    if (environment === "production" && currentUserRole !== "admin" && !pendingApproval) {
+      setPendingApproval(true);
+      toast.info("Aprovação Solicitada", { description: "Aguardando aprovação de um administrador para deploy em produção." });
+      return;
+    }
+
     setIsDeploying(true);
+    setPendingApproval(false);
     setProgress(0);
     
     let currentLogs = resumeFromStepId ? [...previousLogs] : [];
     if (!resumeFromStepId) {
       setLogs([]);
       currentLogs = [];
+      if (!forcedCommit) setCurrentCommit(Math.random().toString(36).substring(7));
     } else {
       setLogs(currentLogs);
     }
+    const finalCommit = forcedCommit || currentCommit;
 
     const startIdx = resumeFromStepId ? steps.findIndex(s => s.id === resumeFromStepId) : 0;
     const newSteps: ValidationStep[] = steps.map((s, idx) => {
@@ -123,7 +159,7 @@ export function DeliveryFlow() {
     });
     setSteps(newSteps);
 
-    addLog(`${resumeFromStepId ? "Retomando" : "Iniciando"} deploy em ambiente: ${environment.toUpperCase()}`, "info");
+    addLog(`${resumeFromStepId ? "Retomando" : "Iniciando"} deploy em ambiente: ${environment.toUpperCase()} (Commit: ${finalCommit})`, "info");
 
     let finalStatus: "success" | "error" = "success";
     let failedStepId: string | undefined;
@@ -159,14 +195,15 @@ export function DeliveryFlow() {
       date: new Date().toISOString(),
       environment,
       status: finalStatus,
-      commit: Math.random().toString(36).substring(7),
+      commit: finalCommit,
       pwaUrl: environment === "production" ? "https://kubovibe.app" : "https://staging.kubovibe.app",
       apkUrl: "/downloads/app-latest.apk",
-      logs: [...logs],
+      logs: [...currentLogs, ...logs],
       failedStepId,
       parameters: {
         environment,
-        notifications: { ...notifications }
+        notifications: { ...notifications },
+        commit: finalCommit
       }
     };
 
@@ -180,7 +217,7 @@ export function DeliveryFlow() {
       toast.error("Deploy falhou", { description: `Erro na etapa: ${steps.find(s => s.id === failedStepId)?.label}` });
     }
 
-    notifyResult(finalStatus, environment);
+    notifyResult(finalStatus, environment, 1, newItem.pwaUrl);
   };
 
   const downloadLogs = (historyItem: DeployHistoryItem, format: "json" | "csv") => {
@@ -199,26 +236,51 @@ export function DeliveryFlow() {
   };
 
   const downloadAuditSummary = (historyItem: DeployHistoryItem) => {
-    // Simulating PDF generation with a text summary for now
+    // Simulating full Audit PDF summary
     const summary = `
-RESUMO DE AUDITORIA DE DEPLOY
-ID: ${historyItem.id}
-Data: ${new Date(historyItem.date).toLocaleString()}
-Ambiente: ${historyItem.environment.toUpperCase()}
-Status: ${historyItem.status.toUpperCase()}
-Commit: ${historyItem.commit}
+=========================================
+RELATÓRIO DE AUDITORIA DE DEPLOY (PDF SIMULATED)
+=========================================
+Identificador Único: ${historyItem.id}
+Data e Hora: ${new Date(historyItem.date).toLocaleString()}
+Responsável: ${currentUserRole.toUpperCase()}
 -----------------------------------------
-Etapas Executadas:
-${steps.map(s => `- ${s.label}: ${historyItem.failedStepId === s.id ? "FALHOU" : "SUCESSO"}`).join("\n")}
+RESUMO DA EXECUÇÃO
+-----------------------------------------
+Ambiente: ${historyItem.environment.toUpperCase()}
+Status Final: ${historyItem.status.toUpperCase()}
+Versão (Commit): ${historyItem.commit}
+URL Pública: ${historyItem.pwaUrl}
+HTTPS: HABILITADO E VERIFICADO
+-----------------------------------------
+TIMELINE DE ETAPAS
+-----------------------------------------
+${steps.map(s => {
+  const isFailed = historyItem.failedStepId === s.id;
+  return `[${isFailed ? "FALHA" : "OK"}] ${s.label}: ${s.description}`;
+}).join("\n")}
+-----------------------------------------
+PARÂMETROS UTILIZADOS
+-----------------------------------------
+Notificações E-mail: ${historyItem.parameters.notifications.email ? "SIM" : "NÃO"}
+Notificações Webhook: ${historyItem.parameters.notifications.webhook ? "SIM" : "NÃO"}
+Retomado de etapa anterior: ${historyItem.failedStepId ? "SIM" : "NÃO"}
+-----------------------------------------
+LOGS DE ACESSO
+-----------------------------------------
+Link para logs JSON: /api/logs/${historyItem.id}.json
+Link para logs CSV: /api/logs/${historyItem.id}.csv
+=========================================
+Documento assinado digitalmente por Lovable Cloud Deploy Engine.
     `;
     const blob = new Blob([summary], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `auditoria-${historyItem.commit}.txt`;
+    a.download = `auditoria-deploy-${historyItem.commit}.txt`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success("Resumo de auditoria baixado");
+    toast.success("Relatório de auditoria gerado e baixado");
   };
 
   const filteredHistory = history.filter(item => {
@@ -290,12 +352,30 @@ ${steps.map(s => `- ${s.label}: ${historyItem.failedStepId === s.id ? "FALHOU" :
                 <div className="flex items-end gap-2">
                   <Button 
                     onClick={() => runValidation()} 
-                    disabled={isDeploying || !canExecuteDeploy}
-                    className="h-9 shadow-lg shadow-primary/20"
+                    disabled={isDeploying || (!canExecuteDeploy && !pendingApproval)}
+                    className={cn(
+                      "h-9 shadow-lg",
+                      pendingApproval ? "bg-orange-500 hover:bg-orange-600 animate-pulse" : "shadow-primary/20"
+                    )}
                   >
-                    {isDeploying ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4 mr-2" />}
-                    {isDeploying ? "Publicando..." : "Deploy Agora"}
+                    {isDeploying ? <Loader2 className="h-4 w-4 animate-spin" /> : 
+                     pendingApproval ? <Lock className="h-4 w-4 mr-2" /> :
+                     <PlayCircle className="h-4 w-4 mr-2" />}
+                    {isDeploying ? "Publicando..." : 
+                     pendingApproval ? "Aguardando Aprovação" : "Deploy Agora"}
                   </Button>
+                  {pendingApproval && currentUserRole === "admin" && (
+                    <Button 
+                      variant="outline" 
+                      className="h-9 border-orange-500 text-orange-500 hover:bg-orange-500/10"
+                      onClick={() => {
+                        setPendingApproval(false);
+                        runValidation();
+                      }}
+                    >
+                      Aprovar Agora
+                    </Button>
+                  )}
                 </div>
               </div>
               
@@ -505,8 +585,9 @@ ${steps.map(s => `- ${s.label}: ${historyItem.failedStepId === s.id ? "FALHOU" :
                           onClick={() => {
                             setEnvironment(item.parameters.environment);
                             setNotifications(item.parameters.notifications);
+                            setCurrentCommit(item.parameters.commit);
                             setActiveTab("current");
-                            runValidation(item.failedStepId, item.logs);
+                            runValidation(item.failedStepId, item.logs, item.parameters.commit);
                           }}
                         >
                           <RotateCcw className="h-3 w-3" /> Retomar
@@ -530,7 +611,7 @@ ${steps.map(s => `- ${s.label}: ${historyItem.failedStepId === s.id ? "FALHOU" :
                               <FileSpreadsheet className="h-4 w-4 text-green-600" /> Baixar em CSV
                             </Button>
                             <Button variant="outline" className="justify-start gap-2" onClick={() => downloadAuditSummary(item)}>
-                              <FileText className="h-4 w-4 text-blue-500" /> Resumo de Auditoria (Audit TXT)
+                              <FileBadge className="h-4 w-4 text-blue-500" /> Relatório de Auditoria Completo (PDF/TXT)
                             </Button>
                           </div>
                         </DialogContent>
