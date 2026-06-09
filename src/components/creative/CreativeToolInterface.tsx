@@ -439,8 +439,6 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       }
     } catch (e: any) {
       console.error("[CreativePanel:Configuration] execution_exception", { toolKey, error: e.message, stack: e.stack });
-    } catch (e: any) {
-      console.error("[CreativePanel:Configuration] execution_exception", { toolKey, error: e.message, stack: e.stack });
       setErrorState({
         message: e.message,
         correlationId: traceInfo?.correlationId,
