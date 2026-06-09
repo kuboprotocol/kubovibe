@@ -118,10 +118,40 @@ function AuditHistoryManager({
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [userFilter, setUserFilter] = useState<string>("all");
   const [attachmentFilter, setAttachmentFilter] = useState<string>("all");
-  const [sortField, setSortField] = useState<"timestamp" | "attachmentName" | "status">("timestamp");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [sortField, setSortField] = useState<"timestamp" | "attachmentName" | "status">(() => {
+    const saved = localStorage.getItem("audit_sortField");
+    return (saved as any) || "timestamp";
+  });
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">(() => {
+    const saved = localStorage.getItem("audit_sortOrder");
+    return (saved as any) || "desc";
+  });
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(25);
+  const [itemsPerPage, setItemsPerPage] = useState(() => {
+    const saved = localStorage.getItem("audit_itemsPerPage");
+    return saved ? parseInt(saved, 10) : 25;
+  });
+
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
+    const saved = localStorage.getItem("audit_visibleColumns");
+    return saved ? JSON.parse(saved) : ["timestamp", "user", "attachmentName", "action", "reason", "status"];
+  });
+
+  useEffect(() => {
+    localStorage.setItem("audit_itemsPerPage", itemsPerPage.toString());
+  }, [itemsPerPage]);
+
+  useEffect(() => {
+    localStorage.setItem("audit_visibleColumns", JSON.stringify(visibleColumns));
+  }, [visibleColumns]);
+
+  useEffect(() => {
+    localStorage.setItem("audit_sortField", sortField);
+  }, [sortField]);
+
+  useEffect(() => {
+    localStorage.setItem("audit_sortOrder", sortOrder);
+  }, [sortOrder]);
 
   // Reset page when filters or sort change
   useEffect(() => {
@@ -173,7 +203,8 @@ function AuditHistoryManager({
 
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState<"csv" | "pdf">("csv");
-  const [exportMode, setExportMode] = useState<"filtered" | "current_page">("filtered");
+  const [exportMode, setExportMode] = useState<"filtered" | "current_page" | "range">("filtered");
+  const [exportRange, setExportRange] = useState({ start: 1, end: 1 });
   const MAX_EXPORT_LIMIT = 500;
 
   const handleExport = async (format: "csv" | "pdf") => {
@@ -183,7 +214,16 @@ function AuditHistoryManager({
       return;
     }
 
-    const baseLogs = exportMode === "current_page" ? paginatedLogs : filteredLogs;
+    let baseLogs = [];
+    if (exportMode === "current_page") {
+      baseLogs = paginatedLogs;
+    } else if (exportMode === "range") {
+      const start = (exportRange.start - 1) * itemsPerPage;
+      const end = exportRange.end * itemsPerPage;
+      baseLogs = filteredLogs.slice(start, end);
+    } else {
+      baseLogs = filteredLogs;
+    }
 
     if (baseLogs.length > MAX_EXPORT_LIMIT) {
       toast.warning("Limite de exportação atingido", { 
@@ -194,16 +234,21 @@ function AuditHistoryManager({
     const logsToExport = baseLogs.slice(0, MAX_EXPORT_LIMIT);
 
     if (format === "csv") {
-      const headers = ["ID", "Timestamp", "Ação", "Usuário", "Anexo", "Motivo", "Status"];
-      const rows = logsToExport.map(log => [
-        log.id,
-        new Date(log.timestamp).toLocaleString(),
-        log.action,
-        log.user,
-        log.attachmentName,
-        log.reason,
-        log.status
-      ]);
+      const headers = ["ID", "Timestamp", "Ação", "Usuário", "Anexo", "Motivo", "Status"].filter((_, i) => {
+        const colKeys = ["id", "timestamp", "action", "user", "attachmentName", "reason", "status"];
+        return visibleColumns.includes(colKeys[i]);
+      });
+      const rows = logsToExport.map(log => {
+        const row = [];
+        if (visibleColumns.includes("id")) row.push(log.id);
+        if (visibleColumns.includes("timestamp")) row.push(new Date(log.timestamp).toLocaleString());
+        if (visibleColumns.includes("action")) row.push(log.action);
+        if (visibleColumns.includes("user")) row.push(log.user);
+        if (visibleColumns.includes("attachmentName")) row.push(log.attachmentName);
+        if (visibleColumns.includes("reason")) row.push(log.reason);
+        if (visibleColumns.includes("status")) row.push(log.status);
+        return row;
+      });
       
       const csvContent = [headers, ...rows].map(e => e.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -223,19 +268,29 @@ function AuditHistoryManager({
         doc.setFontSize(16);
         doc.text(title || "Relatório de Auditoria Filtrado", 14, 15);
         doc.setFontSize(10);
-        doc.text(`Filtros: ${searchTerm || "Nenhum"} | Status: ${statusFilter} | Escopo: ${exportMode} | Qtd: ${logsToExport.length}`, 14, 22);
+        let scopeDesc = exportMode === "current_page" ? `Página Atual (${currentPage})` : 
+                        exportMode === "range" ? `Páginas ${exportRange.start}-${exportRange.end}` : "Todos Filtrados";
+        doc.text(`Filtros: ${searchTerm || "Nenhum"} | Status: ${statusFilter} | Escopo: ${scopeDesc} | Qtd: ${logsToExport.length}`, 14, 22);
         
-        const tableData = logsToExport.map(log => [
-          new Date(log.timestamp).toLocaleString(),
-          log.user,
-          log.attachmentName,
-          log.action,
-          log.status
-        ]);
+        const colMap: Record<string, string> = {
+          timestamp: 'Timestamp',
+          user: 'Usuário',
+          attachmentName: 'Anexo',
+          action: 'Ação',
+          status: 'Status',
+          reason: 'Motivo',
+          id: 'ID'
+        };
+
+        const activeHeaders = visibleColumns.map(c => colMap[c]);
+        const tableBody = logsToExport.map(log => visibleColumns.map(col => {
+          if (col === 'timestamp') return new Date(log.timestamp).toLocaleString();
+          return (log as any)[col];
+        }));
 
         (autoTable as any)(doc, {
-          head: [['Timestamp', 'Usuário', 'Anexo', 'Ação', 'Status']],
-          body: tableData,
+          head: [activeHeaders],
+          body: tableBody,
           startY: 28,
           styles: { fontSize: 8 },
           headStyles: { fillColor: [0, 102, 204] }
@@ -251,8 +306,8 @@ function AuditHistoryManager({
     onAuditLog({
       action: "download_authorized",
       user: userRole,
-      attachmentName: `Exportação ${format.toUpperCase()} (${exportMode === "current_page" ? "Página Atual" : "Filtrado"})`,
-      reason: `Filtros: ${searchTerm || "Nenhum"}, Status: ${statusFilter}, Ordenação: ${sortField} ${sortOrder}, Qtd: ${logsToExport.length}`,
+      attachmentName: `Exportação ${format.toUpperCase()} (${exportMode === "current_page" ? `Pág. ${currentPage}` : exportMode === "range" ? `Págs. ${exportRange.start}-${exportRange.end}` : "Filtrado"})`,
+      reason: `Filtros: ${searchTerm || "Nenhum"}, Status: ${statusFilter}, Ordenação: ${sortField} ${sortOrder}, Colunas: ${visibleColumns.join(",")}, Qtd: ${logsToExport.length}`,
       status: "success"
     });
     
@@ -293,19 +348,59 @@ function AuditHistoryManager({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="filtered">Todos os resultados filtrados ({filteredLogs.length})</SelectItem>
-                  <SelectItem value="current_page">Apenas a página atual ({paginatedLogs.length})</SelectItem>
+                  <SelectItem value="current_page">Apenas a página atual (Pág. {currentPage})</SelectItem>
+                  <SelectItem value="range">Intervalo de páginas</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
+            {exportMode === "range" && (
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-[10px] text-muted-foreground uppercase">De (Página)</label>
+                  <Input 
+                    type="number" 
+                    min={1} 
+                    max={totalPages} 
+                    value={exportRange.start} 
+                    onChange={e => setExportRange(prev => ({ ...prev, start: Math.max(1, parseInt(e.target.value) || 1) }))}
+                    className="h-8 text-xs"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] text-muted-foreground uppercase">Até (Página)</label>
+                  <Input 
+                    type="number" 
+                    min={exportRange.start} 
+                    max={totalPages} 
+                    value={exportRange.end} 
+                    onChange={e => setExportRange(prev => ({ ...prev, end: Math.min(totalPages, Math.max(exportRange.start, parseInt(e.target.value) || 1)) }))}
+                    className="h-8 text-xs"
+                  />
+                </div>
+              </div>
+            )}
+
             <div className="p-4 rounded-lg bg-muted/50 border border-border/40 space-y-2">
               <div className="flex justify-between text-xs">
                 <span className="text-muted-foreground">Registros a exportar:</span>
-                <span className="font-bold">{exportMode === "current_page" ? paginatedLogs.length : filteredLogs.length}</span>
+                <span className="font-bold">
+                  {exportMode === "current_page" ? paginatedLogs.length : 
+                   exportMode === "range" ? Math.min(filteredLogs.length, (exportRange.end - exportRange.start + 1) * itemsPerPage) : 
+                   filteredLogs.length}
+                </span>
               </div>
               <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Filtro de busca:</span>
-                <span className="font-bold truncate max-w-[150px]">{searchTerm || "Nenhum"}</span>
+                <span className="text-muted-foreground">Escopo / Páginas:</span>
+                <span className="font-bold">
+                  {exportMode === "current_page" ? `Página ${currentPage}` : 
+                   exportMode === "range" ? `Páginas ${exportRange.start} a ${exportRange.end}` : 
+                   `Todas (${totalPages} págs)`}
+                </span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Colunas incluídas:</span>
+                <span className="font-bold">{visibleColumns.length} colunas</span>
               </div>
               <div className="flex justify-between text-xs">
                 <span className="text-muted-foreground">Status:</span>
@@ -381,11 +476,38 @@ function AuditHistoryManager({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>Filtros Avançados</DropdownMenuLabel>
+                <DropdownMenuLabel>Configurações da Lista</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <div className="p-2 space-y-2">
+                <div className="p-2 space-y-3">
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase">Colunas Visíveis</p>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                      {[
+                        { id: "timestamp", label: "Data/Hora" },
+                        { id: "user", label: "Usuário" },
+                        { id: "attachmentName", label: "Anexo" },
+                        { id: "action", label: "Ação" },
+                        { id: "reason", label: "Motivo" },
+                        { id: "status", label: "Status" },
+                        { id: "id", label: "ID" }
+                      ].map(col => (
+                        <div key={col.id} className="flex items-center space-x-2">
+                          <Checkbox 
+                            id={`col-${col.id}`} 
+                            checked={visibleColumns.includes(col.id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) setVisibleColumns([...visibleColumns, col.id]);
+                              else if (visibleColumns.length > 1) setVisibleColumns(visibleColumns.filter(c => c !== col.id));
+                            }}
+                          />
+                          <label htmlFor={`col-${col.id}`} className="text-[10px] font-medium cursor-pointer leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">{col.label}</label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <DropdownMenuSeparator />
                   <div className="space-y-1">
-                    <p className="text-[10px] font-medium text-muted-foreground uppercase">Usuário</p>
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase">Filtro por Usuário</p>
                     <Select value={userFilter} onValueChange={setUserFilter}>
                       <SelectTrigger className="h-7 text-[10px]">
                         <SelectValue />
@@ -445,44 +567,59 @@ function AuditHistoryManager({
           {paginatedLogs.length === 0 && (
             <p className="text-[10px] text-center text-muted-foreground italic py-8">Nenhum registro encontrado.</p>
           )}
-          {paginatedLogs.map((log) => (
-            <div
-              key={log.id}
-              className={`text-[10px] rounded border p-2 flex items-start gap-2 ${
-                log.status === "success" ? "border-emerald-500/20 bg-emerald-500/5" :
-                log.status === "denied" ? "border-red-500/20 bg-red-500/5" : "border-border/30 bg-muted/20"
-              }`}
-            >
-              <div className={cn(
-                "h-5 w-5 rounded-full flex items-center justify-center shrink-0",
-                log.status === "success" ? "bg-emerald-500/10 text-emerald-500" :
-                log.status === "denied" ? "bg-red-500/10 text-red-500" : "bg-primary/10 text-primary"
-              )}>
-                {log.status === "success" ? <Check className="h-3 w-3" /> :
-                 log.status === "denied" ? <Lock className="h-3 w-3" /> : <Activity className="h-3 w-3" />}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-bold">
-                    {log.action === "download_authorized" ? "Download Autorizado" :
-                     log.action === "download_denied" ? "Acesso Negado" : 
-                     log.action === "retention_cleanup" ? "Limpeza" : "Solicitado"}
-                    {" · "}
-                    <span className="text-muted-foreground font-mono">{log.user}</span>
-                  </span>
-                  <span className="text-[9px] text-muted-foreground shrink-0 flex items-center gap-1">
-                    <Clock className="h-2.5 w-2.5" /> {new Date(log.timestamp).toLocaleString()}
-                  </span>
-                </div>
-                <div className="text-muted-foreground truncate mt-0.5">
-                  <span className="font-medium text-foreground">{log.attachmentName}</span>
-                </div>
-                <div className="text-[9px] text-muted-foreground italic mt-0.5">
-                  {log.reason}
-                </div>
-              </div>
+          <div className="bg-muted/10 rounded-md border border-border/20 overflow-hidden">
+            <div className="grid grid-cols-7 gap-2 px-3 py-2 bg-muted/40 border-b border-border/30 text-[9px] font-bold text-muted-foreground uppercase">
+              {visibleColumns.includes("timestamp") && <div>Data/Hora</div>}
+              {visibleColumns.includes("user") && <div>Usuário</div>}
+              {visibleColumns.includes("attachmentName") && <div>Anexo</div>}
+              {visibleColumns.includes("action") && <div>Ação</div>}
+              {visibleColumns.includes("reason") && <div>Motivo</div>}
+              {visibleColumns.includes("status") && <div>Status</div>}
+              {visibleColumns.includes("id") && <div>ID</div>}
             </div>
-          ))}
+            <div className="divide-y divide-border/20">
+              {paginatedLogs.map((log) => (
+                <div
+                  key={log.id}
+                  className="grid grid-cols-7 gap-2 px-3 py-2 items-center text-[10px] hover:bg-muted/30 transition-colors"
+                >
+                  {visibleColumns.includes("timestamp") && (
+                    <div className="text-muted-foreground whitespace-nowrap">
+                      {new Date(log.timestamp).toLocaleDateString()}
+                    </div>
+                  )}
+                  {visibleColumns.includes("user") && (
+                    <div className="font-medium truncate">{log.user}</div>
+                  )}
+                  {visibleColumns.includes("attachmentName") && (
+                    <div className="truncate italic text-muted-foreground" title={log.attachmentName}>
+                      {log.attachmentName}
+                    </div>
+                  )}
+                  {visibleColumns.includes("action") && (
+                    <div className="truncate capitalize text-[9px]">
+                      {log.action.replace("_", " ")}
+                    </div>
+                  )}
+                  {visibleColumns.includes("reason") && (
+                    <div className="truncate text-muted-foreground" title={log.reason}>
+                      {log.reason}
+                    </div>
+                  )}
+                  {visibleColumns.includes("status") && (
+                    <div>
+                      <Badge variant={log.status === "success" ? "secondary" : log.status === "denied" ? "destructive" : "outline"} className="h-4 text-[8px] uppercase px-1 py-0">
+                        {log.status === "success" ? "Autorizado" : log.status === "denied" ? "Negado" : "Info"}
+                      </Badge>
+                    </div>
+                  )}
+                  {visibleColumns.includes("id") && (
+                    <div className="font-mono text-[8px] text-muted-foreground truncate">{log.id.split("-")[0]}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </ScrollArea>
 
