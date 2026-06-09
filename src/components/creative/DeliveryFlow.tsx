@@ -148,11 +148,34 @@ export function DeliveryFlow() {
       return;
     }
 
+    // Check for concurrent deploys in the same environment
+    const environmentLock = activeDeploys.find(d => d.environment === environment);
+    if (environmentLock && !isDryRun) {
+      toast.error("Bloqueio de Ambiente", { 
+        description: `O ambiente ${environment.toUpperCase()} já está em deploy por ${environmentLock.user}. Aguarde a conclusão.` 
+      });
+      addLog(`Tentativa de deploy bloqueada por concorrência em ${environment.toUpperCase()} (Usuário: ${currentUserRole})`, "warning");
+      return;
+    }
+
     // Require approval for production if not admin
     if (environment === "production" && currentUserRole !== "admin" && !pendingApproval) {
       setPendingApproval(true);
       toast.info("Aprovação Solicitada", { description: "Aguardando aprovação de um administrador para deploy em produção." });
       return;
+    }
+
+    if (environment === "production" && !isDryRun) {
+      if (!approvalComment.trim() || !approvalTerms) {
+        toast.error("Campos Obrigatórios", { description: "É necessário fornecer um comentário e aceitar os termos de aprovação." });
+        setPendingApproval(true);
+        return;
+      }
+    }
+
+    const deployId = crypto.randomUUID();
+    if (!isDryRun) {
+      setActiveDeploys(prev => [...prev, { id: deployId, environment, user: currentUserRole, timestamp: new Date().toISOString() }]);
     }
 
     setIsDeploying(true);
@@ -176,7 +199,7 @@ export function DeliveryFlow() {
     });
     setSteps(newSteps);
 
-    addLog(`${resumeFromStepId ? "Retomando" : "Iniciando"} deploy em ambiente: ${environment.toUpperCase()} (Commit: ${finalCommit})`, "info");
+    addLog(`${isDryRun ? "[DRY-RUN] " : ""}${resumeFromStepId ? "Retomando" : "Iniciando"} deploy em ambiente: ${environment.toUpperCase()} (Commit: ${finalCommit})`, "info");
 
     let finalStatus: "success" | "error" = "success";
     let failedStepId: string | undefined;
@@ -188,10 +211,24 @@ export function DeliveryFlow() {
       
       addLog(`Processando etapa: ${step.label}...`, "info", step.id);
       
+      // Simulating build/upload integration tests during dry-run or real deploy
+      if (i === 0) {
+        addLog("Validando parâmetros e credenciais de build...", "info", step.id);
+        await new Promise(r => setTimeout(r, 800));
+      }
+
       await new Promise(r => setTimeout(r, 1500));
       
-      // Simulated fail logic (random or specific step)
-      if (step.id === "api" && Math.random() < 0.2) {
+      if (isDryRun && Math.random() < 0.1) {
+        step.status = "error" as const;
+        step.error = "Simulação de falha em modo Dry-Run.";
+        addLog(step.error, "error", step.id);
+        finalStatus = "error";
+        failedStepId = step.id;
+        break;
+      }
+
+      if (!isDryRun && step.id === "api" && Math.random() < 0.2) {
         step.status = "error" as const;
         step.error = "Falha na validação de credenciais da API.";
         addLog(step.error, "error", step.id);
@@ -207,8 +244,18 @@ export function DeliveryFlow() {
       setSteps([...newSteps]);
     }
 
+    // Post-deploy health check
+    let healthStatus: "up" | "down" | "unchecked" = "unchecked";
+    if (finalStatus === "success" && !isDryRun) {
+      addLog("Iniciando Health-Check automático do link público...", "info");
+      await new Promise(r => setTimeout(r, 2000));
+      const isUp = Math.random() > 0.1;
+      healthStatus = isUp ? "up" : "down";
+      addLog(`Health-Check: ${isUp ? "ONLINE (200 OK)" : "OFFLINE / ERRO 500"}`, isUp ? "success" : "error");
+    }
+
     const newItem: DeployHistoryItem = {
-      id: crypto.randomUUID(),
+      id: deployId,
       date: new Date().toISOString(),
       environment,
       status: finalStatus,
@@ -217,24 +264,37 @@ export function DeliveryFlow() {
       apkUrl: "/downloads/app-latest.apk",
       logs: [...currentLogs, ...logs],
       failedStepId,
+      healthStatus,
       parameters: {
         environment,
         notifications: { ...notifications },
-        commit: finalCommit
+        commit: finalCommit,
+        dryRun: isDryRun,
+        approvalComment: environment === "production" ? approvalComment : undefined,
+        approvalTerms: environment === "production" ? approvalTerms : undefined,
+        healthCheck: true
       }
     };
 
-    setHistory(prev => [newItem, ...prev]);
+    if (!isDryRun) {
+      setHistory(prev => [newItem, ...prev]);
+    }
+    
     setIsDeploying(false);
+    setActiveDeploys(prev => prev.filter(d => d.id !== deployId));
     
     if (finalStatus === "success") {
-      toast.success("Entrega finalizada!", { description: `App disponível em ${environment}` });
-      addLog(`Deploy finalizado com sucesso em ${newItem.pwaUrl}`, "success");
+      toast.success(isDryRun ? "Simulação finalizada com sucesso!" : "Entrega finalizada!", { 
+        description: isDryRun ? "Nenhuma alteração real foi feita." : `App disponível em ${environment}` 
+      });
+      if (!isDryRun) addLog(`Deploy finalizado com sucesso em ${newItem.pwaUrl}`, "success");
     } else {
-      toast.error("Deploy falhou", { description: `Erro na etapa: ${steps.find(s => s.id === failedStepId)?.label}` });
+      toast.error(isDryRun ? "Simulação falhou" : "Deploy falhou", { 
+        description: `Erro na etapa: ${steps.find(s => s.id === failedStepId)?.label}` 
+      });
     }
 
-    notifyResult(finalStatus, environment, 1, newItem.pwaUrl);
+    if (!isDryRun) notifyResult(finalStatus, environment, 1, newItem.pwaUrl);
   };
 
   const downloadLogs = (historyItem: DeployHistoryItem, format: "json" | "csv") => {
