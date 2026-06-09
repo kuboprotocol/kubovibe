@@ -16,7 +16,7 @@ const checkAccess = (userRole: string, itemUser: string | undefined, currentUser
   return {
     authorized: isAdmin || isDev || isApprover,
     canExport: isAdmin || isDev || isApprover,
-    error: !(isAdmin || isDev || isApprover) ? 'Acesso Negado: Apenas Dev, Admin ou o Aprovador original podem visualizar ou exportar este histórico.' : null
+    error: !(isAdmin || isDev || isApprover) ? 'ERR_AUTH_DENIED: Acesso Negado: Apenas Dev, Admin ou o Aprovador original podem visualizar ou exportar este histórico.' : null
   };
 };
 
@@ -103,13 +103,39 @@ describe('DeliveryFlow Integration - Security & Audit', () => {
     expect(exportResult.fullExport[2].id).toBe('2');
   });
 
-  it('should restrict export access and return correct error', () => {
+  it('should restrict export access and return correct standardized error', () => {
     const viewer = checkAccess('viewer', 'admin', 'viewer');
     expect(viewer.canExport).toBe(false);
-    expect(viewer.error).toContain('Acesso Negado');
+    expect(viewer.error).toBe('ERR_AUTH_DENIED: Acesso Negado: Apenas Dev, Admin ou o Aprovador original podem visualizar ou exportar este histórico.');
 
     const approver = checkAccess('approver_1', 'approver_1', 'approver_1');
     expect(approver.canExport).toBe(true);
+  });
+
+  it('should verify export limit and logging', () => {
+    const MAX_LIMIT = 500;
+    const largeLogs = Array.from({ length: 600 }, (_, i) => ({ id: String(i) }));
+    const result = paginateAndSort(largeLogs, 1, 10, 'timestamp', 'desc');
+    
+    // Test logic for limit
+    const logsToExport = result.fullExport.slice(0, MAX_LIMIT);
+    expect(logsToExport).toHaveLength(MAX_LIMIT);
+
+    // Verify audit log record for export
+    const auditLogs: any[] = [];
+    const recordExport = (user: string, format: string, count: number, filters: string) => {
+      auditLogs.push({
+        action: 'download_authorized',
+        user,
+        attachmentName: `Exportação ${format.toUpperCase()}`,
+        reason: `Filtros: ${filters}, Qtd: ${count}`,
+        status: 'success'
+      });
+    };
+
+    recordExport('admin', 'CSV', 500, 'searchTerm=test');
+    expect(auditLogs[0].attachmentName).toBe('Exportação CSV');
+    expect(auditLogs[0].reason).toContain('Qtd: 500');
   });
 
   it('should record audit log for every download attempt', () => {

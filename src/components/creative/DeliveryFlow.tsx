@@ -111,8 +111,9 @@ function AuditHistoryManager({
   title, 
   showFilters = true, 
   userRole,
-  originalApprover 
-}: AuditHistoryManagerProps) {
+  originalApprover,
+  onAuditLog // Add this callback to handle logging from within this sub-component
+}: AuditHistoryManagerProps & { onAuditLog: (log: Omit<AuditLog, "id" | "timestamp">) => void }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [userFilter, setUserFilter] = useState<string>("all");
@@ -165,73 +166,90 @@ function AuditHistoryManager({
   const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
   const paginatedLogs = filteredLogs.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  const exportToCSV = () => {
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [exportFormat, setExportFormat] = useState<"csv" | "pdf">("csv");
+  const MAX_EXPORT_LIMIT = 500;
+
+  const handleExport = async (format: "csv" | "pdf") => {
     if (!canViewHistory) {
-      toast.error("Permissão negada para exportação");
+      const errorMsg = "ERR_AUTH_DENIED: Acesso Negado: Apenas Dev, Admin ou o Aprovador original podem visualizar ou exportar este histórico.";
+      toast.error("Permissão negada", { description: errorMsg });
       return;
     }
 
-    const headers = ["ID", "Timestamp", "Ação", "Usuário", "Anexo", "Motivo", "Status"];
-    const rows = filteredLogs.map(log => [
-      log.id,
-      new Date(log.timestamp).toLocaleString(),
-      log.action,
-      log.user,
-      log.attachmentName,
-      log.reason,
-      log.status
-    ]);
-    
-    const csvContent = [headers, ...rows].map(e => e.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `audit_log_filtered_${new Date().toISOString()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success("Histórico exportado (respeitando filtros)");
-  };
-
-  const exportToPDF = async () => {
-    if (!canViewHistory) {
-      toast.error("Permissão negada para exportação");
-      return;
+    if (filteredLogs.length > MAX_EXPORT_LIMIT) {
+      toast.warning("Limite de exportação atingido", { 
+        description: `O arquivo conterá apenas os primeiros ${MAX_EXPORT_LIMIT} registros filtrados.` 
+      });
     }
 
-    try {
-      const { default: jsPDF } = await import("jspdf");
-      const { default: autoTable } = await import("jspdf-autotable");
-      
-      const doc = new jsPDF();
-      doc.setFontSize(16);
-      doc.text(title || "Relatório de Auditoria Filtrado", 14, 15);
-      doc.setFontSize(10);
-      doc.text(`Filtros aplicados: ${searchTerm || "Nenhum"} | Status: ${statusFilter} | Total: ${filteredLogs.length}`, 14, 22);
-      
-      const tableData = filteredLogs.map(log => [
+    const logsToExport = filteredLogs.slice(0, MAX_EXPORT_LIMIT);
+
+    if (format === "csv") {
+      const headers = ["ID", "Timestamp", "Ação", "Usuário", "Anexo", "Motivo", "Status"];
+      const rows = logsToExport.map(log => [
+        log.id,
         new Date(log.timestamp).toLocaleString(),
+        log.action,
         log.user,
         log.attachmentName,
-        log.action,
+        log.reason,
         log.status
       ]);
-
-      (autoTable as any)(doc, {
-        head: [['Timestamp', 'Usuário', 'Anexo', 'Ação', 'Status']],
-        body: tableData,
-        startY: 28,
-        styles: { fontSize: 8 },
-        headStyles: { fillColor: [0, 102, 204] }
-      });
       
-      doc.save(`audit_log_filtered_${new Date().toISOString()}.pdf`);
-      toast.success("Relatório PDF exportado (respeitando filtros)");
-    } catch (error) {
-      console.error("PDF export error:", error);
-      toast.error("Erro ao gerar PDF");
+      const csvContent = [headers, ...rows].map(e => e.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `audit_log_filtered_${new Date().toISOString()}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      try {
+        const { default: jsPDF } = await import("jspdf");
+        const { default: autoTable } = await import("jspdf-autotable");
+        
+        const doc = new jsPDF();
+        doc.setFontSize(16);
+        doc.text(title || "Relatório de Auditoria Filtrado", 14, 15);
+        doc.setFontSize(10);
+        doc.text(`Filtros: ${searchTerm || "Nenhum"} | Status: ${statusFilter} | Total Exportado: ${logsToExport.length}`, 14, 22);
+        
+        const tableData = logsToExport.map(log => [
+          new Date(log.timestamp).toLocaleString(),
+          log.user,
+          log.attachmentName,
+          log.action,
+          log.status
+        ]);
+
+        (autoTable as any)(doc, {
+          head: [['Timestamp', 'Usuário', 'Anexo', 'Ação', 'Status']],
+          body: tableData,
+          startY: 28,
+          styles: { fontSize: 8 },
+          headStyles: { fillColor: [0, 102, 204] }
+        });
+        
+        doc.save(`audit_log_filtered_${new Date().toISOString()}.pdf`);
+      } catch (error) {
+        toast.error("Erro ao gerar PDF");
+        return;
+      }
     }
+
+    onAuditLog({
+      action: "download_authorized", // Using existing action for simplicity or could be "export_requested"
+      user: userRole,
+      attachmentName: `Exportação ${format.toUpperCase()}`,
+      reason: `Filtros: ${searchTerm || "Nenhum"}, Status: ${statusFilter}, Ordenação: ${sortField} ${sortOrder}, Qtd: ${logsToExport.length}`,
+      status: "success"
+    });
+    
+    toast.success("Histórico exportado com sucesso");
+    setIsExportDialogOpen(false);
   };
 
   const uniqueUsers = Array.from(new Set(logs.map(l => l.user)));
@@ -249,6 +267,58 @@ function AuditHistoryManager({
 
   return (
     <div className="space-y-4">
+      {/* Diálogo de confirmação de exportação */}
+      <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Download className="h-5 w-5 text-primary" />
+              Pré-visualização da Exportação ({exportFormat.toUpperCase()})
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="p-4 rounded-lg bg-muted/50 border border-border/40 space-y-2">
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Total de registros:</span>
+                <span className="font-bold">{filteredLogs.length}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Filtro de busca:</span>
+                <span className="font-bold truncate max-w-[150px]">{searchTerm || "Nenhum"}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Status:</span>
+                <Badge variant="outline" className="h-4 text-[9px] uppercase">{statusFilter}</Badge>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Ordenação:</span>
+                <span className="font-bold uppercase text-[9px]">{sortField} ({sortOrder})</span>
+              </div>
+              {filteredLogs.length > MAX_EXPORT_LIMIT && (
+                <div className="pt-2 mt-2 border-t border-destructive/20 text-destructive text-[10px] font-bold">
+                  * Apenas os primeiros {MAX_EXPORT_LIMIT} registros serão exportados.
+                </div>
+              )}
+            </div>
+            
+            <ScrollArea className="h-32 border rounded-md p-2 bg-background/50">
+              <div className="space-y-1">
+                {filteredLogs.slice(0, 5).map(log => (
+                  <div key={log.id} className="text-[9px] text-muted-foreground border-b border-border/10 pb-1">
+                    {new Date(log.timestamp).toLocaleDateString()} - {log.user} - {log.attachmentName}
+                  </div>
+                ))}
+                {filteredLogs.length > 5 && <div className="text-[9px] text-muted-foreground italic">... e outros {filteredLogs.length - 5} registros</div>}
+              </div>
+            </ScrollArea>
+          </div>
+          <DialogFooter className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => setIsExportDialogOpen(false)}>Cancelar</Button>
+            <Button size="sm" onClick={() => handleExport(exportFormat)}>Confirmar Download</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {showFilters && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
           <div className="relative md:col-span-2">
@@ -272,10 +342,10 @@ function AuditHistoryManager({
             </SelectContent>
           </Select>
           <div className="flex gap-1">
-            <Button variant="outline" size="sm" className="h-8 px-2" onClick={exportToCSV} title="CSV">
+            <Button variant="outline" size="sm" className="h-8 px-2" onClick={() => { setExportFormat("csv"); setIsExportDialogOpen(true); }} title="CSV">
               <FileSpreadsheet className="h-3.5 w-3.5" />
             </Button>
-            <Button variant="outline" size="sm" className="h-8 px-2" onClick={exportToPDF} title="PDF">
+            <Button variant="outline" size="sm" className="h-8 px-2" onClick={() => { setExportFormat("pdf"); setIsExportDialogOpen(true); }} title="PDF">
               <FileText className="h-3.5 w-3.5" />
             </Button>
             <DropdownMenu>
@@ -1603,7 +1673,8 @@ export function DeliveryFlow() {
                                     userRole={currentUserRole}
                                     originalApprover={item.user}
                                     showFilters={false}
-                                    filterByAttachment={undefined} // We could filter by all attachments in this item
+                                    filterByAttachment={undefined} 
+                                    onAuditLog={addAuditLog}
                                   />
                                 </div>
                               </div>
@@ -1803,6 +1874,7 @@ export function DeliveryFlow() {
               logs={auditLogs}
               userRole={currentUserRole}
               title="Relatório Geral de Auditoria de Acessos"
+              onAuditLog={addAuditLog}
             />
           </Card>
         </TabsContent>
