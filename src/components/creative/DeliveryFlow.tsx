@@ -121,7 +121,12 @@ function AuditHistoryManager({
   const [sortField, setSortField] = useState<"timestamp" | "attachmentName" | "status">("timestamp");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const [itemsPerPage, setItemsPerPage] = useState(25);
+
+  // Reset page when filters or sort change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, userFilter, attachmentFilter, sortField, sortOrder, itemsPerPage]);
 
   // Reset page when filters or sort change
   useEffect(() => {
@@ -464,6 +469,16 @@ function AuditHistoryManager({
         <div className="flex items-center justify-between px-1">
           <p className="text-[9px] text-muted-foreground">Mostrando {paginatedLogs.length} de {filteredLogs.length} registros</p>
           <div className="flex items-center gap-2">
+            <Select value={String(itemsPerPage)} onValueChange={(v) => setItemsPerPage(Number(v))}>
+              <SelectTrigger className="h-7 w-20 text-[10px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="25">25 / pág</SelectItem>
+                <SelectItem value="50">50 / pág</SelectItem>
+                <SelectItem value="100">100 / pág</SelectItem>
+              </SelectContent>
+            </Select>
             <Button
               variant="outline"
               size="sm"
