@@ -81,6 +81,8 @@ export function DeliveryFlow() {
   const [isDryRun, setIsDryRun] = useState(false);
   const [activeDeploys, setActiveDeploys] = useState<ActiveDeploy[]>([]);
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
+  const [maxEvidenceSize] = useState(5 * 1024 * 1024); // 5MB limit
+  const [allowedTypes] = useState(["image/png", "image/jpeg", "application/pdf", "text/plain"]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [steps, setSteps] = useState<ValidationStep[]>([
