@@ -1055,6 +1055,30 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
               ))}
             </div>
           </ScrollArea>
+          
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 mt-4">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(prev => prev - 1)}
+              >
+                Anterior
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                Página {currentPage} de {totalPages}
+              </span>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(prev => prev + 1)}
+              >
+                Próxima
+              </Button>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </Card>
