@@ -208,11 +208,38 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     let file = e.target.files?.[0];
-    // Reset input so selecting the same file again triggers change
     e.target.value = "";
     if (!file) return;
 
+    const VALID_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/svg+xml'];
+    const MAX_SIZE_MB = 10;
+    const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
+
     setIsUploading(true);
+    
+    // Initial validation
+    if (file.size > MAX_SIZE_BYTES) {
+      const errorMsg = `Arquivo muito grande (${(file.size / 1024 / 1024).toFixed(2)}MB). O limite é ${MAX_SIZE_MB}MB. Reduza a resolução ou comprima a imagem.`;
+      if (toolKey === "avatar") {
+        setProgressSteps(buildSteps(false, { error: "Limite de tamanho excedido", size: (file.size / 1024 / 1024).toFixed(2) + " MB" }));
+        updateStep("upload", "error", errorMsg);
+      }
+      toast.error("Arquivo muito grande", { description: errorMsg });
+      setIsUploading(false);
+      return;
+    }
+
+    if (!VALID_TYPES.includes(file.type) && !file.name.toLowerCase().endsWith(".heic")) {
+      const errorMsg = `O formato "${file.type || "desconhecido"}" não é suportado. Por favor, envie uma imagem em JPG, PNG, WEBP, SVG ou HEIC.`;
+      if (toolKey === "avatar") {
+        setProgressSteps(buildSteps(false, { error: "Formato inválido", type: file.type || "unknown" }));
+        updateStep("upload", "error", errorMsg);
+      }
+      toast.error("Formato não suportatedo", { description: errorMsg });
+      setIsUploading(false);
+      return;
+    }
+
     const needsConvert =
       file.type === "image/heic" ||
       file.name.toLowerCase().endsWith(".heic") ||
@@ -222,41 +249,45 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       setProgressSteps(buildSteps(needsConvert, { 
         name: file.name, 
         size: (file.size / 1024 / 1024).toFixed(2) + " MB",
-        type: file.type || "unknown"
+        type: file.type || "unknown",
+        lastModified: new Date(file.lastModified).toLocaleString()
       }));
       updateStep("upload", "active");
     }
+
     try {
       // Convert HEIC → JPG
       if (file.type === "image/heic" || file.name.toLowerCase().endsWith(".heic")) {
         try {
-            if (toolKey === "avatar") updateStep("convert", "active");
-            toast.info("Convertendo formato HEIC...");
+            if (toolKey === "avatar") updateStep("convert", "active", undefined, { method: "heic2any", target: "image/jpeg" });
+            toast.info("Convertendo formato HEIC...", { description: "Isso pode levar alguns segundos dependendo do tamanho." });
             const convertedBlob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.85 });
             file = new File(
-            [Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob],
-            file.name.replace(/\.[^/.]+$/, ".jpg"),
-            { type: "image/jpeg" }
+              [Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob],
+              file.name.replace(/\.[^/.]+$/, ".jpg"),
+              { type: "image/jpeg" }
             );
-            if (toolKey === "avatar") updateStep("convert", "done");
+            if (toolKey === "avatar") updateStep("convert", "done", undefined, { resultSize: (file.size / 1024 / 1024).toFixed(2) + " MB" });
         } catch (err: any) {
-            if (toolKey === "avatar") updateStep("convert", "error", "Falha na conversão HEIC. O arquivo pode estar corrompido.");
-            throw new Error("Não foi possível processar o arquivo HEIC.");
+            const detailMsg = "O decodificador HEIC falhou. Verifique se a imagem não está protegida por DRM ou corrompida.";
+            if (toolKey === "avatar") updateStep("convert", "error", detailMsg, { error: err.message });
+            throw new Error(detailMsg);
         }
       } else if (file.type === "image/svg+xml") {
         try {
-            // Convert SVG → PNG via canvas
-            if (toolKey === "avatar") updateStep("convert", "active");
-            toast.info("Convertendo SVG para PNG...");
+            if (toolKey === "avatar") updateStep("convert", "active", undefined, { method: "canvas-render", target: "image/png" });
+            toast.info("Processando SVG...");
             const svgText = await file.text();
+            if (!svgText.includes("<svg")) throw new Error("Conteúdo SVG inválido");
+            
             const blobUrl = URL.createObjectURL(new Blob([svgText], { type: "image/svg+xml" }));
             const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-            const i = new Image();
-            i.onload = () => resolve(i);
-            i.onerror = reject;
-            i.src = blobUrl;
+              const i = new Image();
+              i.onload = () => resolve(i);
+              i.onerror = () => reject(new Error("Falha ao carregar SVG no canvas"));
+              i.src = blobUrl;
             });
-            const size = Math.max(img.width || 512, img.height || 512, 512);
+            const size = Math.max(img.width || 1024, img.height || 1024, 1024);
             const canvas = document.createElement("canvas");
             canvas.width = size;
             canvas.height = size;
@@ -265,51 +296,35 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
             URL.revokeObjectURL(blobUrl);
             const pngBlob: Blob = await new Promise((r) => canvas.toBlob((b) => r(b!), "image/png", 0.95));
             file = new File([pngBlob], file.name.replace(/\.[^/.]+$/, ".png"), { type: "image/png" });
-            if (toolKey === "avatar") updateStep("convert", "done");
+            if (toolKey === "avatar") updateStep("convert", "done", undefined, { dimensions: `${size}x${size}`, resultSize: (file.size / 1024 / 1024).toFixed(2) + " MB" });
         } catch (err: any) {
-            if (toolKey === "avatar") updateStep("convert", "error", "Falha na conversão SVG. Verifique se o arquivo é um SVG válido.");
-            throw new Error("Não foi possível processar o arquivo SVG.");
+            const detailMsg = "Não foi possível renderizar o SVG. Certifique-se de que ele contém tags válidas.";
+            if (toolKey === "avatar") updateStep("convert", "error", detailMsg, { error: err.message });
+            throw new Error(detailMsg);
         }
       }
 
-      const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
-      const maxSize = 10 * 1024 * 1024;
-
-      if (!validTypes.includes(file.type)) {
-        const errorMsg = `Formato "${file.type || "desconhecido"}" não suportado. Use JPG, PNG, WEBP, SVG ou HEIC.`;
-        if (toolKey === "avatar") updateStep("upload", "error", errorMsg);
-        toast.error("Formato inválido", { description: errorMsg });
-        setIsUploading(false);
-        return;
-      }
-      if (file.size > maxSize) {
-        const errorMsg = `Arquivo muito grande (${(file.size / 1024 / 1024).toFixed(2)}MB). O limite é 10MB.`;
-        if (toolKey === "avatar") updateStep("upload", "error", errorMsg);
-        toast.error("Arquivo muito grande", { description: errorMsg });
-        setIsUploading(false);
-        return;
-      }
-
-      // For avatar, open crop dialog using a local object URL (don't upload yet)
+      // For avatar, open crop dialog
       if (toolKey === "avatar") {
         const localUrl = URL.createObjectURL(file);
         setCropSourceUrl(localUrl);
         setCropOpen(true);
         setIsUploading(false);
+        updateStep("upload", "done", undefined, { status: "Aguardando ajuste de recorte" });
         return;
       }
 
       const fileExt = file.name.split('.').pop() || "png";
       const publicUrl = await uploadBlobToStorage(file, fileExt);
       setUploadedImageUrl(publicUrl);
-      toast.success("Imagem carregada com sucesso!");
+      toast.success("Imagem carregada!");
     } catch (error: any) {
       console.error("Upload error:", error);
-      toast.error("Falha ao carregar imagem: " + error.message);
-      if (toolKey === "avatar" && progressSteps.find(s => s.key === "convert")?.status === "active") {
-          // Handled above, but ensuring fallback
-      } else if (toolKey === "avatar") {
-          updateStep("upload", "error", error.message);
+      toast.error("Erro no processamento", { description: error.message });
+      if (toolKey === "avatar") {
+          const currentActive = progressSteps.find(s => s.status === "active");
+          if (currentActive) updateStep(currentActive.key, "error", error.message);
+          else updateStep("upload", "error", error.message);
       }
     } finally {
       setIsUploading(false);
