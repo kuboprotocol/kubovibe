@@ -106,6 +106,7 @@ export default function CreativeAuditPage() {
     const saved = localStorage.getItem("creative_audit_recurrence_threshold");
     return saved ? Number(saved) : 2;
   });
+  const [showConfig, setShowConfig] = useState(false);
   const [expandedCorrelations, setExpandedCorrelations] = useState<Set<string>>(new Set());
 
   // Update URL params when filters change
