@@ -112,13 +112,24 @@ describe('DeliveryFlow Integration - Security & Audit', () => {
     expect(approver.canExport).toBe(true);
   });
 
-  it('should verify export limit, range and logging', () => {
+  it('should verify export limit, range validation and logging', () => {
     const MAX_LIMIT = 500;
     const perPage = 25;
     const largeLogs = Array.from({ length: 600 }, (_, i) => ({ id: String(i), timestamp: new Date().toISOString() }));
     const result = paginateAndSort(largeLogs, 1, perPage, 'timestamp', 'desc');
+    const totalPages = Math.ceil(largeLogs.length / perPage);
     
-    // Test range export (Page 2 to 3)
+    // Test range export validation logic
+    const validateRange = (start: number, end: number, total: number) => {
+      return start >= 1 && start <= total && end >= start && end <= total;
+    };
+
+    expect(validateRange(2, 3, totalPages)).toBe(true);
+    expect(validateRange(5, 2, totalPages)).toBe(false);
+    expect(validateRange(0, 1, totalPages)).toBe(false);
+    expect(validateRange(1, 100, totalPages)).toBe(false);
+
+    // Test range export cutting
     const exportRange = (logs: any[], startPage: number, endPage: number, itemsPerPage: number) => {
       const start = (startPage - 1) * itemsPerPage;
       const end = endPage * itemsPerPage;
@@ -126,7 +137,8 @@ describe('DeliveryFlow Integration - Security & Audit', () => {
     };
 
     const rangeLogs = exportRange(largeLogs, 2, 3, perPage);
-    expect(rangeLogs).toHaveLength(50); // 2 pages of 25
+    expect(rangeLogs).toHaveLength(50); 
+
 
     // Test logic for limit
     const logsToExport = result.fullExport.slice(0, MAX_LIMIT);

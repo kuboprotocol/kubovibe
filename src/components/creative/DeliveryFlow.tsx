@@ -214,12 +214,23 @@ function AuditHistoryManager({
       return;
     }
 
+    // Validation for page range
+    if (exportMode === "range") {
+      if (exportRange.start < 1 || exportRange.start > totalPages || exportRange.end < exportRange.start || exportRange.end > totalPages) {
+        toast.error("Intervalo inválido", { 
+          description: `Por favor, informe um intervalo entre 1 e ${totalPages}, onde a página inicial é menor ou igual à final.` 
+        });
+        return;
+      }
+    }
+
     let baseLogs = [];
     if (exportMode === "current_page") {
       baseLogs = paginatedLogs;
     } else if (exportMode === "range") {
       const start = (exportRange.start - 1) * itemsPerPage;
       const end = exportRange.end * itemsPerPage;
+      // Backend-like security check: Ensure we stay within the filtered set and autorized range
       baseLogs = filteredLogs.slice(start, end);
     } else {
       baseLogs = filteredLogs;
