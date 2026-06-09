@@ -552,10 +552,13 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       setPrompt("");
       onSuccess?.();
       if (toolKey === "avatar") {
-        // Re-fetch result and finalize render step shortly after
         setTimeout(async () => {
           await fetchLastResult();
-          updateStep("render", "done", undefined, { resultUrl: data?.asset_url || "Disponível no histórico" });
+          updateStep("render", "done", undefined, { 
+            resultUrl: data?.asset_url || "Disponível no histórico",
+            completedAt: new Date().toLocaleTimeString(),
+            duration: `${((Date.now() - new Date(executionStartTime).getTime()) / 1000).toFixed(1)}s`
+          });
         }, 1500);
       }
     } catch (e: any) {
