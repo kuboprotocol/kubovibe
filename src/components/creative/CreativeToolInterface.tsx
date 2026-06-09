@@ -597,16 +597,33 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                     </Button>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="h-8 text-xs" 
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs"
                     onClick={() => document.getElementById('avatar-upload')?.click()}
                   >
-                    <Upload className="h-3 w-3 mr-1.5" /> Trocar Imagem
+                    <Upload className="h-3 w-3 mr-1.5" /> Trocar
                   </Button>
-                  <input type="file" id="avatar-upload" className="hidden" accept="image/jpeg,image/png,image/webp" onChange={handleFileUpload} disabled={isUploading} />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs"
+                    onClick={() => { setCropSourceUrl(uploadedImageUrl); setCropOpen(true); }}
+                  >
+                    <CropIcon className="h-3 w-3 mr-1.5" /> Ajustar / Zoom
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 text-xs text-destructive hover:text-destructive"
+                    onClick={handleResetSessionAvatar}
+                    title="Limpa o localStorage e remove o avatar padrão da sessão"
+                  >
+                    <Trash2 className="h-3 w-3 mr-1.5" /> Redefinir padrão
+                  </Button>
+                  <input type="file" id="avatar-upload" className="hidden" accept="image/jpeg,image/png,image/webp,image/svg+xml,image/heic,.heic" onChange={handleFileUpload} disabled={isUploading} />
                 </div>
               </div>
             ) : (
