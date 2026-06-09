@@ -1251,7 +1251,7 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
                                     Histórico de Auditoria de Downloads
                                   </h4>
                                   {(() => {
-                                    const attachmentNames = new Set((item.evidenceFiles || []).map((f: any) => f.name));
+                                    const attachmentNames = new Set((((item as any).detailedEvidence as EvidenceFile[]) || []).map(f => f.name));
                                     const relevant = auditLogs.filter(l =>
                                       l.action.startsWith("download_") && attachmentNames.has(l.attachmentName)
                                     );
