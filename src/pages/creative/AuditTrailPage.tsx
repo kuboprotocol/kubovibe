@@ -976,50 +976,60 @@ export default function CreativeAuditPage() {
             </ul>
           </div>
 
-          <div className="mt-6 grid grid-cols-2 gap-6">
-            {compareEntries.map((entry, idx) => {
-              const other = compareEntries[idx === 0 ? 1 : 0];
-              
-              return (
-                <div key={entry.id} className="space-y-6">
-                  <div className="p-3 bg-accent/20 rounded-md border flex justify-between items-center">
-                    <h4 className="font-bold text-sm">Evento #{idx + 1}</h4>
-                    <Badge variant="outline">{new Date(entry.created_at).toLocaleString()}</Badge>
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <p className="text-[10px] text-muted-foreground uppercase font-bold">Ação</p>
-                    <p className={`text-xs font-mono p-2 rounded truncate border ${entry.action !== other.action ? 'border-yellow-500/50 bg-yellow-500/5' : 'bg-muted'}`} title={entry.action}>
-                      {entry.action}
-                    </p>
-                  </div>
-
-                  <div className="space-y-1">
-                    <p className="text-[10px] text-muted-foreground uppercase font-bold">Parâmetros (Com Destaque)</p>
-                    <div className="bg-black/95 p-3 rounded-md overflow-x-auto font-mono text-[10px] h-[400px]">
-                      {Object.keys(entry.params || {}).map(key => {
-                        const val = entry.params[key];
-                        const otherVal = other.params?.[key];
-                        const isDiff = JSON.stringify(val) !== JSON.stringify(otherVal);
-                        
-                        return (
-                          <div key={key} className={`mb-1 ${isDiff ? 'text-yellow-400 font-bold bg-yellow-400/10' : 'text-green-400 opacity-70'}`}>
-                            {key}: {JSON.stringify(val, null, 2)}
-                          </div>
-                        );
-                      })}
+          <div className="mt-6 space-y-8">
+            <div className="grid grid-cols-2 gap-6">
+              {compareEntries.map((entry, idx) => {
+                const other = compareEntries[idx === 0 ? 1 : 0];
+                
+                return (
+                  <div key={entry.id} className="space-y-6">
+                    <div className="p-3 bg-accent/20 rounded-md border flex justify-between items-center">
+                      <h4 className="font-bold text-sm">Evento #{idx + 1}</h4>
+                      <Badge variant="outline">{new Date(entry.created_at).toLocaleString()}</Badge>
                     </div>
-                  </div>
-
-                  {entry.params?.error && (
-                    <div className="p-2 border border-destructive/30 bg-destructive/5 rounded-md">
-                      <p className="text-[10px] font-bold text-destructive uppercase">Erro Detectado</p>
-                      <p className="text-xs text-destructive">{entry.params.error.message}</p>
+                    
+                    <div className="space-y-1">
+                      <p className="text-[10px] text-muted-foreground uppercase font-bold">Ação</p>
+                      <p className={`text-xs font-mono p-2 rounded truncate border ${entry.action !== other.action ? 'border-yellow-500/50 bg-yellow-500/5' : 'bg-muted'}`} title={entry.action}>
+                        {entry.action}
+                      </p>
                     </div>
-                  )}
-                </div>
-              );
-            })}
+
+                    <div className="space-y-1">
+                      <p className="text-[10px] text-muted-foreground uppercase font-bold">Parâmetros (Com Destaque)</p>
+                      <div className="bg-black/95 p-3 rounded-md overflow-x-auto font-mono text-[10px] h-[300px]">
+                        {Object.keys(entry.params || {}).map(key => {
+                          const val = entry.params[key];
+                          const otherVal = other.params?.[key];
+                          const isDiff = JSON.stringify(val) !== JSON.stringify(otherVal);
+                          
+                          return (
+                            <div key={key} className={`mb-1 ${isDiff ? 'text-yellow-400 font-bold bg-yellow-400/10' : 'text-green-400 opacity-70'}`}>
+                              {key}: {JSON.stringify(val, null, 2)}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Timeline per attempt for comparison */}
+                    {entry.correlation_id && (
+                      <div className="space-y-2">
+                        <p className="text-[10px] text-muted-foreground uppercase font-bold">Linha do Tempo (Tentativas)</p>
+                        <TimelineViewer correlationId={entry.correlation_id} currentId={entry.id} />
+                      </div>
+                    )}
+
+                    {entry.params?.error && (
+                      <div className="p-2 border border-destructive/30 bg-destructive/5 rounded-md">
+                        <p className="text-[10px] font-bold text-destructive uppercase">Erro Detectado</p>
+                        <p className="text-xs text-destructive">{entry.params.error.message}</p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </SheetContent>
       </Sheet>
