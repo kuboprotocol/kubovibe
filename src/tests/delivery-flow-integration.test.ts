@@ -9,11 +9,24 @@ const validateAttachment = (file: { size: number; type: string; name: string }, 
   return { valid: !isMalware, scanResult: isMalware ? 'infected' : 'clean', hash: btoa(file.name + file.size).substring(0, 32).toLowerCase() };
 };
 
-const checkAccess = (userRole: string, itemUser: string, currentUser: string) => {
+const checkAccess = (userRole: string, itemUser: string | undefined, currentUser: string) => {
   const isAdmin = userRole === 'admin';
   const isDev = userRole === 'developer';
-  const isApprover = itemUser === currentUser;
-  return isAdmin || isDev || isApprover;
+  const isApprover = itemUser === userRole; // In the component it's item.user === currentUserRole
+  return {
+    authorized: isAdmin || isDev || isApprover,
+    error: !(isAdmin || isDev || isApprover) ? 'Acesso Negado: Apenas Dev, Admin ou o Aprovador original podem baixar esta evidência.' : null
+  };
+};
+
+const paginateAndSort = (logs: any[], page: number, perPage: number, sortField: string, sortOrder: 'asc' | 'desc') => {
+  const sorted = [...logs].sort((a, b) => {
+    let comparison = 0;
+    if (sortField === 'timestamp') comparison = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+    else if (sortField === 'status') comparison = a.status.localeCompare(b.status);
+    return sortOrder === 'desc' ? -comparison : comparison;
+  });
+  return sorted.slice((page - 1) * perPage, page * perPage);
 };
 
 const simulateRetentionJob = (history: any[], policies: any[], now: Date) => {
