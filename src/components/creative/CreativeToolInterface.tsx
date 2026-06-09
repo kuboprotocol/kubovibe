@@ -654,6 +654,10 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
           </div>
         )}
 
+        {toolKey === "avatar" && progressSteps.length > 0 && (
+          <AvatarProgressSteps steps={progressSteps} />
+        )}
+
         {/* Comparison Section (Before vs After) */}
         {toolKey === "avatar" && lastResult && (
           <div className="pt-4 border-t border-border/20 space-y-3">
