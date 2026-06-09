@@ -1,4 +1,4 @@
-import { Check, X, Loader2, PlayCircle, Globe, ShieldCheck, Smartphone, Package, Code, AlertCircle, Terminal, History, Download, ExternalLink, QrCode, Filter, Search, Mail, Bell, FileJson, FileSpreadsheet, FileText, UserCheck, RotateCcw, FileBadge, Lock, MessageSquare, ShieldAlert, Activity, Cpu, Upload, Paperclip, Eye, Clock, Trash2, Settings, HardDrive, Calendar, Shield, Undo2, Keyboard, ListTodo } from "lucide-react";
+import { Check, X, Loader2, PlayCircle, Globe, ShieldCheck, Smartphone, Package, Code, AlertCircle, Terminal, History, Download, ExternalLink, QrCode, Filter, Search, Mail, Bell, FileJson, FileSpreadsheet, FileText, UserCheck, RotateCcw, FileBadge, Lock, MessageSquare, ShieldAlert, Activity, Cpu, Upload, Paperclip, Eye, Clock, Trash2, Settings, HardDrive, Calendar, Shield, Undo2, Keyboard, ListTodo, MoreVertical } from "lucide-react";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -218,9 +218,18 @@ function AuditHistoryManager({
   // Keyboard shortcut for export
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (isExportDialogOpen && e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+      const savedShortcut = localStorage.getItem("audit_export_shortcut") || "Enter";
+      
+      const isMatch = e.key === savedShortcut && (e.ctrlKey || e.metaKey);
+      
+      if (isExportDialogOpen && isMatch) {
         e.preventDefault();
         handleExport(exportFormat);
+      } else if (!isExportDialogOpen && isMatch) {
+        // Trigger default export mode if shortcut is pressed while list is visible
+        e.preventDefault();
+        setExportFormat("csv");
+        setIsExportDialogOpen(true);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -493,12 +502,44 @@ function AuditHistoryManager({
       </Dialog>
 
       <Dialog open={isExportLogOpen} onOpenChange={setIsExportLogOpen}>
-        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader className="flex flex-row items-center justify-between space-y-0 pb-2 border-b">
             <DialogTitle className="flex items-center gap-2">
               <ListTodo className="h-5 w-5 text-primary" />
               Log de Auditoria de Exportações
             </DialogTitle>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="h-8 text-[11px]"
+                onClick={() => {
+                  const exportLogs = logs.filter(l => l.action === "download_authorized");
+                  const headers = ["ID", "Timestamp", "Usuário", "Tipo de Exportação", "Detalhes do Recorte", "Status"];
+                  const rows = exportLogs.map(l => [
+                    l.id,
+                    new Date(l.timestamp).toLocaleString(),
+                    l.user,
+                    l.attachmentName,
+                    l.reason,
+                    l.status
+                  ]);
+                  const csvContent = [headers, ...rows].map(e => e.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
+                  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                  const url = URL.createObjectURL(blob);
+                  const link = document.createElement("a");
+                  link.setAttribute("href", url);
+                  link.setAttribute("download", `export_history_${new Date().toISOString()}.csv`);
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  toast.success("Histórico de logs exportado!");
+                }}
+              >
+                <FileSpreadsheet className="h-3.5 w-3.5 mr-2" />
+                Exportar Histórico de Logs
+              </Button>
+            </div>
           </DialogHeader>
           <div className="flex-1 overflow-hidden mt-4">
             <AuditHistoryManager 
@@ -623,6 +664,27 @@ function AuditHistoryManager({
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <div className="p-2 space-y-3">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase">Atalho de Teclado (Ctrl + ...)</p>
+                    <Select 
+                      value={localStorage.getItem("audit_export_shortcut") || "Enter"} 
+                      onValueChange={(v) => {
+                        localStorage.setItem("audit_export_shortcut", v);
+                        toast.success(`Atalho alterado para Ctrl+${v}`);
+                      }}
+                    >
+                      <SelectTrigger className="h-7 text-[10px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Enter">Enter</SelectItem>
+                        <SelectItem value="e">E</SelectItem>
+                        <SelectItem value="s">S</SelectItem>
+                        <SelectItem value="p">P</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <DropdownMenuSeparator />
                   <div className="space-y-1.5">
                     <p className="text-[10px] font-bold text-muted-foreground uppercase">Colunas Visíveis</p>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-1">
