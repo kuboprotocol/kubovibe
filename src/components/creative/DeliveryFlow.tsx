@@ -882,7 +882,7 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
                   <p className="text-xs">Nenhum deploy encontrado</p>
                 </div>
               )}
-              {filteredHistory.map((item) => (
+              {paginatedHistory.map((item) => (
                 <div key={item.id} className={cn(
                   "p-4 rounded-xl border transition-colors",
                   item.status === "blocked" ? "border-destructive/30 bg-destructive/5" : "border-border/20 bg-muted/20 hover:bg-muted/30"
