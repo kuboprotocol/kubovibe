@@ -69,7 +69,11 @@ export default function CreativeAuditPage() {
     const saved = localStorage.getItem("creative_audit_filters");
     return saved ? JSON.parse(saved) : [];
   });
-  const [recurrenceThreshold, setRecurrenceThreshold] = useState(2);
+  const [recurrenceThreshold, setRecurrenceThreshold] = useState(() => {
+    const saved = localStorage.getItem("creative_audit_recurrence_threshold");
+    return saved ? Number(saved) : 2;
+  });
+  const [expandedCorrelations, setExpandedCorrelations] = useState<Set<string>>(new Set());
 
   // Update URL params when filters change
   useEffect(() => {
@@ -204,16 +208,86 @@ export default function CreativeAuditPage() {
     })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [entries]);
 
-  // Multiple attempts detection
-  const multipleAttempts = useMemo(() => {
-    const correlations: Record<string, number> = {};
+  // Group entries by correlation_id for the UI list
+  const groupedEntries = useMemo(() => {
+    const cidMap: Record<string, AuditTrail[]> = {};
+    const flat: (AuditTrail & { isGroup?: boolean; children?: AuditTrail[] })[] = [];
+
     entries.forEach(entry => {
       if (entry.correlation_id) {
-        correlations[entry.correlation_id] = (correlations[entry.correlation_id] || 0) + 1;
+        if (!cidMap[entry.correlation_id]) cidMap[entry.correlation_id] = [];
+        cidMap[entry.correlation_id].push(entry);
+      } else {
+        flat.push(entry);
       }
     });
-    return Object.entries(correlations).filter(([_, v]) => v > 1).length;
+
+    // For each group, the representative is the most recent one
+    Object.keys(cidMap).forEach(cid => {
+      const sorted = [...cidMap[cid]].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      flat.push({
+        ...sorted[0],
+        isGroup: sorted.length > 1,
+        children: sorted
+      });
+    });
+
+    return flat.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }, [entries]);
+
+  // Multiple attempts detection
+  const multipleAttempts = useMemo(() => {
+    return Object.values(retryCountByCorrelation).filter(v => v > 1).length;
+  }, [retryCountByCorrelation]);
+
+  const saveRecurrenceThreshold = () => {
+    localStorage.setItem("creative_audit_recurrence_threshold", String(recurrenceThreshold));
+    toast.success(`Limite de recorrência padrão salvo como ${recurrenceThreshold}`);
+  };
+
+  const toggleCorrelationExpansion = (cid: string) => {
+    const next = new Set(expandedCorrelations);
+    if (next.has(cid)) next.delete(cid);
+    else next.add(cid);
+    setExpandedCorrelations(next);
+  };
+
+  const exportComparison = (format: "json" | "csv") => {
+    if (compareEntries.length !== 2) return;
+    
+    const content = format === "json" 
+      ? JSON.stringify({ comparison: compareEntries, timestamp: new Date().toISOString() }, null, 2)
+      : [
+          ["ID", "Step", "Action", "Correlation", "Params"],
+          ...compareEntries.map(e => [e.id, e.step, e.action, e.correlation_id || "", JSON.stringify(e.params)])
+        ].map(row => row.join(",")).join("\n");
+
+    const blob = new Blob([content], { type: format === "json" ? "application/json" : "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `audit-comparison-${Date.now()}.${format}`;
+    link.click();
+    toast.success("Comparação exportada");
+  };
+
+  const getDiffProbableCauses = () => {
+    if (compareEntries.length !== 2) return [];
+    const [a, b] = compareEntries;
+    const causes = [];
+    
+    if (JSON.stringify(a.params) !== JSON.stringify(b.params)) {
+      causes.push("Diferença nos parâmetros de entrada detectada.");
+    }
+    if (a.step !== b.step) {
+      causes.push("Eventos ocorridos em etapas diferentes do fluxo.");
+    }
+    if (a.params?.error && b.params?.error && a.params.error.message !== b.params.error.message) {
+      causes.push("Mensagens de erro distintas sugerem falhas em sub-processos diferentes.");
+    }
+    
+    return causes.length > 0 ? causes : ["Padrões técnicos idênticos - possível falha intermitente de ambiente."];
+  };
 
   const loadTimeline = async (correlationId: string) => {
     setIsTimelineLoading(true);
@@ -441,6 +515,9 @@ export default function CreativeAuditPage() {
                 onChange={(e) => setRecurrenceThreshold(Number(e.target.value))}
                 className="w-12 bg-transparent text-xs font-bold border-none focus:ring-0"
               />
+              <Button variant="ghost" size="icon" className="h-5 w-5 ml-1" onClick={saveRecurrenceThreshold} title="Salvar como padrão">
+                <Save className="h-3 w-3" />
+              </Button>
             </div>
             {recurrentFailures.length > 0 && (
               <Button 
@@ -535,67 +612,112 @@ export default function CreativeAuditPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  entries.map((entry) => {
+                  groupedEntries.map((entry) => {
                     const retries = entry.correlation_id ? retryCountByCorrelation[entry.correlation_id] : 0;
                     const isSelectedForCompare = !!compareEntries.find(e => e.id === entry.id);
+                    const isExpanded = entry.correlation_id && expandedCorrelations.has(entry.correlation_id);
                     
                     return (
-                      <TableRow 
-                        key={entry.id} 
-                        className={`cursor-pointer transition-colors ${isSelectedForCompare ? 'bg-primary/10' : 'hover:bg-muted/50'}`}
-                        onClick={() => setSelectedEntry(entry)}
-                      >
-                        <TableCell className="text-xs font-medium">
-                          {new Date(entry.created_at).toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-xs truncate max-w-[150px]" title={entry.user_email}>
-                          {entry.user_email || "Usuário não identificado"}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{entry.step}</Badge>
-                        </TableCell>
-                        <TableCell className="text-xs font-mono">
-                          {entry.action}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col gap-0.5">
+                      <>
+                        <TableRow 
+                          key={entry.id} 
+                          className={`cursor-pointer transition-colors ${isSelectedForCompare ? 'bg-primary/10' : 'hover:bg-muted/50'} ${entry.isGroup ? 'bg-accent/5' : ''}`}
+                          onClick={() => entry.isGroup ? toggleCorrelationExpansion(entry.correlation_id!) : setSelectedEntry(entry)}
+                        >
+                          <TableCell className="text-xs font-medium">
                             <div className="flex items-center gap-2">
-                              {entry.correlation_id && (
-                                <span className="text-[10px] text-muted-foreground">C: {entry.correlation_id}</span>
+                              {entry.isGroup && (
+                                <ChevronRight className={`h-3 w-3 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
                               )}
-                              {retries > 1 && (
-                                <Badge variant="secondary" className="h-4 px-1 text-[8px] bg-yellow-500/10 text-yellow-600 border-yellow-500/20">
-                                  {retries}x
-                                </Badge>
+                              {new Date(entry.created_at).toLocaleString()}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-xs truncate max-w-[150px]" title={entry.user_email}>
+                            {entry.user_email || "Usuário não identificado"}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{entry.step}</Badge>
+                          </TableCell>
+                          <TableCell className="text-xs font-mono">
+                            {entry.action}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col gap-0.5">
+                              <div className="flex items-center gap-2">
+                                {entry.correlation_id && (
+                                  <span className="text-[10px] text-muted-foreground">C: {entry.correlation_id}</span>
+                                )}
+                                {retries > 1 && (
+                                  <Badge variant="secondary" className="h-4 px-1 text-[8px] bg-yellow-500/10 text-yellow-600 border-yellow-500/20">
+                                    {retries}x tentativas
+                                  </Badge>
+                                )}
+                              </div>
+                              {entry.trace_id && (
+                                <span className="text-[10px] text-muted-foreground">T: {entry.trace_id}</span>
                               )}
                             </div>
-                            {entry.trace_id && (
-                              <span className="text-[10px] text-muted-foreground">T: {entry.trace_id}</span>
-                            )}
-                            {!entry.correlation_id && !entry.trace_id && (
-                              <span className="text-[10px] text-muted-foreground italic">N/A</span>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Button 
-                            variant={isSelectedForCompare ? "default" : "ghost"} 
-                            size="icon" 
-                            className="h-7 w-7"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleComparison(entry);
-                            }}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Button 
+                              variant={isSelectedForCompare ? "default" : "ghost"} 
+                              size="icon" 
+                              className="h-7 w-7"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleComparison(entry);
+                              }}
+                            >
+                              <Copy className="h-3.5 w-3.5" />
+                            </Button>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button variant="ghost" size="icon">
+                              <ChevronRight className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                        
+                        {isExpanded && entry.children && entry.children.slice(1).map(child => (
+                          <TableRow 
+                            key={child.id} 
+                            className="bg-accent/5 hover:bg-muted/30 border-l-2 border-l-primary/30"
+                            onClick={() => setSelectedEntry(child)}
                           >
-                            <Copy className="h-3.5 w-3.5" />
-                          </Button>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="icon">
-                            <ChevronRight className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
+                            <TableCell className="pl-8 text-[10px] font-medium opacity-70">
+                              {new Date(child.created_at).toLocaleString()}
+                            </TableCell>
+                            <TableCell className="text-[10px] opacity-70 truncate max-w-[150px]">
+                              {child.user_email || "---"}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="text-[10px] h-4">{child.step}</Badge>
+                            </TableCell>
+                            <TableCell className="text-[10px] font-mono opacity-70">
+                              {child.action}
+                            </TableCell>
+                            <TableCell>
+                              <span className="text-[10px] opacity-50">T: {child.trace_id}</span>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Button 
+                                variant={!!compareEntries.find(e => e.id === child.id) ? "default" : "ghost"} 
+                                size="icon" 
+                                className="h-6 w-6"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleComparison(child);
+                                }}
+                              >
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <ChevronRight className="h-3 w-3 ml-auto opacity-30" />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </>
                     );
                   })
                 )}
@@ -755,49 +877,81 @@ export default function CreativeAuditPage() {
 
       {/* Comparison Modal */}
       <Sheet open={isComparing} onOpenChange={() => setIsComparing(false)}>
-        <SheetContent className="sm:max-w-4xl overflow-y-auto">
+        <SheetContent className="sm:max-w-5xl overflow-y-auto">
           <SheetHeader>
-            <SheetTitle className="flex items-center gap-2">
-              <ArrowLeftRight className="h-5 w-5 text-primary" /> Comparação Técnica
-            </SheetTitle>
+            <div className="flex items-center justify-between">
+              <SheetTitle className="flex items-center gap-2">
+                <ArrowLeftRight className="h-5 w-5 text-primary" /> Comparação Técnica Avançada
+              </SheetTitle>
+              <div className="flex gap-2 mr-6">
+                <Button variant="outline" size="sm" onClick={() => exportComparison("json")}>
+                  <FileDown className="h-3 w-3 mr-1" /> JSON
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => exportComparison("csv")}>
+                  <FileDown className="h-3 w-3 mr-1" /> CSV
+                </Button>
+              </div>
+            </div>
             <SheetDescription>
-              Comparando dois eventos selecionados para identificar discrepâncias.
+              Comparação detalhada com destaque de discrepâncias de parâmetros e causas prováveis.
             </SheetDescription>
           </SheetHeader>
           
-          <div className="mt-8 grid grid-cols-2 gap-6">
-            {compareEntries.map((entry, idx) => (
-              <div key={entry.id} className="space-y-6">
-                <div className="p-3 bg-accent/20 rounded-md border flex justify-between items-center">
-                  <h4 className="font-bold text-sm">Evento #{idx + 1}</h4>
-                  <Badge variant="outline">{new Date(entry.created_at).toLocaleTimeString()}</Badge>
-                </div>
-                
-                <div className="space-y-1">
-                  <p className="text-[10px] text-muted-foreground uppercase font-bold">Ação</p>
-                  <p className="text-xs font-mono bg-muted p-2 rounded truncate" title={entry.action}>{entry.action}</p>
-                </div>
+          <div className="mt-6 p-4 bg-primary/5 rounded-md border border-primary/20">
+            <h4 className="text-sm font-bold flex items-center gap-2 mb-2">
+              <AlertCircle className="h-4 w-4" /> Causas Prováveis da Divergência
+            </h4>
+            <ul className="list-disc list-inside text-xs space-y-1">
+              {getDiffProbableCauses().map((cause, i) => (
+                <li key={i}>{cause}</li>
+              ))}
+            </ul>
+          </div>
 
-                <div className="space-y-1">
-                  <p className="text-[10px] text-muted-foreground uppercase font-bold">Correlation ID</p>
-                  <code className="text-[10px] block bg-accent/50 p-1 rounded">{entry.correlation_id || "N/A"}</code>
-                </div>
-
-                <div className="space-y-2">
-                  <p className="text-[10px] text-muted-foreground uppercase font-bold">Parâmetros Principais</p>
-                  <div className="bg-black/95 text-green-400 p-3 rounded-md overflow-x-auto font-mono text-[10px] h-[300px]">
-                    <pre>{JSON.stringify(entry.params, null, 2)}</pre>
+          <div className="mt-6 grid grid-cols-2 gap-6">
+            {compareEntries.map((entry, idx) => {
+              const other = compareEntries[idx === 0 ? 1 : 0];
+              
+              return (
+                <div key={entry.id} className="space-y-6">
+                  <div className="p-3 bg-accent/20 rounded-md border flex justify-between items-center">
+                    <h4 className="font-bold text-sm">Evento #{idx + 1}</h4>
+                    <Badge variant="outline">{new Date(entry.created_at).toLocaleString()}</Badge>
                   </div>
-                </div>
-
-                {entry.params?.error && (
-                  <div className="p-2 border border-destructive/30 bg-destructive/5 rounded-md">
-                    <p className="text-[10px] font-bold text-destructive uppercase">Erro Detectado</p>
-                    <p className="text-xs text-destructive">{entry.params.error.message}</p>
+                  
+                  <div className="space-y-1">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold">Ação</p>
+                    <p className={`text-xs font-mono p-2 rounded truncate border ${entry.action !== other.action ? 'border-yellow-500/50 bg-yellow-500/5' : 'bg-muted'}`} title={entry.action}>
+                      {entry.action}
+                    </p>
                   </div>
-                )}
-              </div>
-            ))}
+
+                  <div className="space-y-1">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold">Parâmetros (Com Destaque)</p>
+                    <div className="bg-black/95 p-3 rounded-md overflow-x-auto font-mono text-[10px] h-[400px]">
+                      {Object.keys(entry.params || {}).map(key => {
+                        const val = entry.params[key];
+                        const otherVal = other.params?.[key];
+                        const isDiff = JSON.stringify(val) !== JSON.stringify(otherVal);
+                        
+                        return (
+                          <div key={key} className={`mb-1 ${isDiff ? 'text-yellow-400 font-bold bg-yellow-400/10' : 'text-green-400 opacity-70'}`}>
+                            {key}: {JSON.stringify(val, null, 2)}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {entry.params?.error && (
+                    <div className="p-2 border border-destructive/30 bg-destructive/5 rounded-md">
+                      <p className="text-[10px] font-bold text-destructive uppercase">Erro Detectado</p>
+                      <p className="text-xs text-destructive">{entry.params.error.message}</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </SheetContent>
       </Sheet>
