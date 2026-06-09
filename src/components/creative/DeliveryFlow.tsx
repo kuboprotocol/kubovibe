@@ -348,19 +348,59 @@ function AuditHistoryManager({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="filtered">Todos os resultados filtrados ({filteredLogs.length})</SelectItem>
-                  <SelectItem value="current_page">Apenas a página atual ({paginatedLogs.length})</SelectItem>
+                  <SelectItem value="current_page">Apenas a página atual (Pág. {currentPage})</SelectItem>
+                  <SelectItem value="range">Intervalo de páginas</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
+            {exportMode === "range" && (
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-[10px] text-muted-foreground uppercase">De (Página)</label>
+                  <Input 
+                    type="number" 
+                    min={1} 
+                    max={totalPages} 
+                    value={exportRange.start} 
+                    onChange={e => setExportRange(prev => ({ ...prev, start: Math.max(1, parseInt(e.target.value) || 1) }))}
+                    className="h-8 text-xs"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] text-muted-foreground uppercase">Até (Página)</label>
+                  <Input 
+                    type="number" 
+                    min={exportRange.start} 
+                    max={totalPages} 
+                    value={exportRange.end} 
+                    onChange={e => setExportRange(prev => ({ ...prev, end: Math.min(totalPages, Math.max(exportRange.start, parseInt(e.target.value) || 1)) }))}
+                    className="h-8 text-xs"
+                  />
+                </div>
+              </div>
+            )}
+
             <div className="p-4 rounded-lg bg-muted/50 border border-border/40 space-y-2">
               <div className="flex justify-between text-xs">
                 <span className="text-muted-foreground">Registros a exportar:</span>
-                <span className="font-bold">{exportMode === "current_page" ? paginatedLogs.length : filteredLogs.length}</span>
+                <span className="font-bold">
+                  {exportMode === "current_page" ? paginatedLogs.length : 
+                   exportMode === "range" ? Math.min(filteredLogs.length, (exportRange.end - exportRange.start + 1) * itemsPerPage) : 
+                   filteredLogs.length}
+                </span>
               </div>
               <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Filtro de busca:</span>
-                <span className="font-bold truncate max-w-[150px]">{searchTerm || "Nenhum"}</span>
+                <span className="text-muted-foreground">Escopo / Páginas:</span>
+                <span className="font-bold">
+                  {exportMode === "current_page" ? `Página ${currentPage}` : 
+                   exportMode === "range" ? `Páginas ${exportRange.start} a ${exportRange.end}` : 
+                   `Todas (${totalPages} págs)`}
+                </span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Colunas incluídas:</span>
+                <span className="font-bold">{visibleColumns.length} colunas</span>
               </div>
               <div className="flex justify-between text-xs">
                 <span className="text-muted-foreground">Status:</span>
