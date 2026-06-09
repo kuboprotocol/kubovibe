@@ -106,6 +106,7 @@ export default function CreativeAuditPage() {
     const saved = localStorage.getItem("creative_audit_recurrence_threshold");
     return saved ? Number(saved) : 2;
   });
+  const [showConfig, setShowConfig] = useState(false);
   const [expandedCorrelations, setExpandedCorrelations] = useState<Set<string>>(new Set());
 
   // Update URL params when filters change
@@ -307,7 +308,6 @@ export default function CreativeAuditPage() {
   const exportComparison = (format: "json" | "csv") => {
     if (compareEntries.length !== 2) return;
     
-    // Load full timelines for both entries if they have correlation IDs
     const getTimeline = async (entry: AuditTrail) => {
       if (!entry.correlation_id) return [entry];
       const { data } = await supabase
@@ -323,16 +323,41 @@ export default function CreativeAuditPage() {
       const timeline2 = await getTimeline(compareEntries[1]);
       const causes = getDiffProbableCauses();
 
+      // Only compare top-level keys that exist in both for a cleaner export
+      const allKeys = new Set([...Object.keys(compareEntries[0].params || {}), ...Object.keys(compareEntries[1].params || {})]);
+      const comparedParams: any = {};
+      allKeys.forEach(key => {
+        const val1 = compareEntries[0].params?.[key];
+        const val2 = compareEntries[1].params?.[key];
+        if (JSON.stringify(val1) !== JSON.stringify(val2)) {
+          comparedParams[key] = { event1: val1, event2: val2, changed: true };
+        } else {
+          comparedParams[key] = { value: val1, changed: false };
+        }
+      });
+
       let content: string;
       let mime: string;
 
       if (format === "json") {
         content = JSON.stringify({ 
           comparison: {
-            event1: { ...compareEntries[0], full_timeline: timeline1 },
-            event2: { ...compareEntries[1], full_timeline: timeline2 }
+            event1: { 
+              id: compareEntries[0].id, 
+              action: compareEntries[0].action,
+              created_at: compareEntries[0].created_at,
+              full_timeline: timeline1 
+            },
+            event2: { 
+              id: compareEntries[1].id, 
+              action: compareEntries[1].action,
+              created_at: compareEntries[1].created_at,
+              full_timeline: timeline2 
+            },
+            compared_parameters: comparedParams
           }, 
           probable_causes: causes,
+          filters_state: { search, step, status, startDate, endDate },
           timestamp: new Date().toISOString() 
         }, null, 2);
         mime = "application/json";
@@ -341,7 +366,8 @@ export default function CreativeAuditPage() {
         const rows = [
           ...timeline1.map(e => ["Event 1 Timeline", e.id, e.step, e.action, e.correlation_id || "", JSON.stringify(e.params).replace(/"/g, '""'), e.created_at]),
           ...timeline2.map(e => ["Event 2 Timeline", e.id, e.step, e.action, e.correlation_id || "", JSON.stringify(e.params).replace(/"/g, '""'), e.created_at]),
-          ["PROBABLE CAUSES", causes.join("; "), "", "", "", "", ""]
+          ["PROBABLE CAUSES", causes.join("; "), "", "", "", "", ""],
+          ["FILTERS", `Search: ${search} | Step: ${step} | Status: ${status} | Start: ${startDate} | End: ${endDate}`, "", "", "", "", ""]
         ].map(row => row.map(v => `"${v}"`).join(","));
 
         content = [headers.join(","), ...rows].join("\n");
@@ -352,9 +378,9 @@ export default function CreativeAuditPage() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `audit-comparison-full-${Date.now()}.${format}`;
+      link.download = `audit-comparison-snapshot-${Date.now()}.${format}`;
       link.click();
-      toast.success("Comparação detalhada exportada");
+      toast.success("Comparação e estado dos filtros exportados");
     };
 
     handleExport();
@@ -597,14 +623,8 @@ export default function CreativeAuditPage() {
           <div className="flex flex-wrap items-center gap-4 mb-4">
             <div className="flex items-center gap-2 bg-accent/20 px-3 py-1 rounded-full border">
               <span className="text-xs font-medium">Limite de Recorrência:</span>
-              <input 
-                type="number" 
-                min="1" 
-                value={recurrenceThreshold}
-                onChange={(e) => setRecurrenceThreshold(Number(e.target.value))}
-                className="w-12 bg-transparent text-xs font-bold border-none focus:ring-0"
-              />
-              <Button variant="ghost" size="icon" className="h-5 w-5 ml-1" onClick={saveRecurrenceThreshold} title="Salvar como padrão">
+              <span className="text-xs font-bold">{recurrenceThreshold}x</span>
+              <Button variant="ghost" size="icon" className="h-5 w-5 ml-1" onClick={() => setShowConfig(true)} title="Configurar limite padrão">
                 <Save className="h-3 w-3" />
               </Button>
             </div>
@@ -1062,6 +1082,38 @@ export default function CreativeAuditPage() {
                   </div>
                 );
               })}
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+      {/* Config Modal */}
+      <Sheet open={showConfig} onOpenChange={() => setShowConfig(false)}>
+        <SheetContent className="sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <Save className="h-5 w-5 text-primary" /> Configurações de Auditoria
+            </SheetTitle>
+            <SheetDescription>
+              Defina parâmetros padrão que persistem entre suas visitas.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="mt-6 space-y-6">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Limite Padrão de Recorrência</label>
+              <div className="flex gap-2">
+                <Input 
+                  type="number" 
+                  min="1" 
+                  value={recurrenceThreshold}
+                  onChange={(e) => setRecurrenceThreshold(Number(e.target.value))}
+                />
+                <Button onClick={() => { saveRecurrenceThreshold(); setShowConfig(false); }}>
+                  Salvar
+                </Button>
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                Alertas de falhas recorrentes aparecerão quando uma causa atingir este número de ocorrências.
+              </p>
             </div>
           </div>
         </SheetContent>
