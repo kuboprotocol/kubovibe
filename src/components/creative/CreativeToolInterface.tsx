@@ -1205,48 +1205,72 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
 
       {/* Reexecute Dialog */}
       <Dialog open={reexecuteDialogOpen} onOpenChange={setReexecuteDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md bg-card border-border/40">
           <DialogHeader>
-            <DialogTitle>Retomar Execução</DialogTitle>
+            <DialogTitle>Retomar Geração</DialogTitle>
             <DialogDescription>
-              Escolha a partir de qual etapa você deseja retomar a geração.
+              Escolha a partir de qual etapa você deseja retomar a execução para economizar tempo.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4 space-y-4">
-            <div className="space-y-2">
-              <Label className="text-xs">Etapa de início</Label>
-              <Select value={startAtStep} onValueChange={(v: AvatarStepKey) => setStartAtStep(v)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="upload">Upload (Reiniciar tudo)</SelectItem>
-                  <SelectItem value="convert">Conversão (Processar arquivo)</SelectItem>
-                  <SelectItem value="generate">Geração (Pedir à IA)</SelectItem>
-                  <SelectItem value="render">Renderização (Finalizar)</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-[10px] text-muted-foreground italic">
-                * Retomar de etapas avançadas economiza tempo se o arquivo e parâmetros forem os mesmos.
-              </p>
+          
+          <div className="space-y-6 py-4">
+            <div className="relative flex flex-col gap-4">
+               {(["upload", "convert", "generate", "render"] as AvatarStepKey[]).map((step, idx, arr) => {
+                 const isCompleted = reexecuteItem?.logs?.find((s: any) => s.key === step)?.status === "done";
+                 return (
+                   <div key={step} className="flex items-center gap-4 relative">
+                     {idx < arr.length - 1 && (
+                       <div className="absolute left-[15px] top-[30px] w-[2px] h-[20px] bg-border" />
+                     )}
+                     <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 shrink-0 ${isCompleted ? 'bg-primary/10 border-primary text-primary' : 'border-muted text-muted-foreground'}`}>
+                        {idx + 1}
+                     </div>
+                     <div className="flex-1 flex justify-between items-center">
+                       <div>
+                         <p className="text-sm font-medium capitalize">{step}</p>
+                         <p className="text-[10px] text-muted-foreground">{isCompleted ? "Concluído anteriormente" : "Pendente"}</p>
+                       </div>
+                       <Button 
+                        size="sm" 
+                        variant={startAtStep === step ? "default" : "outline"}
+                        className="h-7 text-[10px]"
+                        onClick={() => setStartAtStep(step)}
+                       >
+                         {startAtStep === step ? "Selecionado" : "Iniciar aqui"}
+                       </Button>
+                     </div>
+                   </div>
+                 );
+               })}
             </div>
+            
             <div className="p-3 bg-muted/50 rounded-lg text-xs space-y-1">
               <p className="font-bold">Parâmetros originais:</p>
-              <p className="opacity-70">Prompt: {reexecuteItem?.prompt}</p>
-              {reexecuteItem?.metadata?.preset && <p className="opacity-70">Preset: {reexecuteItem.metadata.preset.name}</p>}
+              <p className="opacity-70 truncate">Prompt: {reexecuteItem?.prompt}</p>
             </div>
           </div>
+
           <DialogFooter>
             <Button variant="ghost" onClick={() => setReexecuteDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={() => {
+            <Button onClick={async () => {
               if (reexecuteItem) {
+                setLoading(true);
                 setPrompt(reexecuteItem.prompt);
-                if (reexecuteItem.metadata?.preset) setAvatarPreset(reexecuteItem.metadata.preset);
-                handleExecute();
+                setMetadata(reexecuteItem.metadata || {});
+                
+                // Se retomar, usamos os logs anteriores como base para persistir status de 'done'
+                const initialSteps = startAtStep !== "upload" ? reexecuteItem.logs : undefined;
+                const needsConvert = reexecuteItem.logs?.find((s: any) => s.key === "convert")?.status !== "skipped";
+                
+                setProgressSteps(buildSteps(needsConvert, reexecuteItem.metadata, initialSteps));
                 setReexecuteDialogOpen(false);
+                
+                toast.info(`Retomando de: ${startAtStep}`);
+                await handleExecute();
+                setLoading(false);
               }
             }}>
-              Confirmar Retomada
+              <PlayCircle className="h-4 w-4 mr-2" /> Iniciar Retomada
             </Button>
           </DialogFooter>
         </DialogContent>
