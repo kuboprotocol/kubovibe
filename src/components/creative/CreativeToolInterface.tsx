@@ -310,16 +310,19 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     }
   };
 
-  const handleCropConfirm = async (blob: Blob) => {
+  const handleCropConfirm = async (blob: Blob, preset: { zoom: number; aspect: number }) => {
     try {
       const publicUrl = await uploadBlobToStorage(blob, "png");
       setUploadedImageUrl(publicUrl);
+      setAvatarPreset(preset);
+      localStorage.setItem("creative_avatar_preset", JSON.stringify(preset));
       updateStep("upload", "done");
       setCropOpen(false);
       if (cropSourceUrl) URL.revokeObjectURL(cropSourceUrl);
       setCropSourceUrl(null);
       toast.success("Avatar ajustado e salvo!");
     } catch (error: any) {
+      updateStep("upload", "error", error.message);
       toast.error("Falha ao salvar recorte: " + error.message);
     }
   };
