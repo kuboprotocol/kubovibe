@@ -442,11 +442,22 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
     toast.success("Relatório de auditoria gerado e baixado");
   };
 
-  const filteredHistory = history.filter(item => {
-    const matchesSearch = item.commit.toLowerCase().includes(historySearch.toLowerCase());
-    const matchesFilter = historyFilter === "all" || item.environment === historyFilter;
-    return matchesSearch && matchesFilter;
-  });
+  const filteredHistory = useMemo(() => {
+    return history.filter(item => {
+      const matchesCommit = item.commit.toLowerCase().includes(historySearch.toLowerCase());
+      const matchesUser = (item.user || "admin").toLowerCase().includes(historyUserSearch.toLowerCase());
+      const matchesEnv = historyFilter === "all" || item.environment === historyFilter;
+      const matchesStatus = historyStatusFilter === "all" || item.status === historyStatusFilter;
+      return matchesCommit && matchesUser && matchesEnv && matchesStatus;
+    });
+  }, [history, historySearch, historyUserSearch, historyFilter, historyStatusFilter]);
+
+  const paginatedHistory = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredHistory.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredHistory, currentPage]);
+
+  const totalPages = Math.ceil(filteredHistory.length / itemsPerPage);
 
   return (
     <Card className="p-6 bg-card/50 backdrop-blur-xl border-primary/20 shadow-2xl overflow-hidden">
