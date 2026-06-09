@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
@@ -94,6 +95,310 @@ interface AuditLog {
 }
 
 
+
+interface AuditHistoryManagerProps {
+  logs: AuditLog[];
+  filterByAttachment?: string;
+  title?: string;
+  showFilters?: boolean;
+  userRole: string;
+  originalApprover?: string;
+}
+
+function AuditHistoryManager({ 
+  logs, 
+  filterByAttachment, 
+  title, 
+  showFilters = true, 
+  userRole,
+  originalApprover 
+}: AuditHistoryManagerProps) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [userFilter, setUserFilter] = useState<string>("all");
+  const [attachmentFilter, setAttachmentFilter] = useState<string>("all");
+  const [sortField, setSortField] = useState<"timestamp" | "attachmentName" | "status">("timestamp");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  const isAdmin = userRole === "admin";
+  const isDev = userRole === "developer";
+  const isOriginalApprover = originalApprover && userRole === originalApprover;
+  const canViewHistory = isAdmin || isDev || isOriginalApprover;
+
+  const filteredLogs = useMemo(() => {
+    if (!canViewHistory) return [];
+    
+    return logs
+      .filter(log => {
+        const matchesSearch = searchTerm === "" || 
+          log.user.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          log.attachmentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          log.reason.toLowerCase().includes(searchTerm.toLowerCase());
+        
+        const matchesStatus = statusFilter === "all" || log.status === statusFilter;
+        const matchesUser = userFilter === "all" || log.user === userFilter;
+        const matchesAttachment = (filterByAttachment ? log.attachmentName === filterByAttachment : true) && 
+                                  (attachmentFilter === "all" || log.attachmentName === attachmentFilter);
+        
+        return matchesSearch && matchesStatus && matchesUser && matchesAttachment;
+      })
+      .sort((a, b) => {
+        let comparison = 0;
+        if (sortField === "timestamp") {
+          comparison = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+        } else if (sortField === "attachmentName") {
+          comparison = a.attachmentName.localeCompare(b.attachmentName);
+        } else if (sortField === "status") {
+          comparison = a.status.localeCompare(b.status);
+        }
+        return sortOrder === "desc" ? -comparison : comparison;
+      });
+  }, [logs, searchTerm, statusFilter, userFilter, attachmentFilter, sortField, sortOrder, filterByAttachment, canViewHistory]);
+
+  const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
+  const paginatedLogs = filteredLogs.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  const exportToCSV = () => {
+    const headers = ["ID", "Timestamp", "Ação", "Usuário", "Anexo", "Motivo", "Status"];
+    const rows = filteredLogs.map(log => [
+      log.id,
+      new Date(log.timestamp).toLocaleString(),
+      log.action,
+      log.user,
+      log.attachmentName,
+      log.reason,
+      log.status
+    ]);
+    
+    const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `audit_log_${new Date().toISOString()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Histórico exportado para CSV");
+  };
+
+  const exportToPDF = async () => {
+    try {
+      const { default: jsPDF } = await import("jspdf");
+      const { default: autoTable } = await import("jspdf-autotable");
+      
+      const doc = new jsPDF();
+      doc.text(title || "Relatório de Auditoria", 14, 15);
+      
+      const tableData = filteredLogs.map(log => [
+        new Date(log.timestamp).toLocaleString(),
+        log.user,
+        log.attachmentName,
+        log.action,
+        log.status
+      ]);
+
+      (autoTable as any)(doc, {
+        head: [['Timestamp', 'Usuário', 'Anexo', 'Ação', 'Status']],
+        body: tableData,
+        startY: 20,
+      });
+      
+      doc.save(`audit_log_${new Date().toISOString()}.pdf`);
+      toast.success("Relatório PDF gerado com sucesso");
+    } catch (error) {
+      console.error("PDF export error:", error);
+      toast.error("Erro ao gerar PDF");
+    }
+  };
+
+  const uniqueUsers = Array.from(new Set(logs.map(l => l.user)));
+  const uniqueAttachments = Array.from(new Set(logs.map(l => l.attachmentName)));
+
+  if (!canViewHistory) {
+    return (
+      <div className="p-8 text-center border rounded-lg bg-destructive/5 border-destructive/20">
+        <ShieldAlert className="h-8 w-8 mx-auto mb-2 text-destructive" />
+        <h4 className="text-sm font-bold text-destructive">Acesso Restrito</h4>
+        <p className="text-xs text-muted-foreground">Você não tem permissão para visualizar este histórico de auditoria.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {showFilters && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+          <div className="relative md:col-span-2">
+            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por usuário, anexo ou motivo..."
+              className="pl-8 h-8 text-[11px]"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="h-8 text-[11px]">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos Status</SelectItem>
+              <SelectItem value="success">Sucesso</SelectItem>
+              <SelectItem value="denied">Negado</SelectItem>
+              <SelectItem value="info">Info</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="flex gap-1">
+            <Button variant="outline" size="sm" className="h-8 px-2" onClick={exportToCSV} title="CSV">
+              <FileSpreadsheet className="h-3.5 w-3.5" />
+            </Button>
+            <Button variant="outline" size="sm" className="h-8 px-2" onClick={exportToPDF} title="PDF">
+              <FileText className="h-3.5 w-3.5" />
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 px-2">
+                  <Filter className="h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Filtros Avançados</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <div className="p-2 space-y-2">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase">Usuário</p>
+                    <Select value={userFilter} onValueChange={setUserFilter}>
+                      <SelectTrigger className="h-7 text-[10px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos Usuários</SelectItem>
+                        {uniqueUsers.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {!filterByAttachment && (
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-medium text-muted-foreground uppercase">Anexo</p>
+                      <Select value={attachmentFilter} onValueChange={setAttachmentFilter}>
+                        <SelectTrigger className="h-7 text-[10px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos Anexos</SelectItem>
+                          {uniqueAttachments.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase">Ordenar por</p>
+                    <div className="flex gap-1">
+                      <Select value={sortField} onValueChange={(v: any) => setSortField(v)}>
+                        <SelectTrigger className="h-7 text-[10px] flex-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="timestamp">Data</SelectItem>
+                          <SelectItem value="attachmentName">Anexo</SelectItem>
+                          <SelectItem value="status">Status</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-7 w-7 p-0" 
+                        onClick={() => setSortOrder(prev => prev === "asc" ? "desc" : "asc")}
+                      >
+                        {sortOrder === "asc" ? "↑" : "↓"}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      )}
+
+      <ScrollArea className={cn("rounded-md border border-border/20 bg-background/50", showFilters ? "h-[350px]" : "h-40")}>
+        <div className="p-2 space-y-2">
+          {paginatedLogs.length === 0 && (
+            <p className="text-[10px] text-center text-muted-foreground italic py-8">Nenhum registro encontrado.</p>
+          )}
+          {paginatedLogs.map((log) => (
+            <div
+              key={log.id}
+              className={`text-[10px] rounded border p-2 flex items-start gap-2 ${
+                log.status === "success" ? "border-emerald-500/20 bg-emerald-500/5" :
+                log.status === "denied" ? "border-red-500/20 bg-red-500/5" : "border-border/30 bg-muted/20"
+              }`}
+            >
+              <div className={cn(
+                "h-5 w-5 rounded-full flex items-center justify-center shrink-0",
+                log.status === "success" ? "bg-emerald-500/10 text-emerald-500" :
+                log.status === "denied" ? "bg-red-500/10 text-red-500" : "bg-primary/10 text-primary"
+              )}>
+                {log.status === "success" ? <Check className="h-3 w-3" /> :
+                 log.status === "denied" ? <Lock className="h-3 w-3" /> : <Activity className="h-3 w-3" />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-bold">
+                    {log.action === "download_authorized" ? "Download Autorizado" :
+                     log.action === "download_denied" ? "Acesso Negado" : 
+                     log.action === "retention_cleanup" ? "Limpeza" : "Solicitado"}
+                    {" · "}
+                    <span className="text-muted-foreground font-mono">{log.user}</span>
+                  </span>
+                  <span className="text-[9px] text-muted-foreground shrink-0 flex items-center gap-1">
+                    <Clock className="h-2.5 w-2.5" /> {new Date(log.timestamp).toLocaleString()}
+                  </span>
+                </div>
+                <div className="text-muted-foreground truncate mt-0.5">
+                  <span className="font-medium text-foreground">{log.attachmentName}</span>
+                </div>
+                <div className="text-[9px] text-muted-foreground italic mt-0.5">
+                  {log.reason}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </ScrollArea>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between px-1">
+          <p className="text-[9px] text-muted-foreground">Mostrando {paginatedLogs.length} de {filteredLogs.length} registros</p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 px-2 text-[10px]"
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(p => p - 1)}
+            >
+              Anterior
+            </Button>
+            <span className="text-[10px]">Pág {currentPage} / {totalPages}</span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 px-2 text-[10px]"
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage(p => p + 1)}
+            >
+              Próxima
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function DeliveryFlow() {
   const [isDeploying, setIsDeploying] = useState(false);
@@ -501,80 +806,103 @@ export function DeliveryFlow() {
     toast.success(`Logs exportados em ${format.toUpperCase()}`);
   };
 
-  const downloadAuditSummary = (historyItem: DeployHistoryItem) => {
-    const detailedEvidence = (historyItem as any).detailedEvidence as EvidenceFile[] || [];
-    
-    // Simulating full Audit PDF summary with embedded evidence links and thumbnails
-    const summary = `
-=========================================
-RELATÓRIO DE AUDITORIA DE DEPLOY (PDF SIMULATED)
-=========================================
-Identificador Único: ${historyItem.id}
-Data e Hora: ${new Date(historyItem.date).toLocaleString()}
-Responsável: ${historyItem.user?.toUpperCase() || "ADMIN"}
------------------------------------------
-RESUMO DA EXECUÇÃO
------------------------------------------
-Ambiente: ${historyItem.environment.toUpperCase()}
-Status Final: ${historyItem.status.toUpperCase()}
-Versão (Commit): ${historyItem.commit}
-URL Pública: ${historyItem.pwaUrl}
-HTTPS: HABILITADO E VERIFICADO
-Health-Check: ${historyItem.healthStatus?.toUpperCase() || "NÃO EXECUTADO"}
-Detalhes Health: ${historyItem.healthDetails || "N/A"}
------------------------------------------
-DETALHES DE APROVAÇÃO (PRODUÇÃO)
------------------------------------------
-Responsável: ${historyItem.user || "Admin"}
-Comentário: ${historyItem.parameters.approvalComment || "N/A"}
-Termos Aceitos: ${historyItem.parameters.approvalTerms ? "SIM" : "NÃO"}
+  const downloadAuditSummary = async (historyItem: DeployHistoryItem) => {
+    try {
+      const { default: jsPDF } = await import("jspdf");
+      const { default: autoTable } = await import("jspdf-autotable");
+      
+      const doc = new jsPDF();
+      const detailedEvidence = (historyItem as any).detailedEvidence as EvidenceFile[] || [];
+      
+      // Header
+      doc.setFontSize(18);
+      doc.setTextColor(0, 102, 204);
+      doc.text("Relatório de Auditoria de Deploy", 14, 20);
+      
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Identificador: ${historyItem.id}`, 14, 28);
+      doc.text(`Data: ${new Date(historyItem.date).toLocaleString()}`, 14, 33);
+      doc.text(`Responsável: ${historyItem.user?.toUpperCase() || "ADMIN"}`, 14, 38);
 
------------------------------------------
-DETALHES DE EVIDÊNCIAS (INCORPORADAS)
------------------------------------------
-${detailedEvidence.length > 0 ? detailedEvidence.map((e, idx) => 
-  `${idx + 1}. [${e.scanResult.toUpperCase()}] ${e.name} (${(e.size / 1024).toFixed(1)} KB)
-     Tipo: ${e.type} | Scanned: ${new Date(e.scannedAt).toLocaleString()}
-     Hash (SHA-256): ${btoa(e.name + e.size).substring(0, 32).toLowerCase()}
-     PÁGINA INCORPORADA: SIM (Thumbnail: ${e.thumbnail ? "ANEXADA AO DOCUMENTO" : "ARQUIVO BINÁRIO"})
-     Link Seguro (Acesso Restrito): ${e.url}`
-).join("\n\n") : "Nenhuma evidência anexada."}
+      // Status Section
+      doc.setFontSize(14);
+      doc.setTextColor(0, 0, 0);
+      doc.text("Resumo da Execução", 14, 50);
+      
+      (autoTable as any)(doc, {
+        startY: 55,
+        head: [['Parâmetro', 'Valor']],
+        body: [
+          ['Ambiente', historyItem.environment.toUpperCase()],
+          ['Status', historyItem.status.toUpperCase()],
+          ['Versão (Commit)', historyItem.commit],
+          ['URL Pública', historyItem.pwaUrl],
+          ['Health-Check', historyItem.healthStatus?.toUpperCase() || "N/A"],
+          ['Comentário', historyItem.parameters.approvalComment || "N/A"],
+          ['Modo', historyItem.parameters.dryRun ? "SIMULAÇÃO" : "REAL"]
+        ],
+        theme: 'striped',
+        headStyles: { fillColor: [0, 102, 204] }
+      });
 
------------------------------------------
-VALIDAÇÃO DE SEGURANÇA (MALWARE SCAN)
------------------------------------------
-${detailedEvidence.every(e => e.scanResult === "clean") 
-  ? "✓ Todos os arquivos validados e limpos por Lovable Scan Engine." 
-  : "⚠ Alerta: Arquivos suspeitos detectados na aprovação."}
+      // Evidence Section
+      const finalY = (doc as any).lastAutoTable.finalY + 15;
+      doc.text("Evidências de Auditoria", 14, finalY);
+      
+      const evidenceData = detailedEvidence.map((e, idx) => [
+        idx + 1,
+        e.name,
+        `${(e.size / 1024).toFixed(1)} KB`,
+        e.scanResult.toUpperCase(),
+        e.hash.substring(0, 16) + '...'
+      ]);
 
+      (autoTable as any)(doc, {
+        startY: finalY + 5,
+        head: [['#', 'Arquivo', 'Tamanho', 'Scan', 'Hash (SHA-256)']],
+        body: evidenceData.length > 0 ? evidenceData : [['-', 'Nenhuma evidência', '-', '-', '-']],
+        theme: 'grid',
+        headStyles: { fillColor: [50, 50, 50] }
+      });
 
------------------------------------------
-MODO DE EXECUÇÃO: ${historyItem.parameters.dryRun ? "DRY-RUN (SIMULAÇÃO)" : "REAL (PRODUÇÃO/STAGING)"}
------------------------------------------
-TIMELINE DE ETAPAS
------------------------------------------
-${steps.map(s => {
-  const isFailed = historyItem.failedStepId === s.id;
-  const isSuccess = !historyItem.failedStepId || steps.findIndex(st => st.id === historyItem.failedStepId) > steps.findIndex(st => st.id === s.id);
-  return `[${isFailed ? "FALHA" : isSuccess ? "OK" : "SKIP"}] ${s.label}: ${s.description}`;
-}).join("\n")}
------------------------------------------
-LOGS DE ACESSO
------------------------------------------
-Link para logs JSON: /api/logs/${historyItem.id}.json
-Link para logs CSV: /api/logs/${historyItem.id}.csv
+      // Append thumbnails/pages for images
+      if (detailedEvidence.length > 0) {
+        doc.addPage();
+        doc.text("Anexos Incorporados (Visualização)", 14, 20);
+        
+        let currentImgY = 30;
+        for (const e of detailedEvidence) {
+          if (e.thumbnail || e.type.startsWith('image/')) {
+            if (currentImgY > 250) {
+              doc.addPage();
+              currentImgY = 20;
+            }
+            doc.setFontSize(10);
+            doc.text(`Anexo: ${e.name}`, 14, currentImgY);
+            // Simulate adding thumbnail (placeholder box in PDF)
+            doc.rect(14, currentImgY + 2, 40, 30);
+            doc.setFontSize(8);
+            doc.text("[Thumbnail Incorporada]", 16, currentImgY + 18);
+            currentImgY += 45;
+          }
+        }
+      }
 
-=========================================
-Documento assinado digitalmente por Lovable Cloud Deploy Engine.
-    `;
-    const blob = new Blob([summary], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `auditoria-deploy-${historyItem.commit}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("PDF de Auditoria gerado com evidências incorporadas e links assinados.");
+      doc.save(`auditoria-deploy-${historyItem.commit}.pdf`);
+      toast.success("PDF de Auditoria gerado com sucesso.");
+      
+      addAuditLog({
+        action: "download_authorized",
+        user: currentUserRole,
+        attachmentName: `Relatório PDF (${historyItem.commit})`,
+        reason: "Exportação de relatório de auditoria",
+        status: "success"
+      });
+    } catch (error) {
+      console.error("Audit PDF error:", error);
+      toast.error("Erro ao gerar PDF de auditoria");
+    }
   };
 
   const filteredHistory = useMemo(() => {
@@ -1250,55 +1578,13 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
                                     <FileBadge className="h-3 w-3 text-primary" />
                                     Histórico de Auditoria de Downloads
                                   </h4>
-                                  {(() => {
-                                    const attachmentNames = new Set((((item as any).detailedEvidence as EvidenceFile[]) || []).map(f => f.name));
-                                    const relevant = auditLogs.filter(l =>
-                                      l.action.startsWith("download_") && attachmentNames.has(l.attachmentName)
-                                    );
-                                    if (relevant.length === 0) {
-                                      return <p className="text-[10px] text-muted-foreground italic">Nenhum download registrado para esta revisão.</p>;
-                                    }
-                                    return (
-                                      <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
-                                        {relevant.map(log => (
-                                          <div
-                                            key={log.id}
-                                            className={`text-[10px] rounded border p-1.5 flex items-start gap-2 ${
-                                              log.status === "success"
-                                                ? "border-emerald-500/30 bg-emerald-500/5"
-                                                : log.status === "denied"
-                                                ? "border-red-500/30 bg-red-500/5"
-                                                : "border-border/30 bg-muted/20"
-                                            }`}
-                                          >
-                                            <span className={`mt-0.5 h-1.5 w-1.5 rounded-full shrink-0 ${
-                                              log.status === "success" ? "bg-emerald-500" :
-                                              log.status === "denied" ? "bg-red-500" : "bg-muted-foreground"
-                                            }`} />
-                                            <div className="flex-1 min-w-0">
-                                              <div className="flex items-center justify-between gap-2">
-                                                <span className="font-medium truncate">
-                                                  {log.action === "download_authorized" ? "Autorizado" :
-                                                   log.action === "download_denied" ? "Negado" : "Solicitado"}
-                                                  {" · "}
-                                                  <span className="text-muted-foreground font-normal">{log.user}</span>
-                                                </span>
-                                                <span className="text-[9px] text-muted-foreground shrink-0">
-                                                  {new Date(log.timestamp).toLocaleString()}
-                                                </span>
-                                              </div>
-                                              <div className="text-muted-foreground truncate">
-                                                <span className="font-mono">{log.attachmentName}</span>
-                                              </div>
-                                              <div className="text-muted-foreground/80 italic truncate">
-                                                Motivo: {log.reason}
-                                              </div>
-                                            </div>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    );
-                                  })()}
+                                  <AuditHistoryManager 
+                                    logs={auditLogs}
+                                    userRole={currentUserRole}
+                                    originalApprover={item.user}
+                                    showFilters={false}
+                                    filterByAttachment={undefined} // We could filter by all attachments in this item
+                                  />
                                 </div>
                               </div>
                             </div>
@@ -1493,49 +1779,11 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
               <Badge variant="outline" className="text-[10px]">Últimas 100 atividades</Badge>
             </div>
             
-            <ScrollArea className="h-[450px]">
-              <div className="space-y-2">
-                {auditLogs.length === 0 && (
-                  <div className="p-12 text-center text-muted-foreground">
-                    <ShieldAlert className="h-8 w-8 mx-auto mb-2 opacity-20" />
-                    <p className="text-xs">Nenhum registro de auditoria disponível</p>
-                  </div>
-                )}
-                {auditLogs.map((log) => (
-                  <div key={log.id} className="flex items-start gap-3 p-3 rounded-lg border border-border/20 bg-background/50 text-[11px]">
-                    <div className={cn(
-                      "p-1.5 rounded-full mt-0.5",
-                      log.status === "success" ? "bg-green-500/10 text-green-500" : 
-                      log.status === "denied" ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"
-                    )}>
-                      {log.status === "success" ? <Check className="h-3 w-3" /> : 
-                       log.status === "denied" ? <Lock className="h-3 w-3" /> : <Activity className="h-3 w-3" />}
-                    </div>
-                    <div className="flex-1 space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-primary">
-                          {log.action === "download_authorized" ? "Download Autorizado" : 
-                           log.action === "download_denied" ? "Acesso Negado" : 
-                           log.action === "retention_cleanup" ? "Limpeza de Retenção" : "Solicitação de Download"}
-                        </span>
-                        <span className="text-[9px] text-muted-foreground">
-                          {new Date(log.timestamp).toLocaleString()}
-                        </span>
-                      </div>
-                      <p className="text-muted-foreground leading-relaxed">
-                        Usuário <span className="text-foreground font-mono">{log.user}</span> 
-                        {log.action.includes("download") ? ` tentou acessar "${log.attachmentName}"` : ` processou "${log.attachmentName}"`}.
-                      </p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge variant="outline" className="text-[9px] h-3.5 px-1 py-0 border-border/40">
-                          MOTIVO: {log.reason}
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
+            <AuditHistoryManager 
+              logs={auditLogs}
+              userRole={currentUserRole}
+              title="Relatório Geral de Auditoria de Acessos"
+            />
           </Card>
         </TabsContent>
       </Tabs>

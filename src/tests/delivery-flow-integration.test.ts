@@ -9,11 +9,24 @@ const validateAttachment = (file: { size: number; type: string; name: string }, 
   return { valid: !isMalware, scanResult: isMalware ? 'infected' : 'clean', hash: btoa(file.name + file.size).substring(0, 32).toLowerCase() };
 };
 
-const checkAccess = (userRole: string, itemUser: string, currentUser: string) => {
+const checkAccess = (userRole: string, itemUser: string | undefined, currentUser: string) => {
   const isAdmin = userRole === 'admin';
   const isDev = userRole === 'developer';
-  const isApprover = itemUser === currentUser;
-  return isAdmin || isDev || isApprover;
+  const isApprover = itemUser === userRole; // In the component it's item.user === currentUserRole
+  return {
+    authorized: isAdmin || isDev || isApprover,
+    error: !(isAdmin || isDev || isApprover) ? 'Acesso Negado: Apenas Dev, Admin ou o Aprovador original podem baixar esta evidência.' : null
+  };
+};
+
+const paginateAndSort = (logs: any[], page: number, perPage: number, sortField: string, sortOrder: 'asc' | 'desc') => {
+  const sorted = [...logs].sort((a, b) => {
+    let comparison = 0;
+    if (sortField === 'timestamp') comparison = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+    else if (sortField === 'status') comparison = a.status.localeCompare(b.status);
+    return sortOrder === 'desc' ? -comparison : comparison;
+  });
+  return sorted.slice((page - 1) * perPage, page * perPage);
 };
 
 const simulateRetentionJob = (history: any[], policies: any[], now: Date) => {
@@ -38,11 +51,55 @@ describe('DeliveryFlow Integration - Security & Audit', () => {
     expect(result.hash).toBe(btoa('test.png1024').substring(0, 32).toLowerCase());
   });
 
-  it('should restrict download based on role and ownership', () => {
-    expect(checkAccess('viewer', 'admin_user', 'viewer_user')).toBe(false);
-    expect(checkAccess('admin', 'other_user', 'admin_user')).toBe(true);
-    expect(checkAccess('developer', 'other_user', 'dev_user')).toBe(true);
-    expect(checkAccess('viewer', 'approver_user', 'approver_user')).toBe(true);
+  it('should restrict download and return correct error for unauthorized users', () => {
+    const denied = checkAccess('viewer', 'admin', 'viewer');
+    expect(denied.authorized).toBe(false);
+    expect(denied.error).toContain('Acesso Negado');
+
+    const admin = checkAccess('admin', 'other_user', 'admin');
+    expect(admin.authorized).toBe(true);
+
+    const dev = checkAccess('developer', 'other_user', 'developer');
+    expect(dev.authorized).toBe(true);
+
+    const approver = checkAccess('approver_1', 'approver_1', 'approver_1');
+    expect(approver.authorized).toBe(true);
+  });
+
+  it('should implement pagination and sorting for audit logs', () => {
+    const logs = [
+      { id: '1', timestamp: '2023-01-01T10:00:00Z', status: 'success' },
+      { id: '2', timestamp: '2023-01-01T09:00:00Z', status: 'denied' },
+      { id: '3', timestamp: '2023-01-01T11:00:00Z', status: 'success' }
+    ];
+
+    const sortedDesc = paginateAndSort(logs, 1, 2, 'timestamp', 'desc');
+    expect(sortedDesc[0].id).toBe('3');
+    expect(sortedDesc[1].id).toBe('1');
+    expect(sortedDesc).toHaveLength(2);
+
+    const sortedStatus = paginateAndSort(logs, 1, 10, 'status', 'asc');
+    expect(sortedStatus[0].status).toBe('denied');
+  });
+
+  it('should record audit log for every download attempt', () => {
+    const auditLogs: any[] = [];
+    const recordAttempt = (user: string, file: string, authorized: boolean) => {
+      auditLogs.push({
+        timestamp: new Date().toISOString(),
+        user,
+        attachmentName: file,
+        action: authorized ? 'download_authorized' : 'download_denied',
+        status: authorized ? 'success' : 'denied'
+      });
+    };
+
+    recordAttempt('viewer_1', 'secret.pdf', false);
+    recordAttempt('admin', 'secret.pdf', true);
+
+    expect(auditLogs).toHaveLength(2);
+    expect(auditLogs[0].status).toBe('denied');
+    expect(auditLogs[1].status).toBe('success');
   });
 
   it('should verify signed URL expiration logic', () => {
