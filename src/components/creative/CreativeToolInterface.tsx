@@ -746,15 +746,28 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                 Atualizar Comparação
               </Button>
               {lastResult.asset_url && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="text-[10px] h-7"
-                  onClick={handleDownloadResult}
-                >
-                  <Download className="h-3 w-3 mr-1.5" />
-                  Baixar {lastResult.asset_url.endsWith('.mp4') ? 'MP4' : 'PNG/JPG'}
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-[10px] h-7"
+                    onClick={() => handleDownloadResult("png")}
+                  >
+                    <Download className="h-3 w-3 mr-1.5" />
+                    Baixar {lastResult.asset_url.endsWith('.mp4') ? 'MP4' : 'PNG'}
+                  </Button>
+                  {!lastResult.asset_url.endsWith('.mp4') && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-[10px] h-7"
+                      onClick={() => handleDownloadResult("jpg")}
+                    >
+                      <Download className="h-3 w-3 mr-1.5" />
+                      Baixar JPG
+                    </Button>
+                  )}
+                </div>
               )}
             </div>
           </div>
