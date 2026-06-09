@@ -1,4 +1,4 @@
-import { Check, X, Loader2, PlayCircle, Globe, ShieldCheck, Smartphone, Package, Code, AlertCircle, Terminal, History, Download, ExternalLink, QrCode, Filter, Search, Mail, Bell, FileJson, FileSpreadsheet, FileText, UserCheck, RotateCcw, FileBadge, Lock, MessageSquare, ShieldAlert, Activity, Cpu, Upload, Paperclip, Eye, Clock, Trash2, Settings, HardDrive, Calendar, Shield } from "lucide-react";
+import { Check, X, Loader2, PlayCircle, Globe, ShieldCheck, Smartphone, Package, Code, AlertCircle, Terminal, History, Download, ExternalLink, QrCode, Filter, Search, Mail, Bell, FileJson, FileSpreadsheet, FileText, UserCheck, RotateCcw, FileBadge, Lock, MessageSquare, ShieldAlert, Activity, Cpu, Upload, Paperclip, Eye, Clock, Trash2, Settings, HardDrive, Calendar, Shield, Undo2, Keyboard, ListTodo } from "lucide-react";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -201,11 +201,36 @@ function AuditHistoryManager({
   const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
   const paginatedLogs = filteredLogs.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
+  const [isExportLogOpen, setIsExportLogOpen] = useState(false);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState<"csv" | "pdf">("csv");
-  const [exportMode, setExportMode] = useState<"filtered" | "current_page" | "range">("filtered");
-  const [exportRange, setExportRange] = useState({ start: 1, end: 1 });
+  const [exportMode, setExportMode] = useState<"filtered" | "current_page" | "range">(() => {
+    const saved = localStorage.getItem("audit_last_exportMode");
+    return (saved as any) || "filtered";
+  });
+  const [exportRange, setExportRange] = useState(() => {
+    const saved = localStorage.getItem("audit_last_exportRange");
+    return saved ? JSON.parse(saved) : { start: 1, end: 1 };
+  });
+  const [lastConfig, setLastConfig] = useState<any>(null);
   const MAX_EXPORT_LIMIT = 500;
+
+  // Keyboard shortcut for export
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isExportDialogOpen && e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        handleExport(exportFormat);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isExportDialogOpen, exportFormat, exportMode, exportRange]);
+
+  useEffect(() => {
+    localStorage.setItem("audit_last_exportMode", exportMode);
+    localStorage.setItem("audit_last_exportRange", JSON.stringify(exportRange));
+  }, [exportMode, exportRange]);
 
   const handleExport = async (format: "csv" | "pdf") => {
     if (!canViewHistory) {
@@ -318,7 +343,7 @@ function AuditHistoryManager({
       action: "download_authorized",
       user: userRole,
       attachmentName: `Exportação ${format.toUpperCase()} (${exportMode === "current_page" ? `Pág. ${currentPage}` : exportMode === "range" ? `Págs. ${exportRange.start}-${exportRange.end}` : "Filtrado"})`,
-      reason: `Filtros: ${searchTerm || "Nenhum"}, Status: ${statusFilter}, Ordenação: ${sortField} ${sortOrder}, Colunas: ${visibleColumns.join(",")}, Recorte: ${exportMode === "range" ? `Páginas ${exportRange.start} a ${exportRange.end} (Total: ${logsToExport.length} registros, Índices: ${(exportRange.start-1)*itemsPerPage+1}-${Math.min(filteredLogs.length, exportRange.end*itemsPerPage)})` : `${logsToExport.length} registros`}`,
+      reason: `Filtros: ${searchTerm || "Nenhum"}, Status: ${statusFilter}, Ordenação: ${sortField} ${sortOrder}, Colunas: ${visibleColumns.join(",")}, Recorte: ${exportMode === "range" ? `Páginas ${exportRange.start} a ${exportRange.end} (Total: ${logsToExport.length} registros, Índices: ${(exportRange.start-1)*itemsPerPage+1}-${Math.min(filteredLogs.length, exportRange.end*itemsPerPage)})` : `${logsToExport.length} registros`}, PágInicial: ${exportMode === "range" ? exportRange.start : 1}, PágFinal: ${exportMode === "range" ? exportRange.end : (exportMode === "current_page" ? 1 : totalPages)}, TotalRecorte: ${logsToExport.length}`,
       status: "success"
     });
     
@@ -391,9 +416,29 @@ function AuditHistoryManager({
                     />
                   </div>
                 </div>
-                {(exportRange.start < 1 || exportRange.start > totalPages || exportRange.end < exportRange.start || exportRange.end > totalPages) && (
-                  <p className="text-[9px] text-destructive font-bold flex items-center gap-1">
-                    <AlertCircle className="h-3 w-3" /> Intervalo inválido (Máx: {totalPages} páginas)
+                {exportRange.start < 1 && (
+                  <p className="text-[9px] text-destructive font-bold flex items-center gap-1 mt-1">
+                    <AlertCircle className="h-3 w-3" /> Página inicial não pode ser menor que 1.
+                  </p>
+                )}
+                {exportRange.start > totalPages && (
+                  <p className="text-[9px] text-destructive font-bold flex items-center gap-1 mt-1">
+                    <AlertCircle className="h-3 w-3" /> Página inicial ({exportRange.start}) excede o total ({totalPages}).
+                  </p>
+                )}
+                {exportRange.end < exportRange.start && (
+                  <p className="text-[9px] text-destructive font-bold flex items-center gap-1 mt-1">
+                    <AlertCircle className="h-3 w-3" /> Página final não pode ser menor que a inicial.
+                  </p>
+                )}
+                {exportRange.end > totalPages && (
+                  <p className="text-[9px] text-destructive font-bold flex items-center gap-1 mt-1">
+                    <AlertCircle className="h-3 w-3" /> Página final ({exportRange.end}) excede o total ({totalPages}).
+                  </p>
+                )}
+                {filteredLogs.length === 0 && (
+                  <p className="text-[9px] text-destructive font-bold flex items-center gap-1 mt-1">
+                    <AlertCircle className="h-3 w-3" /> Recorte vazio: não há registros com os filtros atuais.
                   </p>
                 )}
               </div>
@@ -439,7 +484,33 @@ function AuditHistoryManager({
           </div>
           <DialogFooter className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => setIsExportDialogOpen(false)}>Cancelar</Button>
-            <Button size="sm" onClick={() => handleExport(exportFormat)}>Confirmar Download</Button>
+            <Button size="sm" onClick={() => handleExport(exportFormat)} disabled={filteredLogs.length === 0 || exportRange.start < 1 || exportRange.start > totalPages || exportRange.end < exportRange.start || exportRange.end > totalPages}>
+              <Keyboard className="h-3 w-3 mr-2 opacity-50" />
+              Confirmar Download (Ctrl+Enter)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isExportLogOpen} onOpenChange={setIsExportLogOpen}>
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ListTodo className="h-5 w-5 text-primary" />
+              Log de Auditoria de Exportações
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-hidden mt-4">
+            <AuditHistoryManager 
+              logs={logs.filter(l => l.action === "download_authorized")}
+              userRole={userRole}
+              originalApprover={originalApprover}
+              onAuditLog={onAuditLog}
+              title="Log de Exportações"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setIsExportLogOpen(false)}>Fechar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -489,6 +560,9 @@ function AuditHistoryManager({
             <Button variant="outline" size="sm" className="h-8 px-2" onClick={() => { setExportFormat("pdf"); setIsExportDialogOpen(true); }} title="PDF">
               <FileText className="h-3.5 w-3.5" />
             </Button>
+            <Button variant="outline" size="sm" className="h-8 px-2" onClick={() => setIsExportLogOpen(true)} title="Log de Exportações">
+              <ListTodo className="h-3.5 w-3.5" />
+            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="h-8 px-2">
@@ -498,23 +572,54 @@ function AuditHistoryManager({
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel className="flex items-center justify-between">
                   <span>Configurações da Lista</span>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-5 w-5 text-muted-foreground hover:text-destructive"
-                    title="Resetar Preferências"
-                    onClick={() => {
-                      if (confirm("Tem certeza que deseja resetar todas as preferências de exibição da auditoria para o padrão?")) {
-                        localStorage.removeItem("audit_visibleColumns");
-                        localStorage.removeItem("audit_itemsPerPage");
-                        localStorage.removeItem("audit_sortField");
-                        localStorage.removeItem("audit_sortOrder");
-                        window.location.reload();
-                      }
-                    }}
-                  >
-                    <RotateCcw className="h-3 w-3" />
-                  </Button>
+                  <div className="flex gap-1">
+                    {lastConfig && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-5 w-5 text-primary hover:text-primary/80"
+                        title="Desfazer Reset"
+                        onClick={() => {
+                          setVisibleColumns(lastConfig.columns);
+                          setItemsPerPage(lastConfig.itemsPerPage);
+                          setSortField(lastConfig.sortField);
+                          setSortOrder(lastConfig.sortOrder);
+                          setLastConfig(null);
+                          toast.success("Configurações recuperadas!");
+                        }}
+                      >
+                        <Undo2 className="h-3 w-3" />
+                      </Button>
+                    )}
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-5 w-5 text-muted-foreground hover:text-destructive"
+                      title="Resetar Preferências"
+                      onClick={() => {
+                        if (confirm("Tem certeza que deseja resetar todas as preferências de exibição da auditoria para o padrão?")) {
+                          setLastConfig({
+                            columns: visibleColumns,
+                            itemsPerPage,
+                            sortField,
+                            sortOrder
+                          });
+                          localStorage.removeItem("audit_visibleColumns");
+                          localStorage.removeItem("audit_itemsPerPage");
+                          localStorage.removeItem("audit_sortField");
+                          localStorage.removeItem("audit_sortOrder");
+                          // Instead of reload, just set defaults to allow "Undo"
+                          setVisibleColumns(["timestamp", "user", "attachmentName", "action", "reason", "status"]);
+                          setItemsPerPage(25);
+                          setSortField("timestamp");
+                          setSortOrder("desc");
+                          toast.info("Preferências resetadas", { description: "Você pode desfazer esta ação no menu de filtros." });
+                        }
+                      }}
+                    >
+                      <RotateCcw className="h-3 w-3" />
+                    </Button>
+                  </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <div className="p-2 space-y-3">
