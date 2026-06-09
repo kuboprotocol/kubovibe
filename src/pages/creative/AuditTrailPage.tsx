@@ -44,6 +44,39 @@ type AuditTrail = {
   trace_id: string | null;
   created_at: string;
   user_email?: string;
+  statusCounts?: { success: number, error: number, retry: number };
+};
+
+const TimelineViewer = ({ correlationId, currentId }: { correlationId: string, currentId?: string }) => {
+  const { data: timeline, isLoading } = useQuery({
+    queryKey: ["audit-timeline", correlationId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("creative_audit_trail")
+        .select("*")
+        .eq("correlation_id", correlationId)
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return data as AuditTrail[];
+    }
+  });
+
+  if (isLoading) return <Skeleton className="h-20 w-full" />;
+  if (!timeline || timeline.length === 0) return <p className="text-[10px] text-muted-foreground">Nenhum histórico encontrado.</p>;
+
+  return (
+    <div className="space-y-2 relative before:absolute before:left-2 before:top-2 before:bottom-2 before:w-px before:bg-muted-foreground/30 pl-6">
+      {timeline.map((te) => (
+        <div key={te.id} className={`relative text-[10px] p-1 rounded ${te.id === currentId ? 'bg-primary/10 border border-primary/20' : ''}`}>
+          <div className={`absolute -left-6 top-1.5 w-3 h-3 rounded-full border bg-background z-10 ${
+            te.action.toLowerCase().includes('fail') || te.action.toLowerCase().includes('error') ? 'border-destructive' : 'border-primary'
+          }`} />
+          <p className="font-bold opacity-70">{new Date(te.created_at).toLocaleTimeString()}</p>
+          <p className="font-mono truncate" title={te.action}>{te.action}</p>
+        </div>
+      ))}
+    </div>
+  );
 };
 
 const PAGE_SIZE = 25;
@@ -210,13 +243,26 @@ export default function CreativeAuditPage() {
 
   // Group entries by correlation_id for the UI list
   const groupedEntries = useMemo(() => {
-    const cidMap: Record<string, AuditTrail[]> = {};
-    const flat: (AuditTrail & { isGroup?: boolean; children?: AuditTrail[] })[] = [];
+    const cidMap: Record<string, { entries: AuditTrail[], statusCounts: { success: number, error: number, retry: number } }> = {};
+    const flat: (AuditTrail & { isGroup?: boolean; children?: AuditTrail[]; statusCounts?: { success: number, error: number, retry: number } })[] = [];
 
     entries.forEach(entry => {
       if (entry.correlation_id) {
-        if (!cidMap[entry.correlation_id]) cidMap[entry.correlation_id] = [];
-        cidMap[entry.correlation_id].push(entry);
+        if (!cidMap[entry.correlation_id]) {
+          cidMap[entry.correlation_id] = { 
+            entries: [], 
+            statusCounts: { success: 0, error: 0, retry: 0 } 
+          };
+        }
+        
+        cidMap[entry.correlation_id].entries.push(entry);
+        
+        const isError = entry.action.toLowerCase().includes("failed") || 
+                        entry.action.toLowerCase().includes("error") || 
+                        entry.params?.error;
+        
+        if (isError) cidMap[entry.correlation_id].statusCounts.error++;
+        else cidMap[entry.correlation_id].statusCounts.success++;
       } else {
         flat.push(entry);
       }
@@ -224,11 +270,17 @@ export default function CreativeAuditPage() {
 
     // For each group, the representative is the most recent one
     Object.keys(cidMap).forEach(cid => {
-      const sorted = [...cidMap[cid]].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      const groupData = cidMap[cid];
+      const sorted = [...groupData.entries].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      
+      // Update retry count in statusCounts
+      groupData.statusCounts.retry = sorted.length > 1 ? sorted.length - 1 : 0;
+
       flat.push({
         ...sorted[0],
         isGroup: sorted.length > 1,
-        children: sorted
+        children: sorted,
+        statusCounts: groupData.statusCounts
       });
     });
 
@@ -255,20 +307,57 @@ export default function CreativeAuditPage() {
   const exportComparison = (format: "json" | "csv") => {
     if (compareEntries.length !== 2) return;
     
-    const content = format === "json" 
-      ? JSON.stringify({ comparison: compareEntries, timestamp: new Date().toISOString() }, null, 2)
-      : [
-          ["ID", "Step", "Action", "Correlation", "Params"],
-          ...compareEntries.map(e => [e.id, e.step, e.action, e.correlation_id || "", JSON.stringify(e.params)])
-        ].map(row => row.join(",")).join("\n");
+    // Load full timelines for both entries if they have correlation IDs
+    const getTimeline = async (entry: AuditTrail) => {
+      if (!entry.correlation_id) return [entry];
+      const { data } = await supabase
+        .from("creative_audit_trail")
+        .select("*")
+        .eq("correlation_id", entry.correlation_id)
+        .order("created_at", { ascending: true });
+      return data || [entry];
+    };
 
-    const blob = new Blob([content], { type: format === "json" ? "application/json" : "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `audit-comparison-${Date.now()}.${format}`;
-    link.click();
-    toast.success("Comparação exportada");
+    const handleExport = async () => {
+      const timeline1 = await getTimeline(compareEntries[0]);
+      const timeline2 = await getTimeline(compareEntries[1]);
+      const causes = getDiffProbableCauses();
+
+      let content: string;
+      let mime: string;
+
+      if (format === "json") {
+        content = JSON.stringify({ 
+          comparison: {
+            event1: { ...compareEntries[0], full_timeline: timeline1 },
+            event2: { ...compareEntries[1], full_timeline: timeline2 }
+          }, 
+          probable_causes: causes,
+          timestamp: new Date().toISOString() 
+        }, null, 2);
+        mime = "application/json";
+      } else {
+        const headers = ["Source", "ID", "Step", "Action", "Correlation", "Params", "Created At"];
+        const rows = [
+          ...timeline1.map(e => ["Event 1 Timeline", e.id, e.step, e.action, e.correlation_id || "", JSON.stringify(e.params).replace(/"/g, '""'), e.created_at]),
+          ...timeline2.map(e => ["Event 2 Timeline", e.id, e.step, e.action, e.correlation_id || "", JSON.stringify(e.params).replace(/"/g, '""'), e.created_at]),
+          ["PROBABLE CAUSES", causes.join("; "), "", "", "", "", ""]
+        ].map(row => row.map(v => `"${v}"`).join(","));
+
+        content = [headers.join(","), ...rows].join("\n");
+        mime = "text/csv";
+      }
+
+      const blob = new Blob([content], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `audit-comparison-full-${Date.now()}.${format}`;
+      link.click();
+      toast.success("Comparação detalhada exportada");
+    };
+
+    handleExport();
   };
 
   const getDiffProbableCauses = () => {
@@ -639,7 +728,19 @@ export default function CreativeAuditPage() {
                             <Badge variant="outline">{entry.step}</Badge>
                           </TableCell>
                           <TableCell className="text-xs font-mono">
-                            {entry.action}
+                            {entry.isGroup ? (
+                              <div className="flex flex-wrap gap-1 items-center">
+                                <span className="font-bold">{entry.action}</span>
+                                <Badge variant="secondary" className="h-4 px-1 text-[8px] bg-green-500/10 text-green-600 border-green-500/20">
+                                  {entry.statusCounts?.success} sucessos
+                                </Badge>
+                                <Badge variant="secondary" className="h-4 px-1 text-[8px] bg-destructive/10 text-destructive border-destructive/20">
+                                  {entry.statusCounts?.error} falhas
+                                </Badge>
+                              </div>
+                            ) : (
+                              entry.action
+                            )}
                           </TableCell>
                           <TableCell>
                             <div className="flex flex-col gap-0.5">
@@ -908,50 +1009,60 @@ export default function CreativeAuditPage() {
             </ul>
           </div>
 
-          <div className="mt-6 grid grid-cols-2 gap-6">
-            {compareEntries.map((entry, idx) => {
-              const other = compareEntries[idx === 0 ? 1 : 0];
-              
-              return (
-                <div key={entry.id} className="space-y-6">
-                  <div className="p-3 bg-accent/20 rounded-md border flex justify-between items-center">
-                    <h4 className="font-bold text-sm">Evento #{idx + 1}</h4>
-                    <Badge variant="outline">{new Date(entry.created_at).toLocaleString()}</Badge>
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <p className="text-[10px] text-muted-foreground uppercase font-bold">Ação</p>
-                    <p className={`text-xs font-mono p-2 rounded truncate border ${entry.action !== other.action ? 'border-yellow-500/50 bg-yellow-500/5' : 'bg-muted'}`} title={entry.action}>
-                      {entry.action}
-                    </p>
-                  </div>
-
-                  <div className="space-y-1">
-                    <p className="text-[10px] text-muted-foreground uppercase font-bold">Parâmetros (Com Destaque)</p>
-                    <div className="bg-black/95 p-3 rounded-md overflow-x-auto font-mono text-[10px] h-[400px]">
-                      {Object.keys(entry.params || {}).map(key => {
-                        const val = entry.params[key];
-                        const otherVal = other.params?.[key];
-                        const isDiff = JSON.stringify(val) !== JSON.stringify(otherVal);
-                        
-                        return (
-                          <div key={key} className={`mb-1 ${isDiff ? 'text-yellow-400 font-bold bg-yellow-400/10' : 'text-green-400 opacity-70'}`}>
-                            {key}: {JSON.stringify(val, null, 2)}
-                          </div>
-                        );
-                      })}
+          <div className="mt-6 space-y-8">
+            <div className="grid grid-cols-2 gap-6">
+              {compareEntries.map((entry, idx) => {
+                const other = compareEntries[idx === 0 ? 1 : 0];
+                
+                return (
+                  <div key={entry.id} className="space-y-6">
+                    <div className="p-3 bg-accent/20 rounded-md border flex justify-between items-center">
+                      <h4 className="font-bold text-sm">Evento #{idx + 1}</h4>
+                      <Badge variant="outline">{new Date(entry.created_at).toLocaleString()}</Badge>
                     </div>
-                  </div>
-
-                  {entry.params?.error && (
-                    <div className="p-2 border border-destructive/30 bg-destructive/5 rounded-md">
-                      <p className="text-[10px] font-bold text-destructive uppercase">Erro Detectado</p>
-                      <p className="text-xs text-destructive">{entry.params.error.message}</p>
+                    
+                    <div className="space-y-1">
+                      <p className="text-[10px] text-muted-foreground uppercase font-bold">Ação</p>
+                      <p className={`text-xs font-mono p-2 rounded truncate border ${entry.action !== other.action ? 'border-yellow-500/50 bg-yellow-500/5' : 'bg-muted'}`} title={entry.action}>
+                        {entry.action}
+                      </p>
                     </div>
-                  )}
-                </div>
-              );
-            })}
+
+                    <div className="space-y-1">
+                      <p className="text-[10px] text-muted-foreground uppercase font-bold">Parâmetros (Com Destaque)</p>
+                      <div className="bg-black/95 p-3 rounded-md overflow-x-auto font-mono text-[10px] h-[300px]">
+                        {Object.keys(entry.params || {}).map(key => {
+                          const val = entry.params[key];
+                          const otherVal = other.params?.[key];
+                          const isDiff = JSON.stringify(val) !== JSON.stringify(otherVal);
+                          
+                          return (
+                            <div key={key} className={`mb-1 ${isDiff ? 'text-yellow-400 font-bold bg-yellow-400/10' : 'text-green-400 opacity-70'}`}>
+                              {key}: {JSON.stringify(val, null, 2)}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Timeline per attempt for comparison */}
+                    {entry.correlation_id && (
+                      <div className="space-y-2">
+                        <p className="text-[10px] text-muted-foreground uppercase font-bold">Linha do Tempo (Tentativas)</p>
+                        <TimelineViewer correlationId={entry.correlation_id} currentId={entry.id} />
+                      </div>
+                    )}
+
+                    {entry.params?.error && (
+                      <div className="p-2 border border-destructive/30 bg-destructive/5 rounded-md">
+                        <p className="text-[10px] font-bold text-destructive uppercase">Erro Detectado</p>
+                        <p className="text-xs text-destructive">{entry.params.error.message}</p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </SheetContent>
       </Sheet>
