@@ -515,6 +515,9 @@ export default function CreativeAuditPage() {
                 onChange={(e) => setRecurrenceThreshold(Number(e.target.value))}
                 className="w-12 bg-transparent text-xs font-bold border-none focus:ring-0"
               />
+              <Button variant="ghost" size="icon" className="h-5 w-5 ml-1" onClick={saveRecurrenceThreshold} title="Salvar como padrão">
+                <Save className="h-3 w-3" />
+              </Button>
             </div>
             {recurrentFailures.length > 0 && (
               <Button 
