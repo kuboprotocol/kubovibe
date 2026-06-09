@@ -132,16 +132,23 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
   const [cropSourceUrl, setCropSourceUrl] = useState<string | null>(null);
   const [cropOpen, setCropOpen] = useState(false);
   const [progressSteps, setProgressSteps] = useState<AvatarStepState[]>([]);
+  const [avatarPreset, setAvatarPreset] = useState<{ zoom: number; aspect: number }>(() => {
+    const saved = localStorage.getItem("creative_avatar_preset");
+    return saved ? JSON.parse(saved) : { zoom: 1, aspect: 1 };
+  });
 
-  const buildSteps = (needsConvert: boolean): AvatarStepState[] => [
-    { key: "upload", label: "Upload da imagem", status: "pending" },
-    { key: "convert", label: "Conversão HEIC/SVG", status: needsConvert ? "pending" : "skipped" },
-    { key: "generate", label: "Geração do avatar falante", status: "pending" },
-    { key: "render", label: "Renderização final", status: "pending" },
-  ];
+  const buildSteps = (needsConvert: boolean): AvatarStepState[] => {
+    const now = new Date().toLocaleTimeString();
+    return [
+      { key: "upload", label: "Upload da imagem", status: "pending", timestamp: now },
+      { key: "convert", label: "Conversão HEIC/SVG", status: needsConvert ? "pending" : "skipped", timestamp: needsConvert ? now : undefined },
+      { key: "generate", label: "Geração do avatar falante", status: "pending" },
+      { key: "render", label: "Renderização final", status: "pending" },
+    ];
+  };
 
-  const updateStep = (key: AvatarStepKey, status: AvatarStepState["status"]) => {
-    setProgressSteps((prev) => prev.map((s) => (s.key === key ? { ...s, status } : s)));
+  const updateStep = (key: AvatarStepKey, status: AvatarStepState["status"], errorMessage?: string) => {
+    setProgressSteps((prev) => prev.map((s) => (s.key === key ? { ...s, status, errorMessage, timestamp: new Date().toLocaleTimeString() } : s)));
   };
 
   const fetchLastResult = useCallback(async () => {
