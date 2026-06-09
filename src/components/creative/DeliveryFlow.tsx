@@ -1,5 +1,5 @@
-import { Check, X, Loader2, PlayCircle, Globe, ShieldCheck, Smartphone, Package, Code, AlertCircle, Terminal, History, Download, ExternalLink, QrCode, Filter, Search, Mail, Bell, FileJson, FileSpreadsheet, FileText, UserCheck, RotateCcw, FileBadge, Lock, MessageSquare, ShieldAlert, Activity, Cpu } from "lucide-react";
-import { useState, useEffect, useMemo } from "react";
+import { Check, X, Loader2, PlayCircle, Globe, ShieldCheck, Smartphone, Package, Code, AlertCircle, Terminal, History, Download, ExternalLink, QrCode, Filter, Search, Mail, Bell, FileJson, FileSpreadsheet, FileText, UserCheck, RotateCcw, FileBadge, Lock, MessageSquare, ShieldAlert, Activity, Cpu, Upload, Paperclip, Eye, Clock } from "lucide-react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -33,12 +33,16 @@ interface DeployHistoryItem {
   id: string;
   date: string;
   environment: "staging" | "production";
-  status: "success" | "error";
+  status: "success" | "error" | "blocked";
   commit: string;
   pwaUrl: string;
   apkUrl: string;
   logs: DeployLog[];
   failedStepId?: string;
+  user?: string;
+  evidence?: string[];
+  healthStatus?: "up" | "down" | "unchecked";
+  healthDetails?: string;
   parameters: {
     environment: "staging" | "production";
     notifications: { email: boolean; webhook: boolean };
@@ -47,8 +51,8 @@ interface DeployHistoryItem {
     approvalComment?: string;
     approvalTerms?: boolean;
     healthCheck?: boolean;
+    evidenceCount?: number;
   };
-  healthStatus?: "up" | "down" | "unchecked";
 }
 
 interface ActiveDeploy {
@@ -57,6 +61,7 @@ interface ActiveDeploy {
   user: string;
   timestamp: string;
 }
+
 
 export function DeliveryFlow() {
   const [isDeploying, setIsDeploying] = useState(false);
@@ -75,9 +80,11 @@ export function DeliveryFlow() {
   const [approvalTerms, setApprovalTerms] = useState(false);
   const [isDryRun, setIsDryRun] = useState(false);
   const [activeDeploys, setActiveDeploys] = useState<ActiveDeploy[]>([]);
-
+  const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [steps, setSteps] = useState<ValidationStep[]>([
+    { id: "ci", label: "CI & Testes de Integração", description: "Executando suíte de testes automatizados", status: "pending" },
     { id: "build", label: "Build & Minificação", description: "Otimizando código e recursos para produção", status: "pending" },
     { id: "api", label: "Validação de Infra", description: "Configurando segredos e conexões do banco", status: "pending" },
     { id: "pwa", label: "Deploy Web (PWA)", description: "Publicação com HTTPS e Service Workers", status: "pending" },
@@ -88,6 +95,7 @@ export function DeliveryFlow() {
     const saved = localStorage.getItem("deploy_history");
     return saved ? JSON.parse(saved) : [];
   });
+
 
   const canExecuteDeploy = useMemo(() => {
     if (environment === "production") return currentUserRole === "admin";
@@ -212,12 +220,20 @@ export function DeliveryFlow() {
       addLog(`Processando etapa: ${step.label}...`, "info", step.id);
       
       // Simulating build/upload integration tests during dry-run or real deploy
-      if (i === 0) {
+      if (step.id === "ci") {
+        addLog("Executando testes automatizados de integração...", "info", step.id);
+        addLog("Validando parâmetros, credenciais e etapas de build/upload...", "info", step.id);
+        await new Promise(r => setTimeout(r, 1200));
+        addLog("Suite de testes concluída: 42 testes passaram, 0 falharam.", "success", step.id);
+      }
+
+      if (step.id === "build") {
         addLog("Validando parâmetros e credenciais de build...", "info", step.id);
         await new Promise(r => setTimeout(r, 800));
       }
 
       await new Promise(r => setTimeout(r, 1500));
+
       
       if (isDryRun && Math.random() < 0.1) {
         step.status = "error" as const;
@@ -244,15 +260,38 @@ export function DeliveryFlow() {
       setSteps([...newSteps]);
     }
 
-    // Post-deploy health check
+    // Post-deploy health check with retries and window
     let healthStatus: "up" | "down" | "unchecked" = "unchecked";
+    let healthDetails = "";
     if (finalStatus === "success" && !isDryRun) {
-      addLog("Iniciando Health-Check automático do link público...", "info");
-      await new Promise(r => setTimeout(r, 2000));
-      const isUp = Math.random() > 0.1;
-      healthStatus = isUp ? "up" : "down";
-      addLog(`Health-Check: ${isUp ? "ONLINE (200 OK)" : "OFFLINE / ERRO 500"}`, isUp ? "success" : "error");
+      addLog("Iniciando Health-Check automático do link público (Janela de 30s)...", "info");
+      
+      let attempts = 0;
+      const maxAttempts = 3;
+      while (attempts < maxAttempts) {
+        attempts++;
+        addLog(`Verificando disponibilidade (Tentativa ${attempts}/${maxAttempts})...`, "info");
+        await new Promise(r => setTimeout(r, 2000));
+        
+        const isUp = Math.random() > 0.2; // 80% chance of being up in simulation
+        if (isUp) {
+          healthStatus = "up";
+          healthDetails = "Status 200 OK - Resposta em 142ms. Link público acessível.";
+          addLog(`Health-Check: ONLINE (200 OK)`, "success");
+          break;
+        } else {
+          addLog(`Health-Check: OFFLINE / ERRO 500 (Aguardando propagação...)`, "warning");
+          if (attempts === maxAttempts) {
+            healthStatus = "down";
+            healthDetails = "Falha após 3 tentativas. Erro 503 Service Unavailable ou Timeout.";
+            addLog(`Health-Check: FALHA DEFINITIVA após ${maxAttempts} tentativas`, "error");
+          } else {
+            await new Promise(r => setTimeout(r, 3000));
+          }
+        }
+      }
     }
+
 
     const newItem: DeployHistoryItem = {
       id: deployId,
@@ -265,6 +304,9 @@ export function DeliveryFlow() {
       logs: [...currentLogs, ...logs],
       failedStepId,
       healthStatus,
+      healthDetails,
+      user: currentUserRole,
+      evidence: evidenceFiles.map(f => f.name),
       parameters: {
         environment,
         notifications: { ...notifications },
@@ -272,9 +314,11 @@ export function DeliveryFlow() {
         dryRun: isDryRun,
         approvalComment: environment === "production" ? approvalComment : undefined,
         approvalTerms: environment === "production" ? approvalTerms : undefined,
-        healthCheck: true
+        healthCheck: true,
+        evidenceCount: evidenceFiles.length
       }
     };
+
 
     if (!isDryRun) {
       setHistory(prev => [newItem, ...prev]);
@@ -282,6 +326,10 @@ export function DeliveryFlow() {
     
     setIsDeploying(false);
     setActiveDeploys(prev => prev.filter(d => d.id !== deployId));
+    setEvidenceFiles([]);
+    setApprovalComment("");
+    setApprovalTerms(false);
+
     
     if (finalStatus === "success") {
       toast.success(isDryRun ? "Simulação finalizada com sucesso!" : "Entrega finalizada!", { 
@@ -330,11 +378,15 @@ Versão (Commit): ${historyItem.commit}
 URL Pública: ${historyItem.pwaUrl}
 HTTPS: HABILITADO E VERIFICADO
 Health-Check: ${historyItem.healthStatus?.toUpperCase() || "NÃO EXECUTADO"}
+Detalhes Health: ${historyItem.healthDetails || "N/A"}
 -----------------------------------------
 DETALHES DE APROVAÇÃO (PRODUÇÃO)
 -----------------------------------------
+Responsável: ${historyItem.user || "Admin"}
 Comentário: ${historyItem.parameters.approvalComment || "N/A"}
+Evidências Anexadas: ${historyItem.evidence?.join(", ") || "Nenhuma"}
 Termos Aceitos: ${historyItem.parameters.approvalTerms ? "SIM" : "NÃO"}
+
 -----------------------------------------
 MODO DE EXECUÇÃO: ${historyItem.parameters.dryRun ? "DRY-RUN (SIMULAÇÃO)" : "REAL (PRODUÇÃO/STAGING)"}
 -----------------------------------------
@@ -463,19 +515,56 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
                           <p className="font-bold flex items-center gap-2">
                             <Lock className="h-3.5 w-3.5" /> Política de Segurança
                           </p>
-                          <p>O deploy em {environment.toUpperCase()} exige justificativa e aceitação dos termos de integridade.</p>
+                          <p>O deploy em {environment.toUpperCase()} exige justificativa, evidências e aceitação dos termos.</p>
                         </div>
                         
                         <div className="space-y-2">
                           <label className="text-xs font-bold flex items-center gap-2">
-                            <MessageSquare className="h-3.5 w-3.5" /> Comentários e Justificativa
+                            <MessageSquare className="h-3.5 w-3.5" /> Justificativa e Testes Realizados
                           </label>
                           <Textarea 
-                            placeholder="Descreva as alterações e evidências de testes..."
+                            placeholder="Descreva as alterações e resultados dos testes manuais..."
                             value={approvalComment}
                             onChange={(e) => setApprovalComment(e.target.value)}
-                            className="text-xs min-h-[100px]"
+                            className="text-xs min-h-[80px]"
                           />
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold flex items-center gap-2">
+                            <Paperclip className="h-3.5 w-3.5" /> Evidências (Prints/Logs)
+                          </label>
+                          <div 
+                            onClick={() => fileInputRef.current?.click()}
+                            className="border-2 border-dashed border-border/60 rounded-lg p-4 text-center cursor-pointer hover:bg-muted/50 transition-colors"
+                          >
+                            <input 
+                              type="file" 
+                              multiple 
+                              className="hidden" 
+                              ref={fileInputRef}
+                              onChange={(e) => {
+                                if (e.target.files) {
+                                  setEvidenceFiles(Array.from(e.target.files));
+                                }
+                              }}
+                            />
+                            <Upload className="h-4 w-4 mx-auto mb-2 text-muted-foreground" />
+                            <p className="text-[10px] text-muted-foreground">
+                              {evidenceFiles.length > 0 
+                                ? `${evidenceFiles.length} arquivos selecionados` 
+                                : "Clique para anexar prints de testes ou logs"}
+                            </p>
+                          </div>
+                          {evidenceFiles.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {evidenceFiles.map((f, i) => (
+                                <Badge key={i} variant="outline" className="text-[8px] py-0 h-4">
+                                  {f.name}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
                         </div>
 
                         <div className="flex items-start gap-2 pt-2">
@@ -486,7 +575,7 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
                             className="mt-0.5"
                           />
                           <label htmlFor="terms" className="text-[11px] leading-tight cursor-pointer">
-                            Eu confirmo que validei as APIs, realizei testes de fumaça e assumo a responsabilidade por este deploy em {environment.toUpperCase()}.
+                            Eu confirmo que validei as APIs, anexei evidências e assumo a responsabilidade por este deploy em {environment.toUpperCase()}.
                           </label>
                         </div>
                         
@@ -501,6 +590,7 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
                           />
                         </div>
                       </div>
+
                       <DialogFooter>
                         <Button variant="outline" onClick={() => setPendingApproval(false)}>Cancelar</Button>
                         <Button 
@@ -702,15 +792,24 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
                 </div>
               )}
               {filteredHistory.map((item) => (
-                <div key={item.id} className="p-4 rounded-xl border border-border/20 bg-muted/20 hover:bg-muted/30 transition-colors">
+                <div key={item.id} className={cn(
+                  "p-4 rounded-xl border transition-colors",
+                  item.status === "blocked" ? "border-destructive/30 bg-destructive/5" : "border-border/20 bg-muted/20 hover:bg-muted/30"
+                )}>
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <Badge variant={item.environment === "production" ? "default" : "outline"} className="text-[9px] h-4">
                         {item.environment.toUpperCase()}
                       </Badge>
                       <span className="text-[10px] font-mono text-muted-foreground">#{item.commit}</span>
+                      {item.status === "blocked" && (
+                        <Badge variant="destructive" className="text-[8px] h-3 px-1">BLOQUEADO</Badge>
+                      )}
                     </div>
-                    <span className="text-[10px] text-muted-foreground">{new Date(item.date).toLocaleString()}</span>
+                    <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                      <Clock className="h-3 w-3" />
+                      {new Date(item.date).toLocaleString()}
+                    </div>
                   </div>
                   <div className="flex flex-wrap items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
@@ -720,14 +819,20 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
                       )}>
                         {item.status === "success" ? <Check className="h-4 w-4 text-green-500" /> : <X className="h-4 w-4 text-destructive" />}
                       </div>
-                      <div>
-                        <span className="text-xs font-medium block">
-                          {item.status === "success" ? "Deploy realizado com sucesso" : "Deploy falhou"}
-                          {item.parameters.dryRun && <Badge variant="outline" className="ml-2 text-[8px] h-3 border-orange-500 text-orange-500">DRY-RUN</Badge>}
-                        </span>
-                        <div className="flex items-center gap-2 mt-0.5">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-medium">
+                            {item.status === "success" ? "Deploy realizado com sucesso" : 
+                             item.status === "blocked" ? "Tentativa de deploy bloqueada" : "Deploy falhou"}
+                            {item.parameters.dryRun && <Badge variant="outline" className="ml-2 text-[8px] h-3 border-orange-500 text-orange-500">DRY-RUN</Badge>}
+                          </span>
+                          <span className="text-[9px] text-muted-foreground italic flex items-center gap-1">
+                            por <UserCheck className="h-2.5 w-2.5" /> {item.user || "admin"}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
                           {item.failedStepId && (
-                            <span className="text-[10px] text-destructive">
+                            <span className="text-[10px] text-destructive font-medium">
                               Falha na etapa: {steps.find(s => s.id === item.failedStepId)?.label}
                             </span>
                           )}
@@ -737,10 +842,71 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
                               HEALTH: {item.healthStatus.toUpperCase()}
                             </Badge>
                           )}
+                          {item.parameters.approvalComment && (
+                            <span className="text-[9px] text-muted-foreground flex items-center gap-1 bg-muted px-1.5 py-0.5 rounded">
+                              <MessageSquare className="h-2.5 w-2.5" /> {item.parameters.approvalComment.substring(0, 30)}...
+                            </span>
+                          )}
+                          {item.evidence && item.evidence.length > 0 && (
+                            <span className="text-[9px] text-primary flex items-center gap-1 bg-primary/10 px-1.5 py-0.5 rounded">
+                              <Paperclip className="h-2.5 w-2.5" /> {item.evidence.length} evidências
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
                     <div className="flex gap-2">
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" size="sm" className="h-8 gap-1.5 text-[10px]">
+                            <Eye className="h-3.5 w-3.5" /> Revisar
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[600px]">
+                          <DialogHeader>
+                            <DialogTitle>Detalhes da Execução #{item.commit}</DialogTitle>
+                          </DialogHeader>
+                          <div className="grid grid-cols-2 gap-4 py-4">
+                            <div className="space-y-3">
+                              <div className="space-y-1">
+                                <p className="text-[10px] uppercase text-muted-foreground font-bold">Ambiente & Status</p>
+                                <div className="flex items-center gap-2">
+                                  <Badge>{item.environment.toUpperCase()}</Badge>
+                                  <Badge variant={item.status === "success" ? "outline" : "destructive"}>{item.status.toUpperCase()}</Badge>
+                                </div>
+                              </div>
+                              <div className="space-y-1">
+                                <p className="text-[10px] uppercase text-muted-foreground font-bold">Responsável</p>
+                                <p className="text-xs font-mono">{item.user || "admin"}</p>
+                              </div>
+                              <div className="space-y-1">
+                                <p className="text-[10px] uppercase text-muted-foreground font-bold">Justificativa</p>
+                                <p className="text-xs italic bg-muted p-2 rounded border">{item.parameters.approvalComment || "Nenhuma justificativa fornecida"}</p>
+                              </div>
+                            </div>
+                            <div className="space-y-3">
+                              <div className="space-y-1">
+                                <p className="text-[10px] uppercase text-muted-foreground font-bold">Health Check</p>
+                                <p className="text-xs">{item.healthDetails || "Não executado"}</p>
+                              </div>
+                              <div className="space-y-1">
+                                <p className="text-[10px] uppercase text-muted-foreground font-bold">Evidências ({item.evidence?.length || 0})</p>
+                                <div className="flex flex-wrap gap-1">
+                                  {item.evidence?.map((f, idx) => (
+                                    <Badge key={idx} variant="secondary" className="text-[9px]">{f}</Badge>
+                                  )) || <span className="text-[10px] text-muted-foreground">Nenhuma evidência anexada</span>}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          <DialogFooter className="sm:justify-start">
+                            <Button variant="outline" size="sm" onClick={() => downloadAuditSummary(item)}>
+                              <FileBadge className="h-3.5 w-3.5 mr-2" /> PDF Auditoria
+                            </Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
+
                       {item.status === "error" && item.failedStepId && (
                         <Button 
                           variant="outline" 
@@ -756,6 +922,7 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
                         >
                           <RotateCcw className="h-3 w-3" /> Retomar
                         </Button>
+
                       )}
                       <Dialog>
                         <DialogTrigger asChild>
