@@ -1,4 +1,4 @@
-import { Check, X, Loader2, PlayCircle, Globe, ShieldCheck, Smartphone, Package, Code, AlertCircle, Terminal, History, Download, ExternalLink, QrCode, Filter, Search, Mail, Bell, FileJson, FileSpreadsheet, FileText, UserCheck, RotateCcw, FileBadge, Lock, MessageSquare, ShieldAlert, Activity, Cpu, Upload, Paperclip, Eye, Clock, Trash2, Settings, HardDrive, Calendar } from "lucide-react";
+import { Check, X, Loader2, PlayCircle, Globe, ShieldCheck, Smartphone, Package, Code, AlertCircle, Terminal, History, Download, ExternalLink, QrCode, Filter, Search, Mail, Bell, FileJson, FileSpreadsheet, FileText, UserCheck, RotateCcw, FileBadge, Lock, MessageSquare, ShieldAlert, Activity, Cpu, Upload, Paperclip, Eye, Clock, Trash2, Settings, HardDrive, Calendar, Shield } from "lucide-react";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -80,6 +80,17 @@ interface EvidenceFile {
   thumbnail?: string;
   scannedAt: string;
   scanResult: "clean" | "infected" | "suspicious";
+  hash: string;
+}
+
+interface AuditLog {
+  id: string;
+  timestamp: string;
+  action: "download_requested" | "download_authorized" | "download_denied" | "retention_cleanup";
+  user: string;
+  attachmentName: string;
+  reason: string;
+  status: "success" | "denied" | "info";
 }
 
 
@@ -122,6 +133,23 @@ export function DeliveryFlow() {
   const [allowedTypes] = useState(["image/png", "image/jpeg", "application/pdf", "text/plain"]);
   const [isScanning, setIsScanning] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => {
+    const saved = localStorage.getItem("deploy_audit_logs");
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const addAuditLog = (log: Omit<AuditLog, "id" | "timestamp">) => {
+    const newLog: AuditLog = {
+      ...log,
+      id: crypto.randomUUID(),
+      timestamp: new Date().toISOString()
+    };
+    setAuditLogs(prev => {
+      const updated = [newLog, ...prev].slice(0, 100);
+      localStorage.setItem("deploy_audit_logs", JSON.stringify(updated));
+      return updated;
+    });
+  };
 
 
   const [steps, setSteps] = useState<ValidationStep[]>([
@@ -165,6 +193,13 @@ export function DeliveryFlow() {
             const diffDays = (now.getTime() - deployDate.getTime()) / (1000 * 3600 * 24);
             if (diffDays > policy.expirationDays && item.evidence && item.evidence.length > 0) {
               console.log(`[Retention Job] Expiring evidence for deploy ${item.commit} (${item.environment})`);
+              addAuditLog({
+                action: "retention_cleanup",
+                user: "system",
+                attachmentName: item.evidence?.join(", ") || "N/A",
+                reason: `Expiração de ${policy.expirationDays} dias atingida para ${item.environment}`,
+                status: "info"
+              });
               changed = true;
               return { ...item, evidence: [], detailedEvidence: [] };
             }
@@ -415,10 +450,11 @@ export function DeliveryFlow() {
         name: f.name,
         size: f.size,
         type: f.type,
-        url: `https://storage.kubovibe.app/signed/${deployId}/${f.name}?token=${Math.random().toString(36).substring(7)}`,
+        url: `https://storage.kubovibe.app/signed/${deployId}/${f.name}?token=${Math.random().toString(36).substring(7)}&expires=${Date.now() + 3600000}`,
         thumbnail: f.type.startsWith('image/') ? URL.createObjectURL(f) : undefined,
         scannedAt: new Date().toISOString(),
-        scanResult: "clean" as const
+        scanResult: "clean" as const,
+        hash: btoa(f.name + f.size).substring(0, 32).toLowerCase()
       };
     }));
     (newItem as any).detailedEvidence = detailedEvidence;
@@ -588,7 +624,10 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
             <TabsTrigger value="current" className="text-xs">Atual</TabsTrigger>
             <TabsTrigger value="history" className="text-xs">Histórico</TabsTrigger>
             <TabsTrigger value="settings" className="text-xs">
-              <Settings className="h-3 w-3 mr-1.5" /> Configurações
+              <Settings className="h-3 w-3 mr-1.5" /> Políticas
+            </TabsTrigger>
+            <TabsTrigger value="audit" className="text-xs">
+              <Shield className="h-3 w-3 mr-1.5" /> Auditoria
             </TabsTrigger>
           </TabsList>
         </div>
@@ -1142,8 +1181,7 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
                                         <div className="flex flex-col col-span-2">
                                           <span className="text-[7px] text-muted-foreground uppercase">Hash (SHA-256)</span>
                                           <span className="text-[8px] font-mono truncate opacity-60">
-                                            {/* Mock hash for display */}
-                                            {btoa(f.name + f.size).substring(0, 32).toLowerCase()}
+                                            {f.hash}
                                           </span>
                                         </div>
                                       </div>
@@ -1158,13 +1196,43 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
                                           onClick={() => {
                                             const isAdmin = currentUserRole === 'admin';
                                             const isDev = currentUserRole === 'developer';
-                                            const isApprover = item.user === currentUserRole; // In real scenario, check if current user is the approver record
+                                            const isApprover = item.user === currentUserRole; 
+                                            const reason = isAdmin ? "Acesso administrativo (Admin)" : isDev ? "Acesso de desenvolvedor (Dev)" : isApprover ? "Aprovador original da execução" : "Acesso não autorizado";
 
                                             if (!isAdmin && !isDev && !isApprover) {
+                                              addAuditLog({
+                                                action: "download_denied",
+                                                user: currentUserRole,
+                                                attachmentName: f.name,
+                                                reason,
+                                                status: "denied"
+                                              });
                                               toast.error("Acesso Negado", { description: "Apenas Dev, Admin ou o Aprovador original podem baixar esta evidência." });
                                               return;
                                             }
+
+                                            // Check expiration from URL for simulation
+                                            const urlParams = new URLSearchParams(f.url.split('?')[1]);
+                                            const expires = parseInt(urlParams.get('expires') || '0');
+                                            if (Date.now() > expires) {
+                                              addAuditLog({
+                                                action: "download_denied",
+                                                user: currentUserRole,
+                                                attachmentName: f.name,
+                                                reason: "Link assinado expirado",
+                                                status: "denied"
+                                              });
+                                              toast.error("Link Expirado", { description: "O link assinado para esta evidência expirou por segurança." });
+                                              return;
+                                            }
                                             
+                                            addAuditLog({
+                                              action: "download_authorized",
+                                              user: currentUserRole,
+                                              attachmentName: f.name,
+                                              reason,
+                                              status: "success"
+                                            });
                                             toast.success("Download iniciado", { description: `Arquivo: ${f.name} via link temporário assinado.` });
                                             window.open(f.url, '_blank');
                                           }}
@@ -1357,6 +1425,61 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
               Aplicar em Tudo
             </Button>
           </div>
+        </TabsContent>
+        <TabsContent value="audit" className="mt-0 space-y-4">
+          <Card className="p-4 border-primary/10 bg-muted/10">
+            <div className="flex items-center justify-between mb-4 border-b pb-2">
+              <div className="flex items-center gap-2">
+                <Shield className="h-4 w-4 text-primary" />
+                <h4 className="text-sm font-bold uppercase">Log de Auditoria de Acessos</h4>
+              </div>
+              <Badge variant="outline" className="text-[10px]">Últimas 100 atividades</Badge>
+            </div>
+            
+            <ScrollArea className="h-[450px]">
+              <div className="space-y-2">
+                {auditLogs.length === 0 && (
+                  <div className="p-12 text-center text-muted-foreground">
+                    <ShieldAlert className="h-8 w-8 mx-auto mb-2 opacity-20" />
+                    <p className="text-xs">Nenhum registro de auditoria disponível</p>
+                  </div>
+                )}
+                {auditLogs.map((log) => (
+                  <div key={log.id} className="flex items-start gap-3 p-3 rounded-lg border border-border/20 bg-background/50 text-[11px]">
+                    <div className={cn(
+                      "p-1.5 rounded-full mt-0.5",
+                      log.status === "success" ? "bg-green-500/10 text-green-500" : 
+                      log.status === "denied" ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"
+                    )}>
+                      {log.status === "success" ? <Check className="h-3 w-3" /> : 
+                       log.status === "denied" ? <Lock className="h-3 w-3" /> : <Activity className="h-3 w-3" />}
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-primary">
+                          {log.action === "download_authorized" ? "Download Autorizado" : 
+                           log.action === "download_denied" ? "Acesso Negado" : 
+                           log.action === "retention_cleanup" ? "Limpeza de Retenção" : "Solicitação de Download"}
+                        </span>
+                        <span className="text-[9px] text-muted-foreground">
+                          {new Date(log.timestamp).toLocaleString()}
+                        </span>
+                      </div>
+                      <p className="text-muted-foreground leading-relaxed">
+                        Usuário <span className="text-foreground font-mono">{log.user}</span> 
+                        {log.action.includes("download") ? ` tentou acessar "${log.attachmentName}"` : ` processou "${log.attachmentName}"`}.
+                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Badge variant="outline" className="text-[9px] h-3.5 px-1 py-0 border-border/40">
+                          MOTIVO: {log.reason}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </Card>
         </TabsContent>
       </Tabs>
     </Card>

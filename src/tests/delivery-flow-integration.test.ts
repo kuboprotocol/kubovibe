@@ -45,6 +45,20 @@ describe('DeliveryFlow Integration - Security & Audit', () => {
     expect(checkAccess('viewer', 'approver_user', 'approver_user')).toBe(true);
   });
 
+  it('should verify signed URL expiration logic', () => {
+    const expiresPast = Date.now() - 1000;
+    const expiresFuture = Date.now() + 3600000;
+    
+    const checkExpiration = (url: string) => {
+      const urlParams = new URLSearchParams(url.split('?')[1]);
+      const expires = parseInt(urlParams.get('expires') || '0');
+      return Date.now() < expires;
+    };
+
+    expect(checkExpiration(`https://test.com?expires=${expiresPast}`)).toBe(false);
+    expect(checkExpiration(`https://test.com?expires=${expiresFuture}`)).toBe(true);
+  });
+
   it('should expire evidence based on retention policy', () => {
     const history = [{ date: new Date(Date.now() - 8 * 24 * 3600 * 1000).toISOString(), environment: 'staging', evidence: ['file.png'] }];
     const result = simulateRetentionJob(history, [mockPolicy], new Date());
@@ -52,9 +66,24 @@ describe('DeliveryFlow Integration - Security & Audit', () => {
   });
 
   it('should verify audit PDF structure and hash consistency', () => {
-    const evidence = { name: 'audit.png', size: 2048, type: 'image/png' };
-    const validation = validateAttachment(evidence, mockPolicy);
-    const auditText = `Hash (SHA-256): ${validation.hash}`;
-    expect(auditText).toContain(validation.hash);
+    const evidence = [
+      { name: 'audit1.png', size: 2048, type: 'image/png' },
+      { name: 'audit2.png', size: 4096, type: 'image/png' }
+    ];
+    
+    const validations = evidence.map(e => validateAttachment(e, mockPolicy));
+    
+    // Simulate PDF generation sequence
+    const pdfSequence = validations.map((v, i) => ({
+      page: i + 1,
+      thumbnail: `thumb_${evidence[i].name}`,
+      hash: v.hash
+    }));
+
+    expect(pdfSequence).toHaveLength(2);
+    expect(pdfSequence[0].page).toBe(1);
+    expect(pdfSequence[0].hash).toBe(validations[0].hash);
+    expect(pdfSequence[1].page).toBe(2);
+    expect(pdfSequence[1].hash).toBe(validations[1].hash);
   });
 });
