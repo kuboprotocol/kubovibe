@@ -137,18 +137,18 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     return saved ? JSON.parse(saved) : { zoom: 1, aspect: 1 };
   });
 
-  const buildSteps = (needsConvert: boolean): AvatarStepState[] => {
+  const buildSteps = (needsConvert: boolean, initialDetails?: Record<string, any>): AvatarStepState[] => {
     const now = new Date().toLocaleTimeString();
     return [
-      { key: "upload", label: "Upload da imagem", status: "pending", timestamp: now },
+      { key: "upload", label: "Upload da imagem", status: "pending", timestamp: now, details: initialDetails },
       { key: "convert", label: "Conversão HEIC/SVG", status: needsConvert ? "pending" : "skipped", timestamp: needsConvert ? now : undefined },
       { key: "generate", label: "Geração do avatar falante", status: "pending" },
       { key: "render", label: "Renderização final", status: "pending" },
     ];
   };
 
-  const updateStep = (key: AvatarStepKey, status: AvatarStepState["status"], errorMessage?: string) => {
-    setProgressSteps((prev) => prev.map((s) => (s.key === key ? { ...s, status, errorMessage, timestamp: new Date().toLocaleTimeString() } : s)));
+  const updateStep = (key: AvatarStepKey, status: AvatarStepState["status"], errorMessage?: string, details?: Record<string, any>) => {
+    setProgressSteps((prev) => prev.map((s) => (s.key === key ? { ...s, status, errorMessage, details: details || s.details, timestamp: new Date().toLocaleTimeString() } : s)));
   };
 
   const fetchLastResult = useCallback(async () => {
@@ -217,10 +217,16 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       file.type === "image/heic" ||
       file.name.toLowerCase().endsWith(".heic") ||
       file.type === "image/svg+xml";
-    if (toolKey === "avatar") setProgressSteps(buildSteps(needsConvert));
+    
+    if (toolKey === "avatar") {
+      setProgressSteps(buildSteps(needsConvert, { 
+        name: file.name, 
+        size: (file.size / 1024 / 1024).toFixed(2) + " MB",
+        type: file.type || "unknown"
+      }));
+      updateStep("upload", "active");
+    }
     try {
-      if (toolKey === "avatar") updateStep("upload", "active");
-
       // Convert HEIC → JPG
       if (file.type === "image/heic" || file.name.toLowerCase().endsWith(".heic")) {
         try {
@@ -270,14 +276,14 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       const maxSize = 10 * 1024 * 1024;
 
       if (!validTypes.includes(file.type)) {
-        const errorMsg = "Formato aceito: JPG, PNG, WEBP, SVG ou HEIC.";
+        const errorMsg = `Formato "${file.type || "desconhecido"}" não suportado. Use JPG, PNG, WEBP, SVG ou HEIC.`;
         if (toolKey === "avatar") updateStep("upload", "error", errorMsg);
         toast.error("Formato inválido", { description: errorMsg });
         setIsUploading(false);
         return;
       }
       if (file.size > maxSize) {
-        const errorMsg = "O tamanho máximo permitido é 10MB.";
+        const errorMsg = `Arquivo muito grande (${(file.size / 1024 / 1024).toFixed(2)}MB). O limite é 10MB.`;
         if (toolKey === "avatar") updateStep("upload", "error", errorMsg);
         toast.error("Arquivo muito grande", { description: errorMsg });
         setIsUploading(false);
@@ -316,7 +322,11 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       setUploadedImageUrl(publicUrl);
       setAvatarPreset(preset);
       localStorage.setItem("creative_avatar_preset", JSON.stringify(preset));
-      updateStep("upload", "done");
+      updateStep("upload", "done", undefined, { 
+        zoom: preset.zoom.toFixed(2), 
+        aspect: preset.aspect.toFixed(2),
+        finalUrl: publicUrl
+      });
       setCropOpen(false);
       if (cropSourceUrl) URL.revokeObjectURL(cropSourceUrl);
       setCropSourceUrl(null);
@@ -327,6 +337,12 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     }
   };
 
+  const handleSaveAvatarPreset = (preset: { zoom: number; aspect: number }) => {
+    setAvatarPreset(preset);
+    localStorage.setItem("creative_avatar_preset", JSON.stringify(preset));
+    toast.success("Preset de enquadramento salvo!");
+  };
+
   const handleResetSessionAvatar = () => {
     localStorage.removeItem("creative_last_avatar_image");
     setUploadedImageUrl(null);
@@ -334,7 +350,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     toast.success("Avatar padrão da sessão removido.");
   };
 
-  const handleDownloadResult = async (format: "png" | "jpg" = "png") => {
+  const handleDownloadResult = async (format: "png" | "jpg" = "png", quality: number = 0.90) => {
     if (!lastResult?.asset_url) return;
     try {
       const res = await fetch(lastResult.asset_url);
@@ -359,7 +375,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
         ctx.fillStyle = "white"; // JPG doesn't support transparency
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0);
-        finalBlob = await new Promise((r) => canvas.toBlob((b) => r(b!), "image/jpeg", 0.90)) as Blob;
+        finalBlob = await new Promise((r) => canvas.toBlob((b) => r(b!), "image/jpeg", quality)) as Blob;
         URL.revokeObjectURL(img.src);
       }
 
@@ -409,7 +425,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
         const base = prev.length ? prev : buildSteps(false);
         return base.map((s) => {
           if (s.key === "upload") return { ...s, status: "done" };
-          if (s.key === "generate") return { ...s, status: "active" };
+          if (s.key === "generate") return { ...s, status: "active", details: { prompt, ...metadata } };
           return s;
         });
       });
@@ -473,7 +489,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
 
       if (toolKey === "avatar") {
         updateStep("generate", "done");
-        updateStep("render", "active");
+        updateStep("render", "active", undefined, { fnName, correlationId: cId || "N/A" });
       }
       toast.success("Solicitação enviada!", {
         description: "Você pode acompanhar o progresso no histórico.",
@@ -484,7 +500,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
         // Re-fetch result and finalize render step shortly after
         setTimeout(async () => {
           await fetchLastResult();
-          updateStep("render", "done");
+          updateStep("render", "done", undefined, { resultUrl: data?.asset_url || "Disponível no histórico" });
         }, 1500);
       }
     } catch (e: any) {
@@ -498,7 +514,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       if (toolKey === "avatar") {
         setProgressSteps((prev) =>
           prev.map((s) =>
-            s.status === "active" ? { ...s, status: "pending" } : s
+            s.status === "active" ? { ...s, status: "error", errorMessage: e.message } : s
           )
         );
       }
@@ -746,7 +762,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                 Atualizar Comparação
               </Button>
               {lastResult.asset_url && (
-                <div className="flex gap-2">
+                <div className="flex flex-wrap justify-center gap-2">
                   <Button
                     size="sm"
                     variant="outline"
@@ -757,15 +773,26 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                     Baixar {lastResult.asset_url.endsWith('.mp4') ? 'MP4' : 'PNG'}
                   </Button>
                   {!lastResult.asset_url.endsWith('.mp4') && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="text-[10px] h-7"
-                      onClick={() => handleDownloadResult("jpg")}
-                    >
-                      <Download className="h-3 w-3 mr-1.5" />
-                      Baixar JPG
-                    </Button>
+                    <div className="flex gap-1 items-center bg-muted/30 rounded-md px-1 border border-border/20">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-[10px] h-7 px-2"
+                        onClick={() => handleDownloadResult("jpg", 0.95)}
+                      >
+                        <Download className="h-3 w-3 mr-1.5" />
+                        JPG (Alta)
+                      </Button>
+                      <div className="w-[1px] h-3 bg-border" />
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-[10px] h-7 px-2"
+                        onClick={() => handleDownloadResult("jpg", 0.60)}
+                      >
+                        JPG (Compresso)
+                      </Button>
+                    </div>
                   )}
                 </div>
               )}
@@ -852,6 +879,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
           setCropSourceUrl(null);
         }}
         onConfirm={handleCropConfirm}
+        onSavePreset={handleSaveAvatarPreset}
       />
     </div>
   );
