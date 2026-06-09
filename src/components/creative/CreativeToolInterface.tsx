@@ -845,6 +845,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       <AvatarCropDialog
         open={cropOpen}
         imageUrl={cropSourceUrl}
+        initialPreset={avatarPreset}
         onCancel={() => {
           setCropOpen(false);
           if (cropSourceUrl && cropSourceUrl.startsWith("blob:")) URL.revokeObjectURL(cropSourceUrl);
