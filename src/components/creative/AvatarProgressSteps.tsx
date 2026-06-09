@@ -15,20 +15,26 @@ export interface AvatarStepState {
 
 interface Props {
   steps: AvatarStepState[];
+  isCompact?: boolean;
 }
 
-export function AvatarProgressSteps({ steps }: Props) {
+export function AvatarProgressSteps({ steps, isCompact }: Props) {
   const [expandedStep, setExpandedStep] = useState<string | null>(null);
 
   return (
-    <div className="rounded-lg border border-border/40 bg-card/40 backdrop-blur p-4 space-y-3 animate-in fade-in slide-in-from-top-2">
-      <div className="flex items-center justify-between">
-        <p className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">
-          Progresso da execução
-        </p>
-        <Clock className="h-3 w-3 text-muted-foreground/50" />
-      </div>
-      <ol className="space-y-2">
+    <div className={cn(
+      "rounded-lg border border-border/40 bg-card/40 backdrop-blur space-y-3 animate-in fade-in slide-in-from-top-2",
+      isCompact ? "p-2 border-none bg-transparent" : "p-4"
+    )}>
+      {!isCompact && (
+        <div className="flex items-center justify-between">
+          <p className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">
+            Progresso da execução
+          </p>
+          <Clock className="h-3 w-3 text-muted-foreground/50" />
+        </div>
+      )}
+      <ol className={cn("space-y-2", isCompact && "space-y-1")}>
         {steps.map((step, idx) => (
           <li key={step.key} className="flex flex-col gap-1">
             <div 
@@ -37,7 +43,8 @@ export function AvatarProgressSteps({ steps }: Props) {
             >
                 <div
                 className={cn(
-                    "flex h-6 w-6 items-center justify-center rounded-full border text-[10px] font-bold transition-colors",
+                    "flex items-center justify-center rounded-full border text-[10px] font-bold transition-colors",
+                    isCompact ? "h-4 w-4" : "h-6 w-6",
                     step.status === "done" && "bg-primary text-primary-foreground border-primary",
                     step.status === "active" && "border-primary text-primary",
                     step.status === "pending" && "border-border text-muted-foreground",
@@ -46,19 +53,20 @@ export function AvatarProgressSteps({ steps }: Props) {
                 )}
                 >
                 {step.status === "done" ? (
-                    <Check className="h-3 w-3" />
+                    <Check className={cn(isCompact ? "h-2 w-2" : "h-3 w-3")} />
                 ) : step.status === "active" ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
+                    <Loader2 className={cn("animate-spin", isCompact ? "h-2 w-2" : "h-3 w-3")} />
                 ) : step.status === "error" ? (
-                    <AlertCircle className="h-3 w-3" />
+                    <AlertCircle className={cn(isCompact ? "h-2 w-2" : "h-3 w-3")} />
                 ) : (
-                    <span>{idx + 1}</span>
+                    <span className={isCompact ? "text-[8px]" : ""}>{idx + 1}</span>
                 )}
                 </div>
                 <div className="flex-1 flex items-center justify-between">
                     <span
                         className={cn(
-                            "text-sm flex items-center gap-1.5",
+                            "flex items-center gap-1.5",
+                            isCompact ? "text-[10px]" : "text-sm",
                             step.status === "active" && "font-semibold text-foreground",
                             step.status === "done" && "text-foreground/80",
                             (step.status === "pending" || step.status === "skipped") && "text-muted-foreground",
