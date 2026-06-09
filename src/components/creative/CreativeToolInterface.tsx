@@ -798,50 +798,67 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                 </div>
               </div>
             </div>
-            <div className="flex justify-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-[10px] h-7 opacity-60 hover:opacity-100"
-                onClick={fetchLastResult}
-              >
-                Atualizar Comparação
-              </Button>
-              {lastResult.asset_url && (
-                <div className="flex flex-wrap justify-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="text-[10px] h-7"
-                    onClick={() => handleDownloadResult("png")}
-                  >
-                    <Download className="h-3 w-3 mr-1.5" />
-                    Baixar {lastResult.asset_url.endsWith('.mp4') ? 'MP4' : 'PNG'}
-                  </Button>
-                  {!lastResult.asset_url.endsWith('.mp4') && (
-                    <div className="flex gap-1 items-center bg-muted/30 rounded-md px-1 border border-border/20">
+            <div className="flex flex-col items-center gap-4">
+              <div className="flex justify-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-[10px] h-7 opacity-60 hover:opacity-100"
+                  onClick={fetchLastResult}
+                >
+                  Atualizar Comparação
+                </Button>
+                {lastResult.asset_url && (
+                  <div className="flex flex-wrap justify-center gap-2">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button size="sm" variant="outline" className="text-[10px] h-7">
+                          <Download className="h-3 w-3 mr-1.5" />
+                          Opções de Download
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-64 space-y-4">
+                        <div className="space-y-2">
+                          <Label className="text-xs uppercase font-bold text-muted-foreground">Formato & Qualidade</Label>
+                          <div className="grid grid-cols-2 gap-2">
+                            <Button size="sm" variant={downloadOptions.quality > 0.8 ? "default" : "outline"} onClick={() => setDownloadOptions({ ...downloadOptions, quality: 0.95 })}>Alta (JPG)</Button>
+                            <Button size="sm" variant={downloadOptions.quality <= 0.8 ? "default" : "outline"} onClick={() => setDownloadOptions({ ...downloadOptions, quality: 0.60 })}>Média (JPG)</Button>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs uppercase font-bold text-muted-foreground">Resolução</Label>
+                          <Select value={downloadOptions.resolution} onValueChange={(v) => setDownloadOptions({ ...downloadOptions, resolution: v })}>
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="original">Original</SelectItem>
+                              <SelectItem value="1080p">1080p (Full HD)</SelectItem>
+                              <SelectItem value="720p">720p (HD)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 pt-2 border-t">
+                          <Button size="sm" className="w-full" onClick={() => handleDownloadResult("jpg", downloadOptions.quality, downloadOptions.resolution)}>Baixar JPG</Button>
+                          <Button size="sm" variant="secondary" className="w-full" onClick={() => handleDownloadResult("png", 1, downloadOptions.resolution)}>Baixar PNG</Button>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+
+                    {lastResult.asset_url.endsWith('.mp4') && (
                       <Button
                         size="sm"
-                        variant="ghost"
-                        className="text-[10px] h-7 px-2"
-                        onClick={() => handleDownloadResult("jpg", 0.95)}
+                        variant="default"
+                        className="text-[10px] h-7"
+                        onClick={() => handleDownloadResult("png")}
                       >
                         <Download className="h-3 w-3 mr-1.5" />
-                        JPG (Alta)
+                        Baixar MP4
                       </Button>
-                      <div className="w-[1px] h-3 bg-border" />
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-[10px] h-7 px-2"
-                        onClick={() => handleDownloadResult("jpg", 0.60)}
-                      >
-                        JPG (Compresso)
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              )}
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -856,18 +873,23 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                 <div key={opt.key} className="space-y-1.5">
                   <Label className="text-xs uppercase tracking-wider text-muted-foreground">{opt.label}</Label>
                   {opt.type === "select" ? (
-                    <select 
-                      className="flex h-9 w-full rounded-md border border-input bg-background/50 px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    <Select 
                       value={metadata[opt.key]}
-                      onChange={(e) => setMetadata({ ...metadata, [opt.key]: e.target.value })}
+                      onValueChange={(v) => setMetadata({ ...metadata, [opt.key]: v })}
                     >
-                      {opt.options?.map(o => <option key={o} value={o}>{o}</option>)}
-                    </select>
+                      <SelectTrigger className="h-9 bg-background/50 border-border/40">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {opt.options?.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                   ) : opt.type === "number" ? (
                     <Input 
                       type="number" 
                       value={metadata[opt.key]}
                       onChange={(e) => setMetadata({ ...metadata, [opt.key]: parseInt(e.target.value) })}
+
                       className="bg-background/50 h-9"
                     />
                   ) : (
