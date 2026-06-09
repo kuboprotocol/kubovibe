@@ -504,11 +504,13 @@ function AuditHistoryManager({
                     className="h-5 w-5 text-muted-foreground hover:text-destructive"
                     title="Resetar Preferências"
                     onClick={() => {
-                      localStorage.removeItem("audit_visibleColumns");
-                      localStorage.removeItem("audit_itemsPerPage");
-                      localStorage.removeItem("audit_sortField");
-                      localStorage.removeItem("audit_sortOrder");
-                      window.location.reload();
+                      if (confirm("Tem certeza que deseja resetar todas as preferências de exibição da auditoria para o padrão?")) {
+                        localStorage.removeItem("audit_visibleColumns");
+                        localStorage.removeItem("audit_itemsPerPage");
+                        localStorage.removeItem("audit_sortField");
+                        localStorage.removeItem("audit_sortOrder");
+                        window.location.reload();
+                      }
                     }}
                   >
                     <RotateCcw className="h-3 w-3" />
