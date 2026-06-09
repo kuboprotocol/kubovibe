@@ -896,6 +896,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
               ))}
             </div>
           </div>
+        )}
 
         {/* Comparison Section (Before vs After) */}
         {toolKey === "avatar" && lastResult && (
