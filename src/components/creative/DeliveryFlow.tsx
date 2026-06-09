@@ -830,25 +830,46 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
         </TabsContent>
 
         <TabsContent value="history" className="space-y-4 mt-0">
-          <div className="flex gap-2">
-            <div className="relative flex-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+            <div className="relative">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input 
-                placeholder="Buscar por commit..." 
-                className="pl-9 h-9"
+                placeholder="Commit..." 
+                className="pl-9 h-9 text-xs"
                 value={historySearch}
-                onChange={(e) => setHistorySearch(e.target.value)}
+                onChange={(e) => { setHistorySearch(e.target.value); setCurrentPage(1); }}
               />
             </div>
-            <Select value={historyFilter} onValueChange={setHistoryFilter}>
-              <SelectTrigger className="w-[130px] h-9">
+            <div className="relative">
+              <UserCheck className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Usuário..." 
+                className="pl-9 h-9 text-xs"
+                value={historyUserSearch}
+                onChange={(e) => { setHistoryUserSearch(e.target.value); setCurrentPage(1); }}
+              />
+            </div>
+            <Select value={historyFilter} onValueChange={(v) => { setHistoryFilter(v); setCurrentPage(1); }}>
+              <SelectTrigger className="h-9 text-xs">
                 <Filter className="h-3.5 w-3.5 mr-2" />
-                <SelectValue />
+                <SelectValue placeholder="Ambiente" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="all">Todos Ambientes</SelectItem>
                 <SelectItem value="staging">Staging</SelectItem>
                 <SelectItem value="production">Produção</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={historyStatusFilter} onValueChange={(v) => { setHistoryStatusFilter(v); setCurrentPage(1); }}>
+              <SelectTrigger className="h-9 text-xs">
+                <Activity className="h-3.5 w-3.5 mr-2" />
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos Status</SelectItem>
+                <SelectItem value="success">Sucesso</SelectItem>
+                <SelectItem value="error">Falha</SelectItem>
+                <SelectItem value="blocked">Bloqueado</SelectItem>
               </SelectContent>
             </Select>
           </div>
