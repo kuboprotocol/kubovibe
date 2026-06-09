@@ -1156,11 +1156,16 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
                                           size="sm" 
                                           className="h-6 px-2 text-[9px] gap-1 hover:bg-primary hover:text-primary-foreground transition-all" 
                                           onClick={() => {
-                                            if (currentUserRole === 'viewer') {
-                                              toast.error("Acesso Negado", { description: "Apenas Dev/Admin podem baixar evidências assinadas." });
+                                            const isAdmin = currentUserRole === 'admin';
+                                            const isDev = currentUserRole === 'developer';
+                                            const isApprover = item.user === currentUserRole; // In real scenario, check if current user is the approver record
+
+                                            if (!isAdmin && !isDev && !isApprover) {
+                                              toast.error("Acesso Negado", { description: "Apenas Dev, Admin ou o Aprovador original podem baixar esta evidência." });
                                               return;
                                             }
-                                            toast.success("Download iniciado", { description: `Arquivo: ${f.name}` });
+                                            
+                                            toast.success("Download iniciado", { description: `Arquivo: ${f.name} via link temporário assinado.` });
                                             window.open(f.url, '_blank');
                                           }}
                                         >
