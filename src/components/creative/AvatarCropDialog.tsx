@@ -12,6 +12,7 @@ interface Props {
   imageUrl: string | null;
   onCancel: () => void;
   onConfirm: (croppedBlob: Blob, preset: { zoom: number; aspect: number }) => void | Promise<void>;
+  onSavePreset: (preset: { zoom: number; aspect: number }) => void;
   initialPreset?: { zoom: number; aspect: number };
 }
 
@@ -41,7 +42,7 @@ async function getCroppedBlob(imageSrc: string, area: Area): Promise<Blob> {
   });
 }
 
-export function AvatarCropDialog({ open, imageUrl, onCancel, onConfirm, initialPreset }: Props) {
+export function AvatarCropDialog({ open, imageUrl, onCancel, onConfirm, onSavePreset, initialPreset }: Props) {
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(initialPreset?.zoom || 1);
   const [aspect, setAspect] = useState(initialPreset?.aspect || 1);
@@ -112,7 +113,10 @@ export function AvatarCropDialog({ open, imageUrl, onCancel, onConfirm, initialP
             </div>
             <div className="flex-1 space-y-2">
                 <Label className="text-xs text-muted-foreground flex items-center gap-1"><Maximize className="h-3 w-3"/> Ajustar à área</Label>
-                <Button variant="outline" className="w-full" onClick={() => setZoom(1)}>Resetar Zoom</Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" className="flex-1" onClick={() => setZoom(1)}>Resetar Zoom</Button>
+                  <Button variant="secondary" className="flex-1" onClick={() => onSavePreset({ zoom, aspect })}>Salvar Preset</Button>
+                </div>
             </div>
           </div>
           <div className="space-y-2">

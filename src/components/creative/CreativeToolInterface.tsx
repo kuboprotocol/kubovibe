@@ -137,18 +137,18 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     return saved ? JSON.parse(saved) : { zoom: 1, aspect: 1 };
   });
 
-  const buildSteps = (needsConvert: boolean): AvatarStepState[] => {
+  const buildSteps = (needsConvert: boolean, initialDetails?: Record<string, any>): AvatarStepState[] => {
     const now = new Date().toLocaleTimeString();
     return [
-      { key: "upload", label: "Upload da imagem", status: "pending", timestamp: now },
+      { key: "upload", label: "Upload da imagem", status: "pending", timestamp: now, details: initialDetails },
       { key: "convert", label: "Conversão HEIC/SVG", status: needsConvert ? "pending" : "skipped", timestamp: needsConvert ? now : undefined },
       { key: "generate", label: "Geração do avatar falante", status: "pending" },
       { key: "render", label: "Renderização final", status: "pending" },
     ];
   };
 
-  const updateStep = (key: AvatarStepKey, status: AvatarStepState["status"], errorMessage?: string) => {
-    setProgressSteps((prev) => prev.map((s) => (s.key === key ? { ...s, status, errorMessage, timestamp: new Date().toLocaleTimeString() } : s)));
+  const updateStep = (key: AvatarStepKey, status: AvatarStepState["status"], errorMessage?: string, details?: Record<string, any>) => {
+    setProgressSteps((prev) => prev.map((s) => (s.key === key ? { ...s, status, errorMessage, details: details || s.details, timestamp: new Date().toLocaleTimeString() } : s)));
   };
 
   const fetchLastResult = useCallback(async () => {
@@ -217,9 +217,15 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       file.type === "image/heic" ||
       file.name.toLowerCase().endsWith(".heic") ||
       file.type === "image/svg+xml";
-    if (toolKey === "avatar") setProgressSteps(buildSteps(needsConvert));
-    try {
-      if (toolKey === "avatar") updateStep("upload", "active");
+    
+    if (toolKey === "avatar") {
+      setProgressSteps(buildSteps(needsConvert, { 
+        name: file.name, 
+        size: (file.size / 1024 / 1024).toFixed(2) + " MB",
+        type: file.type || "unknown"
+      }));
+      updateStep("upload", "active");
+    }
 
       // Convert HEIC → JPG
       if (file.type === "image/heic" || file.name.toLowerCase().endsWith(".heic")) {
