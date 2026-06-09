@@ -572,7 +572,12 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       if (toolKey === "avatar") {
         setProgressSteps((prev) =>
           prev.map((s) =>
-            s.status === "active" ? { ...s, status: "error", errorMessage: e.message } : s
+            s.status === "active" ? { 
+              ...s, 
+              status: "error" as const, 
+              errorMessage: e.message, 
+              details: { ...s.details, fullError: e.stack || e.message, timestamp: new Date().toISOString() } 
+            } : s
           )
         );
       }
