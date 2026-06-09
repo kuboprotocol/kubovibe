@@ -227,7 +227,10 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       
       const body: any = { prompt, metadata };
       if (toolKey === "chat") body.messages = [{ role: "user", content: prompt }];
-      if (toolKey === "avatar") body.mode = "avatar";
+      if (toolKey === "avatar") {
+        body.mode = "avatar";
+        body.metadata = { ...metadata, source_image: uploadedImageUrl };
+      }
       if (toolKey === "shorts") body.mode = "shorts";
       if (toolKey === "ebook") body.topic = prompt;
       
