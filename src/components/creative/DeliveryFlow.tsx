@@ -173,6 +173,7 @@ function AuditHistoryManager({
 
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState<"csv" | "pdf">("csv");
+  const [exportMode, setExportMode] = useState<"filtered" | "current_page">("filtered");
   const MAX_EXPORT_LIMIT = 500;
 
   const handleExport = async (format: "csv" | "pdf") => {
@@ -182,13 +183,15 @@ function AuditHistoryManager({
       return;
     }
 
-    if (filteredLogs.length > MAX_EXPORT_LIMIT) {
+    const baseLogs = exportMode === "current_page" ? paginatedLogs : filteredLogs;
+
+    if (baseLogs.length > MAX_EXPORT_LIMIT) {
       toast.warning("Limite de exportação atingido", { 
-        description: `O arquivo conterá apenas os primeiros ${MAX_EXPORT_LIMIT} registros filtrados.` 
+        description: `O arquivo conterá apenas os primeiros ${MAX_EXPORT_LIMIT} registros selecionados.` 
       });
     }
 
-    const logsToExport = filteredLogs.slice(0, MAX_EXPORT_LIMIT);
+    const logsToExport = baseLogs.slice(0, MAX_EXPORT_LIMIT);
 
     if (format === "csv") {
       const headers = ["ID", "Timestamp", "Ação", "Usuário", "Anexo", "Motivo", "Status"];
@@ -207,7 +210,7 @@ function AuditHistoryManager({
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.setAttribute("href", url);
-      link.setAttribute("download", `audit_log_filtered_${new Date().toISOString()}.csv`);
+      link.setAttribute("download", `audit_log_${exportMode}_${new Date().toISOString()}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -220,7 +223,7 @@ function AuditHistoryManager({
         doc.setFontSize(16);
         doc.text(title || "Relatório de Auditoria Filtrado", 14, 15);
         doc.setFontSize(10);
-        doc.text(`Filtros: ${searchTerm || "Nenhum"} | Status: ${statusFilter} | Total Exportado: ${logsToExport.length}`, 14, 22);
+        doc.text(`Filtros: ${searchTerm || "Nenhum"} | Status: ${statusFilter} | Escopo: ${exportMode} | Qtd: ${logsToExport.length}`, 14, 22);
         
         const tableData = logsToExport.map(log => [
           new Date(log.timestamp).toLocaleString(),
@@ -238,7 +241,7 @@ function AuditHistoryManager({
           headStyles: { fillColor: [0, 102, 204] }
         });
         
-        doc.save(`audit_log_filtered_${new Date().toISOString()}.pdf`);
+        doc.save(`audit_log_${exportMode}_${new Date().toISOString()}.pdf`);
       } catch (error) {
         toast.error("Erro ao gerar PDF");
         return;
@@ -246,9 +249,9 @@ function AuditHistoryManager({
     }
 
     onAuditLog({
-      action: "download_authorized", // Using existing action for simplicity or could be "export_requested"
+      action: "download_authorized",
       user: userRole,
-      attachmentName: `Exportação ${format.toUpperCase()}`,
+      attachmentName: `Exportação ${format.toUpperCase()} (${exportMode === "current_page" ? "Página Atual" : "Filtrado"})`,
       reason: `Filtros: ${searchTerm || "Nenhum"}, Status: ${statusFilter}, Ordenação: ${sortField} ${sortOrder}, Qtd: ${logsToExport.length}`,
       status: "success"
     });
