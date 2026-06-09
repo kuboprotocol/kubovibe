@@ -353,6 +353,17 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     setLoading(true);
     setTraceInfo(null);
     setErrorState(null);
+    if (toolKey === "avatar") {
+      // Ensure steps reflect generation phase (upload is already done)
+      setProgressSteps((prev) => {
+        const base = prev.length ? prev : buildSteps(false);
+        return base.map((s) => {
+          if (s.key === "upload") return { ...s, status: "done" };
+          if (s.key === "generate") return { ...s, status: "active" };
+          return s;
+        });
+      });
+    }
     try {
       if (simulationMode) {
         const cId = crypto.randomUUID().slice(0, 8);
