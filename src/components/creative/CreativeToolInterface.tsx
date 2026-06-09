@@ -120,12 +120,34 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [simulationMode, setSimulationMode] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [lastResult, setLastResult] = useState<any>(null);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(() => {
     if (toolKey === "avatar") {
       return localStorage.getItem("creative_last_avatar_image");
     }
     return null;
   });
+
+  const fetchLastResult = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data } = await supabase
+      .from("creative_assets")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("tool", toolKey)
+      .eq("status", "completed")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+    
+    if (data) setLastResult(data);
+  }, [toolKey]);
+
+  useEffect(() => {
+    fetchLastResult();
+  }, [fetchLastResult]);
 
   useEffect(() => {
     if (toolKey === "avatar" && uploadedImageUrl) {
