@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Sparkles, Send, Coins, Settings2, Info, AlertCircle, Wallet, RotateCw } from "lucide-react";
+import { Loader2, Sparkles, Send, Coins, Settings2, Info, AlertCircle, Wallet, RotateCw, Upload, X, Image as ImageIcon } from "lucide-react";
 import { useSubscription } from "@/hooks/useSubscription";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
@@ -118,6 +118,8 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
   const [errorState, setErrorState] = useState<{ message: string; correlationId?: string; traceId?: string; stack?: string } | null>(null);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [simulationMode, setSimulationMode] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
 
   const logAuditAction = useCallback(async (step: string, action: string, params: any = {}, correlationId?: string, traceId?: string) => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -137,11 +139,53 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
   }, []);
   const { subscription, editsRemaining } = useSubscription();
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error("Por favor, selecione uma imagem.");
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não autenticado");
+
+      const fileExt = file.name.split('.').pop();
+      const filePath = `${user.id}/creative/${crypto.randomUUID()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      setUploadedImageUrl(publicUrl);
+      toast.success("Imagem carregada com sucesso!");
+    } catch (error: any) {
+      console.error("Upload error:", error);
+      toast.error("Falha ao carregar imagem: " + error.message);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleExecute = async () => {
-    if (loading) return; // Prevent double clicks
+    if (loading) return;
     
-    if (!prompt.trim() && toolKey !== "emo") {
+    if (!prompt.trim() && toolKey !== "emo" && toolKey !== "avatar") {
       toast.error("O campo de prompt/URL é obrigatório");
+      return;
+    }
+
+    if (toolKey === "avatar" && !uploadedImageUrl) {
+      toast.error("Por favor, selecione uma imagem para o avatar.");
       return;
     }
 
@@ -183,7 +227,10 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       
       const body: any = { prompt, metadata };
       if (toolKey === "chat") body.messages = [{ role: "user", content: prompt }];
-      if (toolKey === "avatar") body.mode = "avatar";
+      if (toolKey === "avatar") {
+        body.mode = "avatar";
+        body.metadata = { ...metadata, source_image: uploadedImageUrl };
+      }
       if (toolKey === "shorts") body.mode = "shorts";
       if (toolKey === "ebook") body.topic = prompt;
       
@@ -343,6 +390,49 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
             className="min-h-[120px] bg-background/50 border-border/40 focus:ring-primary/20"
           />
         </div>
+
+        {toolKey === "avatar" && (
+          <div className="space-y-3 pb-2 border-b border-border/20">
+            <Label className="text-sm font-semibold flex items-center gap-2">
+              <ImageIcon className="h-4 w-4 text-primary" /> Imagem do Avatar (Obrigatório)
+            </Label>
+            
+            {uploadedImageUrl ? (
+              <div className="relative w-24 h-24 group">
+                <img 
+                  src={uploadedImageUrl} 
+                  alt="Avatar" 
+                  className="w-full h-full object-cover rounded-lg border border-border" 
+                />
+                <button 
+                  onClick={() => setUploadedImageUrl(null)}
+                  className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-4">
+                <label className="flex flex-col items-center justify-center w-24 h-24 border-2 border-dashed border-border/60 rounded-lg cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition-all">
+                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                    {isUploading ? (
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    ) : (
+                      <>
+                        <Upload className="h-6 w-6 text-muted-foreground mb-1" />
+                        <span className="text-[10px] text-muted-foreground font-medium uppercase">Upload</span>
+                      </>
+                    )}
+                  </div>
+                  <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} disabled={isUploading} />
+                </label>
+                <div className="text-xs text-muted-foreground italic">
+                  Escolha uma foto clara do rosto para melhores resultados.
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {config.options && config.options.length > 0 && (
           <div className="space-y-4 pt-2">
