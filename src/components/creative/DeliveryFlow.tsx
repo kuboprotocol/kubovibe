@@ -93,7 +93,7 @@ export function DeliveryFlow() {
 
     for (let i = 0; i < newSteps.length; i++) {
       const step = newSteps[i];
-      step.status = "validating";
+      step.status = "validating" as const;
       setSteps([...newSteps]);
       
       addLog(`Processando etapa: ${step.label}...`, "info", step.id);
@@ -101,7 +101,7 @@ export function DeliveryFlow() {
       await new Promise(r => setTimeout(r, 1000 + Math.random() * 1000));
       
       if (step.id === "api" && Math.random() < 0.05) { // Small chance of simulated fail
-        step.status = "error";
+        step.status = "error" as const;
         step.error = "Falha na conexão com o banco de dados principal.";
         addLog(step.error, "error", step.id);
         setSteps([...newSteps]);
@@ -109,7 +109,7 @@ export function DeliveryFlow() {
         return;
       }
 
-      step.status = "success";
+      step.status = "success" as const;
       addLog(`${step.label} concluído com sucesso.`, "success", step.id);
       setProgress(((i + 1) / newSteps.length) * 100);
       setSteps([...newSteps]);
