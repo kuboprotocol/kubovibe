@@ -112,23 +112,28 @@ describe('DeliveryFlow Integration - Security & Audit', () => {
     expect(approver.canExport).toBe(true);
   });
 
-  it('should verify export limit, range validation and indices logging', () => {
+  it('should verify export limit, range validation and indices logging with edge cases', () => {
     const MAX_LIMIT = 500;
     const perPage = 25;
     const largeLogs = Array.from({ length: 600 }, (_, i) => ({ id: String(i), timestamp: new Date().toISOString() }));
     const result = paginateAndSort(largeLogs, 1, perPage, 'timestamp', 'desc');
     const totalPages = Math.ceil(largeLogs.length / perPage);
     
-    // Test range export validation logic
+    // Test range export validation logic with edge cases
     const validateRange = (start: number, end: number, total: number) => {
+      if (total === 0) return false;
       return start >= 1 && start <= total && end >= start && end <= total;
     };
 
     expect(validateRange(2, 3, totalPages)).toBe(true);
-    expect(validateRange(5, 2, totalPages)).toBe(false);
+    expect(validateRange(5, 2, totalPages)).toBe(false); // start > end
+    expect(validateRange(0, 1, totalPages)).toBe(false); // out of lower bound
+    expect(validateRange(1, totalPages + 1, totalPages)).toBe(false); // out of upper bound
+    expect(validateRange(1, 1, 0)).toBe(false); // empty list case
 
-    // Test indices calculation logic
+    // Test indices calculation logic for partial pages
     const getIndices = (startPage: number, endPage: number, itemsPerPage: number, totalRecords: number) => {
+      if (totalRecords === 0) return { first: 0, last: 0 };
       const first = (startPage - 1) * itemsPerPage + 1;
       const last = Math.min(totalRecords, endPage * itemsPerPage);
       return { first, last };
@@ -137,6 +142,9 @@ describe('DeliveryFlow Integration - Security & Audit', () => {
     const indices = getIndices(2, 3, perPage, 600);
     expect(indices.first).toBe(26);
     expect(indices.last).toBe(75);
+
+    const partialIndices = getIndices(24, 25, perPage, 610); // last page only has 10 items
+    expect(partialIndices.last).toBe(610);
 
     // Verify audit log record for export with detailed indices
     const auditLogs: any[] = [];
