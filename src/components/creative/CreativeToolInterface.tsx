@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import heic2any from "heic2any";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -119,12 +120,34 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [simulationMode, setSimulationMode] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [lastResult, setLastResult] = useState<any>(null);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(() => {
     if (toolKey === "avatar") {
       return localStorage.getItem("creative_last_avatar_image");
     }
     return null;
   });
+
+  const fetchLastResult = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data } = await supabase
+      .from("creative_assets")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("tool", toolKey)
+      .eq("status", "completed")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+    
+    if (data) setLastResult(data);
+  }, [toolKey]);
+
+  useEffect(() => {
+    fetchLastResult();
+  }, [fetchLastResult]);
 
   useEffect(() => {
     if (toolKey === "avatar" && uploadedImageUrl) {
@@ -151,29 +174,47 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
   const { subscription, editsRemaining } = useSubscription();
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    let file = e.target.files?.[0];
     if (!file) return;
-
-    // Validate type and size (max 5MB)
-    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
-    const maxSize = 5 * 1024 * 1024; // 5MB
-
-    if (!validTypes.includes(file.type)) {
-      toast.error("Formato inválido", {
-        description: "Apenas JPG, PNG ou WEBP são aceitos."
-      });
-      return;
-    }
-
-    if (file.size > maxSize) {
-      toast.error("Arquivo muito grande", {
-        description: "O tamanho máximo permitido é 5MB."
-      });
-      return;
-    }
 
     setIsUploading(true);
     try {
+      // Support for HEIC conversion
+      if (file.type === "image/heic" || file.name.toLowerCase().endsWith(".heic")) {
+        toast.info("Convertendo formato HEIC...");
+        const convertedBlob = await heic2any({ 
+          blob: file, 
+          toType: "image/jpeg",
+          quality: 0.8
+        });
+        const convertedFile = new File(
+          [Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob], 
+          file.name.replace(/\.[^/.]+$/, ".jpg"), 
+          { type: "image/jpeg" }
+        );
+        file = convertedFile;
+      }
+
+      // Validate type and size (max 10MB for support of more formats)
+      const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml', 'image/heic'];
+      const maxSize = 10 * 1024 * 1024; // 10MB
+
+      if (!validTypes.includes(file.type) && !file.name.toLowerCase().endsWith('.heic')) {
+        toast.error("Formato inválido", {
+          description: "Formatos aceitos: JPG, PNG, WEBP, SVG ou HEIC."
+        });
+        setIsUploading(false);
+        return;
+      }
+
+      if (file.size > maxSize) {
+        toast.error("Arquivo muito grande", {
+          description: "O tamanho máximo permitido é 10MB."
+        });
+        setIsUploading(false);
+        return;
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
 
@@ -471,13 +512,54 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                 <div className="space-y-1">
                   <p className="text-xs text-muted-foreground font-medium">Requisitos da Imagem:</p>
                   <ul className="text-[10px] text-muted-foreground/80 list-disc list-inside space-y-0.5">
-                    <li>Formatos: JPG, PNG ou WEBP</li>
-                    <li>Tamanho máximo: 5MB</li>
+                    <li>Formatos: JPG, PNG, WEBP, SVG ou HEIC</li>
+                    <li>Tamanho máximo: 10MB</li>
                     <li>Rosto claro e centralizado</li>
                   </ul>
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Comparison Section (Before vs After) */}
+        {toolKey === "avatar" && lastResult && (
+          <div className="pt-4 border-t border-border/20 space-y-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+              <RotateCw className="h-3 w-3" /> Último Resultado: Antes vs Depois
+            </h4>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <p className="text-[10px] text-center text-muted-foreground font-medium uppercase">Original</p>
+                <div className="aspect-square bg-muted rounded-lg overflow-hidden border border-border/40">
+                  {lastResult.metadata?.source_image ? (
+                    <img src={lastResult.metadata.source_image} alt="Antes" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-[10px] text-muted-foreground">N/A</div>
+                  )}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <p className="text-[10px] text-center text-primary font-medium uppercase">Avatar Gerado</p>
+                <div className="aspect-square bg-black rounded-lg overflow-hidden border border-primary/20 shadow-inner">
+                  {lastResult.asset_url?.endsWith('.mp4') ? (
+                    <video src={lastResult.asset_url} controls className="w-full h-full object-cover" />
+                  ) : (
+                    <img src={lastResult.asset_url} alt="Depois" className="w-full h-full object-cover" />
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-center">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-[10px] h-6 opacity-60 hover:opacity-100"
+                onClick={fetchLastResult}
+              >
+                Atualizar Comparação
+              </Button>
+            </div>
           </div>
         )}
 
