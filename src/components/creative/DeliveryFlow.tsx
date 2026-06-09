@@ -1555,55 +1555,13 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
                                     <FileBadge className="h-3 w-3 text-primary" />
                                     Histórico de Auditoria de Downloads
                                   </h4>
-                                  {(() => {
-                                    const attachmentNames = new Set((((item as any).detailedEvidence as EvidenceFile[]) || []).map(f => f.name));
-                                    const relevant = auditLogs.filter(l =>
-                                      l.action.startsWith("download_") && attachmentNames.has(l.attachmentName)
-                                    );
-                                    if (relevant.length === 0) {
-                                      return <p className="text-[10px] text-muted-foreground italic">Nenhum download registrado para esta revisão.</p>;
-                                    }
-                                    return (
-                                      <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
-                                        {relevant.map(log => (
-                                          <div
-                                            key={log.id}
-                                            className={`text-[10px] rounded border p-1.5 flex items-start gap-2 ${
-                                              log.status === "success"
-                                                ? "border-emerald-500/30 bg-emerald-500/5"
-                                                : log.status === "denied"
-                                                ? "border-red-500/30 bg-red-500/5"
-                                                : "border-border/30 bg-muted/20"
-                                            }`}
-                                          >
-                                            <span className={`mt-0.5 h-1.5 w-1.5 rounded-full shrink-0 ${
-                                              log.status === "success" ? "bg-emerald-500" :
-                                              log.status === "denied" ? "bg-red-500" : "bg-muted-foreground"
-                                            }`} />
-                                            <div className="flex-1 min-w-0">
-                                              <div className="flex items-center justify-between gap-2">
-                                                <span className="font-medium truncate">
-                                                  {log.action === "download_authorized" ? "Autorizado" :
-                                                   log.action === "download_denied" ? "Negado" : "Solicitado"}
-                                                  {" · "}
-                                                  <span className="text-muted-foreground font-normal">{log.user}</span>
-                                                </span>
-                                                <span className="text-[9px] text-muted-foreground shrink-0">
-                                                  {new Date(log.timestamp).toLocaleString()}
-                                                </span>
-                                              </div>
-                                              <div className="text-muted-foreground truncate">
-                                                <span className="font-mono">{log.attachmentName}</span>
-                                              </div>
-                                              <div className="text-muted-foreground/80 italic truncate">
-                                                Motivo: {log.reason}
-                                              </div>
-                                            </div>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    );
-                                  })()}
+                                  <AuditHistoryManager 
+                                    logs={auditLogs}
+                                    userRole={currentUserRole}
+                                    originalApprover={item.user}
+                                    showFilters={false}
+                                    filterByAttachment={undefined} // We could filter by all attachments in this item
+                                  />
                                 </div>
                               </div>
                             </div>
