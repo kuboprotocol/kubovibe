@@ -1,4 +1,4 @@
-import { Check, X, Loader2, PlayCircle, Globe, ShieldCheck, Smartphone, Package, Code, AlertCircle, Terminal, History, Download, ExternalLink, QrCode, Filter, Search, Mail, Bell, FileJson, FileSpreadsheet, FileText, UserCheck, RotateCcw, FileBadge, Lock } from "lucide-react";
+import { Check, X, Loader2, PlayCircle, Globe, ShieldCheck, Smartphone, Package, Code, AlertCircle, Terminal, History, Download, ExternalLink, QrCode, Filter, Search, Mail, Bell, FileJson, FileSpreadsheet, FileText, UserCheck, RotateCcw, FileBadge, Lock, MessageSquare, ShieldAlert, Activity, Cpu } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 interface ValidationStep {
@@ -42,7 +43,19 @@ interface DeployHistoryItem {
     environment: "staging" | "production";
     notifications: { email: boolean; webhook: boolean };
     commit: string;
+    dryRun?: boolean;
+    approvalComment?: string;
+    approvalTerms?: boolean;
+    healthCheck?: boolean;
   };
+  healthStatus?: "up" | "down" | "unchecked";
+}
+
+interface ActiveDeploy {
+  id: string;
+  environment: string;
+  user: string;
+  timestamp: string;
 }
 
 export function DeliveryFlow() {
@@ -58,6 +71,10 @@ export function DeliveryFlow() {
   const [currentUserRole, setCurrentUserRole] = useState<string>("admin"); // Mock role: 'admin', 'developer', 'viewer'
   const [pendingApproval, setPendingApproval] = useState<boolean>(false);
   const [currentCommit, setCurrentCommit] = useState<string>(() => Math.random().toString(36).substring(7));
+  const [approvalComment, setApprovalComment] = useState("");
+  const [approvalTerms, setApprovalTerms] = useState(false);
+  const [isDryRun, setIsDryRun] = useState(false);
+  const [activeDeploys, setActiveDeploys] = useState<ActiveDeploy[]>([]);
 
 
   const [steps, setSteps] = useState<ValidationStep[]>([
@@ -131,11 +148,34 @@ export function DeliveryFlow() {
       return;
     }
 
+    // Check for concurrent deploys in the same environment
+    const environmentLock = activeDeploys.find(d => d.environment === environment);
+    if (environmentLock && !isDryRun) {
+      toast.error("Bloqueio de Ambiente", { 
+        description: `O ambiente ${environment.toUpperCase()} já está em deploy por ${environmentLock.user}. Aguarde a conclusão.` 
+      });
+      addLog(`Tentativa de deploy bloqueada por concorrência em ${environment.toUpperCase()} (Usuário: ${currentUserRole})`, "warning");
+      return;
+    }
+
     // Require approval for production if not admin
     if (environment === "production" && currentUserRole !== "admin" && !pendingApproval) {
       setPendingApproval(true);
       toast.info("Aprovação Solicitada", { description: "Aguardando aprovação de um administrador para deploy em produção." });
       return;
+    }
+
+    if (environment === "production" && !isDryRun) {
+      if (!approvalComment.trim() || !approvalTerms) {
+        toast.error("Campos Obrigatórios", { description: "É necessário fornecer um comentário e aceitar os termos de aprovação." });
+        setPendingApproval(true);
+        return;
+      }
+    }
+
+    const deployId = crypto.randomUUID();
+    if (!isDryRun) {
+      setActiveDeploys(prev => [...prev, { id: deployId, environment, user: currentUserRole, timestamp: new Date().toISOString() }]);
     }
 
     setIsDeploying(true);
@@ -159,7 +199,7 @@ export function DeliveryFlow() {
     });
     setSteps(newSteps);
 
-    addLog(`${resumeFromStepId ? "Retomando" : "Iniciando"} deploy em ambiente: ${environment.toUpperCase()} (Commit: ${finalCommit})`, "info");
+    addLog(`${isDryRun ? "[DRY-RUN] " : ""}${resumeFromStepId ? "Retomando" : "Iniciando"} deploy em ambiente: ${environment.toUpperCase()} (Commit: ${finalCommit})`, "info");
 
     let finalStatus: "success" | "error" = "success";
     let failedStepId: string | undefined;
@@ -171,10 +211,24 @@ export function DeliveryFlow() {
       
       addLog(`Processando etapa: ${step.label}...`, "info", step.id);
       
+      // Simulating build/upload integration tests during dry-run or real deploy
+      if (i === 0) {
+        addLog("Validando parâmetros e credenciais de build...", "info", step.id);
+        await new Promise(r => setTimeout(r, 800));
+      }
+
       await new Promise(r => setTimeout(r, 1500));
       
-      // Simulated fail logic (random or specific step)
-      if (step.id === "api" && Math.random() < 0.2) {
+      if (isDryRun && Math.random() < 0.1) {
+        step.status = "error" as const;
+        step.error = "Simulação de falha em modo Dry-Run.";
+        addLog(step.error, "error", step.id);
+        finalStatus = "error";
+        failedStepId = step.id;
+        break;
+      }
+
+      if (!isDryRun && step.id === "api" && Math.random() < 0.2) {
         step.status = "error" as const;
         step.error = "Falha na validação de credenciais da API.";
         addLog(step.error, "error", step.id);
@@ -190,8 +244,18 @@ export function DeliveryFlow() {
       setSteps([...newSteps]);
     }
 
+    // Post-deploy health check
+    let healthStatus: "up" | "down" | "unchecked" = "unchecked";
+    if (finalStatus === "success" && !isDryRun) {
+      addLog("Iniciando Health-Check automático do link público...", "info");
+      await new Promise(r => setTimeout(r, 2000));
+      const isUp = Math.random() > 0.1;
+      healthStatus = isUp ? "up" : "down";
+      addLog(`Health-Check: ${isUp ? "ONLINE (200 OK)" : "OFFLINE / ERRO 500"}`, isUp ? "success" : "error");
+    }
+
     const newItem: DeployHistoryItem = {
-      id: crypto.randomUUID(),
+      id: deployId,
       date: new Date().toISOString(),
       environment,
       status: finalStatus,
@@ -200,24 +264,37 @@ export function DeliveryFlow() {
       apkUrl: "/downloads/app-latest.apk",
       logs: [...currentLogs, ...logs],
       failedStepId,
+      healthStatus,
       parameters: {
         environment,
         notifications: { ...notifications },
-        commit: finalCommit
+        commit: finalCommit,
+        dryRun: isDryRun,
+        approvalComment: environment === "production" ? approvalComment : undefined,
+        approvalTerms: environment === "production" ? approvalTerms : undefined,
+        healthCheck: true
       }
     };
 
-    setHistory(prev => [newItem, ...prev]);
+    if (!isDryRun) {
+      setHistory(prev => [newItem, ...prev]);
+    }
+    
     setIsDeploying(false);
+    setActiveDeploys(prev => prev.filter(d => d.id !== deployId));
     
     if (finalStatus === "success") {
-      toast.success("Entrega finalizada!", { description: `App disponível em ${environment}` });
-      addLog(`Deploy finalizado com sucesso em ${newItem.pwaUrl}`, "success");
+      toast.success(isDryRun ? "Simulação finalizada com sucesso!" : "Entrega finalizada!", { 
+        description: isDryRun ? "Nenhuma alteração real foi feita." : `App disponível em ${environment}` 
+      });
+      if (!isDryRun) addLog(`Deploy finalizado com sucesso em ${newItem.pwaUrl}`, "success");
     } else {
-      toast.error("Deploy falhou", { description: `Erro na etapa: ${steps.find(s => s.id === failedStepId)?.label}` });
+      toast.error(isDryRun ? "Simulação falhou" : "Deploy falhou", { 
+        description: `Erro na etapa: ${steps.find(s => s.id === failedStepId)?.label}` 
+      });
     }
 
-    notifyResult(finalStatus, environment, 1, newItem.pwaUrl);
+    if (!isDryRun) notifyResult(finalStatus, environment, 1, newItem.pwaUrl);
   };
 
   const downloadLogs = (historyItem: DeployHistoryItem, format: "json" | "csv") => {
@@ -252,6 +329,14 @@ Status Final: ${historyItem.status.toUpperCase()}
 Versão (Commit): ${historyItem.commit}
 URL Pública: ${historyItem.pwaUrl}
 HTTPS: HABILITADO E VERIFICADO
+Health-Check: ${historyItem.healthStatus?.toUpperCase() || "NÃO EXECUTADO"}
+-----------------------------------------
+DETALHES DE APROVAÇÃO (PRODUÇÃO)
+-----------------------------------------
+Comentário: ${historyItem.parameters.approvalComment || "N/A"}
+Termos Aceitos: ${historyItem.parameters.approvalTerms ? "SIM" : "NÃO"}
+-----------------------------------------
+MODO DE EXECUÇÃO: ${historyItem.parameters.dryRun ? "DRY-RUN (SIMULAÇÃO)" : "REAL (PRODUÇÃO/STAGING)"}
 -----------------------------------------
 TIMELINE DE ETAPAS
 -----------------------------------------
@@ -350,41 +435,111 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
                   </Select>
                 </div>
                 <div className="flex items-end gap-2">
-                  <Button 
-                    onClick={() => runValidation()} 
-                    disabled={isDeploying || (!canExecuteDeploy && !pendingApproval)}
-                    className={cn(
-                      "h-9 shadow-lg",
-                      pendingApproval ? "bg-orange-500 hover:bg-orange-600 animate-pulse" : "shadow-primary/20"
-                    )}
-                  >
-                    {isDeploying ? <Loader2 className="h-4 w-4 animate-spin" /> : 
-                     pendingApproval ? <Lock className="h-4 w-4 mr-2" /> :
-                     <PlayCircle className="h-4 w-4 mr-2" />}
-                    {isDeploying ? "Publicando..." : 
-                     pendingApproval ? "Aguardando Aprovação" : "Deploy Agora"}
-                  </Button>
-                  {pendingApproval && currentUserRole === "admin" && (
-                    <Button 
-                      variant="outline" 
-                      className="h-9 border-orange-500 text-orange-500 hover:bg-orange-500/10"
-                      onClick={() => {
-                        setPendingApproval(false);
-                        runValidation();
-                      }}
-                    >
-                      Aprovar Agora
-                    </Button>
-                  )}
+                  <Dialog open={pendingApproval} onOpenChange={setPendingApproval}>
+                    <DialogTrigger asChild>
+                      <Button 
+                        disabled={isDeploying || !canExecuteDeploy}
+                        className={cn(
+                          "h-9 shadow-lg",
+                          environment === "production" ? "bg-primary hover:bg-primary/90" : "bg-primary shadow-primary/20"
+                        )}
+                      >
+                        {isDeploying ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : 
+                         isDryRun ? <Activity className="h-4 w-4 mr-2" /> :
+                         <PlayCircle className="h-4 w-4 mr-2" />}
+                        {isDeploying ? "Publicando..." : 
+                         isDryRun ? "Simular Deploy" : "Deploy Agora"}
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[500px]">
+                      <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                          <ShieldAlert className="h-5 w-5 text-primary" />
+                          Aprovação de Deploy - {environment.toUpperCase()}
+                        </DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="p-3 bg-muted/50 rounded-lg border border-border/40 text-[11px] space-y-2">
+                          <p className="font-bold flex items-center gap-2">
+                            <Lock className="h-3.5 w-3.5" /> Política de Segurança
+                          </p>
+                          <p>O deploy em {environment.toUpperCase()} exige justificativa e aceitação dos termos de integridade.</p>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold flex items-center gap-2">
+                            <MessageSquare className="h-3.5 w-3.5" /> Comentários e Justificativa
+                          </label>
+                          <Textarea 
+                            placeholder="Descreva as alterações e evidências de testes..."
+                            value={approvalComment}
+                            onChange={(e) => setApprovalComment(e.target.value)}
+                            className="text-xs min-h-[100px]"
+                          />
+                        </div>
+
+                        <div className="flex items-start gap-2 pt-2">
+                          <Checkbox 
+                            id="terms" 
+                            checked={approvalTerms}
+                            onCheckedChange={(v) => setApprovalTerms(!!v)}
+                            className="mt-0.5"
+                          />
+                          <label htmlFor="terms" className="text-[11px] leading-tight cursor-pointer">
+                            Eu confirmo que validei as APIs, realizei testes de fumaça e assumo a responsabilidade por este deploy em {environment.toUpperCase()}.
+                          </label>
+                        </div>
+                        
+                        <div className="flex items-center justify-between p-2 bg-primary/5 rounded-lg border border-primary/20">
+                          <div className="flex items-center gap-2">
+                            <Activity className="h-4 w-4 text-primary" />
+                            <span className="text-[11px] font-bold">Modo Dry-Run</span>
+                          </div>
+                          <Checkbox 
+                            checked={isDryRun}
+                            onCheckedChange={(v) => setIsDryRun(!!v)}
+                          />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setPendingApproval(false)}>Cancelar</Button>
+                        <Button 
+                          onClick={() => runValidation()}
+                          disabled={environment === "production" && (!approvalComment.trim() || !approvalTerms)}
+                        >
+                          Confirmar e Iniciar
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </div>
               </div>
               
-              {!canExecuteDeploy && (
-                <div className="flex items-center gap-2 text-[10px] text-destructive font-bold p-2 bg-destructive/10 rounded-lg">
-                  <AlertCircle className="h-3.5 w-3.5" />
-                  Seu cargo ({currentUserRole}) não permite deploy em {environment.toUpperCase()}
+              <div className="flex items-center justify-between mt-1">
+                {!canExecuteDeploy ? (
+                  <div className="flex items-center gap-2 text-[10px] text-destructive font-bold p-2 bg-destructive/10 rounded-lg flex-1 mr-4">
+                    <AlertCircle className="h-3.5 w-3.5" />
+                    Seu cargo ({currentUserRole}) não permite deploy em {environment.toUpperCase()}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-[10px] text-primary font-bold p-2 bg-primary/5 rounded-lg flex-1 mr-4">
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                    Acesso autorizado para {environment.toUpperCase()}
+                  </div>
+                )}
+                
+                <div className="flex items-center gap-4 shrink-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase">Simulação</span>
+                    <Checkbox checked={isDryRun} onCheckedChange={(v) => setIsDryRun(!!v)} />
+                  </div>
+                  {activeDeploys.length > 0 && (
+                    <Badge variant="destructive" className="animate-pulse gap-1 text-[9px]">
+                      <Cpu className="h-2.5 w-2.5" /> DEPLOY CONCORRENTE ATIVO
+                    </Badge>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
 
             <div className="bg-muted/30 p-4 rounded-xl border border-border/20 space-y-3">
@@ -568,12 +723,21 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
                       <div>
                         <span className="text-xs font-medium block">
                           {item.status === "success" ? "Deploy realizado com sucesso" : "Deploy falhou"}
+                          {item.parameters.dryRun && <Badge variant="outline" className="ml-2 text-[8px] h-3 border-orange-500 text-orange-500">DRY-RUN</Badge>}
                         </span>
-                        {item.failedStepId && (
-                          <span className="text-[10px] text-destructive">
-                            Falha na etapa: {steps.find(s => s.id === item.failedStepId)?.label}
-                          </span>
-                        )}
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {item.failedStepId && (
+                            <span className="text-[10px] text-destructive">
+                              Falha na etapa: {steps.find(s => s.id === item.failedStepId)?.label}
+                            </span>
+                          )}
+                          {item.healthStatus && item.healthStatus !== "unchecked" && (
+                            <Badge variant={item.healthStatus === "up" ? "outline" : "destructive"} className="text-[8px] h-3 gap-1">
+                              {item.healthStatus === "up" ? <Check className="h-2 w-2" /> : <X className="h-2 w-2" />}
+                              HEALTH: {item.healthStatus.toUpperCase()}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     </div>
                     <div className="flex gap-2">
