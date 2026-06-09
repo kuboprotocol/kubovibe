@@ -639,7 +639,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                       </>
                     )}
                   </div>
-                  <input type="file" className="hidden" accept="image/jpeg,image/png,image/webp" onChange={handleFileUpload} disabled={isUploading} />
+                  <input type="file" className="hidden" accept="image/jpeg,image/png,image/webp,image/svg+xml,image/heic,.heic" onChange={handleFileUpload} disabled={isUploading} />
                 </label>
                 <div className="space-y-1">
                   <p className="text-xs text-muted-foreground font-medium">Requisitos da Imagem:</p>
