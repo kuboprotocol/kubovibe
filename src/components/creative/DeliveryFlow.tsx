@@ -111,8 +111,9 @@ function AuditHistoryManager({
   title, 
   showFilters = true, 
   userRole,
-  originalApprover 
-}: AuditHistoryManagerProps) {
+  originalApprover,
+  onAuditLog // Add this callback to handle logging from within this sub-component
+}: AuditHistoryManagerProps & { onAuditLog: (log: Omit<AuditLog, "id" | "timestamp">) => void }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [userFilter, setUserFilter] = useState<string>("all");
