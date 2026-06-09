@@ -498,6 +498,9 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
 
       const fnName = TOOL_TO_FN[toolKey];
       
+      const fnName = TOOL_TO_FN[toolKey];
+      const executionStartTime = new Date().toISOString();
+      
       const body: any = { prompt, metadata };
       if (toolKey === "chat") body.messages = [{ role: "user", content: prompt }];
       if (toolKey === "avatar") {
