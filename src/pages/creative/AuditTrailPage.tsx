@@ -1086,6 +1086,38 @@ export default function CreativeAuditPage() {
           </div>
         </SheetContent>
       </Sheet>
+      {/* Config Modal */}
+      <Sheet open={showConfig} onOpenChange={() => setShowConfig(false)}>
+        <SheetContent className="sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <Save className="h-5 w-5 text-primary" /> Configurações de Auditoria
+            </SheetTitle>
+            <SheetDescription>
+              Defina parâmetros padrão que persistem entre suas visitas.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="mt-6 space-y-6">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Limite Padrão de Recorrência</label>
+              <div className="flex gap-2">
+                <Input 
+                  type="number" 
+                  min="1" 
+                  value={recurrenceThreshold}
+                  onChange={(e) => setRecurrenceThreshold(Number(e.target.value))}
+                />
+                <Button onClick={() => { saveRecurrenceThreshold(); setShowConfig(false); }}>
+                  Salvar
+                </Button>
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                Alertas de falhas recorrentes aparecerão quando uma causa atingir este número de ocorrências.
+              </p>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
