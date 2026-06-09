@@ -139,6 +139,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     const saved = localStorage.getItem("creative_avatar_preset");
     return saved ? JSON.parse(saved) : { zoom: 1, aspect: 1 };
   });
+  const [downloadOptions, setDownloadOptions] = useState({ quality: 0.90, resolution: "original" as any });
 
   const buildSteps = (needsConvert: boolean, initialDetails?: Record<string, any>): AvatarStepState[] => {
     const now = new Date().toLocaleTimeString();
