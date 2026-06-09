@@ -512,13 +512,54 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                 <div className="space-y-1">
                   <p className="text-xs text-muted-foreground font-medium">Requisitos da Imagem:</p>
                   <ul className="text-[10px] text-muted-foreground/80 list-disc list-inside space-y-0.5">
-                    <li>Formatos: JPG, PNG ou WEBP</li>
-                    <li>Tamanho máximo: 5MB</li>
+                    <li>Formatos: JPG, PNG, WEBP, SVG ou HEIC</li>
+                    <li>Tamanho máximo: 10MB</li>
                     <li>Rosto claro e centralizado</li>
                   </ul>
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Comparison Section (Before vs After) */}
+        {toolKey === "avatar" && lastResult && (
+          <div className="pt-4 border-t border-border/20 space-y-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+              <RotateCw className="h-3 w-3" /> Último Resultado: Antes vs Depois
+            </h4>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <p className="text-[10px] text-center text-muted-foreground font-medium uppercase">Original</p>
+                <div className="aspect-square bg-muted rounded-lg overflow-hidden border border-border/40">
+                  {lastResult.metadata?.source_image ? (
+                    <img src={lastResult.metadata.source_image} alt="Antes" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-[10px] text-muted-foreground">N/A</div>
+                  )}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <p className="text-[10px] text-center text-primary font-medium uppercase">Avatar Gerado</p>
+                <div className="aspect-square bg-black rounded-lg overflow-hidden border border-primary/20 shadow-inner">
+                  {lastResult.asset_url?.endsWith('.mp4') ? (
+                    <video src={lastResult.asset_url} controls className="w-full h-full object-cover" />
+                  ) : (
+                    <img src={lastResult.asset_url} alt="Depois" className="w-full h-full object-cover" />
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-center">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-[10px] h-6 opacity-60 hover:opacity-100"
+                onClick={fetchLastResult}
+              >
+                Atualizar Comparação
+              </Button>
+            </div>
           </div>
         )}
 
