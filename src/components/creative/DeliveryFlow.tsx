@@ -318,7 +318,7 @@ function AuditHistoryManager({
       action: "download_authorized",
       user: userRole,
       attachmentName: `Exportação ${format.toUpperCase()} (${exportMode === "current_page" ? `Pág. ${currentPage}` : exportMode === "range" ? `Págs. ${exportRange.start}-${exportRange.end}` : "Filtrado"})`,
-      reason: `Filtros: ${searchTerm || "Nenhum"}, Status: ${statusFilter}, Ordenação: ${sortField} ${sortOrder}, Colunas: ${visibleColumns.join(",")}, Qtd: ${logsToExport.length}`,
+      reason: `Filtros: ${searchTerm || "Nenhum"}, Status: ${statusFilter}, Ordenação: ${sortField} ${sortOrder}, Colunas: ${visibleColumns.join(",")}, Recorte: ${exportMode === "range" ? `Páginas ${exportRange.start} a ${exportRange.end} (Total: ${logsToExport.length} registros, Índices: ${(exportRange.start-1)*itemsPerPage+1}-${Math.min(filteredLogs.length, exportRange.end*itemsPerPage)})` : `${logsToExport.length} registros`}`,
       status: "success"
     });
     
@@ -366,29 +366,36 @@ function AuditHistoryManager({
             </div>
 
             {exportMode === "range" && (
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <label className="text-[10px] text-muted-foreground uppercase">De (Página)</label>
-                  <Input 
-                    type="number" 
-                    min={1} 
-                    max={totalPages} 
-                    value={exportRange.start} 
-                    onChange={e => setExportRange(prev => ({ ...prev, start: Math.max(1, parseInt(e.target.value) || 1) }))}
-                    className="h-8 text-xs"
-                  />
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-muted-foreground uppercase">De (Página)</label>
+                    <Input 
+                      type="number" 
+                      min={1} 
+                      max={totalPages} 
+                      value={exportRange.start} 
+                      onChange={e => setExportRange(prev => ({ ...prev, start: Math.max(1, parseInt(e.target.value) || 1) }))}
+                      className={cn("h-8 text-xs", (exportRange.start < 1 || exportRange.start > totalPages) && "border-destructive")}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-muted-foreground uppercase">Até (Página)</label>
+                    <Input 
+                      type="number" 
+                      min={exportRange.start} 
+                      max={totalPages} 
+                      value={exportRange.end} 
+                      onChange={e => setExportRange(prev => ({ ...prev, end: Math.min(totalPages, Math.max(exportRange.start, parseInt(e.target.value) || 1)) }))}
+                      className={cn("h-8 text-xs", (exportRange.end < exportRange.start || exportRange.end > totalPages) && "border-destructive")}
+                    />
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] text-muted-foreground uppercase">Até (Página)</label>
-                  <Input 
-                    type="number" 
-                    min={exportRange.start} 
-                    max={totalPages} 
-                    value={exportRange.end} 
-                    onChange={e => setExportRange(prev => ({ ...prev, end: Math.min(totalPages, Math.max(exportRange.start, parseInt(e.target.value) || 1)) }))}
-                    className="h-8 text-xs"
-                  />
-                </div>
+                {(exportRange.start < 1 || exportRange.start > totalPages || exportRange.end < exportRange.start || exportRange.end > totalPages) && (
+                  <p className="text-[9px] text-destructive font-bold flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" /> Intervalo inválido (Máx: {totalPages} páginas)
+                  </p>
+                )}
               </div>
             )}
 
@@ -399,6 +406,14 @@ function AuditHistoryManager({
                   {exportMode === "current_page" ? paginatedLogs.length : 
                    exportMode === "range" ? Math.min(filteredLogs.length, (exportRange.end - exportRange.start + 1) * itemsPerPage) : 
                    filteredLogs.length}
+                </span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Índices (Início - Fim):</span>
+                <span className="font-bold">
+                  {exportMode === "current_page" ? `${(currentPage - 1) * itemsPerPage + 1} - ${Math.min(filteredLogs.length, currentPage * itemsPerPage)}` : 
+                   exportMode === "range" ? `${(exportRange.start - 1) * itemsPerPage + 1} - ${Math.min(filteredLogs.length, exportRange.end * itemsPerPage)}` : 
+                   `1 - ${filteredLogs.length}`}
                 </span>
               </div>
               <div className="flex justify-between text-xs">
@@ -413,17 +428,11 @@ function AuditHistoryManager({
                 <span className="text-muted-foreground">Colunas incluídas:</span>
                 <span className="font-bold">{visibleColumns.length} colunas</span>
               </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Status:</span>
-                <Badge variant="outline" className="h-4 text-[9px] uppercase">{statusFilter}</Badge>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Ordenação:</span>
-                <span className="font-bold uppercase text-[9px]">{sortField} ({sortOrder})</span>
-              </div>
-              {(exportMode === "filtered" ? filteredLogs.length : paginatedLogs.length) > MAX_EXPORT_LIMIT && (
-                <div className="pt-2 mt-2 border-t border-destructive/20 text-destructive text-[10px] font-bold">
-                  * Apenas os primeiros {MAX_EXPORT_LIMIT} registros selecionados serão exportados.
+              {(exportMode === "filtered" ? filteredLogs.length : 
+                exportMode === "range" ? (exportRange.end - exportRange.start + 1) * itemsPerPage : 
+                paginatedLogs.length) > MAX_EXPORT_LIMIT && (
+                <div className="pt-2 mt-2 border-t border-destructive/20 text-destructive text-[10px] font-bold flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" /> * Apenas os primeiros {MAX_EXPORT_LIMIT} registros serão exportados.
                 </div>
               )}
             </div>
@@ -487,7 +496,24 @@ function AuditHistoryManager({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>Configurações da Lista</DropdownMenuLabel>
+                <DropdownMenuLabel className="flex items-center justify-between">
+                  <span>Configurações da Lista</span>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-5 w-5 text-muted-foreground hover:text-destructive"
+                    title="Resetar Preferências"
+                    onClick={() => {
+                      localStorage.removeItem("audit_visibleColumns");
+                      localStorage.removeItem("audit_itemsPerPage");
+                      localStorage.removeItem("audit_sortField");
+                      localStorage.removeItem("audit_sortOrder");
+                      window.location.reload();
+                    }}
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                  </Button>
+                </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <div className="p-2 space-y-3">
                   <div className="space-y-1.5">
