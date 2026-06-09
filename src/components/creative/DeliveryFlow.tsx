@@ -13,6 +13,14 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 
+interface ValidationStep {
+  id: string;
+  label: string;
+  description: string;
+  status: "pending" | "validating" | "success" | "error";
+  error?: string;
+}
+
 interface DeployLog {
   timestamp: string;
   level: "info" | "success" | "error" | "warning";
