@@ -139,11 +139,53 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
   }, []);
   const { subscription, editsRemaining } = useSubscription();
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error("Por favor, selecione uma imagem.");
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não autenticado");
+
+      const fileExt = file.name.split('.').pop();
+      const filePath = `${user.id}/creative/${crypto.randomUUID()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      setUploadedImageUrl(publicUrl);
+      toast.success("Imagem carregada com sucesso!");
+    } catch (error: any) {
+      console.error("Upload error:", error);
+      toast.error("Falha ao carregar imagem: " + error.message);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleExecute = async () => {
-    if (loading) return; // Prevent double clicks
+    if (loading) return;
     
-    if (!prompt.trim() && toolKey !== "emo") {
+    if (!prompt.trim() && toolKey !== "emo" && toolKey !== "avatar") {
       toast.error("O campo de prompt/URL é obrigatório");
+      return;
+    }
+
+    if (toolKey === "avatar" && !uploadedImageUrl) {
+      toast.error("Por favor, selecione uma imagem para o avatar.");
       return;
     }
 
