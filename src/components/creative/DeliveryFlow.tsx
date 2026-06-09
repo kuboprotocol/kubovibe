@@ -240,7 +240,7 @@ function AuditHistoryManager({
       }
     }
 
-    addAuditLog({
+    onAuditLog({
       action: "download_authorized", // Using existing action for simplicity or could be "export_requested"
       user: userRole,
       attachmentName: `Exportação ${format.toUpperCase()}`,
@@ -267,6 +267,58 @@ function AuditHistoryManager({
 
   return (
     <div className="space-y-4">
+      {/* Diálogo de confirmação de exportação */}
+      <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Download className="h-5 w-5 text-primary" />
+              Pré-visualização da Exportação ({exportFormat.toUpperCase()})
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="p-4 rounded-lg bg-muted/50 border border-border/40 space-y-2">
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Total de registros:</span>
+                <span className="font-bold">{filteredLogs.length}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Filtro de busca:</span>
+                <span className="font-bold truncate max-w-[150px]">{searchTerm || "Nenhum"}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Status:</span>
+                <Badge variant="outline" className="h-4 text-[9px] uppercase">{statusFilter}</Badge>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Ordenação:</span>
+                <span className="font-bold uppercase text-[9px]">{sortField} ({sortOrder})</span>
+              </div>
+              {filteredLogs.length > MAX_EXPORT_LIMIT && (
+                <div className="pt-2 mt-2 border-t border-destructive/20 text-destructive text-[10px] font-bold">
+                  * Apenas os primeiros {MAX_EXPORT_LIMIT} registros serão exportados.
+                </div>
+              )}
+            </div>
+            
+            <ScrollArea className="h-32 border rounded-md p-2 bg-background/50">
+              <div className="space-y-1">
+                {filteredLogs.slice(0, 5).map(log => (
+                  <div key={log.id} className="text-[9px] text-muted-foreground border-b border-border/10 pb-1">
+                    {new Date(log.timestamp).toLocaleDateString()} - {log.user} - {log.attachmentName}
+                  </div>
+                ))}
+                {filteredLogs.length > 5 && <div className="text-[9px] text-muted-foreground italic">... e outros {filteredLogs.length - 5} registros</div>}
+              </div>
+            </ScrollArea>
+          </div>
+          <DialogFooter className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => setIsExportDialogOpen(false)}>Cancelar</Button>
+            <Button size="sm" onClick={() => handleExport(exportFormat)}>Confirmar Download</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {showFilters && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
           <div className="relative md:col-span-2">
@@ -290,10 +342,10 @@ function AuditHistoryManager({
             </SelectContent>
           </Select>
           <div className="flex gap-1">
-            <Button variant="outline" size="sm" className="h-8 px-2" onClick={exportToCSV} title="CSV">
+            <Button variant="outline" size="sm" className="h-8 px-2" onClick={() => { setExportFormat("csv"); setIsExportDialogOpen(true); }} title="CSV">
               <FileSpreadsheet className="h-3.5 w-3.5" />
             </Button>
-            <Button variant="outline" size="sm" className="h-8 px-2" onClick={exportToPDF} title="PDF">
+            <Button variant="outline" size="sm" className="h-8 px-2" onClick={() => { setExportFormat("pdf"); setIsExportDialogOpen(true); }} title="PDF">
               <FileText className="h-3.5 w-3.5" />
             </Button>
             <DropdownMenu>
@@ -1621,7 +1673,8 @@ export function DeliveryFlow() {
                                     userRole={currentUserRole}
                                     originalApprover={item.user}
                                     showFilters={false}
-                                    filterByAttachment={undefined} // We could filter by all attachments in this item
+                                    filterByAttachment={undefined} 
+                                    onAuditLog={addAuditLog}
                                   />
                                 </div>
                               </div>
@@ -1821,6 +1874,7 @@ export function DeliveryFlow() {
               logs={auditLogs}
               userRole={currentUserRole}
               title="Relatório Geral de Auditoria de Acessos"
+              onAuditLog={addAuditLog}
             />
           </Card>
         </TabsContent>
