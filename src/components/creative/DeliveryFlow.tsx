@@ -806,80 +806,103 @@ export function DeliveryFlow() {
     toast.success(`Logs exportados em ${format.toUpperCase()}`);
   };
 
-  const downloadAuditSummary = (historyItem: DeployHistoryItem) => {
-    const detailedEvidence = (historyItem as any).detailedEvidence as EvidenceFile[] || [];
-    
-    // Simulating full Audit PDF summary with embedded evidence links and thumbnails
-    const summary = `
-=========================================
-RELATÓRIO DE AUDITORIA DE DEPLOY (PDF SIMULATED)
-=========================================
-Identificador Único: ${historyItem.id}
-Data e Hora: ${new Date(historyItem.date).toLocaleString()}
-Responsável: ${historyItem.user?.toUpperCase() || "ADMIN"}
------------------------------------------
-RESUMO DA EXECUÇÃO
------------------------------------------
-Ambiente: ${historyItem.environment.toUpperCase()}
-Status Final: ${historyItem.status.toUpperCase()}
-Versão (Commit): ${historyItem.commit}
-URL Pública: ${historyItem.pwaUrl}
-HTTPS: HABILITADO E VERIFICADO
-Health-Check: ${historyItem.healthStatus?.toUpperCase() || "NÃO EXECUTADO"}
-Detalhes Health: ${historyItem.healthDetails || "N/A"}
------------------------------------------
-DETALHES DE APROVAÇÃO (PRODUÇÃO)
------------------------------------------
-Responsável: ${historyItem.user || "Admin"}
-Comentário: ${historyItem.parameters.approvalComment || "N/A"}
-Termos Aceitos: ${historyItem.parameters.approvalTerms ? "SIM" : "NÃO"}
+  const downloadAuditSummary = async (historyItem: DeployHistoryItem) => {
+    try {
+      const { default: jsPDF } = await import("jspdf");
+      const { default: autoTable } = await import("jspdf-autotable");
+      
+      const doc = new jsPDF();
+      const detailedEvidence = (historyItem as any).detailedEvidence as EvidenceFile[] || [];
+      
+      // Header
+      doc.setFontSize(18);
+      doc.setTextColor(0, 102, 204);
+      doc.text("Relatório de Auditoria de Deploy", 14, 20);
+      
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Identificador: ${historyItem.id}`, 14, 28);
+      doc.text(`Data: ${new Date(historyItem.date).toLocaleString()}`, 14, 33);
+      doc.text(`Responsável: ${historyItem.user?.toUpperCase() || "ADMIN"}`, 14, 38);
 
------------------------------------------
-DETALHES DE EVIDÊNCIAS (INCORPORADAS)
------------------------------------------
-${detailedEvidence.length > 0 ? detailedEvidence.map((e, idx) => 
-  `${idx + 1}. [${e.scanResult.toUpperCase()}] ${e.name} (${(e.size / 1024).toFixed(1)} KB)
-     Tipo: ${e.type} | Scanned: ${new Date(e.scannedAt).toLocaleString()}
-     Hash (SHA-256): ${btoa(e.name + e.size).substring(0, 32).toLowerCase()}
-     PÁGINA INCORPORADA: SIM (Thumbnail: ${e.thumbnail ? "ANEXADA AO DOCUMENTO" : "ARQUIVO BINÁRIO"})
-     Link Seguro (Acesso Restrito): ${e.url}`
-).join("\n\n") : "Nenhuma evidência anexada."}
+      // Status Section
+      doc.setFontSize(14);
+      doc.setTextColor(0, 0, 0);
+      doc.text("Resumo da Execução", 14, 50);
+      
+      (autoTable as any)(doc, {
+        startY: 55,
+        head: [['Parâmetro', 'Valor']],
+        body: [
+          ['Ambiente', historyItem.environment.toUpperCase()],
+          ['Status', historyItem.status.toUpperCase()],
+          ['Versão (Commit)', historyItem.commit],
+          ['URL Pública', historyItem.pwaUrl],
+          ['Health-Check', historyItem.healthStatus?.toUpperCase() || "N/A"],
+          ['Comentário', historyItem.parameters.approvalComment || "N/A"],
+          ['Modo', historyItem.parameters.dryRun ? "SIMULAÇÃO" : "REAL"]
+        ],
+        theme: 'striped',
+        headStyles: { fillColor: [0, 102, 204] }
+      });
 
------------------------------------------
-VALIDAÇÃO DE SEGURANÇA (MALWARE SCAN)
------------------------------------------
-${detailedEvidence.every(e => e.scanResult === "clean") 
-  ? "✓ Todos os arquivos validados e limpos por Lovable Scan Engine." 
-  : "⚠ Alerta: Arquivos suspeitos detectados na aprovação."}
+      // Evidence Section
+      const finalY = (doc as any).lastAutoTable.finalY + 15;
+      doc.text("Evidências de Auditoria", 14, finalY);
+      
+      const evidenceData = detailedEvidence.map((e, idx) => [
+        idx + 1,
+        e.name,
+        `${(e.size / 1024).toFixed(1)} KB`,
+        e.scanResult.toUpperCase(),
+        e.hash.substring(0, 16) + '...'
+      ]);
 
+      (autoTable as any)(doc, {
+        startY: finalY + 5,
+        head: [['#', 'Arquivo', 'Tamanho', 'Scan', 'Hash (SHA-256)']],
+        body: evidenceData.length > 0 ? evidenceData : [['-', 'Nenhuma evidência', '-', '-', '-']],
+        theme: 'grid',
+        headStyles: { fillColor: [50, 50, 50] }
+      });
 
------------------------------------------
-MODO DE EXECUÇÃO: ${historyItem.parameters.dryRun ? "DRY-RUN (SIMULAÇÃO)" : "REAL (PRODUÇÃO/STAGING)"}
------------------------------------------
-TIMELINE DE ETAPAS
------------------------------------------
-${steps.map(s => {
-  const isFailed = historyItem.failedStepId === s.id;
-  const isSuccess = !historyItem.failedStepId || steps.findIndex(st => st.id === historyItem.failedStepId) > steps.findIndex(st => st.id === s.id);
-  return `[${isFailed ? "FALHA" : isSuccess ? "OK" : "SKIP"}] ${s.label}: ${s.description}`;
-}).join("\n")}
------------------------------------------
-LOGS DE ACESSO
------------------------------------------
-Link para logs JSON: /api/logs/${historyItem.id}.json
-Link para logs CSV: /api/logs/${historyItem.id}.csv
+      // Append thumbnails/pages for images
+      if (detailedEvidence.length > 0) {
+        doc.addPage();
+        doc.text("Anexos Incorporados (Visualização)", 14, 20);
+        
+        let currentImgY = 30;
+        for (const e of detailedEvidence) {
+          if (e.thumbnail || e.type.startsWith('image/')) {
+            if (currentImgY > 250) {
+              doc.addPage();
+              currentImgY = 20;
+            }
+            doc.setFontSize(10);
+            doc.text(`Anexo: ${e.name}`, 14, currentImgY);
+            // Simulate adding thumbnail (placeholder box in PDF)
+            doc.rect(14, currentImgY + 2, 40, 30);
+            doc.setFontSize(8);
+            doc.text("[Thumbnail Incorporada]", 16, currentImgY + 18);
+            currentImgY += 45;
+          }
+        }
+      }
 
-=========================================
-Documento assinado digitalmente por Lovable Cloud Deploy Engine.
-    `;
-    const blob = new Blob([summary], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `auditoria-deploy-${historyItem.commit}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("PDF de Auditoria gerado com evidências incorporadas e links assinados.");
+      doc.save(`auditoria-deploy-${historyItem.commit}.pdf`);
+      toast.success("PDF de Auditoria gerado com sucesso.");
+      
+      addAuditLog({
+        action: "download_authorized",
+        user: currentUserRole,
+        attachmentName: `Relatório PDF (${historyItem.commit})`,
+        reason: "Exportação de relatório de auditoria",
+        status: "success"
+      });
+    } catch (error) {
+      console.error("Audit PDF error:", error);
+      toast.error("Erro ao gerar PDF de auditoria");
+    }
   };
 
   const filteredHistory = useMemo(() => {
