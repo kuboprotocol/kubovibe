@@ -17,11 +17,11 @@ export function PromoCards() {
     if (!user) return
     // Fetch referral code and count in parallel
     const fetchData = async () => {
-      const [profileRes, referralsRes] = await Promise.all([
-        supabase.from('profiles').select('referral_code').eq('id', user.id).single(),
+      const [refCodeRes, referralsRes] = await Promise.all([
+        supabase.rpc('get_my_referral_code'),
         supabase.from('referrals').select('id', { count: 'exact', head: true }).eq('referrer_id', user.id),
       ])
-      if (profileRes.data?.referral_code) setReferralCode(profileRes.data.referral_code)
+      if (refCodeRes.data) setReferralCode(refCodeRes.data as string)
       if (referralsRes.count != null) setReferralCount(referralsRes.count)
     }
     fetchData()
