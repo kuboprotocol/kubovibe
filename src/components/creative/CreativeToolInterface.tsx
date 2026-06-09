@@ -226,7 +226,8 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       }));
       updateStep("upload", "active");
     }
-
+    }
+    try {
       // Convert HEIC → JPG
       if (file.type === "image/heic" || file.name.toLowerCase().endsWith(".heic")) {
         try {
