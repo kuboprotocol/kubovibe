@@ -430,6 +430,40 @@ export default function CreativeAuditPage() {
               onChange={(e) => { setEndDate(e.target.value); setPage(1); }}
             />
           </div>
+
+          <div className="flex flex-wrap items-center gap-4 mb-4">
+            <div className="flex items-center gap-2 bg-accent/20 px-3 py-1 rounded-full border">
+              <span className="text-xs font-medium">Limite de Recorrência:</span>
+              <input 
+                type="number" 
+                min="1" 
+                value={recurrenceThreshold}
+                onChange={(e) => setRecurrenceThreshold(Number(e.target.value))}
+                className="w-12 bg-transparent text-xs font-bold border-none focus:ring-0"
+              />
+            </div>
+            {recurrentFailures.length > 0 && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="text-xs h-8"
+                onClick={() => setSearch(recurrentFailures[0][0])}
+              >
+                <Layers className="h-3 w-3 mr-1" /> Ver falhas mais recorrentes
+              </Button>
+            )}
+            {compareEntries.length > 0 && (
+              <div className="flex items-center gap-2 ml-auto">
+                <span className="text-xs font-medium">{compareEntries.length}/2 selecionados</span>
+                <Button size="sm" className="h-8" disabled={compareEntries.length !== 2} onClick={startComparison}>
+                  <ArrowLeftRight className="h-3 w-3 mr-1" /> Comparar
+                </Button>
+                <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => setCompareEntries([])}>
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            )}
+          </div>
           
           <div className="flex flex-wrap items-center justify-between gap-4 pt-2 border-t">
             <div className="flex gap-2">
