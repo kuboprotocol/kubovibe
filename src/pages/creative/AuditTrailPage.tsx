@@ -149,10 +149,41 @@ export default function CreativeAuditPage() {
       }
     });
     return Object.entries(failures)
-      .filter(([_, v]) => v.count > 1)
+      .filter(([_, v]) => v.count >= recurrenceThreshold)
       .sort((a, b) => b[1].count - a[1].count)
-      .slice(0, 3);
+      .slice(0, 5);
+  }, [entries, recurrenceThreshold]);
+
+  // Detected retries for alert indicators in table
+  const retryCountByCorrelation = useMemo(() => {
+    const counts: Record<string, number> = {};
+    entries.forEach(entry => {
+      if (entry.correlation_id) {
+        counts[entry.correlation_id] = (counts[entry.correlation_id] || 0) + 1;
+      }
+    });
+    return counts;
   }, [entries]);
+
+  const toggleComparison = (entry: AuditTrail) => {
+    setCompareEntries(prev => {
+      const exists = prev.find(e => e.id === entry.id);
+      if (exists) return prev.filter(e => e.id !== entry.id);
+      if (prev.length >= 2) {
+        toast.warning("Selecione apenas 2 eventos para comparar");
+        return prev;
+      }
+      return [...prev, entry];
+    });
+  };
+
+  const startComparison = () => {
+    if (compareEntries.length !== 2) {
+      toast.error("Selecione exatamente 2 eventos para comparar");
+      return;
+    }
+    setIsComparing(true);
+  };
 
   // Failure Trends Data for Chart
   const failureTrends = useMemo(() => {
