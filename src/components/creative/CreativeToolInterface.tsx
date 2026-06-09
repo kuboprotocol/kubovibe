@@ -150,14 +150,23 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
   const [reexecuteItem, setReexecuteItem] = useState<any>(null);
   const [startAtStep, setStartAtStep] = useState<AvatarStepKey>("upload");
 
-  const buildSteps = (needsConvert: boolean, initialDetails?: Record<string, any>): AvatarStepState[] => {
+  const buildSteps = (needsConvert: boolean, initialDetails?: Record<string, any>, currentSteps?: AvatarStepState[]): AvatarStepState[] => {
     const now = new Date().toLocaleTimeString();
-    return [
+    const steps: AvatarStepState[] = [
       { key: "upload", label: "Upload da imagem", status: "pending", timestamp: now, details: initialDetails },
       { key: "convert", label: "Conversão HEIC/SVG", status: needsConvert ? "pending" : "skipped", timestamp: needsConvert ? now : undefined },
       { key: "generate", label: "Geração do avatar falante", status: "pending" },
       { key: "render", label: "Renderização final", status: "pending" },
     ];
+
+    if (currentSteps) {
+      return steps.map(s => {
+        const existing = currentSteps.find(ex => ex.key === s.key);
+        if (existing && existing.status === "done") return { ...existing };
+        return s;
+      });
+    }
+    return steps;
   };
 
   const updateStep = (key: AvatarStepKey, status: AvatarStepState["status"], errorMessage?: string, details?: Record<string, any>) => {

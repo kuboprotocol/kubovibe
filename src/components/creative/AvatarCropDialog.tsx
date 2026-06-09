@@ -52,6 +52,8 @@ export function AvatarCropDialog({ open, imageUrl, onCancel, onConfirm, onSavePr
   const [processing, setProcessing] = useState(false);
   const [presetName, setPresetName] = useState("");
   const [editingPreset, setEditingPreset] = useState<string | null>(null);
+  const [importConflicts, setImportConflicts] = useState<{ name: string; zoom: number; aspect: number }[]>([]);
+  const [showConflicts, setShowConflicts] = useState(false);
   const [presets, setPresets] = useState<{ name: string; zoom: number; aspect: number }[]>(() => {
     const saved = localStorage.getItem("creative_avatar_presets_list");
     return saved ? JSON.parse(saved) : [];
@@ -124,24 +126,54 @@ export function AvatarCropDialog({ open, imageUrl, onCancel, onConfirm, onSavePr
         const validPresets = imported.filter(p => p.name && typeof p.zoom === "number" && typeof p.aspect === "number");
         if (validPresets.length === 0) throw new Error("Nenhum preset válido encontrado");
 
-        const newPresets = [...presets];
-        let mergedCount = 0;
-        validPresets.forEach(p => {
-          if (!newPresets.find(x => x.name.toLowerCase() === p.name.toLowerCase())) {
-            newPresets.push(p);
-            mergedCount++;
-          }
-        });
+        const conflicts = validPresets.filter(p => presets.some(x => x.name.toLowerCase() === p.name.toLowerCase()));
+        const nonConflicts = validPresets.filter(p => !presets.some(x => x.name.toLowerCase() === p.name.toLowerCase()));
 
-        setPresets(newPresets);
-        localStorage.setItem("creative_avatar_presets_list", JSON.stringify(newPresets));
-        toast.success(`Importação concluída: ${mergedCount} novos presets adicionados.`);
+        if (conflicts.length > 0) {
+          setImportConflicts(conflicts);
+          setShowConflicts(true);
+          // Adiciona os não conflitantes primeiro
+          if (nonConflicts.length > 0) {
+            const newPresets = [...presets, ...nonConflicts];
+            setPresets(newPresets);
+            localStorage.setItem("creative_avatar_presets_list", JSON.stringify(newPresets));
+          }
+        } else {
+          const newPresets = [...presets, ...validPresets];
+          setPresets(newPresets);
+          localStorage.setItem("creative_avatar_presets_list", JSON.stringify(newPresets));
+          toast.success(`Importação concluída: ${validPresets.length} presets adicionados.`);
+        }
       } catch (err) {
         toast.error("Erro ao importar arquivo JSON");
       }
     };
     reader.readAsText(file);
     e.target.value = "";
+  };
+
+  const handleConflictResolve = (preset: { name: string; zoom: number; aspect: number }, action: "overwrite" | "keep" | "rename") => {
+    let newPresets = [...presets];
+    if (action === "overwrite") {
+      newPresets = newPresets.map(p => p.name.toLowerCase() === preset.name.toLowerCase() ? preset : p);
+      toast.info(`Preset "${preset.name}" sobrescrito`);
+    } else if (action === "rename") {
+      let newName = `${preset.name} (Importado)`;
+      let counter = 1;
+      while (newPresets.find(p => p.name === newName) || importConflicts.find(p => p.name === newName)) {
+        newName = `${preset.name} (Importado ${counter})`;
+        counter++;
+      }
+      newPresets.push({ ...preset, name: newName });
+      toast.info(`Preset renomeado para "${newName}"`);
+    }
+    
+    setPresets(newPresets);
+    localStorage.setItem("creative_avatar_presets_list", JSON.stringify(newPresets));
+    
+    const remaining = importConflicts.filter(p => p.name !== preset.name);
+    setImportConflicts(remaining);
+    if (remaining.length === 0) setShowConflicts(false);
   };
 
   const exportPresets = () => {
@@ -329,6 +361,39 @@ export function AvatarCropDialog({ open, imageUrl, onCancel, onConfirm, onSavePr
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      <Dialog open={showConflicts} onOpenChange={setShowConflicts}>
+        <DialogContent className="max-w-md bg-card border-border/40">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-500" /> Conflitos de Importação
+            </DialogTitle>
+            <DialogDescription>
+              Os seguintes presets já existem. Escolha como deseja prosseguir para cada um.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2">
+            {importConflicts.map((p) => (
+              <div key={p.name} className="p-3 border rounded-lg space-y-3 bg-muted/20">
+                <div className="flex justify-between items-center">
+                  <span className="font-medium text-sm">{p.name}</span>
+                  <span className="text-[10px] text-muted-foreground uppercase">Conflito</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <Button size="sm" variant="outline" className="text-[10px] h-7" onClick={() => handleConflictResolve(p, "overwrite")}>Sobrescrever</Button>
+                  <Button size="sm" variant="outline" className="text-[10px] h-7" onClick={() => handleConflictResolve(p, "rename")}>Renomear</Button>
+                  <Button size="sm" variant="ghost" className="text-[10px] h-7" onClick={() => handleConflictResolve(p, "keep")}>Pular</Button>
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowConflicts(false)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }
