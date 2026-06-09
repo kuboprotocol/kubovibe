@@ -114,8 +114,8 @@ export function AvatarCropDialog({ open, imageUrl, onCancel, onConfirm, onSavePr
             <div className="flex-1 space-y-2">
                 <Label className="text-xs text-muted-foreground flex items-center gap-1"><Maximize className="h-3 w-3"/> Ajustar à área</Label>
                 <div className="flex gap-2">
-                  <Button variant="outline" className="flex-1" onClick={() => setZoom(1)}>Resetar Zoom</Button>
-                  <Button variant="secondary" className="flex-1" onClick={() => onSavePreset({ zoom, aspect })}>Salvar Preset</Button>
+                  <Button variant="outline" className="flex-1" onClick={() => { setZoom(1); setCrop({ x: 0, y: 0 }); }}>Ajustar</Button>
+                  <Button variant="secondary" className="flex-1 font-semibold" onClick={() => onSavePreset({ zoom, aspect })}>Salvar Preset</Button>
                 </div>
             </div>
           </div>

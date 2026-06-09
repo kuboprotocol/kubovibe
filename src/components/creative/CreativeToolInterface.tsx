@@ -6,12 +6,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Sparkles, Send, Coins, Settings2, Info, AlertCircle, Wallet, RotateCw, Upload, X, Image as ImageIcon, Download, Crop as CropIcon, Trash2 } from "lucide-react";
+import { Loader2, Sparkles, Send, Coins, Settings2, Info, AlertCircle, Wallet, RotateCw, Upload, X, Image as ImageIcon, Download, Crop as CropIcon, Trash2, Sliders } from "lucide-react";
 import { useSubscription } from "@/hooks/useSubscription";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Slider } from "@/components/ui/slider";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AvatarCropDialog } from "./AvatarCropDialog";
 import { AvatarProgressSteps, type AvatarStepState, type AvatarStepKey } from "./AvatarProgressSteps";
 
@@ -136,6 +139,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     const saved = localStorage.getItem("creative_avatar_preset");
     return saved ? JSON.parse(saved) : { zoom: 1, aspect: 1 };
   });
+  const [downloadOptions, setDownloadOptions] = useState({ quality: 0.90, resolution: "original" as any });
 
   const buildSteps = (needsConvert: boolean, initialDetails?: Record<string, any>): AvatarStepState[] => {
     const now = new Date().toLocaleTimeString();
@@ -208,11 +212,38 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     let file = e.target.files?.[0];
-    // Reset input so selecting the same file again triggers change
     e.target.value = "";
     if (!file) return;
 
+    const VALID_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/svg+xml'];
+    const MAX_SIZE_MB = 10;
+    const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
+
     setIsUploading(true);
+    
+    // Initial validation
+    if (file.size > MAX_SIZE_BYTES) {
+      const errorMsg = `Arquivo muito grande (${(file.size / 1024 / 1024).toFixed(2)}MB). O limite é ${MAX_SIZE_MB}MB. Reduza a resolução ou comprima a imagem.`;
+      if (toolKey === "avatar") {
+        setProgressSteps(buildSteps(false, { error: "Limite de tamanho excedido", size: (file.size / 1024 / 1024).toFixed(2) + " MB" }));
+        updateStep("upload", "error", errorMsg);
+      }
+      toast.error("Arquivo muito grande", { description: errorMsg });
+      setIsUploading(false);
+      return;
+    }
+
+    if (!VALID_TYPES.includes(file.type) && !file.name.toLowerCase().endsWith(".heic")) {
+      const errorMsg = `O formato "${file.type || "desconhecido"}" não é suportado. Por favor, envie uma imagem em JPG, PNG, WEBP, SVG ou HEIC.`;
+      if (toolKey === "avatar") {
+        setProgressSteps(buildSteps(false, { error: "Formato inválido", type: file.type || "unknown" }));
+        updateStep("upload", "error", errorMsg);
+      }
+      toast.error("Formato não suportatedo", { description: errorMsg });
+      setIsUploading(false);
+      return;
+    }
+
     const needsConvert =
       file.type === "image/heic" ||
       file.name.toLowerCase().endsWith(".heic") ||
@@ -222,41 +253,45 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       setProgressSteps(buildSteps(needsConvert, { 
         name: file.name, 
         size: (file.size / 1024 / 1024).toFixed(2) + " MB",
-        type: file.type || "unknown"
+        type: file.type || "unknown",
+        lastModified: new Date(file.lastModified).toLocaleString()
       }));
       updateStep("upload", "active");
     }
+
     try {
       // Convert HEIC → JPG
       if (file.type === "image/heic" || file.name.toLowerCase().endsWith(".heic")) {
         try {
-            if (toolKey === "avatar") updateStep("convert", "active");
-            toast.info("Convertendo formato HEIC...");
+            if (toolKey === "avatar") updateStep("convert", "active", undefined, { method: "heic2any", target: "image/jpeg" });
+            toast.info("Convertendo formato HEIC...", { description: "Isso pode levar alguns segundos dependendo do tamanho." });
             const convertedBlob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.85 });
             file = new File(
-            [Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob],
-            file.name.replace(/\.[^/.]+$/, ".jpg"),
-            { type: "image/jpeg" }
+              [Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob],
+              file.name.replace(/\.[^/.]+$/, ".jpg"),
+              { type: "image/jpeg" }
             );
-            if (toolKey === "avatar") updateStep("convert", "done");
+            if (toolKey === "avatar") updateStep("convert", "done", undefined, { resultSize: (file.size / 1024 / 1024).toFixed(2) + " MB" });
         } catch (err: any) {
-            if (toolKey === "avatar") updateStep("convert", "error", "Falha na conversão HEIC. O arquivo pode estar corrompido.");
-            throw new Error("Não foi possível processar o arquivo HEIC.");
+            const detailMsg = "O decodificador HEIC falhou. Verifique se a imagem não está protegida por DRM ou corrompida.";
+            if (toolKey === "avatar") updateStep("convert", "error", detailMsg, { error: err.message });
+            throw new Error(detailMsg);
         }
       } else if (file.type === "image/svg+xml") {
         try {
-            // Convert SVG → PNG via canvas
-            if (toolKey === "avatar") updateStep("convert", "active");
-            toast.info("Convertendo SVG para PNG...");
+            if (toolKey === "avatar") updateStep("convert", "active", undefined, { method: "canvas-render", target: "image/png" });
+            toast.info("Processando SVG...");
             const svgText = await file.text();
+            if (!svgText.includes("<svg")) throw new Error("Conteúdo SVG inválido");
+            
             const blobUrl = URL.createObjectURL(new Blob([svgText], { type: "image/svg+xml" }));
             const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-            const i = new Image();
-            i.onload = () => resolve(i);
-            i.onerror = reject;
-            i.src = blobUrl;
+              const i = new Image();
+              i.onload = () => resolve(i);
+              i.onerror = () => reject(new Error("Falha ao carregar SVG no canvas"));
+              i.src = blobUrl;
             });
-            const size = Math.max(img.width || 512, img.height || 512, 512);
+            const size = Math.max(img.width || 1024, img.height || 1024, 1024);
             const canvas = document.createElement("canvas");
             canvas.width = size;
             canvas.height = size;
@@ -265,51 +300,35 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
             URL.revokeObjectURL(blobUrl);
             const pngBlob: Blob = await new Promise((r) => canvas.toBlob((b) => r(b!), "image/png", 0.95));
             file = new File([pngBlob], file.name.replace(/\.[^/.]+$/, ".png"), { type: "image/png" });
-            if (toolKey === "avatar") updateStep("convert", "done");
+            if (toolKey === "avatar") updateStep("convert", "done", undefined, { dimensions: `${size}x${size}`, resultSize: (file.size / 1024 / 1024).toFixed(2) + " MB" });
         } catch (err: any) {
-            if (toolKey === "avatar") updateStep("convert", "error", "Falha na conversão SVG. Verifique se o arquivo é um SVG válido.");
-            throw new Error("Não foi possível processar o arquivo SVG.");
+            const detailMsg = "Não foi possível renderizar o SVG. Certifique-se de que ele contém tags válidas.";
+            if (toolKey === "avatar") updateStep("convert", "error", detailMsg, { error: err.message });
+            throw new Error(detailMsg);
         }
       }
 
-      const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
-      const maxSize = 10 * 1024 * 1024;
-
-      if (!validTypes.includes(file.type)) {
-        const errorMsg = `Formato "${file.type || "desconhecido"}" não suportado. Use JPG, PNG, WEBP, SVG ou HEIC.`;
-        if (toolKey === "avatar") updateStep("upload", "error", errorMsg);
-        toast.error("Formato inválido", { description: errorMsg });
-        setIsUploading(false);
-        return;
-      }
-      if (file.size > maxSize) {
-        const errorMsg = `Arquivo muito grande (${(file.size / 1024 / 1024).toFixed(2)}MB). O limite é 10MB.`;
-        if (toolKey === "avatar") updateStep("upload", "error", errorMsg);
-        toast.error("Arquivo muito grande", { description: errorMsg });
-        setIsUploading(false);
-        return;
-      }
-
-      // For avatar, open crop dialog using a local object URL (don't upload yet)
+      // For avatar, open crop dialog
       if (toolKey === "avatar") {
         const localUrl = URL.createObjectURL(file);
         setCropSourceUrl(localUrl);
         setCropOpen(true);
         setIsUploading(false);
+        updateStep("upload", "done", undefined, { status: "Aguardando ajuste de recorte" });
         return;
       }
 
       const fileExt = file.name.split('.').pop() || "png";
       const publicUrl = await uploadBlobToStorage(file, fileExt);
       setUploadedImageUrl(publicUrl);
-      toast.success("Imagem carregada com sucesso!");
+      toast.success("Imagem carregada!");
     } catch (error: any) {
       console.error("Upload error:", error);
-      toast.error("Falha ao carregar imagem: " + error.message);
-      if (toolKey === "avatar" && progressSteps.find(s => s.key === "convert")?.status === "active") {
-          // Handled above, but ensuring fallback
-      } else if (toolKey === "avatar") {
-          updateStep("upload", "error", error.message);
+      toast.error("Erro no processamento", { description: error.message });
+      if (toolKey === "avatar") {
+          const currentActive = progressSteps.find(s => s.status === "active");
+          if (currentActive) updateStep(currentActive.key, "error", error.message);
+          else updateStep("upload", "error", error.message);
       }
     } finally {
       setIsUploading(false);
@@ -350,43 +369,69 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     toast.success("Avatar padrão da sessão removido.");
   };
 
-  const handleDownloadResult = async (format: "png" | "jpg" = "png", quality: number = 0.90) => {
+  const handleDownloadResult = async (format: "png" | "jpg" = "png", quality: number = 0.90, resolution?: "original" | "1080p" | "720p") => {
     if (!lastResult?.asset_url) return;
     try {
       const res = await fetch(lastResult.asset_url);
       const blob = await res.blob();
       const isVideo = lastResult.asset_url.endsWith(".mp4");
       
-      let finalBlob = blob;
-      let ext = isVideo ? "mp4" : format;
-
-      if (!isVideo && format === "jpg") {
-        // Convert PNG/WebP blob to JPG via canvas if needed
-        const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-            const i = new Image();
-            i.onload = () => resolve(i);
-            i.onerror = reject;
-            i.src = URL.createObjectURL(blob);
-        });
-        const canvas = document.createElement("canvas");
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext("2d")!;
-        ctx.fillStyle = "white"; // JPG doesn't support transparency
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0);
-        finalBlob = await new Promise((r) => canvas.toBlob((b) => r(b!), "image/jpeg", quality)) as Blob;
-        URL.revokeObjectURL(img.src);
+      if (isVideo) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `kubo-avatar-${Date.now()}.mp4`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        return;
       }
+
+      // Image processing
+      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+          const i = new Image();
+          i.onload = () => resolve(i);
+          i.onerror = reject;
+          i.src = URL.createObjectURL(blob);
+      });
+
+      const canvas = document.createElement("canvas");
+      let width = img.width;
+      let height = img.height;
+
+      if (resolution === "1080p") {
+        const ratio = Math.min(1920 / width, 1080 / height);
+        if (ratio < 1) { width *= ratio; height *= ratio; }
+      } else if (resolution === "720p") {
+        const ratio = Math.min(1280 / width, 720 / height);
+        if (ratio < 1) { width *= ratio; height *= ratio; }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d")!;
+      
+      if (format === "jpg") {
+        ctx.fillStyle = "white";
+        ctx.fillRect(0, 0, width, height);
+      }
+      
+      ctx.drawImage(img, 0, 0, width, height);
+      
+      const finalBlob = await new Promise<Blob>((r) => 
+        canvas.toBlob((b) => r(b!), format === "jpg" ? "image/jpeg" : "image/png", quality)
+      );
 
       const url = URL.createObjectURL(finalBlob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `kubo-avatar-${Date.now()}.${ext}`;
+      a.download = `kubo-avatar-${Date.now()}.${format}`;
       document.body.appendChild(a);
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
+      URL.revokeObjectURL(img.src);
     } catch (e: any) {
       toast.error("Falha ao baixar: " + e.message);
     }
@@ -452,6 +497,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       };
 
       const fnName = TOOL_TO_FN[toolKey];
+      const executionStartTime = new Date().toISOString();
       
       const body: any = { prompt, metadata };
       if (toolKey === "chat") body.messages = [{ role: "user", content: prompt }];
@@ -488,8 +534,17 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       }
 
       if (toolKey === "avatar") {
-        updateStep("generate", "done");
-        updateStep("render", "active", undefined, { fnName, correlationId: cId || "N/A" });
+        updateStep("generate", "done", undefined, { 
+          promptLength: prompt.length,
+          startTime: executionStartTime,
+          metadataKeys: Object.keys(metadata).join(", "),
+          status: "Solicitação processada"
+        });
+        updateStep("render", "active", undefined, { 
+          fnName, 
+          correlationId: cId || "N/A",
+          traceId: tId || "N/A"
+        });
       }
       toast.success("Solicitação enviada!", {
         description: "Você pode acompanhar o progresso no histórico.",
@@ -497,10 +552,13 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       setPrompt("");
       onSuccess?.();
       if (toolKey === "avatar") {
-        // Re-fetch result and finalize render step shortly after
         setTimeout(async () => {
           await fetchLastResult();
-          updateStep("render", "done", undefined, { resultUrl: data?.asset_url || "Disponível no histórico" });
+          updateStep("render", "done", undefined, { 
+            resultUrl: data?.asset_url || "Disponível no histórico",
+            completedAt: new Date().toLocaleTimeString(),
+            duration: `${((Date.now() - new Date(executionStartTime).getTime()) / 1000).toFixed(1)}s`
+          });
         }, 1500);
       }
     } catch (e: any) {
@@ -514,7 +572,12 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       if (toolKey === "avatar") {
         setProgressSteps((prev) =>
           prev.map((s) =>
-            s.status === "active" ? { ...s, status: "error", errorMessage: e.message } : s
+            s.status === "active" ? { 
+              ...s, 
+              status: "error" as const, 
+              errorMessage: e.message, 
+              details: { ...s.details, fullError: e.stack || e.message, timestamp: new Date().toISOString() } 
+            } : s
           )
         );
       }
@@ -681,6 +744,18 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                     <CropIcon className="h-3 w-3 mr-1.5" /> Ajustar / Zoom
                   </Button>
                   <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs bg-primary/5 hover:bg-primary/10 border-primary/20"
+                    onClick={() => { 
+                      setCropSourceUrl(uploadedImageUrl); 
+                      setCropOpen(true); 
+                    }}
+                    title="Aplica o último zoom e enquadramento salvo"
+                  >
+                    <Sliders className="h-3 w-3 mr-1.5" /> Reaplicar Ajustes
+                  </Button>
+                  <Button
                     variant="ghost"
                     size="sm"
                     className="h-8 text-xs text-destructive hover:text-destructive"
@@ -752,50 +827,67 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                 </div>
               </div>
             </div>
-            <div className="flex justify-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-[10px] h-7 opacity-60 hover:opacity-100"
-                onClick={fetchLastResult}
-              >
-                Atualizar Comparação
-              </Button>
-              {lastResult.asset_url && (
-                <div className="flex flex-wrap justify-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="text-[10px] h-7"
-                    onClick={() => handleDownloadResult("png")}
-                  >
-                    <Download className="h-3 w-3 mr-1.5" />
-                    Baixar {lastResult.asset_url.endsWith('.mp4') ? 'MP4' : 'PNG'}
-                  </Button>
-                  {!lastResult.asset_url.endsWith('.mp4') && (
-                    <div className="flex gap-1 items-center bg-muted/30 rounded-md px-1 border border-border/20">
+            <div className="flex flex-col items-center gap-4">
+              <div className="flex justify-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-[10px] h-7 opacity-60 hover:opacity-100"
+                  onClick={fetchLastResult}
+                >
+                  Atualizar Comparação
+                </Button>
+                {lastResult.asset_url && (
+                  <div className="flex flex-wrap justify-center gap-2">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button size="sm" variant="outline" className="text-[10px] h-7">
+                          <Download className="h-3 w-3 mr-1.5" />
+                          Opções de Download
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-64 space-y-4">
+                        <div className="space-y-2">
+                          <Label className="text-xs uppercase font-bold text-muted-foreground">Formato & Qualidade</Label>
+                          <div className="grid grid-cols-2 gap-2">
+                            <Button size="sm" variant={downloadOptions.quality > 0.8 ? "default" : "outline"} onClick={() => setDownloadOptions({ ...downloadOptions, quality: 0.95 })}>Alta (JPG)</Button>
+                            <Button size="sm" variant={downloadOptions.quality <= 0.8 ? "default" : "outline"} onClick={() => setDownloadOptions({ ...downloadOptions, quality: 0.60 })}>Média (JPG)</Button>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs uppercase font-bold text-muted-foreground">Resolução</Label>
+                          <Select value={downloadOptions.resolution} onValueChange={(v) => setDownloadOptions({ ...downloadOptions, resolution: v })}>
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="original">Original</SelectItem>
+                              <SelectItem value="1080p">1080p (Full HD)</SelectItem>
+                              <SelectItem value="720p">720p (HD)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 pt-2 border-t">
+                          <Button size="sm" className="w-full" onClick={() => handleDownloadResult("jpg", downloadOptions.quality, downloadOptions.resolution)}>Baixar JPG</Button>
+                          <Button size="sm" variant="secondary" className="w-full" onClick={() => handleDownloadResult("png", 1, downloadOptions.resolution)}>Baixar PNG</Button>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+
+                    {lastResult.asset_url.endsWith('.mp4') && (
                       <Button
                         size="sm"
-                        variant="ghost"
-                        className="text-[10px] h-7 px-2"
-                        onClick={() => handleDownloadResult("jpg", 0.95)}
+                        variant="default"
+                        className="text-[10px] h-7"
+                        onClick={() => handleDownloadResult("png")}
                       >
                         <Download className="h-3 w-3 mr-1.5" />
-                        JPG (Alta)
+                        Baixar MP4
                       </Button>
-                      <div className="w-[1px] h-3 bg-border" />
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-[10px] h-7 px-2"
-                        onClick={() => handleDownloadResult("jpg", 0.60)}
-                      >
-                        JPG (Compresso)
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              )}
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -810,18 +902,23 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                 <div key={opt.key} className="space-y-1.5">
                   <Label className="text-xs uppercase tracking-wider text-muted-foreground">{opt.label}</Label>
                   {opt.type === "select" ? (
-                    <select 
-                      className="flex h-9 w-full rounded-md border border-input bg-background/50 px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    <Select 
                       value={metadata[opt.key]}
-                      onChange={(e) => setMetadata({ ...metadata, [opt.key]: e.target.value })}
+                      onValueChange={(v) => setMetadata({ ...metadata, [opt.key]: v })}
                     >
-                      {opt.options?.map(o => <option key={o} value={o}>{o}</option>)}
-                    </select>
+                      <SelectTrigger className="h-9 bg-background/50 border-border/40">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {opt.options?.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                   ) : opt.type === "number" ? (
                     <Input 
                       type="number" 
                       value={metadata[opt.key]}
                       onChange={(e) => setMetadata({ ...metadata, [opt.key]: parseInt(e.target.value) })}
+
                       className="bg-background/50 h-9"
                     />
                   ) : (
