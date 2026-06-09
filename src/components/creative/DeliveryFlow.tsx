@@ -1,4 +1,4 @@
-import { Check, X, Loader2, PlayCircle, Globe, ShieldCheck, Smartphone, Package, Code, AlertCircle, Terminal, History, Download, ExternalLink, QrCode, Filter, Search, Mail, Bell, FileJson, FileSpreadsheet, FileText, UserCheck, RotateCcw, FileBadge, Lock, MessageSquare, ShieldAlert, Activity, Cpu, Upload, Paperclip, Eye, Clock, Trash2 } from "lucide-react";
+import { Check, X, Loader2, PlayCircle, Globe, ShieldCheck, Smartphone, Package, Code, AlertCircle, Terminal, History, Download, ExternalLink, QrCode, Filter, Search, Mail, Bell, FileJson, FileSpreadsheet, FileText, UserCheck, RotateCcw, FileBadge, Lock, MessageSquare, ShieldAlert, Activity, Cpu, Upload, Paperclip, Eye, Clock, Trash2, Settings, HardDrive, Calendar } from "lucide-react";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -12,6 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
 
 interface ValidationStep {
@@ -62,6 +64,20 @@ interface ActiveDeploy {
   timestamp: string;
 }
 
+interface RetentionPolicy {
+  environment: "staging" | "production";
+  maxSizeMB: number;
+  expirationDays: number;
+  autoDelete: boolean;
+}
+
+interface EvidenceFile {
+  name: string;
+  size: number;
+  type: string;
+  url: string; // Simulated signed URL
+}
+
 
 export function DeliveryFlow() {
   const [isDeploying, setIsDeploying] = useState(false);
@@ -85,7 +101,19 @@ export function DeliveryFlow() {
   const [isDryRun, setIsDryRun] = useState(false);
   const [activeDeploys, setActiveDeploys] = useState<ActiveDeploy[]>([]);
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
-  const [maxEvidenceSize] = useState(5 * 1024 * 1024); // 5MB limit
+  const [retentionPolicies, setRetentionPolicies] = useState<RetentionPolicy[]>(() => {
+    const saved = localStorage.getItem("deploy_retention_policies");
+    return saved ? JSON.parse(saved) : [
+      { environment: "staging", maxSizeMB: 10, expirationDays: 7, autoDelete: true },
+      { environment: "production", maxSizeMB: 50, expirationDays: 30, autoDelete: false }
+    ];
+  });
+  
+  const currentPolicy = useMemo(() => 
+    retentionPolicies.find(p => p.environment === environment) || retentionPolicies[0]
+  , [retentionPolicies, environment]);
+
+  const maxEvidenceSize = currentPolicy.maxSizeMB * 1024 * 1024;
   const [allowedTypes] = useState(["image/png", "image/jpeg", "application/pdf", "text/plain"]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -111,6 +139,10 @@ export function DeliveryFlow() {
   useEffect(() => {
     localStorage.setItem("deploy_history", JSON.stringify(history));
   }, [history]);
+
+  useEffect(() => {
+    localStorage.setItem("deploy_retention_policies", JSON.stringify(retentionPolicies));
+  }, [retentionPolicies]);
 
   const addLog = (message: string, level: DeployLog["level"] = "info", step?: string) => {
     const newLog = {
@@ -341,6 +373,15 @@ export function DeliveryFlow() {
       }
     };
 
+    // Simulated evidence with metadata for UI
+    const detailedEvidence: EvidenceFile[] = evidenceFiles.map(f => ({
+      name: f.name,
+      size: f.size,
+      type: f.type,
+      url: `https://storage.kubovibe.app/signed/${deployId}/${f.name}?token=${Math.random().toString(36).substring(7)}`
+    }));
+    (newItem as any).detailedEvidence = detailedEvidence;
+
 
     if (!isDryRun) {
       setHistory(prev => [newItem, ...prev]);
@@ -383,14 +424,16 @@ export function DeliveryFlow() {
   };
 
   const downloadAuditSummary = (historyItem: DeployHistoryItem) => {
-    // Simulating full Audit PDF summary
+    const detailedEvidence = (historyItem as any).detailedEvidence as EvidenceFile[] || [];
+    
+    // Simulating full Audit PDF summary with embedded evidence links
     const summary = `
 =========================================
 RELATÓRIO DE AUDITORIA DE DEPLOY (PDF SIMULATED)
 =========================================
 Identificador Único: ${historyItem.id}
 Data e Hora: ${new Date(historyItem.date).toLocaleString()}
-Responsável: ${currentUserRole.toUpperCase()}
+Responsável: ${historyItem.user?.toUpperCase() || "ADMIN"}
 -----------------------------------------
 RESUMO DA EXECUÇÃO
 -----------------------------------------
@@ -406,8 +449,15 @@ DETALHES DE APROVAÇÃO (PRODUÇÃO)
 -----------------------------------------
 Responsável: ${historyItem.user || "Admin"}
 Comentário: ${historyItem.parameters.approvalComment || "N/A"}
-Evidências Anexadas: ${historyItem.evidence?.join(", ") || "Nenhuma"}
 Termos Aceitos: ${historyItem.parameters.approvalTerms ? "SIM" : "NÃO"}
+
+-----------------------------------------
+EVIDÊNCIAS ANEXADAS E LINKS ASSINADOS
+-----------------------------------------
+${detailedEvidence.length > 0 ? detailedEvidence.map((e, idx) => 
+  `${idx + 1}. ${e.name} (${(e.size / 1024).toFixed(1)} KB)
+   Link para Download: ${e.url} (Acesso Restrito: Dev/Admin/Aprovador)`
+).join("\n\n") : "Nenhuma evidência anexada."}
 
 -----------------------------------------
 MODO DE EXECUÇÃO: ${historyItem.parameters.dryRun ? "DRY-RUN (SIMULAÇÃO)" : "REAL (PRODUÇÃO/STAGING)"}
@@ -416,19 +466,15 @@ TIMELINE DE ETAPAS
 -----------------------------------------
 ${steps.map(s => {
   const isFailed = historyItem.failedStepId === s.id;
-  return `[${isFailed ? "FALHA" : "OK"}] ${s.label}: ${s.description}`;
+  const isSuccess = !historyItem.failedStepId || steps.findIndex(st => st.id === historyItem.failedStepId) > steps.findIndex(st => st.id === s.id);
+  return `[${isFailed ? "FALHA" : isSuccess ? "OK" : "SKIP"}] ${s.label}: ${s.description}`;
 }).join("\n")}
------------------------------------------
-PARÂMETROS UTILIZADOS
------------------------------------------
-Notificações E-mail: ${historyItem.parameters.notifications.email ? "SIM" : "NÃO"}
-Notificações Webhook: ${historyItem.parameters.notifications.webhook ? "SIM" : "NÃO"}
-Retomado de etapa anterior: ${historyItem.failedStepId ? "SIM" : "NÃO"}
 -----------------------------------------
 LOGS DE ACESSO
 -----------------------------------------
 Link para logs JSON: /api/logs/${historyItem.id}.json
 Link para logs CSV: /api/logs/${historyItem.id}.csv
+
 =========================================
 Documento assinado digitalmente por Lovable Cloud Deploy Engine.
     `;
@@ -439,7 +485,7 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
     a.download = `auditoria-deploy-${historyItem.commit}.txt`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success("Relatório de auditoria gerado e baixado");
+    toast.success("Relatório de auditoria gerado (Links assinados incluídos)");
   };
 
   const filteredHistory = useMemo(() => {
@@ -488,6 +534,9 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
           <TabsList className="bg-muted/50">
             <TabsTrigger value="current" className="text-xs">Atual</TabsTrigger>
             <TabsTrigger value="history" className="text-xs">Histórico</TabsTrigger>
+            <TabsTrigger value="settings" className="text-xs">
+              <Settings className="h-3 w-3 mr-1.5" /> Configurações
+            </TabsTrigger>
           </TabsList>
         </div>
 
@@ -566,7 +615,7 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
                         <div className="space-y-2">
                           <label className="text-xs font-bold flex items-center justify-between">
                             <span className="flex items-center gap-2"><Paperclip className="h-3.5 w-3.5" /> Evidências (Prints/Logs)</span>
-                            <span className="text-[10px] text-muted-foreground font-normal">Máx. 5MB</span>
+                            <span className="text-[10px] text-muted-foreground font-normal">Máx. {currentPolicy.maxSizeMB}MB</span>
                           </label>
                           <div 
                             onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
@@ -981,14 +1030,39 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
                                 <p className="text-xs">{item.healthDetails || "Não executado"}</p>
                               </div>
                               <div className="space-y-1">
-                                <p className="text-[10px] uppercase text-muted-foreground font-bold">Evidências ({item.evidence?.length || 0})</p>
-                                <div className="space-y-1">
-                                  {item.evidence?.map((f, idx) => (
-                                    <div key={idx} className="flex items-center justify-between bg-muted/30 p-1.5 rounded border border-border/40">
-                                      <span className="text-[10px] truncate max-w-[150px]">{f}</span>
-                                      <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => toast.info(`Iniciando download de ${f}`)}>
-                                        <Download className="h-3 w-3" />
-                                      </Button>
+                                <p className="text-[10px] uppercase text-muted-foreground font-bold">Evidências e Downloads ({item.evidence?.length || 0})</p>
+                                <div className="space-y-1.5">
+                                  {((item as any).detailedEvidence as EvidenceFile[])?.map((f, idx) => (
+                                    <div key={idx} className="group relative flex flex-col gap-1 bg-muted/40 p-2 rounded border border-border/40 hover:border-primary/40 transition-colors">
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2 overflow-hidden">
+                                          <FileText className="h-3 w-3 text-primary" />
+                                          <span className="text-[10px] font-bold truncate max-w-[140px]">{f.name}</span>
+                                        </div>
+                                        <Badge variant="outline" className="text-[8px] h-3.5 px-1 bg-background">
+                                          {(f.size / 1024).toFixed(0)} KB
+                                        </Badge>
+                                      </div>
+                                      <div className="flex items-center justify-between gap-2 mt-1">
+                                        <p className="text-[8px] text-muted-foreground truncate opacity-70">
+                                          URL assinada para Admin/Dev/Aprovador
+                                        </p>
+                                        <Button 
+                                          variant="secondary" 
+                                          size="sm" 
+                                          className="h-6 px-2 text-[9px] gap-1 hover:bg-primary hover:text-primary-foreground transition-all" 
+                                          onClick={() => {
+                                            if (currentUserRole === 'viewer') {
+                                              toast.error("Acesso Negado", { description: "Apenas Dev/Admin podem baixar evidências assinadas." });
+                                              return;
+                                            }
+                                            toast.success("Download iniciado", { description: `Arquivo: ${f.name} via link temporário.` });
+                                            window.open(f.url, '_blank');
+                                          }}
+                                        >
+                                          <Download className="h-2.5 w-2.5" /> Baixar
+                                        </Button>
+                                      </div>
                                     </div>
                                   )) || <span className="text-[10px] text-muted-foreground">Nenhuma evidência anexada</span>}
                                 </div>
@@ -1079,6 +1153,95 @@ Documento assinado digitalmente por Lovable Cloud Deploy Engine.
               </Button>
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="settings" className="space-y-6 mt-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {retentionPolicies.map((policy, idx) => (
+              <Card key={policy.environment} className="p-4 bg-muted/20 border-border/40">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <div className={cn(
+                      "p-2 rounded-lg",
+                      policy.environment === "production" ? "bg-primary/20" : "bg-muted"
+                    )}>
+                      {policy.environment === "production" ? <ShieldCheck className="h-4 w-4 text-primary" /> : <Globe className="h-4 w-4" />}
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold uppercase">{policy.environment}</h4>
+                      <p className="text-[10px] text-muted-foreground">Política de Retenção de Anexos</p>
+                    </div>
+                  </div>
+                  <Switch 
+                    checked={policy.autoDelete} 
+                    onCheckedChange={(v) => {
+                      const newPolicies = [...retentionPolicies];
+                      newPolicies[idx].autoDelete = v;
+                      setRetentionPolicies(newPolicies);
+                    }}
+                  />
+                </div>
+
+                <div className="space-y-5 py-2">
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <label className="text-xs font-medium flex items-center gap-1.5">
+                        <HardDrive className="h-3 w-3" /> Tamanho Máximo por Arquivo
+                      </label>
+                      <span className="text-xs font-bold text-primary">{policy.maxSizeMB}MB</span>
+                    </div>
+                    <Slider 
+                      value={[policy.maxSizeMB]} 
+                      max={100} 
+                      min={1} 
+                      step={1} 
+                      onValueChange={([v]) => {
+                        const newPolicies = [...retentionPolicies];
+                        newPolicies[idx].maxSizeMB = v;
+                        setRetentionPolicies(newPolicies);
+                      }}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <label className="text-xs font-medium flex items-center gap-1.5">
+                        <Calendar className="h-3 w-3" /> Expiração Automática
+                      </label>
+                      <span className="text-xs font-bold text-primary">{policy.expirationDays} dias</span>
+                    </div>
+                    <Slider 
+                      value={[policy.expirationDays]} 
+                      max={90} 
+                      min={1} 
+                      step={1} 
+                      onValueChange={([v]) => {
+                        const newPolicies = [...retentionPolicies];
+                        newPolicies[idx].expirationDays = v;
+                        setRetentionPolicies(newPolicies);
+                      }}
+                    />
+                  </div>
+
+                  <div className="p-3 bg-background/50 rounded-lg border border-border/40 space-y-2">
+                    <p className="text-[10px] font-bold flex items-center gap-1.5">
+                      <AlertCircle className="h-3 w-3 text-muted-foreground" /> Resumo da Política
+                    </p>
+                    <p className="text-[10px] text-muted-foreground leading-relaxed">
+                      Arquivos em <span className="font-bold text-foreground">{policy.environment}</span> serão {policy.autoDelete ? "apagados permanentemente" : "mantidos"} após {policy.expirationDays} dias. 
+                      Uploads limitados a {policy.maxSizeMB}MB para garantir estabilidade do storage.
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+          
+          <div className="flex justify-end pt-4">
+            <Button className="gap-2" onClick={() => toast.success("Políticas salvas com sucesso!")}>
+              Salvar Todas as Configurações
+            </Button>
+          </div>
         </TabsContent>
       </Tabs>
     </Card>
