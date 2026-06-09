@@ -5,7 +5,7 @@ import { Slider } from "@/components/ui/slider";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Loader2, Crop as CropIcon, ZoomIn, Square, Maximize, Save, Trash2, List, Pencil, Copy } from "lucide-react";
+import { Loader2, Crop as CropIcon, ZoomIn, Square, Maximize, Save, Trash2, List, Pencil, Copy, Download, Upload, AlertTriangle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 
@@ -75,9 +75,10 @@ export function AvatarCropDialog({ open, imageUrl, onCancel, onConfirm, onSavePr
 
     let newPresets;
     if (editingPreset) {
+      if (!confirm(`Deseja salvar as alterações no preset "${editingPreset}"?`)) return;
       newPresets = presets.map(x => x.name === editingPreset ? { ...x, name, ...p } : x);
       setEditingPreset(null);
-      toast.success("Preset renomeado");
+      toast.success("Preset atualizado");
     } else {
       newPresets = [...presets, { name, ...p }];
       toast.success("Preset salvo");
@@ -111,11 +112,55 @@ export function AvatarCropDialog({ open, imageUrl, onCancel, onConfirm, onSavePr
     setEditingPreset(preset.name);
   };
 
+  const importPresets = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const imported = JSON.parse(event.target?.result as string);
+        if (!Array.isArray(imported)) throw new Error("Formato inválido");
+        
+        const validPresets = imported.filter(p => p.name && typeof p.zoom === "number" && typeof p.aspect === "number");
+        if (validPresets.length === 0) throw new Error("Nenhum preset válido encontrado");
+
+        const newPresets = [...presets];
+        let mergedCount = 0;
+        validPresets.forEach(p => {
+          if (!newPresets.find(x => x.name.toLowerCase() === p.name.toLowerCase())) {
+            newPresets.push(p);
+            mergedCount++;
+          }
+        });
+
+        setPresets(newPresets);
+        localStorage.setItem("creative_avatar_presets_list", JSON.stringify(newPresets));
+        toast.success(`Importação concluída: ${mergedCount} novos presets adicionados.`);
+      } catch (err) {
+        toast.error("Erro ao importar arquivo JSON");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
+  const exportPresets = () => {
+    const blob = new Blob([JSON.stringify(presets, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "kubo-avatar-presets.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const deletePreset = (name: string) => {
-    const newPresets = presets.filter(p => p.name !== name);
-    setPresets(newPresets);
-    localStorage.setItem("creative_avatar_presets_list", JSON.stringify(newPresets));
-    toast.success("Preset removido");
+    if (confirm(`Tem certeza que deseja excluir o preset "${name}"?`)) {
+      const newPresets = presets.filter(p => p.name !== name);
+      setPresets(newPresets);
+      localStorage.setItem("creative_avatar_presets_list", JSON.stringify(newPresets));
+      toast.success("Preset removido");
+    }
   };
 
   const onCropComplete = useCallback((_: Area, areaPixels: Area) => {
@@ -181,7 +226,20 @@ export function AvatarCropDialog({ open, imageUrl, onCancel, onConfirm, onSavePr
                 </Select>
             </div>
             <div className="flex-1 space-y-2">
-                <Label className="text-xs text-muted-foreground flex items-center gap-1"><Maximize className="h-3 w-3"/> Ajustar & Presets</Label>
+                <Label className="text-xs text-muted-foreground flex items-center justify-between gap-1">
+                  <span className="flex items-center gap-1"><Maximize className="h-3 w-3"/> Ajustar & Presets</span>
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="icon" className="h-4 w-4" onClick={exportPresets} title="Exportar Presets">
+                      <Download className="h-3 w-3" />
+                    </Button>
+                    <Label htmlFor="import-presets" className="cursor-pointer">
+                      <div className="h-4 w-4 inline-flex items-center justify-center rounded-sm hover:bg-muted" title="Importar Presets">
+                        <Upload className="h-3 w-3" />
+                      </div>
+                      <Input id="import-presets" type="file" accept=".json" className="hidden" onChange={importPresets} />
+                    </Label>
+                  </div>
+                </Label>
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" className="flex-1 text-[10px] h-8" onClick={() => { setZoom(1); setCrop({ x: 0, y: 0 }); }}>Resetar</Button>
                   <Select onValueChange={(v) => {

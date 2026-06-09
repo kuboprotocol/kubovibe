@@ -6,12 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Sparkles, Send, Coins, Settings2, Info, AlertCircle, Wallet, RotateCw, Upload, X, Image as ImageIcon, Download, Crop as CropIcon, Trash2, Sliders, History, FileText, FileCode, Play } from "lucide-react";
+import { Loader2, Sparkles, Send, Coins, Settings2, Info, AlertCircle, Wallet, RotateCw, Upload, X, Image as ImageIcon, Download, Crop as CropIcon, Trash2, Sliders, History, FileText, FileCode, Play, Search, Filter, PlayCircle } from "lucide-react";
 import { useSubscription } from "@/hooks/useSubscription";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -144,6 +144,11 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     return saved ? JSON.parse(saved) : { zoom: 1, aspect: 1 };
   });
   const [downloadOptions, setDownloadOptions] = useState({ quality: 0.90, resolution: "original" as any, pngQuality: 1 });
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyStatusFilter, setHistoryStatusFilter] = useState<string>("all");
+  const [reexecuteDialogOpen, setReexecuteDialogOpen] = useState(false);
+  const [reexecuteItem, setReexecuteItem] = useState<any>(null);
+  const [startAtStep, setStartAtStep] = useState<AvatarStepKey>("upload");
 
   const buildSteps = (needsConvert: boolean, initialDetails?: Record<string, any>): AvatarStepState[] => {
     const now = new Date().toLocaleTimeString();
@@ -1128,6 +1133,55 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
         onConfirm={handleCropConfirm}
         onSavePreset={handleSaveAvatarPreset}
       />
+
+      {/* Reexecute Dialog */}
+      <Dialog open={reexecuteDialogOpen} onOpenChange={setReexecuteDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Retomar Execução</DialogTitle>
+            <DialogDescription>
+              Escolha a partir de qual etapa você deseja retomar a geração.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <Label className="text-xs">Etapa de início</Label>
+              <Select value={startAtStep} onValueChange={(v: AvatarStepKey) => setStartAtStep(v)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="upload">Upload (Reiniciar tudo)</SelectItem>
+                  <SelectItem value="convert">Conversão (Processar arquivo)</SelectItem>
+                  <SelectItem value="generate">Geração (Pedir à IA)</SelectItem>
+                  <SelectItem value="render">Renderização (Finalizar)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-[10px] text-muted-foreground italic">
+                * Retomar de etapas avançadas economiza tempo se o arquivo e parâmetros forem os mesmos.
+              </p>
+            </div>
+            <div className="p-3 bg-muted/50 rounded-lg text-xs space-y-1">
+              <p className="font-bold">Parâmetros originais:</p>
+              <p className="opacity-70">Prompt: {reexecuteItem?.prompt}</p>
+              {reexecuteItem?.metadata?.preset && <p className="opacity-70">Preset: {reexecuteItem.metadata.preset.name}</p>}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setReexecuteDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={() => {
+              if (reexecuteItem) {
+                setPrompt(reexecuteItem.prompt);
+                if (reexecuteItem.metadata?.preset) setAvatarPreset(reexecuteItem.metadata.preset);
+                handleExecute();
+                setReexecuteDialogOpen(false);
+              }
+            }}>
+              Confirmar Retomada
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
