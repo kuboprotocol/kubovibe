@@ -512,6 +512,7 @@ export default function CreativeAuditPage() {
                   <TableHead>Etapa</TableHead>
                   <TableHead>Ação</TableHead>
                   <TableHead>Correlation / Trace ID</TableHead>
+                  <TableHead className="text-center">Comparar</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
