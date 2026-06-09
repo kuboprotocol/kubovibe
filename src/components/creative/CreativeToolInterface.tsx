@@ -334,14 +334,36 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     toast.success("Avatar padrão da sessão removido.");
   };
 
-  const handleDownloadResult = async () => {
+  const handleDownloadResult = async (format: "png" | "jpg" = "png") => {
     if (!lastResult?.asset_url) return;
     try {
       const res = await fetch(lastResult.asset_url);
       const blob = await res.blob();
       const isVideo = lastResult.asset_url.endsWith(".mp4");
-      const ext = isVideo ? "mp4" : (blob.type.includes("png") ? "png" : "jpg");
-      const url = URL.createObjectURL(blob);
+      
+      let finalBlob = blob;
+      let ext = isVideo ? "mp4" : format;
+
+      if (!isVideo && format === "jpg") {
+        // Convert PNG/WebP blob to JPG via canvas if needed
+        const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+            const i = new Image();
+            i.onload = () => resolve(i);
+            i.onerror = reject;
+            i.src = URL.createObjectURL(blob);
+        });
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d")!;
+        ctx.fillStyle = "white"; // JPG doesn't support transparency
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0);
+        finalBlob = await new Promise((r) => canvas.toBlob((b) => r(b!), "image/jpeg", 0.90)) as Blob;
+        URL.revokeObjectURL(img.src);
+      }
+
+      const url = URL.createObjectURL(finalBlob);
       const a = document.createElement("a");
       a.href = url;
       a.download = `kubo-avatar-${Date.now()}.${ext}`;
