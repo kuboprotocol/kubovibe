@@ -422,23 +422,41 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
             </Label>
             
             {uploadedImageUrl ? (
-              <div className="relative w-24 h-24 group">
-                <img 
-                  src={uploadedImageUrl} 
-                  alt="Avatar" 
-                  className="w-full h-full object-cover rounded-lg border border-border" 
-                />
-                <button 
-                  onClick={() => setUploadedImageUrl(null)}
-                  className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <X className="h-3 w-3" />
-                </button>
+              <div className="flex flex-col gap-3">
+                <div className="relative w-32 h-32 group">
+                  <img 
+                    src={uploadedImageUrl} 
+                    alt="Preview" 
+                    className="w-full h-full object-cover rounded-lg border-2 border-primary/20 shadow-sm" 
+                  />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-2">
+                    <Button 
+                      variant="destructive" 
+                      size="icon" 
+                      className="h-8 w-8 rounded-full"
+                      onClick={() => setUploadedImageUrl(null)}
+                      title="Remover"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-8 text-xs" 
+                    onClick={() => document.getElementById('avatar-upload')?.click()}
+                  >
+                    <Upload className="h-3 w-3 mr-1.5" /> Trocar Imagem
+                  </Button>
+                  <input type="file" id="avatar-upload" className="hidden" accept="image/jpeg,image/png,image/webp" onChange={handleFileUpload} disabled={isUploading} />
+                </div>
               </div>
             ) : (
               <div className="flex items-center gap-4">
                 <label className="flex flex-col items-center justify-center w-24 h-24 border-2 border-dashed border-border/60 rounded-lg cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition-all">
-                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                  <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center px-2">
                     {isUploading ? (
                       <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                     ) : (
@@ -448,10 +466,15 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                       </>
                     )}
                   </div>
-                  <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} disabled={isUploading} />
+                  <input type="file" className="hidden" accept="image/jpeg,image/png,image/webp" onChange={handleFileUpload} disabled={isUploading} />
                 </label>
-                <div className="text-xs text-muted-foreground italic">
-                  Escolha uma foto clara do rosto para melhores resultados.
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground font-medium">Requisitos da Imagem:</p>
+                  <ul className="text-[10px] text-muted-foreground/80 list-disc list-inside space-y-0.5">
+                    <li>Formatos: JPG, PNG ou WEBP</li>
+                    <li>Tamanho máximo: 5MB</li>
+                    <li>Rosto claro e centralizado</li>
+                  </ul>
                 </div>
               </div>
             )}
