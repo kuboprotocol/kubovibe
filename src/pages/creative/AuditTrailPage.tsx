@@ -877,49 +877,81 @@ export default function CreativeAuditPage() {
 
       {/* Comparison Modal */}
       <Sheet open={isComparing} onOpenChange={() => setIsComparing(false)}>
-        <SheetContent className="sm:max-w-4xl overflow-y-auto">
+        <SheetContent className="sm:max-w-5xl overflow-y-auto">
           <SheetHeader>
-            <SheetTitle className="flex items-center gap-2">
-              <ArrowLeftRight className="h-5 w-5 text-primary" /> Comparação Técnica
-            </SheetTitle>
+            <div className="flex items-center justify-between">
+              <SheetTitle className="flex items-center gap-2">
+                <ArrowLeftRight className="h-5 w-5 text-primary" /> Comparação Técnica Avançada
+              </SheetTitle>
+              <div className="flex gap-2 mr-6">
+                <Button variant="outline" size="sm" onClick={() => exportComparison("json")}>
+                  <FileDown className="h-3 w-3 mr-1" /> JSON
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => exportComparison("csv")}>
+                  <FileDown className="h-3 w-3 mr-1" /> CSV
+                </Button>
+              </div>
+            </div>
             <SheetDescription>
-              Comparando dois eventos selecionados para identificar discrepâncias.
+              Comparação detalhada com destaque de discrepâncias de parâmetros e causas prováveis.
             </SheetDescription>
           </SheetHeader>
           
-          <div className="mt-8 grid grid-cols-2 gap-6">
-            {compareEntries.map((entry, idx) => (
-              <div key={entry.id} className="space-y-6">
-                <div className="p-3 bg-accent/20 rounded-md border flex justify-between items-center">
-                  <h4 className="font-bold text-sm">Evento #{idx + 1}</h4>
-                  <Badge variant="outline">{new Date(entry.created_at).toLocaleTimeString()}</Badge>
-                </div>
-                
-                <div className="space-y-1">
-                  <p className="text-[10px] text-muted-foreground uppercase font-bold">Ação</p>
-                  <p className="text-xs font-mono bg-muted p-2 rounded truncate" title={entry.action}>{entry.action}</p>
-                </div>
+          <div className="mt-6 p-4 bg-primary/5 rounded-md border border-primary/20">
+            <h4 className="text-sm font-bold flex items-center gap-2 mb-2">
+              <AlertCircle className="h-4 w-4" /> Causas Prováveis da Divergência
+            </h4>
+            <ul className="list-disc list-inside text-xs space-y-1">
+              {getDiffProbableCauses().map((cause, i) => (
+                <li key={i}>{cause}</li>
+              ))}
+            </ul>
+          </div>
 
-                <div className="space-y-1">
-                  <p className="text-[10px] text-muted-foreground uppercase font-bold">Correlation ID</p>
-                  <code className="text-[10px] block bg-accent/50 p-1 rounded">{entry.correlation_id || "N/A"}</code>
-                </div>
-
-                <div className="space-y-2">
-                  <p className="text-[10px] text-muted-foreground uppercase font-bold">Parâmetros Principais</p>
-                  <div className="bg-black/95 text-green-400 p-3 rounded-md overflow-x-auto font-mono text-[10px] h-[300px]">
-                    <pre>{JSON.stringify(entry.params, null, 2)}</pre>
+          <div className="mt-6 grid grid-cols-2 gap-6">
+            {compareEntries.map((entry, idx) => {
+              const other = compareEntries[idx === 0 ? 1 : 0];
+              
+              return (
+                <div key={entry.id} className="space-y-6">
+                  <div className="p-3 bg-accent/20 rounded-md border flex justify-between items-center">
+                    <h4 className="font-bold text-sm">Evento #{idx + 1}</h4>
+                    <Badge variant="outline">{new Date(entry.created_at).toLocaleString()}</Badge>
                   </div>
-                </div>
-
-                {entry.params?.error && (
-                  <div className="p-2 border border-destructive/30 bg-destructive/5 rounded-md">
-                    <p className="text-[10px] font-bold text-destructive uppercase">Erro Detectado</p>
-                    <p className="text-xs text-destructive">{entry.params.error.message}</p>
+                  
+                  <div className="space-y-1">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold">Ação</p>
+                    <p className={`text-xs font-mono p-2 rounded truncate border ${entry.action !== other.action ? 'border-yellow-500/50 bg-yellow-500/5' : 'bg-muted'}`} title={entry.action}>
+                      {entry.action}
+                    </p>
                   </div>
-                )}
-              </div>
-            ))}
+
+                  <div className="space-y-1">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold">Parâmetros (Com Destaque)</p>
+                    <div className="bg-black/95 p-3 rounded-md overflow-x-auto font-mono text-[10px] h-[400px]">
+                      {Object.keys(entry.params || {}).map(key => {
+                        const val = entry.params[key];
+                        const otherVal = other.params?.[key];
+                        const isDiff = JSON.stringify(val) !== JSON.stringify(otherVal);
+                        
+                        return (
+                          <div key={key} className={`mb-1 ${isDiff ? 'text-yellow-400 font-bold bg-yellow-400/10' : 'text-green-400 opacity-70'}`}>
+                            {key}: {JSON.stringify(val, null, 2)}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {entry.params?.error && (
+                    <div className="p-2 border border-destructive/30 bg-destructive/5 rounded-md">
+                      <p className="text-[10px] font-bold text-destructive uppercase">Erro Detectado</p>
+                      <p className="text-xs text-destructive">{entry.params.error.message}</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </SheetContent>
       </Sheet>
