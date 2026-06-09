@@ -32,16 +32,17 @@ export default function ProfilePage() {
   }, [user])
 
   const loadProfile = async () => {
-    const [profileRes, referralsRes] = await Promise.all([
-      supabase.from('profiles').select('display_name, avatar_url, referral_code').eq('id', user!.id).single(),
+    const [profileRes, referralsRes, refCodeRes] = await Promise.all([
+      supabase.from('profiles').select('display_name, avatar_url').eq('id', user!.id).single(),
       supabase.from('referrals').select('id, credits_awarded').eq('referrer_id', user!.id),
+      supabase.rpc('get_my_referral_code'),
     ])
 
     if (!profileRes.error && profileRes.data) {
       setDisplayName(profileRes.data.display_name || '')
       setAvatarUrl(profileRes.data.avatar_url)
-      setReferralCode(profileRes.data.referral_code || '')
     }
+    if (refCodeRes.data) setReferralCode(refCodeRes.data as string)
     if (!referralsRes.error && referralsRes.data) {
       setReferralCount(referralsRes.data.length)
       setReferralCredits(referralsRes.data.reduce((sum, r) => sum + Number(r.credits_awarded), 0))
