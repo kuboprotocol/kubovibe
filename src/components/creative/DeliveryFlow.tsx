@@ -12,15 +12,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/integrations/supabase/client";
-
-interface ValidationStep {
-  id: string;
-  label: string;
-  description: string;
-  status: "pending" | "validating" | "success" | "error";
-  error?: string;
-}
 
 interface DeployLog {
   timestamp: string;
@@ -230,6 +221,22 @@ ${steps.map(s => `- ${s.label}: ${historyItem.failedStepId === s.id ? "FALHOU" :
 
   return (
     <Card className="p-6 bg-card/50 backdrop-blur-xl border-primary/20 shadow-2xl overflow-hidden">
+      <div className="absolute top-4 right-4 flex items-center gap-2">
+        <Badge variant="outline" className="text-[9px] gap-1 px-2 py-0.5">
+          <UserCheck className="h-2.5 w-2.5" /> {currentUserRole.toUpperCase()}
+        </Badge>
+        <Select value={currentUserRole} onValueChange={setCurrentUserRole}>
+          <SelectTrigger className="w-[100px] h-6 text-[9px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="admin">Admin</SelectItem>
+            <SelectItem value="developer">Dev</SelectItem>
+            <SelectItem value="viewer">Viewer</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className="flex items-center justify-between mb-6">
           <div className="space-y-1">
