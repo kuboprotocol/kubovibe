@@ -10,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { 
   ArrowLeft, Search, FileDown, ArrowUpDown, Loader2, X, Filter, 
-  AlertTriangle, Save, History, ChevronRight, Info, AlertCircle, Share2, TrendingUp, Clock
+  AlertTriangle, Save, History, ChevronRight, Info, AlertCircle, Share2, TrendingUp, Clock,
+  Layers, Copy, ArrowLeftRight
 } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
