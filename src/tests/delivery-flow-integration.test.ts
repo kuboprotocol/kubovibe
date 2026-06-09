@@ -16,7 +16,7 @@ const checkAccess = (userRole: string, itemUser: string | undefined, currentUser
   return {
     authorized: isAdmin || isDev || isApprover,
     canExport: isAdmin || isDev || isApprover,
-    error: !(isAdmin || isDev || isApprover) ? 'Acesso Negado: Apenas Dev, Admin ou o Aprovador original podem visualizar ou exportar este histórico.' : null
+    error: !(isAdmin || isDev || isApprover) ? 'ERR_AUTH_DENIED: Acesso Negado: Apenas Dev, Admin ou o Aprovador original podem visualizar ou exportar este histórico.' : null
   };
 };
 
