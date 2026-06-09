@@ -2700,7 +2700,6 @@ export type Database = {
       }
       has_role: { Args: { _role: string }; Returns: boolean }
       is_admin: { Args: { p_user_id: string }; Returns: boolean }
-      is_kubo_admin: { Args: never; Returns: boolean }
       log_connector_activity: {
         Args: {
           _connector_slug: string
