@@ -901,55 +901,115 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
 
         {sessionHistory.length > 0 && (
           <div className="pt-4 border-t border-border/20 space-y-3">
-             <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-              <History className="h-3 w-3" /> Histórico da Sessão
-            </h4>
-            <div className="space-y-2 max-h-[200px] overflow-auto pr-2 custom-scrollbar">
-              {sessionHistory.map((item) => (
-                <div key={item.id} className="flex items-center justify-between p-2 rounded bg-muted/20 border border-border/10 group">
-                  <div className="flex flex-col gap-0.5">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-mono opacity-50">{item.timestamp}</span>
-                      <Badge variant={item.status === "success" ? "secondary" : "destructive"} className="text-[8px] h-3.5 px-1 py-0">
-                        {item.status === "success" ? "Sucesso" : "Erro"}
-                      </Badge>
+             <div className="flex flex-col gap-2">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                  <div className="flex items-center gap-2"><History className="h-3 w-3" /> Histórico da Sessão</div>
+                  <Badge variant="outline" className="text-[9px] font-normal">{sessionHistory.length} registros</Badge>
+                </h4>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                    <Input 
+                      placeholder="Buscar por prompt..." 
+                      className="h-7 pl-7 text-[10px] bg-muted/20 border-border/10"
+                      value={historySearch}
+                      onChange={(e) => setHistorySearch(e.target.value)}
+                    />
+                  </div>
+                  <Select value={historyStatusFilter} onValueChange={setHistoryStatusFilter}>
+                    <SelectTrigger className="h-7 w-[100px] text-[10px] bg-muted/20 border-border/10">
+                      <Filter className="h-3 w-3 mr-1" />
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      <SelectItem value="success">Sucesso</SelectItem>
+                      <SelectItem value="error">Erro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+             </div>
+            <div className="space-y-2 max-h-[300px] overflow-auto pr-2 custom-scrollbar">
+              {sessionHistory
+                .filter(item => {
+                  const matchesSearch = !historySearch || item.prompt?.toLowerCase().includes(historySearch.toLowerCase());
+                  const matchesStatus = historyStatusFilter === "all" || item.status === historyStatusFilter;
+                  return matchesSearch && matchesStatus;
+                })
+                .map((item) => (
+                <div key={item.id} className="flex flex-col p-2.5 rounded-lg bg-muted/20 border border-border/10 group hover:border-primary/20 transition-all">
+                  <div className="flex items-start justify-between mb-1.5">
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono opacity-50 bg-muted px-1.5 py-0.5 rounded">{item.timestamp}</span>
+                        <Badge variant={item.status === "success" ? "secondary" : "destructive"} className="text-[8px] h-4 px-1.5 py-0 leading-none">
+                          {item.status === "success" ? "Sucesso" : "Erro"}
+                        </Badge>
+                      </div>
+                      <p className="text-[11px] font-medium leading-tight text-foreground/90 pr-4">{item.prompt || "(Sem texto)"}</p>
                     </div>
-                    <p className="text-[11px] truncate max-w-[400px] text-foreground/80">{item.prompt || "(Sem texto)"}</p>
+                    <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-primary/10 hover:text-primary" onClick={() => {
+                        setPrompt(item.prompt);
+                        if (item.metadata) setMetadata(item.metadata);
+                        toast.info("Parâmetros carregados!");
+                      }} title="Carregar parâmetros">
+                        <Settings2 className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-primary hover:bg-primary/10" onClick={() => {
+                        setReexecuteItem(item);
+                        setStartAtStep("upload");
+                        setReexecuteDialogOpen(true);
+                      }} title="Reexecutar">
+                        <Play className="h-3.5 w-3.5" />
+                      </Button>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-7 w-7">
+                            <FileCode className="h-3.5 w-3.5" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-40 p-1.5" align="end">
+                          <p className="text-[9px] font-bold text-muted-foreground uppercase px-2 mb-1.5">Exportar Logs</p>
+                          <Button variant="ghost" size="sm" className="w-full justify-start text-[10px] h-8" onClick={() => exportLogs("txt", item.logs)}>
+                            <FileText className="h-3 w-3 mr-2" /> .TXT (Logs)
+                          </Button>
+                          <Button variant="ghost" size="sm" className="w-full justify-start text-[10px] h-8" onClick={() => exportLogs("json", item.logs)}>
+                            <FileCode className="h-3 w-3 mr-2" /> .JSON (Logs)
+                          </Button>
+                        </PopoverContent>
+                      </Popover>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-7 w-7 text-destructive hover:bg-destructive/10" 
+                        onClick={() => {
+                          if (confirm("Deseja remover esta execução do histórico?")) {
+                            setSessionHistory(prev => prev.filter(h => h.id !== item.id));
+                          }
+                        }}
+                        title="Excluir"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReplay(item)} title="Carregar parâmetros">
-                      <Settings2 className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-primary" onClick={() => handleRerunFromHistory(item)} title="Reexecutar agora">
-                      <Play className="h-3.5 w-3.5" />
-                    </Button>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-7 w-7">
-                          <FileCode className="h-3.5 w-3.5" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-32 p-1" align="end">
-                        <Button variant="ghost" size="sm" className="w-full justify-start text-[10px]" onClick={() => exportLogs("txt", item.logs)}>
-                          <FileText className="h-3 w-3 mr-2" /> .TXT
-                        </Button>
-                        <Button variant="ghost" size="sm" className="w-full justify-start text-[10px]" onClick={() => exportLogs("json", item.logs)}>
-                          <FileCode className="h-3 w-3 mr-2" /> .JSON
-                        </Button>
-                      </PopoverContent>
-                    </Popover>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-7 w-7 text-destructive" 
-                      onClick={() => setSessionHistory(prev => prev.filter(h => h.id !== item.id))}
-                      title="Excluir do histórico"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
+                  {item.logs && (
+                    <div className="mt-2 border-t border-border/10 pt-2 opacity-60 group-hover:opacity-100 transition-opacity">
+                      <AvatarProgressSteps steps={item.logs} isCompact />
+                    </div>
+                  )}
                 </div>
               ))}
+              {sessionHistory.length > 0 && sessionHistory.filter(item => {
+                const matchesSearch = !historySearch || item.prompt?.toLowerCase().includes(historySearch.toLowerCase());
+                const matchesStatus = historyStatusFilter === "all" || item.status === historyStatusFilter;
+                return matchesSearch && matchesStatus;
+              }).length === 0 && (
+                <div className="py-8 text-center text-xs text-muted-foreground italic">
+                  Nenhum resultado encontrado para os filtros atuais.
+                </div>
+              )}
             </div>
           </div>
         )}
