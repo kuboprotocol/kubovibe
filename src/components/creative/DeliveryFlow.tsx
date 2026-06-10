@@ -210,7 +210,6 @@ function AuditHistoryManager({
   const [isExportLogOpen, setIsExportLogOpen] = useState(false);
   const [selectedLogForDetails, setSelectedLogForDetails] = useState<AuditLog | null>(null);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
-  const [isLogExportDialogOpen, setIsLogExportDialogOpen] = useState(false);
   const [logExportColumns, setLogExportColumns] = useState<string[]>(["timestamp", "user", "range", "filters", "total"]);
   const [exportFormat, setExportFormat] = useState<"csv" | "pdf">("csv");
   const [exportMode, setExportMode] = useState<"filtered" | "current_page" | "range">(() => {
@@ -267,13 +266,17 @@ function AuditHistoryManager({
       }
     }
 
+    if (logExportColumns.length === 0) {
+      toast.error("Seleção inválida", { description: "Você precisa selecionar ao menos uma coluna para exportar." });
+      return;
+    }
+
     let baseLogs = [];
     if (exportMode === "current_page") {
       baseLogs = paginatedLogs;
     } else if (exportMode === "range") {
       const start = (exportRange.start - 1) * itemsPerPage;
       const end = exportRange.end * itemsPerPage;
-      // Backend-like security check: Ensure we stay within the filtered set and autorized range
       baseLogs = filteredLogs.slice(start, end);
     } else {
       baseLogs = filteredLogs;
@@ -288,21 +291,29 @@ function AuditHistoryManager({
     const logsToExport = baseLogs.slice(0, MAX_EXPORT_LIMIT);
 
     if (format === "csv") {
-      const headers = ["ID", "Timestamp", "Ação", "Usuário", "Anexo", "Motivo", "Status"].filter((_, i) => {
-        const colKeys = ["id", "timestamp", "action", "user", "attachmentName", "reason", "status"];
-        return visibleColumns.includes(colKeys[i]);
+      const headers = logExportColumns.map(c => {
+        const map: any = { 
+          timestamp: "Data/Hora", 
+          user: "Usuário", 
+          range: "Intervalo", 
+          filters: "Filtros", 
+          total: "Total",
+          attachmentName: "Anexo", 
+          status: "Status",
+          id: "ID",
+          action: "Ação",
+          reason: "Motivo"
+        };
+        return map[c] || c;
       });
-      const rows = logsToExport.map(log => {
-        const row = [];
-        if (visibleColumns.includes("id")) row.push(log.id);
-        if (visibleColumns.includes("timestamp")) row.push(new Date(log.timestamp).toLocaleString());
-        if (visibleColumns.includes("action")) row.push(log.action);
-        if (visibleColumns.includes("user")) row.push(log.user);
-        if (visibleColumns.includes("attachmentName")) row.push(log.attachmentName);
-        if (visibleColumns.includes("reason")) row.push(log.reason);
-        if (visibleColumns.includes("status")) row.push(log.status);
-        return row;
-      });
+
+      const rows = logsToExport.map(log => logExportColumns.map(c => {
+        if (c === "timestamp") return new Date(log.timestamp).toLocaleString();
+        if (c === "range") return log.exportParams?.range ? `${log.exportParams.range.start}-${log.exportParams.range.end}` : "N/A";
+        if (c === "filters") return log.exportParams?.filters || "Nenhum";
+        if (c === "total") return log.exportParams?.total || "0";
+        return (log as any)[c] || "";
+      }));
       
       const csvContent = [headers, ...rows].map(e => e.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -333,13 +344,19 @@ function AuditHistoryManager({
           action: 'Ação',
           status: 'Status',
           reason: 'Motivo',
-          id: 'ID'
+          id: 'ID',
+          range: 'Intervalo',
+          filters: 'Filtros',
+          total: 'Total'
         };
 
-        const activeHeaders = visibleColumns.map(c => colMap[c]);
-        const tableBody = logsToExport.map(log => visibleColumns.map(col => {
+        const activeHeaders = logExportColumns.map(c => colMap[c] || c);
+        const tableBody = logsToExport.map(log => logExportColumns.map(col => {
           if (col === 'timestamp') return new Date(log.timestamp).toLocaleString();
-          return (log as any)[col];
+          if (col === "range") return log.exportParams?.range ? `${log.exportParams.range.start}-${log.exportParams.range.end}` : "N/A";
+          if (col === "filters") return log.exportParams?.filters || "Nenhum";
+          if (col === "total") return log.exportParams?.total || "0";
+          return (log as any)[col] || "";
         }));
 
         (autoTable as any)(doc, {
