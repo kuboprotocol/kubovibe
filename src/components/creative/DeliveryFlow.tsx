@@ -545,7 +545,7 @@ function AuditHistoryManager({
                 variant="outline" 
                 size="sm" 
                 className="h-8 text-[11px]"
-                onClick={() => setIsLogExportDialogOpen(true)}
+                onClick={() => { setExportFormat("csv"); setIsExportDialogOpen(true); }}
               >
                 <FileSpreadsheet className="h-3.5 w-3.5 mr-2" />
                 Exportar Histórico de Logs
