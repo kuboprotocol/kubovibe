@@ -107,6 +107,42 @@ const TimelineViewer = ({ correlationId, currentId }: { correlationId: string, c
   );
 };
 
+const SortableItem = ({ id, label, isChecked, onToggle }: { id: string; label: string; isChecked: boolean; onToggle: () => void }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : "auto",
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div 
+      ref={setNodeRef} 
+      style={style} 
+      className={`flex items-center space-x-2 p-2 rounded-md border bg-card/50 hover:bg-accent/30 transition-colors ${isDragging ? "shadow-lg border-primary" : ""}`}
+    >
+      <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-muted-foreground p-1">
+        <GripVertical className="h-4 w-4" />
+      </div>
+      <Checkbox 
+        id={`col-${id}`} 
+        checked={isChecked} 
+        onCheckedChange={onToggle}
+      />
+      <Label htmlFor={`col-${id}`} className="text-xs cursor-pointer flex-1 py-1">{label}</Label>
+    </div>
+  );
+};
+
 const PAGE_SIZE = 25;
 
 export default function CreativeAuditPage() {
