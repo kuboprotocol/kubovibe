@@ -917,7 +917,8 @@ function AuditHistoryManager({
               {paginatedLogs.map((log) => (
                 <div
                   key={log.id}
-                  className="grid grid-cols-7 gap-2 px-3 py-2 items-center text-[10px] hover:bg-muted/30 transition-colors"
+                  className="grid grid-cols-7 gap-2 px-3 py-2 items-center text-[10px] hover:bg-muted/30 transition-colors cursor-pointer"
+                  onClick={() => setSelectedLogForDetails(log)}
                 >
                   {visibleColumns.includes("timestamp") && (
                     <div className="text-muted-foreground whitespace-nowrap">
