@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { 
   Card, 
@@ -26,7 +27,11 @@ import {
   Check,
   Save,
   Trash2,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Copy,
+  Download,
+  FileText,
+  Keyboard
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -69,20 +74,21 @@ interface SkillExecution {
 }
 
 export function SkillExecutionsList() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [executions, setExecutions] = useState<SkillExecution[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
   
   // Filters & Search
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [skillFilter, setSkillFilter] = useState<string>("all");
-  const [dateStart, setDateStart] = useState("");
-  const [dateEnd, setDateEnd] = useState("");
+  const [search, setSearch] = useState(searchParams.get("search") || "");
+  const [statusFilter, setStatusFilter] = useState<string>(searchParams.get("status") || "all");
+  const [skillFilter, setSkillFilter] = useState<string>(searchParams.get("skill") || "all");
+  const [dateStart, setDateStart] = useState(searchParams.get("start") || "");
+  const [dateEnd, setDateEnd] = useState(searchParams.get("end") || "");
   
   // Pagination & Sorting
-  const [page, setPage] = useState(1);
-  const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
+  const [page, setPage] = useState(Number(searchParams.get("page")) || 1);
+  const [sortOrder, setSortOrder] = useState<"desc" | "asc">((searchParams.get("sort") as "asc" | "desc") || "desc");
   const pageSize = 10;
   
   // Details Modal
@@ -94,9 +100,12 @@ export function SkillExecutionsList() {
   const [availableSkills, setAvailableSkills] = useState<{slug: string, name: string}[]>([]);
 
   // Presets
-  const [presets, setPresets] = useState<{ id: string, name: string, config: any }[]>([]);
+  const [presets, setPresets] = useState<{ id: string, name: string, filters: any, sorting: any }[]>([]);
   const [newPresetName, setNewPresetName] = useState("");
   const [isSavingPreset, setIsSavingPreset] = useState(false);
+  const [isPresetsModalOpen, setIsPresetsModalOpen] = useState(false);
+  const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
+  const [editPresetName, setEditPresetName] = useState("");
 
   // Export Configuration
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -124,53 +133,220 @@ export function SkillExecutionsList() {
     loadPresets();
   }, []);
 
-  const loadPresets = () => {
+  // Update URL params when filters change
+  useEffect(() => {
+    const params: Record<string, string> = {};
+    if (search) params.search = search;
+    if (statusFilter !== "all") params.status = statusFilter;
+    if (skillFilter !== "all") params.skill = skillFilter;
+    if (dateStart) params.start = dateStart;
+    if (dateEnd) params.end = dateEnd;
+    if (page > 1) params.page = String(page);
+    if (sortOrder !== "desc") params.sort = sortOrder;
+    
+    setSearchParams(params, { replace: true });
+  }, [search, statusFilter, skillFilter, dateStart, dateEnd, page, sortOrder]);
+
+  const loadPresets = async () => {
     try {
-      const saved = localStorage.getItem("skill_history_presets");
-      if (saved) setPresets(JSON.parse(saved));
+      const { data, error } = await supabase
+        .from("filter_presets")
+        .select("*")
+        .order("name");
+      
+      if (error) throw error;
+      setPresets(data || []);
     } catch (e) {
-      console.error("Error loading presets", e);
+      console.error("Error loading presets from DB, falling back to local", e);
+      const saved = localStorage.getItem("skill_history_presets");
+      if (saved) {
+        const localPresets = JSON.parse(saved).map((p: any) => ({
+          ...p,
+          filters: p.config,
+          sorting: { column: "created_at", direction: p.config?.sortOrder || "desc" }
+        }));
+        setPresets(localPresets);
+      }
     }
   };
 
-  const savePreset = () => {
+  const savePreset = async () => {
     if (!newPresetName) {
       toast.error("Dê um nome ao seu preset.");
       return;
     }
-    const newPreset = {
-      id: crypto.randomUUID(),
-      name: newPresetName,
-      config: { search, statusFilter, skillFilter, dateStart, dateEnd, sortOrder }
-    };
-    const updated = [...presets, newPreset];
-    setPresets(updated);
-    localStorage.setItem("skill_history_presets", JSON.stringify(updated));
-    setNewPresetName("");
-    setIsSavingPreset(false);
-    toast.success("Preset salvo!");
+
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error("Usuário não autenticado");
+
+      const filters = { search, statusFilter, skillFilter, dateStart, dateEnd };
+      const sorting = { column: "created_at", direction: sortOrder };
+
+      const { data, error } = await supabase
+        .from("filter_presets")
+        .insert({
+          user_id: userData.user.id,
+          name: newPresetName,
+          filters,
+          sorting
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      setPresets(prev => [...prev, data]);
+      setNewPresetName("");
+      setIsSavingPreset(false);
+      toast.success("Preset salvo!");
+    } catch (error) {
+      console.error("Error saving preset:", error);
+      toast.error("Erro ao salvar preset no banco.");
+    }
   };
 
   const applyPreset = (preset: any) => {
-    setSearch(preset.config.search || "");
-    setStatusFilter(preset.config.statusFilter || "all");
-    setSkillFilter(preset.config.skillFilter || "all");
-    setDateStart(preset.config.dateStart || "");
-    setDateEnd(preset.config.dateEnd || "");
-    setSortOrder(preset.config.sortOrder || "desc");
+    setSearch(preset.filters.search || "");
+    setStatusFilter(preset.filters.statusFilter || "all");
+    setSkillFilter(preset.filters.skillFilter || "all");
+    setDateStart(preset.filters.dateStart || "");
+    setDateEnd(preset.filters.dateEnd || "");
+    setSortOrder(preset.sorting?.direction || "desc");
+    setPage(1);
     toast.info(`Preset "${preset.name}" aplicado.`);
   };
 
-  const deletePreset = (id: string) => {
-    const updated = presets.filter(p => p.id !== id);
-    setPresets(updated);
-    localStorage.setItem("skill_history_presets", JSON.stringify(updated));
+  const deletePreset = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from("filter_presets")
+        .delete()
+        .eq("id", id);
+      
+      if (error) throw error;
+      setPresets(prev => prev.filter(p => p.id !== id));
+      toast.success("Preset removido.");
+    } catch (error) {
+      console.error("Error deleting preset:", error);
+      toast.error("Erro ao remover preset.");
+    }
   };
 
+  const updatePreset = async (id: string, name: string) => {
+    try {
+      const { error } = await supabase
+        .from("filter_presets")
+        .update({ name })
+        .eq("id", id);
+      
+      if (error) throw error;
+      setPresets(prev => prev.map(p => p.id === id ? { ...p, name } : p));
+      setEditingPresetId(null);
+      toast.success("Preset renomeado.");
+    } catch (error) {
+      console.error("Error updating preset:", error);
+      toast.error("Erro ao renomear preset.");
+    }
+  };
 
+  const duplicatePreset = async (preset: any) => {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error("Usuário não autenticado");
+
+      const { data, error } = await supabase
+        .from("filter_presets")
+        .insert({
+          user_id: userData.user.id,
+          name: `${preset.name} (Cópia)`,
+          filters: preset.filters,
+          sorting: preset.sorting
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      setPresets(prev => [...prev, data]);
+      toast.success("Preset duplicado!");
+    } catch (error) {
+      console.error("Error duplicating preset:", error);
+      toast.error("Erro ao duplicar preset.");
+    }
+  };
+
+  const downloadDetailsAsTxt = (ex: SkillExecution) => {
+    const content = `
+=========================================
+DETALHES DA EXECUÇÃO - SKILL HISTORY
+=========================================
+ID: ${ex.id}
+SKILL: ${ex.skill_name} (${ex.skill_slug})
+DATA: ${new Date(ex.created_at).toLocaleString()}
+STATUS: ${ex.status.toUpperCase()}
+CRÉDITOS: ${ex.credits_charged}c
+DURAÇÃO: ${ex.duration_ms || 0}ms
+
+${ex.error_message ? `!!! ERRO DE EXECUÇÃO !!!\n${ex.error_message}\n` : ""}
+
+-----------------------------------------
+PARÂMETROS DE ENTRADA (INPUT):
+-----------------------------------------
+${JSON.stringify(ex.input, null, 2)}
+
+-----------------------------------------
+RESULTADO GERADO (OUTPUT):
+-----------------------------------------
+${JSON.stringify(ex.output, null, 2)}
+=========================================
+    `;
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `execution_${ex.id.slice(0, 8)}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Keyboard Shortcuts
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    // Navigate between executions if modal is open
+    if (selectedEx) {
+      const currentIndex = executions.findIndex(ex => ex.id === selectedEx.id);
+      
+      if (e.key === "ArrowLeft" && currentIndex > 0) {
+        setSelectedEx(executions[currentIndex - 1]);
+        setLogPage(1);
+      } else if (e.key === "ArrowRight" && currentIndex < executions.length - 1) {
+        setSelectedEx(executions[currentIndex + 1]);
+        setLogPage(1);
+      } else if (e.key === "Escape") {
+        setSelectedEx(null);
+      } else if (e.key === "p") {
+        // Toggle log pages with 'p'
+        const jsonStr = JSON.stringify(selectedEx.output, null, 2);
+        const totalLines = jsonStr.split('\n').length;
+        if (totalLines > logPageSize) {
+          setLogPage(prev => (prev * logPageSize >= totalLines ? 1 : prev + 1));
+        }
+      }
+      return;
+    }
+
+    // Open first execution with 'Enter' or 'o' when list is focused (simplified for now)
+    if (e.key === "Enter" && executions.length > 0 && !selectedEx) {
+      setSelectedEx(executions[0]);
+    }
+  }, [selectedEx, executions, logPage]);
 
   useEffect(() => {
-    setPage(1); // Reset to first page on filter change
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleKeyDown]);
+
+  useEffect(() => {
+    setPage(1);
     fetchExecutions();
   }, [search, statusFilter, skillFilter, dateStart, dateEnd, sortOrder]);
 
@@ -406,6 +582,16 @@ export function SkillExecutionsList() {
             </PopoverContent>
           </Popover>
 
+          <Button 
+            variant="outline" 
+            size="icon" 
+            className="h-9 w-9 shrink-0" 
+            title="Gerenciar Presets"
+            onClick={() => setIsPresetsModalOpen(true)}
+          >
+            <Settings2 className="h-4 w-4" />
+          </Button>
+
           {presets.length > 0 && (
             <Select onValueChange={(v) => {
               const p = presets.find(p => p.id === v);
@@ -416,17 +602,7 @@ export function SkillExecutionsList() {
               </SelectTrigger>
               <SelectContent>
                 {presets.map(p => (
-                  <div key={p.id} className="flex items-center justify-between px-2 py-1">
-                    <SelectItem value={p.id} className="flex-1 cursor-pointer">{p.name}</SelectItem>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-6 w-6 text-destructive opacity-50 hover:opacity-100"
-                      onClick={(e) => { e.stopPropagation(); deletePreset(p.id); }}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
+                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -515,8 +691,86 @@ export function SkillExecutionsList() {
         </DialogContent>
       </Dialog>
 
+      {/* Presets Management Modal */}
+      <Dialog open={isPresetsModalOpen} onOpenChange={setIsPresetsModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings2 className="h-5 w-5 text-primary" />
+              Gerenciar Presets de Filtros
+            </DialogTitle>
+            <DialogDescription>
+              Organize seus filtros salvos para acesso rápido.
+            </DialogDescription>
+          </DialogHeader>
 
-      {/* List */}
+          <div className="py-4 space-y-3 max-h-[400px] overflow-y-auto pr-2 scrollbar-hide">
+            {presets.length === 0 ? (
+              <p className="text-center text-sm text-muted-foreground py-8">Nenhum preset salvo ainda.</p>
+            ) : (
+              presets.map(p => (
+                <div key={p.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/30 border border-border/50 group">
+                  {editingPresetId === p.id ? (
+                    <div className="flex-1 flex gap-2">
+                      <Input 
+                        value={editPresetName} 
+                        onChange={e => setEditPresetName(e.target.value)}
+                        className="h-8 text-xs"
+                        autoFocus
+                      />
+                      <Button size="icon" className="h-8 w-8" onClick={() => updatePreset(p.id, editPresetName)}>
+                        <Check className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingPresetId(null)}>
+                        <XCircle className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex-1">
+                        <p className="text-sm font-bold">{p.name}</p>
+                        <p className="text-[10px] text-muted-foreground opacity-70">
+                          {Object.entries(p.filters).filter(([_, v]) => v && v !== 'all').map(([k, v]) => `${k}: ${v}`).join(', ') || 'Sem filtros específicos'}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 text-muted-foreground hover:text-primary"
+                          onClick={() => { setEditingPresetId(p.id); setEditPresetName(p.name); }}
+                          title="Renomear"
+                        >
+                          <Info className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 text-muted-foreground hover:text-primary"
+                          onClick={() => duplicatePreset(p)}
+                          title="Duplicar"
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 text-destructive opacity-50 hover:opacity-100"
+                          onClick={() => deletePreset(p.id)}
+                          title="Excluir"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="space-y-4">
         {loading ? (
           <div className="text-center py-20">
@@ -632,6 +886,19 @@ export function SkillExecutionsList() {
                 <DialogDescription className="text-xs uppercase tracking-widest font-bold opacity-60">
                   ID: {selectedEx?.id}
                 </DialogDescription>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-2 text-[10px] uppercase font-bold"
+                onClick={() => downloadDetailsAsTxt(selectedEx)}
+              >
+                <Download className="w-3.5 h-3.5" /> Exportar TXT
+              </Button>
+              <div className="p-1.5 bg-muted/50 rounded-lg" title="Use as setas ← → para navegar e 'P' para alternar páginas de logs">
+                <Keyboard className="w-4 h-4 text-muted-foreground" />
               </div>
             </div>
           </DialogHeader>
