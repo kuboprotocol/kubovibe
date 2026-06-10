@@ -108,6 +108,33 @@ function handleFnError(d: any, fallback = "Erro") {
   }
 }
 
+import CSVExportModal from "@/components/builder/CSVExportModal";
+
+function CSVExportModalWrapper() {
+  const [open, setOpen] = useState(false);
+  const [logs, setLogs] = useState<any[]>([]);
+  const [fallbackOnly, setFallbackOnly] = useState(false);
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      setLogs((window as any).__exportLogsToCSV || []);
+      setFallbackOnly(!!e.detail?.filterFallback);
+      setOpen(true);
+    };
+    window.addEventListener('open-audit-export', handler);
+    return () => window.removeEventListener('open-audit-export', handler);
+  }, []);
+
+  return (
+    <CSVExportModal 
+      open={open} 
+      onOpenChange={setOpen} 
+      logs={logs} 
+      filterFallbackOnly={fallbackOnly}
+    />
+  );
+}
+
 export default function CreativePage() {
   const { tool } = useParams<{ tool?: ToolKey }>();
   const navigate = useNavigate();
@@ -1251,6 +1278,15 @@ export default function CreativePage() {
             </TabsContent>
           ))}
         </Tabs>
+
+        {(() => {
+          const CSVExportModal = React.lazy(() => import('@/components/builder/CSVExportModal'));
+          return (
+            <React.Suspense fallback={null}>
+              <CSVExportModalWrapper />
+            </React.Suspense>
+          );
+        })()}
       </main>
     </div>
   );
