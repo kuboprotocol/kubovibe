@@ -161,7 +161,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
   const [traceInfo, setTraceInfo] = useState<{ correlationId?: string; traceId?: string } | null>(null);
   const [errorState, setErrorState] = useState<{ message: string; correlationId?: string; traceId?: string; stack?: string } | null>(null);
   const [showErrorModal, setShowErrorModal] = useState(false);
-  const [simulationMode, setSimulationMode] = useState(false);
+  const [simulationMode, setSimulationMode] = useState(() => localStorage.getItem("creative_simulation_mode") === "true");
   const [isUploading, setIsUploading] = useState(false);
   const [lastResult, setLastResult] = useState<any>(null);
   const [sessionHistory, setSessionHistory] = useState<{ id: string; timestamp: string; prompt: string; status: "success" | "error"; assetUrl?: string; output_text?: string; metadata?: any; logs?: AvatarStepState[] }[]>(() => {
@@ -224,12 +224,23 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                {autoDetectMode ? <Zap className="h-2.5 w-2.5" /> : <Settings2 className="h-2.5 w-2.5" />}
                {autoDetectMode ? "AUTO" : "MANUAL"}
              </span>
-             <button 
-               onClick={() => setAutoDetectMode(!autoDetectMode)}
-               className="text-[9px] underline hover:text-primary transition-colors"
-             >
-               MUDAR
-             </button>
+              <button 
+                onClick={() => setAutoDetectMode(!autoDetectMode)}
+                className="text-[9px] underline hover:text-primary transition-colors"
+              >
+                MUDAR
+              </button>
+              <div className="h-3 w-[1px] bg-border mx-1" />
+              <button 
+                onClick={() => setSimulationMode(!simulationMode)}
+                className={cn(
+                  "text-[9px] font-bold px-1.5 rounded transition-colors",
+                  simulationMode ? "bg-amber-500 text-white" : "text-muted-foreground hover:text-foreground"
+                )}
+                title="Simular falha na Kimi para testar fallback"
+              >
+                SIMULAR FALHA
+              </button>
           </div>
         </div>
         
@@ -347,7 +358,8 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     localStorage.setItem("creative_kimi_model", kimiModel);
     localStorage.setItem("creative_temperature", String(temperature));
     localStorage.setItem("creative_max_tokens", String(maxTokens));
-  }, [kimiModel, temperature, maxTokens]);
+    localStorage.setItem("creative_simulation_mode", String(simulationMode));
+  }, [kimiModel, temperature, maxTokens, simulationMode]);
 
   const logAuditAction = useCallback(async (step: string, action: string, params: any = {}, correlationId?: string, traceId?: string) => {
     // Audit logs for deployment and agent improvements
