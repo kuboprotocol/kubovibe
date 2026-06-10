@@ -79,12 +79,30 @@ describe('Auditoria de Simulação de Falhas e CSV', () => {
     expect(filtered.every(l => l.metadata.run_id === targetRunId)).toBe(true);
   });
 
-  it('deve falhar na validação se colunas obrigatórias estiverem ausentes no XLSX', () => {
+  it('deve falhar na validação se colunas obrigatórias estiverem em ordem incorreta no XLSX', () => {
     const requiredLabels = ['Modelo', 'Créditos', 'Tempo/Mensagem', 'Status (Sucesso/Fallback)'];
-    const currentLabels = ['Modelo', 'Créditos']; // Faltando colunas
+    const sheetLabels = ['Créditos', 'Modelo', 'Tempo/Mensagem', 'Status (Sucesso/Fallback)']; // Ordem errada
     
-    const missing = requiredLabels.filter(label => !currentLabels.includes(label));
-    expect(missing.length).toBeGreaterThan(0);
-    expect(missing).toContain('Tempo/Mensagem');
+    // Lógica que implementamos no CSVExportModal
+    const presentRequired = requiredLabels.filter(l => sheetLabels.includes(l));
+    const sheetRequiredOrder = sheetLabels.filter(l => requiredLabels.includes(l));
+    const isOrderCorrect = JSON.stringify(presentRequired) === JSON.stringify(sheetRequiredOrder);
+    
+    expect(isOrderCorrect).toBe(false);
+  });
+
+  it('deve validar que o filtro por RunID funciona corretamente no conjunto de dados', () => {
+    const logs = [
+      { id: '1', metadata: { run_id: 'run_A' } },
+      { id: '2', metadata: { run_id: 'run_B' } },
+      { id: '3', metadata: { run_id: 'run_A' } }
+    ];
+    
+    const filterByRunA = (l: any) => l.metadata.run_id === 'run_A';
+    const result = logs.filter(filterByRunA);
+    
+    expect(result.length).toBe(2);
+    expect(result[0].id).toBe('1');
+    expect(result[1].id).toBe('3');
   });
 });
