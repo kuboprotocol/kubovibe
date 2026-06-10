@@ -27,8 +27,9 @@ import {
   useSortable
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Download, AlertTriangle, Check, X, ListFilter, AlertCircle, ChevronUp, ChevronDown, Search } from 'lucide-react';
+import { GripVertical, Download, AlertTriangle, Check, X, ListFilter, AlertCircle, ChevronUp, ChevronDown, Search, FileSpreadsheet } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { 
@@ -80,6 +81,7 @@ const ALL_COLUMNS = [
   { id: 'duration', label: 'Duração Total (ms)' },
   { id: 'stack', label: 'Stack Trace' },
   { id: 'trail', label: 'Trilha de Decisão/Motivo' },
+  { id: 'run_id', label: 'ID de Execução (RunID)' },
 ];
 
 const LS_KEY_COLS = 'kubo:audit:export:columns';
@@ -266,6 +268,7 @@ export default function CSVExportModal({ open, onOpenChange, logs, filterFallbac
         if (colId === 'duration_msg') return (log as any).metadata?.duration || '';
         if (colId === 'status_final') return (log as any).status || '';
         if (colId === 'trail') return (log as any).metadata?.decision_trail?.join(' | ') || '';
+        if (colId === 'run_id') return (log as any).metadata?.run_id || (log as any).id || '';
         return (log as any)[colId] ?? '';
       });
     });
@@ -295,6 +298,7 @@ export default function CSVExportModal({ open, onOpenChange, logs, filterFallbac
         if (colId === 'duration_msg') val = (log as any).metadata?.duration || '';
         if (colId === 'status_final') val = (log as any).status || '';
         if (colId === 'trail') val = (log as any).metadata?.decision_trail?.join(' | ') || '';
+        if (colId === 'run_id') val = (log as any).metadata?.run_id || (log as any).id || '';
         return csvEscape(val);
       }).join(',');
     });
@@ -310,6 +314,38 @@ export default function CSVExportModal({ open, onOpenChange, logs, filterFallbac
     document.body.removeChild(link);
     
     toast.success('Download iniciado!');
+    onOpenChange(false);
+  };
+
+  const handleDownloadXLSX = () => {
+    if (filteredLogs.length === 0 || selectedColumns.size === 0) return;
+
+    const activeCols = columnOrder.filter(id => selectedColumns.has(id));
+    const header = activeCols.map(id => ALL_COLUMNS.find(c => c.id === id)?.label || id);
+    
+    const dataRows = filteredLogs.map(log => {
+      const row: Record<string, any> = {};
+      activeCols.forEach((colId, i) => {
+        const label = header[i];
+        let val = (log as any)[colId] ?? '';
+        if (colId === 'iso') val = formatDate(log.ts);
+        if (colId === 'model') val = (log as any).metadata?.model || '';
+        if (colId === 'credits') val = (log as any).metadata?.credits || 0;
+        if (colId === 'duration_msg') val = (log as any).metadata?.duration || '';
+        if (colId === 'status_final') val = (log as any).status || '';
+        if (colId === 'trail') val = (log as any).metadata?.decision_trail?.join(' | ') || '';
+        if (colId === 'run_id') val = (log as any).metadata?.run_id || (log as any).id || '';
+        row[label] = val;
+      });
+      return row;
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(dataRows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Audit Log");
+    XLSX.writeFile(workbook, `audit-log-${Date.now()}.xlsx`);
+    
+    toast.success('Download Excel iniciado!');
     onOpenChange(false);
   };
 
@@ -507,8 +543,11 @@ export default function CSVExportModal({ open, onOpenChange, logs, filterFallbac
             {filteredLogs.length} registros prontos para exportação
           </div>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button variant="outline" onClick={handleDownloadXLSX} disabled={filteredLogs.length === 0 || selectedColumns.size === 0}>
+            <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel (.XLSX)
+          </Button>
           <Button onClick={handleDownload} disabled={filteredLogs.length === 0 || selectedColumns.size === 0}>
-            <Download className="h-4 w-4 mr-2" /> Confirmar Download CSV
+            <Download className="h-4 w-4 mr-2" /> CSV (.CSV)
           </Button>
         </DialogFooter>
       </DialogContent>

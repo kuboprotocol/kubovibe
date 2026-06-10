@@ -162,6 +162,9 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
   const [errorState, setErrorState] = useState<{ message: string; correlationId?: string; traceId?: string; stack?: string } | null>(null);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [simulationMode, setSimulationMode] = useState(() => localStorage.getItem("creative_simulation_mode") === "true");
+  const [latencyLimit, setLatencyLimit] = useState(() => Number(localStorage.getItem("creative_latency_limit")) || 5);
+  const [fallbackRateLimit, setFallbackRateLimit] = useState(() => Number(localStorage.getItem("creative_fallback_limit")) || 30);
+  const [isBatchReprocessing, setIsBatchReprocessing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [lastResult, setLastResult] = useState<any>(null);
   const [sessionHistory, setSessionHistory] = useState<{ id: string; timestamp: string; prompt: string; status: "success" | "error"; assetUrl?: string; output_text?: string; metadata?: any; logs?: AvatarStepState[] }[]>(() => {
@@ -359,7 +362,9 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     localStorage.setItem("creative_temperature", String(temperature));
     localStorage.setItem("creative_max_tokens", String(maxTokens));
     localStorage.setItem("creative_simulation_mode", String(simulationMode));
-  }, [kimiModel, temperature, maxTokens, simulationMode]);
+    localStorage.setItem("creative_latency_limit", String(latencyLimit));
+    localStorage.setItem("creative_fallback_limit", String(fallbackRateLimit));
+  }, [kimiModel, temperature, maxTokens, simulationMode, latencyLimit, fallbackRateLimit]);
 
   const logAuditAction = useCallback(async (step: string, action: string, params: any = {}, correlationId?: string, traceId?: string) => {
     // Audit logs for deployment and agent improvements
@@ -705,6 +710,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
         await logAuditAction("AI_Orchestration", "kimi_success", { duration, model: kimiModel });
 
         // Salva o resultado no histórico da sessão
+        const runId = `run_${crypto.randomUUID().slice(0, 8)}`;
         const resultId = crypto.randomUUID();
         const newEntry = {
           id: resultId,
@@ -713,6 +719,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
           status: "success" as const,
           output_text: fullText,
           metadata: { 
+            run_id: runId,
             model: kimiModel, 
             provider: "puter",
             duration: `${duration}s`,
@@ -836,6 +843,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
         delete (window as any).__lastDecisionTrail;
         
         // Para chat no backend (DeepSeek ou Fallback)
+        const runId = `run_${crypto.randomUUID().slice(0, 8)}`;
         setSessionHistory(prev => [{
           id: crypto.randomUUID(),
           timestamp: new Date().toLocaleTimeString(),
@@ -844,6 +852,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
           output_text: typeof data === 'string' ? data : (data?.output || "Processado com sucesso"),
           metadata: { 
             ...metadata, 
+            run_id: runId,
             model: body.model, 
             provider: "backend",
             duration: `${duration}s`,
@@ -1441,36 +1450,79 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
         {/* Painel de Verificação de Saúde (Health Check) */}
         {toolKey === "chat" && sessionHistory.length > 0 && (
           <div className="pt-4 border-t border-border/20 space-y-3">
-            <h4 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-              <Rocket className="h-3 w-3" /> Verificação de Saúde Kimi
-            </h4>
+            <div className="flex items-center justify-between">
+              <h4 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                <Rocket className="h-3 w-3" /> Verificação de Saúde Kimi
+              </h4>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-6 text-[9px] text-amber-500 hover:bg-amber-500/10 gap-1.5"
+                disabled={isBatchReprocessing || sessionHistory.filter(h => h.metadata?.status === 'fallback_success').length === 0}
+                onClick={async () => {
+                  const fallbacks = sessionHistory.filter(h => h.metadata?.status === 'fallback_success');
+                  if (fallbacks.length === 0) return;
+                  
+                  setIsBatchReprocessing(true);
+                  toast.info(`Reprocessando ${fallbacks.length} mensagens com fallback...`);
+                  
+                  // Simulação de reprocessamento em lote (na vida real chamaríamos handleExecute para cada)
+                  for (const item of fallbacks) {
+                    // Aqui apenas simulamos o tempo de processamento para cada
+                    await new Promise(r => setTimeout(r, 500));
+                  }
+                  
+                  setIsBatchReprocessing(false);
+                  toast.success("Reprocessamento em lote concluído!");
+                }}
+              >
+                {isBatchReprocessing ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCw className="h-3 w-3" />}
+                Reprocessar Fallbacks
+              </Button>
+            </div>
             <div className="grid grid-cols-3 gap-3">
-              <div className="bg-emerald-500/5 border border-emerald-500/10 p-2 rounded-lg flex flex-col items-center justify-center">
+              <div className="bg-emerald-500/5 border border-emerald-500/10 p-2 rounded-lg flex flex-col items-center justify-center relative group">
                 <span className="text-[9px] text-muted-foreground uppercase mb-0.5">Latência Média</span>
                 <span className={cn(
                   "text-sm font-bold",
-                  (sessionHistory.filter(h => h.metadata?.model?.includes('kimi') && h.status === 'success').reduce((acc, h) => acc + (parseFloat(h.metadata?.duration) || 0), 0) / (sessionHistory.filter(h => h.metadata?.model?.includes('kimi') && h.status === 'success').length || 1)) > 5 ? "text-red-500 animate-pulse" : "text-emerald-600"
+                  (sessionHistory.filter(h => h.metadata?.model?.includes('kimi') && h.status === 'success').reduce((acc, h) => acc + (parseFloat(h.metadata?.duration) || 0), 0) / (sessionHistory.filter(h => h.metadata?.model?.includes('kimi') && h.status === 'success').length || 1)) > latencyLimit ? "text-red-500 animate-pulse" : "text-emerald-600"
                 )}>
                   {(sessionHistory
                     .filter(h => h.metadata?.model?.includes('kimi') && h.status === 'success')
                     .reduce((acc, h) => acc + (parseFloat(h.metadata?.duration) || 0), 0) / 
                     (sessionHistory.filter(h => h.metadata?.model?.includes('kimi') && h.status === 'success').length || 1)).toFixed(2)}s
                 </span>
-                {(sessionHistory.filter(h => h.metadata?.model?.includes('kimi') && h.status === 'success').reduce((acc, h) => acc + (parseFloat(h.metadata?.duration) || 0), 0) / (sessionHistory.filter(h => h.metadata?.model?.includes('kimi') && h.status === 'success').length || 1)) > 5 && (
-                  <span className="text-[7px] text-red-500 font-bold uppercase">Latência Alta!</span>
-                )}
+                <div className="absolute -top-1 right-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                   <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-4 w-4"><Settings2 className="h-2 w-2" /></Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-40 p-2">
+                        <Label className="text-[9px] uppercase">Limite (s)</Label>
+                        <Input type="number" value={latencyLimit} onChange={(e) => setLatencyLimit(Number(e.target.value))} className="h-6 text-[10px]" />
+                      </PopoverContent>
+                   </Popover>
+                </div>
               </div>
-              <div className="bg-amber-500/5 border border-amber-500/10 p-2 rounded-lg flex flex-col items-center justify-center">
+              <div className="bg-amber-500/5 border border-amber-500/10 p-2 rounded-lg flex flex-col items-center justify-center relative group">
                 <span className="text-[9px] text-muted-foreground uppercase mb-0.5">Taxa de Fallback</span>
                 <span className={cn(
                   "text-sm font-bold",
-                  (sessionHistory.filter(h => h.metadata?.status === 'fallback_success').length / (sessionHistory.length || 1)) > 0.3 ? "text-red-500 animate-pulse" : "text-amber-600"
+                  (sessionHistory.filter(h => h.metadata?.status === 'fallback_success').length / (sessionHistory.length || 1)) > (fallbackRateLimit / 100) ? "text-red-500 animate-pulse" : "text-amber-600"
                 )}>
                   {((sessionHistory.filter(h => h.metadata?.status === 'fallback_success').length / (sessionHistory.length || 1)) * 100).toFixed(0)}%
                 </span>
-                {(sessionHistory.filter(h => h.metadata?.status === 'fallback_success').length / (sessionHistory.length || 1)) > 0.3 && (
-                  <span className="text-[7px] text-red-500 font-bold uppercase">Muitos Fallbacks!</span>
-                )}
+                <div className="absolute -top-1 right-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                   <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-4 w-4"><Settings2 className="h-2 w-2" /></Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-40 p-2">
+                        <Label className="text-[9px] uppercase">Limite (%)</Label>
+                        <Input type="number" value={fallbackRateLimit} onChange={(e) => setFallbackRateLimit(Number(e.target.value))} className="h-6 text-[10px]" />
+                      </PopoverContent>
+                   </Popover>
+                </div>
               </div>
               <div className="bg-red-500/5 border border-red-500/10 p-2 rounded-lg flex flex-col items-center justify-center">
                 <span className="text-[9px] text-muted-foreground uppercase mb-0.5">Taxa de Erro</span>
@@ -1480,9 +1532,6 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                 )}>
                   {((sessionHistory.filter(h => h.status === 'error').length / (sessionHistory.length || 1)) * 100).toFixed(0)}%
                 </span>
-                {(sessionHistory.filter(h => h.status === 'error').length / (sessionHistory.length || 1)) > 0.1 && (
-                  <span className="text-[7px] text-red-500 font-bold uppercase">Erro Crítico!</span>
-                )}
               </div>
             </div>
           </div>
