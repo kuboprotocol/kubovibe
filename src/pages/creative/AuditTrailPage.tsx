@@ -1419,22 +1419,34 @@ export default function CreativeAuditPage() {
             {/* Preview Section */}
             {selectedColumns.length > 0 && entries.length > 0 && (
               <div className="space-y-3">
-                <h4 className="text-sm font-semibold flex items-center gap-2">
-                  <ListChecks className="h-4 w-4" /> Pré-visualização (Primeiras 10 linhas)
-                </h4>
-                <div className="border rounded-md overflow-x-auto">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-semibold flex items-center gap-2">
+                    <ListChecks className="h-4 w-4" /> Pré-visualização (Primeiras {previewRowsCount} linhas)
+                  </h4>
+                  {entries.length > previewRowsCount && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-7 text-[10px]"
+                      onClick={() => setPreviewRowsCount(prev => Math.min(prev + 5, 20))}
+                    >
+                      <ChevronRight className="h-3 w-3 mr-1 rotate-90" /> Carregar mais linhas
+                    </Button>
+                  )}
+                </div>
+                <div className="border rounded-md overflow-x-auto max-h-[150px]">
                   <table className="w-full text-[10px] border-collapse">
-                    <thead className="bg-muted">
+                    <thead className="bg-muted sticky top-0 z-10">
                       <tr>
                         {selectedColumns.map(colId => (
-                          <th key={colId} className="p-2 border text-left whitespace-nowrap">
+                          <th key={colId} className="p-2 border text-left whitespace-nowrap bg-muted">
                             {availableColumns.find(c => c.id === colId)?.label}
                           </th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {entries.slice(0, 10).map((e, idx) => (
+                      {entries.slice(0, previewRowsCount).map((e, idx) => (
                         <tr key={idx}>
                           {selectedColumns.map(colId => {
                             let val = "";
@@ -1456,6 +1468,17 @@ export default function CreativeAuditPage() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              </div>
+            )}
+
+            {/* Warning for 0 records */}
+            {entries.length === 0 && (
+              <div className="p-3 border border-amber-500/50 bg-amber-500/10 rounded-md flex items-center gap-3">
+                <AlertOctagon className="h-5 w-5 text-amber-500 flex-shrink-0" />
+                <div>
+                  <p className="text-xs font-bold text-amber-600 uppercase">Aviso de Filtro</p>
+                  <p className="text-[11px] text-amber-700">A combinação de filtros atual resultou em 0 registros. Ajuste os filtros antes de exportar.</p>
                 </div>
               </div>
             )}
