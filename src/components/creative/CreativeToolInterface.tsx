@@ -1563,26 +1563,42 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
 
                 {!isBatchReprocessing && reprocessResults.length > 0 && (
                   <div className="pt-2 border-t border-border/10 grid grid-cols-2 gap-4">
-                    <div className="bg-emerald-500/5 p-2 rounded-lg">
-                      <p className="text-[8px] font-bold text-emerald-600 uppercase mb-1">Resumo Normal</p>
-                      <div className="flex justify-between text-[10px]">
-                        <span className="opacity-60">Latência Média:</span>
-                        <span className="font-bold">{(reprocessResults.reduce((acc, r) => acc + parseFloat(r.normal.duration), 0) / reprocessResults.length).toFixed(2)}s</span>
-                      </div>
-                      <div className="flex justify-between text-[10px]">
-                        <span className="opacity-60">Status Sucesso:</span>
-                        <span className="font-bold text-emerald-600">100%</span>
+                    <div className="bg-emerald-500/5 p-2 rounded-lg border border-emerald-500/20 shadow-sm">
+                      <p className="text-[8px] font-bold text-emerald-600 uppercase mb-1 flex items-center justify-between">
+                        Resumo Normal <Badge variant="outline" className="h-3 text-[7px] border-emerald-500/20 text-emerald-600">{reprocessResults.length} msg</Badge>
+                      </p>
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[10px]">
+                          <span className="opacity-60">Latência Média:</span>
+                          <span className="font-bold">{(reprocessResults.reduce((acc, r) => acc + parseFloat(r.normal.duration), 0) / reprocessResults.length).toFixed(2)}s</span>
+                        </div>
+                        <div className="flex justify-between text-[10px]">
+                          <span className="opacity-60">Sucessos (Kimi):</span>
+                          <span className="font-bold text-emerald-600">{reprocessResults.length}</span>
+                        </div>
+                        <div className="flex justify-between text-[10px]">
+                          <span className="opacity-60">Taxa Sucesso:</span>
+                          <span className="font-bold">100%</span>
+                        </div>
                       </div>
                     </div>
-                    <div className="bg-amber-500/5 p-2 rounded-lg">
-                      <p className="text-[8px] font-bold text-amber-600 uppercase mb-1">Resumo Simulado</p>
-                      <div className="flex justify-between text-[10px]">
-                        <span className="opacity-60">Latência Média:</span>
-                        <span className="font-bold">{(reprocessResults.reduce((acc, r) => acc + parseFloat(r.simulated.duration), 0) / reprocessResults.length).toFixed(2)}s</span>
-                      </div>
-                      <div className="flex justify-between text-[10px]">
-                        <span className="opacity-60">Taxa Fallback:</span>
-                        <span className="font-bold text-amber-600">100%</span>
+                    <div className="bg-amber-500/5 p-2 rounded-lg border border-amber-500/20 shadow-sm">
+                      <p className="text-[8px] font-bold text-amber-600 uppercase mb-1 flex items-center justify-between">
+                        Resumo Simulado <Badge variant="outline" className="h-3 text-[7px] border-amber-500/20 text-amber-600">{reprocessResults.length} msg</Badge>
+                      </p>
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[10px]">
+                          <span className="opacity-60">Latência Média:</span>
+                          <span className="font-bold">{(reprocessResults.reduce((acc, r) => acc + parseFloat(r.simulated.duration), 0) / reprocessResults.length).toFixed(2)}s</span>
+                        </div>
+                        <div className="flex justify-between text-[10px]">
+                          <span className="opacity-60">Fallbacks (DeepSeek):</span>
+                          <span className="font-bold text-amber-600">{reprocessResults.length}</span>
+                        </div>
+                        <div className="flex justify-between text-[10px]">
+                          <span className="opacity-60">Taxa Fallback:</span>
+                          <span className="font-bold text-red-500">100%</span>
+                        </div>
                       </div>
                     </div>
                   </div>
