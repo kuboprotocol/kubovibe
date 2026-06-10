@@ -248,6 +248,18 @@ export async function runAgent(
       completed_at: new Date().toISOString(),
     }).eq("id", jobId);
 
+    // Record failure in unified skill_executions table
+    await admin.from("skill_executions").insert({
+      user_id: userId,
+      skill_slug: agentSlug,
+      skill_name: agent.name,
+      input,
+      status: "failed",
+      error_message: message,
+      credits_charged: 0,
+      duration_ms: Date.now() - startedAt,
+    });
+
     await admin.rpc("log_security_audit", {
       _action: `agent.${agentSlug}.failed`,
       _resource_type: "agent",
