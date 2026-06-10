@@ -208,7 +208,10 @@ function AuditHistoryManager({
   const paginatedLogs = filteredLogs.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const [isExportLogOpen, setIsExportLogOpen] = useState(false);
+  const [selectedLogForDetails, setSelectedLogForDetails] = useState<AuditLog | null>(null);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [isLogExportDialogOpen, setIsLogExportDialogOpen] = useState(false);
+  const [logExportColumns, setLogExportColumns] = useState<string[]>(["timestamp", "user", "attachmentName", "reason", "status"]);
   const [exportFormat, setExportFormat] = useState<"csv" | "pdf">("csv");
   const [exportMode, setExportMode] = useState<"filtered" | "current_page" | "range">(() => {
     const saved = localStorage.getItem("audit_last_exportMode");
