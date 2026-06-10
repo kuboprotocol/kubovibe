@@ -2,6 +2,8 @@ import Navbar from "@/components/landing/Navbar";
 import HeroSection from "@/components/landing/HeroSection";
 import CommunitySection from "@/components/landing/CommunitySection";
 import HowItWorksSection from "@/components/landing/HowItWorksSection";
+import DomainSection from "@/components/landing/DomainSection";
+import ConnectorSection from "@/components/landing/ConnectorSection";
 import FAQSection from "@/components/landing/FAQSection";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
@@ -22,6 +24,19 @@ const Index = () => {
 
         <CommunitySection />
         <HowItWorksSection />
+
+        {/* Gold divider */}
+        <div className="max-w-xl mx-auto gold-line" aria-hidden="true" />
+
+        <DomainSection />
+
+        {/* Gold divider */}
+        <div className="max-w-xl mx-auto gold-line" aria-hidden="true" />
+
+        <ConnectorSection />
+
+        {/* Gold divider */}
+        <div className="max-w-xl mx-auto gold-line" aria-hidden="true" />
 
         {/* CTA Section */}
         <motion.section
