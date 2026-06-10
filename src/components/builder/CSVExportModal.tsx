@@ -135,6 +135,14 @@ export default function CSVExportModal({ open, onOpenChange, logs, filterFallbac
   const [dateFormat, setDateFormat] = useState<'ISO' | 'DD/MM/AAAA'>('ISO');
   const [previewLimit, setPreviewLimit] = useState(5);
   const [internalFallbackFilter, setInternalFallbackFilter] = useState(filterFallbackOnly);
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+
+  const validationResult = useMemo(() => {
+    const required = ['model', 'credits', 'duration_msg', 'status_final'];
+    const missing = required.filter(r => !selectedColumns.has(r));
+    const isValid = missing.length === 0;
+    return { isValid, missing };
+  }, [selectedColumns]);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id || 'anonymous'));
