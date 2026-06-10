@@ -11,7 +11,10 @@ const InputSchema = z.object({
 });
 
 const FORMAT_PROMPTS: Record<string, string> = {
-...
+  caption: "Gere legendas curtas e engajadoras para redes sociais.",
+  post: "Gere posts informativos e interessantes.",
+  ideas: "Gere ideias criativas sobre o tema.",
+  tagline: "Gere frases de impacto curtas.",
 };
 
 Deno.serve((req) =>
@@ -35,7 +38,7 @@ Deno.serve((req) =>
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-2.0-flash-exp",
         messages: [
           { role: "system", content: sys },
           { role: "user", content: prompt },

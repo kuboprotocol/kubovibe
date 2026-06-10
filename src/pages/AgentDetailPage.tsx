@@ -74,16 +74,41 @@ export default function AgentDetailPage() {
   async function run() {
     if (!agent || !prompt.trim()) return;
     setRunning(true); setResult(null);
+    const requestId = crypto.randomUUID();
+    const promptField = PROMPT_KEY[agent.slug] ?? "prompt";
+    const body = { agent: agent.slug, input: { [promptField]: prompt, ...extras } };
+
+    console.log(`[AgentDetailPage] Invocando agente: ${agent.slug}`, {
+      endpoint: "agent-route",
+      requestId,
+      payload: body
+    });
+
     try {
-      const promptField = PROMPT_KEY[agent.slug] ?? "prompt";
-      const body = { agent: agent.slug, input: { [promptField]: prompt, ...extras } };
-      const { data, error } = await supabase.functions.invoke("agent-route", { body });
-      if (error) throw error;
+      const { data, error } = await supabase.functions.invoke("agent-route", { 
+        body,
+        headers: { "x-request-id": requestId }
+      });
+
+      if (error) {
+        console.error(`[AgentDetailPage] Erro na Edge Function (${agent.slug}):`, error);
+        throw error;
+      }
+
+      console.log(`[AgentDetailPage] Resposta recebida (${agent.slug}):`, data);
       setResult(data);
       toast({ title: `${agent.name} ok`, description: `${agent.credit_cost} créditos.` });
       void refreshJobs();
     } catch (e) {
-      toast({ title: "Falhou", description: e instanceof Error ? e.message : String(e), variant: "destructive" });
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[AgentDetailPage] Falha crítica ao executar agente (${agent.slug}):`, e);
+      toast({ 
+        title: "Erro de Conexão", 
+        description: msg === "Failed to fetch" 
+          ? "Não foi possível conectar ao servidor. Verifique sua internet ou tente novamente." 
+          : msg, 
+        variant: "destructive" 
+      });
     } finally { setRunning(false); }
   }
 
