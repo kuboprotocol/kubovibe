@@ -211,7 +211,7 @@ function AuditHistoryManager({
   const [selectedLogForDetails, setSelectedLogForDetails] = useState<AuditLog | null>(null);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [isLogExportDialogOpen, setIsLogExportDialogOpen] = useState(false);
-  const [logExportColumns, setLogExportColumns] = useState<string[]>(["timestamp", "user", "attachmentName", "reason", "status"]);
+  const [logExportColumns, setLogExportColumns] = useState<string[]>(["timestamp", "user", "range", "filters", "total"]);
   const [exportFormat, setExportFormat] = useState<"csv" | "pdf">("csv");
   const [exportMode, setExportMode] = useState<"filtered" | "current_page" | "range">(() => {
     const saved = localStorage.getItem("audit_last_exportMode");
@@ -623,8 +623,10 @@ function AuditHistoryManager({
                   {[
                     { id: "timestamp", label: "Data/Hora" },
                     { id: "user", label: "Usuário" },
+                    { id: "range", label: "Intervalo (Páginas)" },
+                    { id: "filters", label: "Filtros Aplicados" },
+                    { id: "total", label: "Total de Registros" },
                     { id: "attachmentName", label: "Tipo de Exportação" },
-                    { id: "reason", label: "Detalhes (Intervalo/Filtros)" },
                     { id: "status", label: "Status" }
                   ].map(col => (
                     <div key={col.id} className="flex items-center space-x-2">
@@ -633,39 +635,69 @@ function AuditHistoryManager({
                         checked={logExportColumns.includes(col.id)}
                         onCheckedChange={(checked) => {
                           if (checked) setLogExportColumns([...logExportColumns, col.id]);
-                          else if (logExportColumns.length > 1) setLogExportColumns(logExportColumns.filter(c => c !== col.id));
+                          else setLogExportColumns(logExportColumns.filter(c => c !== col.id));
                         }}
                       />
                       <label htmlFor={`log-col-${col.id}`} className="text-xs cursor-pointer">{col.label}</label>
                     </div>
                   ))}
                 </div>
+                {logExportColumns.length === 0 && (
+                  <p className="text-[10px] text-destructive font-bold flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" /> Selecione ao menos uma coluna para exportar.
+                  </p>
+                )}
               </div>
               <DialogFooter>
                 <Button variant="outline" size="sm" onClick={() => setIsLogExportDialogOpen(false)}>Cancelar</Button>
-                <Button size="sm" onClick={() => {
-                  const exportLogs = logs.filter(l => l.action === "download_authorized");
-                  const headers = logExportColumns.map(c => {
-                    const map: any = { timestamp: "Data/Hora", user: "Usuário", attachmentName: "Tipo", reason: "Detalhes", status: "Status" };
-                    return map[c];
-                  });
-                  const rows = exportLogs.map(l => logExportColumns.map(c => {
-                    if (c === "timestamp") return new Date(l.timestamp).toLocaleString();
-                    return (l as any)[c];
-                  }));
-                  
-                  const csvContent = [headers, ...rows].map(e => e.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
-                  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-                  const url = URL.createObjectURL(blob);
-                  const link = document.createElement("a");
-                  link.setAttribute("href", url);
-                  link.setAttribute("download", `export_history_${new Date().toISOString()}.csv`);
-                  document.body.appendChild(link);
-                  link.click();
-                  document.body.removeChild(link);
-                  setIsLogExportDialogOpen(false);
-                  toast.success("Histórico de logs exportado!");
-                }}>
+                <Button 
+                  size="sm" 
+                  disabled={logExportColumns.length === 0}
+                  onClick={() => {
+                    if (logExportColumns.length === 0) {
+                      toast.error("Seleção inválida", { description: "Você precisa selecionar ao menos uma coluna para o CSV." });
+                      return;
+                    }
+
+                    // Respect filtered results (search, filters, etc)
+                    const exportLogs = filteredLogs;
+                    
+                    const headers = logExportColumns.map(c => {
+                      const map: any = { 
+                        timestamp: "Data/Hora", 
+                        user: "Usuário", 
+                        range: "Intervalo", 
+                        filters: "Filtros", 
+                        total: "Total",
+                        attachmentName: "Tipo", 
+                        status: "Status" 
+                      };
+                      return map[c];
+                    });
+
+                    const rows = exportLogs.map(l => logExportColumns.map(c => {
+                      if (c === "timestamp") return new Date(l.timestamp).toLocaleString();
+                      if (c === "range") return l.exportParams?.range ? `${l.exportParams.range.start}-${l.exportParams.range.end}` : "N/A";
+                      if (c === "filters") return l.exportParams?.filters || "Nenhum";
+                      if (c === "total") return l.exportParams?.total || "0";
+                      return (l as any)[c];
+                    }));
+                    
+                    const csvContent = [headers, ...rows].map(e => e.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
+                    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement("a");
+                    link.setAttribute("href", url);
+                    link.setAttribute("download", `audit_history_filtered_${new Date().toISOString()}.csv`);
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    setIsLogExportDialogOpen(false);
+                    toast.success("Histórico de logs exportado!", { 
+                      description: `${exportLogs.length} registros incluídos respeitando os filtros atuais.` 
+                    });
+                  }}
+                >
                   Baixar CSV
                 </Button>
               </DialogFooter>
