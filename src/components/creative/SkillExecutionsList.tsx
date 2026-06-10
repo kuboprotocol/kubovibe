@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { 
@@ -31,7 +31,9 @@ import {
   Copy,
   Download,
   FileText,
-  Keyboard
+  Keyboard,
+  Upload,
+  AlertTriangle
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -106,6 +108,9 @@ export function SkillExecutionsList() {
   const [isPresetsModalOpen, setIsPresetsModalOpen] = useState(false);
   const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
   const [editPresetName, setEditPresetName] = useState("");
+  const [presetSearch, setPresetSearch] = useState("");
+  const [presetSort, setPresetSort] = useState<"name" | "recent">("name");
+  const [presetToDelete, setPresetToDelete] = useState<string | null>(null);
 
   // Export Configuration
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -249,6 +254,72 @@ export function SkillExecutionsList() {
       toast.error("Erro ao renomear preset.");
     }
   };
+
+  const exportPresets = () => {
+    if (presets.length === 0) {
+      toast.error("Nenhum preset para exportar.");
+      return;
+    }
+    const data = JSON.stringify(presets, null, 2);
+    const blob = new Blob([data], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `presets_history_${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success("Presets exportados com sucesso!");
+  };
+
+  const importPresets = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const imported = JSON.parse(text);
+      
+      if (!Array.isArray(imported)) throw new Error("Formato inválido");
+
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error("Usuário não autenticado");
+
+      // Insert each valid preset
+      for (const p of imported) {
+        if (p.name && p.filters) {
+          await supabase.from("filter_presets").insert({
+            user_id: userData.user.id,
+            name: `${p.name} (Importado)`,
+            filters: p.filters,
+            sorting: p.sorting || { column: "created_at", direction: "desc" }
+          });
+        }
+      }
+      
+      await loadPresets();
+      toast.success("Presets importados com sucesso!");
+    } catch (error) {
+      console.error("Error importing presets:", error);
+      toast.error("Erro ao importar arquivo JSON.");
+    }
+    e.target.value = "";
+  };
+
+  const filteredPresets = useMemo(() => {
+    let result = [...presets];
+    if (presetSearch) {
+      result = result.filter(p => p.name.toLowerCase().includes(presetSearch.toLowerCase()));
+    }
+    if (presetSort === "name") {
+      result.sort((a, b) => a.name.localeCompare(b.name));
+    } else {
+      // Logic for "recent" depends on if we have updated_at or created_at in the interface
+      // Since it's from DB, we can assume alphabetical for now if not present, but usually we have it.
+      // @ts-ignore
+      result.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+    }
+    return result;
+  }, [presets, presetSearch, presetSort]);
 
   const duplicatePreset = async (preset: any) => {
     try {
