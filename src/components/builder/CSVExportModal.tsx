@@ -379,25 +379,37 @@ export default function CSVExportModal({ open, onOpenChange, logs, filterFallbac
               </div>
             </div>
 
-            <div className="flex items-center justify-between gap-4 p-2 bg-muted/30 rounded-md">
-              <div className="flex items-center gap-2">
-                <Checkbox 
-                  id="filter-fallback" 
-                  checked={internalFallbackFilter} 
-                  onCheckedChange={(v) => setInternalFallbackFilter(!!v)}
-                />
-                <Label htmlFor="filter-fallback" className="text-[10px] font-medium cursor-pointer uppercase">Apenas Fallbacks</Label>
+            <div className="flex flex-col gap-2 p-2 bg-muted/30 rounded-md">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2">
+                  <Checkbox 
+                    id="filter-fallback" 
+                    checked={internalFallbackFilter} 
+                    onCheckedChange={(v) => setInternalFallbackFilter(!!v)}
+                  />
+                  <Label htmlFor="filter-fallback" className="text-[10px] font-medium cursor-pointer uppercase">Apenas Fallbacks</Label>
+                </div>
+
+                <div className={cn(
+                  "flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase",
+                  validationResult.isValid ? "bg-emerald-500/10 text-emerald-500" : "bg-red-500/10 text-red-500"
+                )}>
+                  {validationResult.isValid ? (
+                    <><Check className="h-2.5 w-2.5" /> Auditoria Válida</>
+                  ) : (
+                    <><AlertCircle className="h-2.5 w-2.5" /> Colunas Ausentes: {validationResult.missing.join(', ')}</>
+                  )}
+                </div>
               </div>
 
-              <div className={cn(
-                "flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase",
-                validationResult.isValid ? "bg-emerald-500/10 text-emerald-500" : "bg-red-500/10 text-red-500"
-              )}>
-                {validationResult.isValid ? (
-                  <><Check className="h-2.5 w-2.5" /> Auditoria Válida</>
-                ) : (
-                  <><AlertCircle className="h-2.5 w-2.5" /> Colunas Ausentes: {validationResult.missing.join(', ')}</>
-                )}
+              <div className="relative">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                <Input 
+                  placeholder="Buscar no log..." 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="h-7 pl-7 text-[10px] bg-background/50"
+                />
               </div>
             </div>
 
