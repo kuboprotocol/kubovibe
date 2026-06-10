@@ -1330,15 +1330,28 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                             size="sm" 
                             className="w-full justify-start text-[10px] h-8 text-primary" 
                             onClick={() => {
+                              // Validação Automática do JSON
+                              const requiredKeys = ['model_path', 'credits_consumed', 'duration', 'status_final'];
+                              // status_final pode vir de item.status ou metadata.status
+                              const currentStatus = item.metadata?.status || item.status;
+                              
                               const auditData = {
                                 session_item: item,
                                 decision_trail: item.metadata?.decision_trail || [],
                                 model_path: item.metadata?.model || "unknown",
                                 credits_consumed: item.metadata?.credits || 0,
                                 duration: item.metadata?.duration || "0s",
+                                status_final: currentStatus,
                                 timestamp: item.timestamp,
                                 exported_at: new Date().toISOString()
                               };
+
+                              const missingKeys = requiredKeys.filter(k => (auditData as any)[k] === undefined || (auditData as any)[k] === null);
+                              if (missingKeys.length > 0) {
+                                toast.error(`Falha na validação do JSON: campos ${missingKeys.join(', ')} ausentes.`);
+                                return;
+                              }
+
                               const blob = new Blob([JSON.stringify(auditData, null, 2)], { type: 'application/json' });
                               const url = URL.createObjectURL(blob);
                               const link = document.createElement('a');
