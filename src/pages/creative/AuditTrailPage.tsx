@@ -1196,7 +1196,6 @@ export default function CreativeAuditPage() {
           </div>
         </SheetContent>
       </Sheet>
-      </main>
 
       {/* Export CSV Dialog */}
       <Dialog open={isExportModalOpen} onOpenChange={setIsExportModalOpen}>
