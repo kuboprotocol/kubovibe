@@ -1389,6 +1389,38 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
           </div>
         )}
 
+        {/* Painel de Verificação de Saúde (Health Check) */}
+        {toolKey === "chat" && sessionHistory.length > 0 && (
+          <div className="pt-4 border-t border-border/20 space-y-3">
+            <h4 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+              <Rocket className="h-3 w-3" /> Verificação de Saúde Kimi
+            </h4>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="bg-emerald-500/5 border border-emerald-500/10 p-2 rounded-lg flex flex-col items-center justify-center">
+                <span className="text-[9px] text-muted-foreground uppercase mb-0.5">Latência Média</span>
+                <span className="text-sm font-bold text-emerald-600">
+                  {(sessionHistory
+                    .filter(h => h.metadata?.model?.includes('kimi') && h.status === 'success')
+                    .reduce((acc, h) => acc + (parseFloat(h.metadata?.duration) || 0), 0) / 
+                    (sessionHistory.filter(h => h.metadata?.model?.includes('kimi') && h.status === 'success').length || 1)).toFixed(2)}s
+                </span>
+              </div>
+              <div className="bg-amber-500/5 border border-amber-500/10 p-2 rounded-lg flex flex-col items-center justify-center">
+                <span className="text-[9px] text-muted-foreground uppercase mb-0.5">Taxa de Fallback</span>
+                <span className="text-sm font-bold text-amber-600">
+                  {((sessionHistory.filter(h => h.metadata?.status === 'fallback_success').length / (sessionHistory.length || 1)) * 100).toFixed(0)}%
+                </span>
+              </div>
+              <div className="bg-red-500/5 border border-red-500/10 p-2 rounded-lg flex flex-col items-center justify-center">
+                <span className="text-[9px] text-muted-foreground uppercase mb-0.5">Taxa de Erro</span>
+                <span className="text-sm font-bold text-red-600">
+                  {((sessionHistory.filter(h => h.status === 'error').length / (sessionHistory.length || 1)) * 100).toFixed(0)}%
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Comparison Section (Before vs After) */}
         {toolKey === "avatar" && lastResult && (
           <div className="pt-4 border-t border-border/20 space-y-3">
