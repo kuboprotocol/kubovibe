@@ -524,6 +524,49 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       return;
     }
 
+    // Fluxo do Kimi via Puter.js para Chat
+    if (toolKey === "chat" && kimiModel.includes("kimi")) {
+      setLoading(true);
+      setStreamingContent("");
+      try {
+        const resp = await puter.ai.chat(prompt, { 
+          model: kimiModel,
+          stream: true 
+        });
+
+        let fullText = "";
+        for await (const part of resp) {
+          if (part?.text) {
+            fullText += part.text;
+            setStreamingContent(fullText);
+          }
+        }
+
+        // Salva o resultado no histórico da sessão
+        const resultId = crypto.randomUUID();
+        const newEntry = {
+          id: resultId,
+          timestamp: new Date().toLocaleTimeString(),
+          prompt,
+          status: "success" as const,
+          output_text: fullText,
+          metadata: { model: kimiModel, provider: "puter" }
+        };
+        
+        setSessionHistory(prev => [newEntry, ...prev].slice(0, 50));
+        toast.success("Kimi respondeu!");
+        
+        // Registro em background no backend (opcional, para auditoria sem custo de crédito se possível)
+        // Por enquanto mantemos apenas local para máxima economia conforme pedido
+        
+      } catch (err: any) {
+        toast.error("Erro no Kimi: " + err.message);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     const cost = config.cost;
     const balance = editsRemaining || 0;
 
