@@ -6,8 +6,11 @@ import { z } from "npm:zod@3";
 const InputSchema = z.object({
   messages: z.array(z.object({
     role: z.enum(["system", "user", "assistant"]),
-    content: z.string().min(1).max(5000),
+    content: z.string().min(1).max(10000),
   })).min(1),
+  model: z.string().optional(),
+  temperature: z.number().optional(),
+  max_tokens: z.number().optional(),
 });
 
 const COST = 1;
@@ -31,7 +34,7 @@ Deno.serve(async (req) => {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const { messages } = parsed.data;
+    const { messages, model, temperature, max_tokens } = parsed.data;
 
     const ded = await deductCredits(user.id, COST, "creative_chat", { count: messages.length }, user.email, idempotencyKey);
     if (!ded.ok) {
@@ -50,15 +53,33 @@ Deno.serve(async (req) => {
     const payload = { messages: [sys, ...messages], stream: true };
 
     const tries: Array<{ name: string; url: string; key?: string; model: string }> = [];
-    if (OR) tries.push({ name: "openrouter", url: "https://openrouter.ai/api/v1/chat/completions", key: OR, model: "moonshotai/kimi-k2.6" });
-    if (OR) tries.push({ name: "openrouter_fallback", url: "https://openrouter.ai/api/v1/chat/completions", key: OR, model: "openai/gpt-4o-mini" });
-    if (LK) tries.push({ name: "lovable", url: "https://ai.gateway.lovable.dev/v1/chat/completions", key: LK, model: "google/gemini-3-flash-preview" });
+    
+    // Se o cliente pedir um modelo específico, tentamos ele primeiro via OpenRouter
+    if (OR && model) {
+      tries.push({ name: "primary_requested", url: "https://openrouter.ai/api/v1/chat/completions", key: OR, model: model });
+    }
+
+    if (OR) {
+      // DeepSeek como prioridade Nível 3 se não for o pedido
+      if (model !== "deepseek/deepseek-chat") {
+        tries.push({ name: "deepseek", url: "https://openrouter.ai/api/v1/chat/completions", key: OR, model: "deepseek/deepseek-chat" });
+      }
+      tries.push({ name: "openrouter_kimi", url: "https://openrouter.ai/api/v1/chat/completions", key: OR, model: "moonshotai/kimi-k2.6" });
+      tries.push({ name: "openrouter_fallback", url: "https://openrouter.ai/api/v1/chat/completions", key: OR, model: "openai/gpt-4o-mini" });
+    }
+    
+    if (LK) tries.push({ name: "lovable", url: "https://ai.gateway.lovable.dev/v1/chat/completions", key: LK, model: "google/gemini-2.0-flash-exp" });
 
     for (const t of tries) {
       const r = await fetch(t.url, {
         method: "POST",
         headers: { Authorization: `Bearer ${t.key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ ...payload, model: t.model }),
+        body: JSON.stringify({ 
+          ...payload, 
+          model: t.model,
+          temperature: temperature ?? 0.7,
+          max_tokens: max_tokens ?? 2000
+        }),
       });
       if (r.ok) {
         // Record asset (best-effort, fire-and-forget)
