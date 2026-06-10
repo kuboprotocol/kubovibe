@@ -730,7 +730,12 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       const executionStartTime = new Date().toISOString();
       
       const body: any = { prompt, metadata };
-      if (toolKey === "chat") body.messages = [{ role: "user", content: prompt }];
+      if (toolKey === "chat") {
+        body.messages = [{ role: "user", content: prompt }];
+        body.model = kimiModel === "deepseek-chat" ? "deepseek/deepseek-chat" : kimiModel;
+        body.temperature = temperature;
+        body.max_tokens = maxTokens;
+      }
       if (toolKey === "avatar") {
         body.mode = "avatar";
         body.metadata = { ...metadata, source_image: uploadedImageUrl };
@@ -763,15 +768,38 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
         throw new Error(data.error || "Erro na execução");
       }
 
-      setSessionHistory(prev => [{
-        id: crypto.randomUUID(),
-        timestamp: new Date().toLocaleTimeString(),
-        prompt,
-        status: "success",
-        assetUrl: data?.asset_url,
-        metadata: { ...metadata, uploadedImageUrl },
-        logs: progressSteps // Capture current logs
-      }, ...prev]);
+      const endTime = Date.now();
+      const duration = ((endTime - new Date(executionStartTime).getTime()) / 1000).toFixed(2);
+
+      if (toolKey === "chat") {
+        // Para chat no backend (DeepSeek ou Fallback)
+        setSessionHistory(prev => [{
+          id: crypto.randomUUID(),
+          timestamp: new Date().toLocaleTimeString(),
+          prompt,
+          status: "success",
+          output_text: typeof data === 'string' ? data : (data?.output || "Processado com sucesso"),
+          metadata: { 
+            ...metadata, 
+            model: body.model, 
+            provider: "backend",
+            duration: `${duration}s`,
+            credits: cost,
+            temperature,
+            max_tokens: maxTokens
+          }
+        }, ...prev]);
+      } else {
+        setSessionHistory(prev => [{
+          id: crypto.randomUUID(),
+          timestamp: new Date().toLocaleTimeString(),
+          prompt,
+          status: "success",
+          assetUrl: data?.asset_url,
+          metadata: { ...metadata, uploadedImageUrl, duration: `${duration}s`, credits: cost },
+          logs: progressSteps 
+        }, ...prev]);
+      }
 
       if (toolKey === "avatar") {
         updateStep("generate", "done", undefined, { 
