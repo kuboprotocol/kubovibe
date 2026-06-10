@@ -27,8 +27,9 @@ import {
   useSortable
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Download, AlertTriangle, Check, X, ListFilter, AlertCircle, ChevronUp, ChevronDown, Search } from 'lucide-react';
+import { GripVertical, Download, AlertTriangle, Check, X, ListFilter, AlertCircle, ChevronUp, ChevronDown, Search, FileSpreadsheet } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { 
