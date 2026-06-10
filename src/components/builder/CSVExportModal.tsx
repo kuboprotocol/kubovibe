@@ -360,7 +360,7 @@ export default function CSVExportModal({ open, onOpenChange, logs, filterFallbac
               </div>
             </div>
 
-            <div className="flex items-center gap-4 p-2 bg-muted/30 rounded-md">
+            <div className="flex items-center justify-between gap-4 p-2 bg-muted/30 rounded-md">
               <div className="flex items-center gap-2">
                 <Checkbox 
                   id="filter-fallback" 
@@ -368,6 +368,17 @@ export default function CSVExportModal({ open, onOpenChange, logs, filterFallbac
                   onCheckedChange={(v) => setInternalFallbackFilter(!!v)}
                 />
                 <Label htmlFor="filter-fallback" className="text-[10px] font-medium cursor-pointer uppercase">Apenas Fallbacks</Label>
+              </div>
+
+              <div className={cn(
+                "flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase",
+                validationResult.isValid ? "bg-emerald-500/10 text-emerald-500" : "bg-red-500/10 text-red-500"
+              )}>
+                {validationResult.isValid ? (
+                  <><Check className="h-2.5 w-2.5" /> Auditoria Válida</>
+                ) : (
+                  <><AlertCircle className="h-2.5 w-2.5" /> Colunas Ausentes: {validationResult.missing.join(', ')}</>
+                )}
               </div>
             </div>
 
