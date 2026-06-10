@@ -362,7 +362,9 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     localStorage.setItem("creative_temperature", String(temperature));
     localStorage.setItem("creative_max_tokens", String(maxTokens));
     localStorage.setItem("creative_simulation_mode", String(simulationMode));
-  }, [kimiModel, temperature, maxTokens, simulationMode]);
+    localStorage.setItem("creative_latency_limit", String(latencyLimit));
+    localStorage.setItem("creative_fallback_limit", String(fallbackRateLimit));
+  }, [kimiModel, temperature, maxTokens, simulationMode, latencyLimit, fallbackRateLimit]);
 
   const logAuditAction = useCallback(async (step: string, action: string, params: any = {}, correlationId?: string, traceId?: string) => {
     // Audit logs for deployment and agent improvements
