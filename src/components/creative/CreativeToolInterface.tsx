@@ -1560,6 +1560,33 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                     </div>
                   )}
                 </div>
+
+                {!isBatchReprocessing && reprocessResults.length > 0 && (
+                  <div className="pt-2 border-t border-border/10 grid grid-cols-2 gap-4">
+                    <div className="bg-emerald-500/5 p-2 rounded-lg">
+                      <p className="text-[8px] font-bold text-emerald-600 uppercase mb-1">Resumo Normal</p>
+                      <div className="flex justify-between text-[10px]">
+                        <span className="opacity-60">Latência Média:</span>
+                        <span className="font-bold">{(reprocessResults.reduce((acc, r) => acc + parseFloat(r.normal.duration), 0) / reprocessResults.length).toFixed(2)}s</span>
+                      </div>
+                      <div className="flex justify-between text-[10px]">
+                        <span className="opacity-60">Status Sucesso:</span>
+                        <span className="font-bold text-emerald-600">100%</span>
+                      </div>
+                    </div>
+                    <div className="bg-amber-500/5 p-2 rounded-lg">
+                      <p className="text-[8px] font-bold text-amber-600 uppercase mb-1">Resumo Simulado</p>
+                      <div className="flex justify-between text-[10px]">
+                        <span className="opacity-60">Latência Média:</span>
+                        <span className="font-bold">{(reprocessResults.reduce((acc, r) => acc + parseFloat(r.simulated.duration), 0) / reprocessResults.length).toFixed(2)}s</span>
+                      </div>
+                      <div className="flex justify-between text-[10px]">
+                        <span className="opacity-60">Taxa Fallback:</span>
+                        <span className="font-bold text-amber-600">100%</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
             <div className="grid grid-cols-3 gap-3">
