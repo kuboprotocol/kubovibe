@@ -55,7 +55,10 @@ const queryClient = new QueryClient();
 // in the browser and only when the host actually contains "lovable.app").
 if (typeof window !== 'undefined') {
   const host = window.location.hostname
-  if (/(^|\.)lovable\.app$/i.test(host) && !host.startsWith('id-preview--')) {
+  const previewHost = 'preview--kubo-secure-ai.lovable.app'
+  if (host === previewHost) {
+    // Already on the preview domain
+  } else if (/(^|\.)lovable\.app$/i.test(host) && !host.startsWith('id-preview--')) {
     const target = `https://kubovibe.dev${window.location.pathname}${window.location.search}${window.location.hash}`
     window.location.replace(target)
   }
