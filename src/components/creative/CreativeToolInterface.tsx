@@ -138,7 +138,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
   const [simulationMode, setSimulationMode] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [lastResult, setLastResult] = useState<any>(null);
-  const [sessionHistory, setSessionHistory] = useState<{ id: string; timestamp: string; prompt: string; status: "success" | "error"; assetUrl?: string; metadata?: any; logs?: AvatarStepState[] }[]>(() => {
+  const [sessionHistory, setSessionHistory] = useState<{ id: string; timestamp: string; prompt: string; status: "success" | "error"; assetUrl?: string; output_text?: string; metadata?: any; logs?: AvatarStepState[] }[]>(() => {
     const saved = localStorage.getItem(`creative_history_${toolKey}`);
     return saved ? JSON.parse(saved) : [];
   });
