@@ -25,17 +25,12 @@ const Index = () => {
         <CommunitySection />
         <HowItWorksSection />
 
-        {/* Gold divider */}
-        <div className="max-w-xl mx-auto gold-line" aria-hidden="true" />
-
-        {/* Conectores — instiga a ligar APIs e serviços */}
-        <ConnectorSection />
-
-        {/* Gold divider */}
-        <div className="max-w-xl mx-auto gold-line" aria-hidden="true" />
-
-        {/* Domínio — instiga comprar ou transferir via Ionos */}
         <DomainSection />
+
+        {/* Gold divider */}
+        <div className="max-w-xl mx-auto gold-line" aria-hidden="true" />
+
+        <ConnectorSection />
 
         {/* Gold divider */}
         <div className="max-w-xl mx-auto gold-line" aria-hidden="true" />

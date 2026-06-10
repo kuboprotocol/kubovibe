@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Globe, ArrowRight, RefreshCw, ShoppingCart } from "lucide-react";
+import { Globe, ArrowRight, RefreshCw, ShoppingCart, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const DomainSection = () => {
@@ -20,93 +20,101 @@ const DomainSection = () => {
   };
 
   return (
-    <motion.section
-      initial={{ opacity: 0, y: 32 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.5 }}
-      className="py-24 px-6"
-    >
-      <div className="max-w-4xl mx-auto">
-        {/* Eyebrow */}
-        <p className="text-center text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-4">
-          Seu app merece um endereço de verdade
-        </p>
+    <section className="py-24 px-6 relative overflow-hidden">
+      <div className="absolute inset-0 dot-pattern opacity-30 pointer-events-none" />
+      
+      <div className="max-w-5xl mx-auto relative z-10">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="text-center mb-16"
+        >
+          <span className="text-xs font-medium text-primary uppercase tracking-widest mb-3 block">Domínios Profissionais</span>
+          <h2 className="text-3xl md:text-4xl font-display font-bold text-foreground">
+            Seu domínio profissional em poucos minutos
+          </h2>
+          <p className="text-muted-foreground mt-4 max-w-2xl mx-auto">
+            Compre um novo domínio ou transfira um existente para conectar sua marca ao mundo.
+          </p>
+        </motion.div>
 
-        {/* Heading */}
-        <h2 className="text-center text-3xl md:text-4xl font-display font-bold text-foreground mb-4">
-          Publique com domínio próprio
-        </h2>
-        <p className="text-center text-muted-foreground max-w-xl mx-auto mb-12">
-          Um app sem domínio é uma ideia sem endereço. Registre ou transfira o
-          seu em segundos — direto pela Ionos, nosso parceiro de hospedagem.
-        </p>
-
-        {/* Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Buy domain */}
-          <div className="rounded-2xl border border-border bg-card p-8 flex flex-col gap-4 hover:border-primary/50 transition-colors">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <ShoppingCart className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-foreground text-lg mb-1">
-                Comprar um domínio novo
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                Pesquise a disponibilidade e registre o domínio perfeito para o
-                seu projeto — .com, .app, .io e muito mais.
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Card 1: Buy Domain */}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            whileHover={{ y: -5, scale: 1.01 }}
+            transition={{ duration: 0.3 }}
+            className="group relative"
+          >
+            <div className="p-8 rounded-2xl border border-border bg-card/50 backdrop-blur-sm hover:shadow-gold transition-all duration-300 h-full flex flex-col hover:border-primary/30">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-accent flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                <ShoppingCart className="h-6 w-6 text-foreground" />
+              </div>
+              <h3 className="text-xl font-display font-semibold text-foreground mb-3">Comprar domínio novo</h3>
+              <p className="text-muted-foreground leading-relaxed mb-8 flex-grow">
+                Encontre e registre o domínio ideal para sua empresa, startup ou projeto digital.
               </p>
+              <Button 
+                onClick={handleBuyDomain}
+                className="w-full sm:w-auto gap-2 rounded-xl group/btn"
+              >
+                Ver disponibilidade
+                <Search className="h-4 w-4 group-hover/btn:scale-110 transition-transform" />
+              </Button>
             </div>
-            <Button
-              onClick={handleBuyDomain}
-              className="mt-auto gap-2 rounded-xl"
-            >
-              Buscar domínio
-              <ArrowRight className="h-4 w-4" />
-            </Button>
-          </div>
+          </motion.div>
 
-          {/* Transfer domain */}
-          <div className="rounded-2xl border border-border bg-card p-8 flex flex-col gap-4 hover:border-primary/50 transition-colors">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <RefreshCw className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-foreground text-lg mb-1">
-                Transferir domínio existente
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                Já tem um domínio em outro provedor? Traga ele para a Ionos e
-                conecte ao seu app KUBO VIBE sem complicação.
+          {/* Card 2: Transfer Domain */}
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            whileHover={{ y: -5, scale: 1.01 }}
+            transition={{ duration: 0.3 }}
+            className="group relative"
+          >
+            <div className="p-8 rounded-2xl border border-border bg-card/50 backdrop-blur-sm hover:shadow-gold transition-all duration-300 h-full flex flex-col hover:border-primary/30">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-900/30 to-indigo-900/20 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                <RefreshCw className="h-6 w-6 text-foreground" />
+              </div>
+              <h3 className="text-xl font-display font-semibold text-foreground mb-3">Transferir domínio existente</h3>
+              <p className="text-muted-foreground leading-relaxed mb-8 flex-grow">
+                Já possui um domínio? Transfira facilmente e centralize tudo em um único lugar.
               </p>
+              <Button 
+                variant="outline"
+                onClick={handleTransferDomain}
+                className="w-full sm:w-auto gap-2 rounded-xl border-primary/20 hover:bg-primary/5 group/btn"
+              >
+                Transferir domínio
+                <Globe className="h-4 w-4 group-hover/btn:scale-110 transition-transform" />
+              </Button>
             </div>
-            <Button
-              variant="outline"
-              onClick={handleTransferDomain}
-              className="mt-auto gap-2 rounded-xl"
-            >
-              Transferir domínio
-              <Globe className="h-4 w-4" />
-            </Button>
-          </div>
+          </motion.div>
         </div>
 
-        {/* Fine print */}
-        <p className="text-center text-xs text-muted-foreground mt-6">
-          Parceria com{" "}
+        <motion.p 
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.5 }}
+          className="text-center text-xs text-muted-foreground mt-12"
+        >
+          Serviço realizado através da infraestrutura parceira da{" "}
           <a
             href="https://www.ionos.com"
             target="_blank"
             rel="noopener noreferrer"
-            className="underline hover:text-foreground transition-colors"
+            className="underline hover:text-foreground transition-colors font-medium"
           >
             Ionos
-          </a>{" "}
-          · Você será redirecionado para o site da Ionos para concluir a compra.
-        </p>
+          </a>.
+        </motion.p>
       </div>
-    </motion.section>
+    </section>
   );
 };
 
