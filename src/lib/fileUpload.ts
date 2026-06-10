@@ -117,6 +117,7 @@ export async function uploadFile(
   const timestamp = Date.now()
   const path = `${userId}/${timestamp}_${safeName}`
 
+  console.log(`[uploadFile] Inciando upload para path: ${path}`, { contentType: processedFile.type });
   const { error: uploadError } = await supabase.storage
     .from('uploads')
     .upload(path, processedFile, {
@@ -124,7 +125,11 @@ export async function uploadFile(
       upsert: false,
     })
 
-  if (uploadError) throw new Error(`Upload falhou: ${uploadError.message}`)
+  if (uploadError) {
+    console.error(`[uploadFile] Erro no upload:`, uploadError);
+    throw new Error(`Upload falhou: ${uploadError.message}`)
+  }
+  console.log(`[uploadFile] Upload concluído com sucesso para: ${path}`);
 
   onProgress?.(90)
 
