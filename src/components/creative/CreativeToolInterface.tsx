@@ -825,7 +825,8 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${session?.access_token}`,
+          "Authorization": `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          "apikey": import.meta.env.VITE_SUPABASE_ANON_KEY
         },
         body: JSON.stringify(body),
       });

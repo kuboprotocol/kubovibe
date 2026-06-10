@@ -23,8 +23,15 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     console.log("[emo-animate] Payload recebido:", body);
     
-    const { source_image: rawImg, driving_video: rawVid } = body;
-    if (!rawImg || !rawVid) throw new Error("Missing source_image or driving_video");
+    const { source_image, driving_video, metadata } = body;
+    const rawImg = source_image || metadata?.source_image;
+    const rawVid = driving_video || metadata?.driving_video;
+    
+    console.log("[emo-animate] Assets a processar:", { rawImg, rawVid });
+
+    if (!rawImg || !rawVid) {
+      throw new Error(`Missing source_image or driving_video. Received: ${JSON.stringify(body)}`);
+    }
 
     const ded = await deductCredits(user.id, COST, "creative_emo", { rawImg, rawVid }, user.email, idempotencyKey);
     if (!ded.ok) return new Response(JSON.stringify({ error: ded.error }), { status: (ded as any).status ?? 402, headers: corsHeaders });
