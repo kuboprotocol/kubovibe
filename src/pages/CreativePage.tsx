@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -106,6 +106,33 @@ function handleFnError(d: any, fallback = "Erro") {
   } else {
     toast.error(typeof msg === "string" ? msg : fallback);
   }
+}
+
+import CSVExportModal from "@/components/builder/CSVExportModal";
+
+function CSVExportModalWrapper() {
+  const [open, setOpen] = useState(false);
+  const [logs, setLogs] = useState<any[]>([]);
+  const [fallbackOnly, setFallbackOnly] = useState(false);
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      setLogs((window as any).__exportLogsToCSV || []);
+      setFallbackOnly(!!e.detail?.filterFallback);
+      setOpen(true);
+    };
+    window.addEventListener('open-audit-export', handler);
+    return () => window.removeEventListener('open-audit-export', handler);
+  }, []);
+
+  return (
+    <CSVExportModal 
+      open={open} 
+      onOpenChange={setOpen} 
+      logs={logs} 
+      filterFallbackOnly={fallbackOnly}
+    />
+  );
 }
 
 export default function CreativePage() {
@@ -1112,12 +1139,25 @@ export default function CreativePage() {
                         </Button>
                         <Button 
                           variant="secondary" 
-                          onClick={() => exportFullPanelReport("json")}
+                          onClick={() => {
+                             const auditLogs = history.map(h => ({
+                               id: h.id,
+                               ts: new Date(h.created_at).getTime(),
+                               kind: 'TOOL_EXECUTION',
+                               message: h.prompt,
+                               model: h.metadata?.model || 'default',
+                               credits: h.metadata?.credits || 0,
+                               duration: h.metadata?.duration || '0s',
+                               status: h.status
+                             }));
+                             (window as any).__exportLogsToCSV = auditLogs;
+                             window.dispatchEvent(new CustomEvent('open-audit-export', { detail: { filterFallback: false } }));
+                          }}
                           disabled={isExporting || history.length === 0}
-                          title="Exportar tudo em JSON"
+                          title="Exportar tudo em CSV"
                         >
                           {isExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileDown className="h-4 w-4 mr-2" />}
-                          JSON Full
+                          Exportar Auditoria (CSV)
                         </Button>
                         <Button 
                           variant="outline" 
@@ -1238,6 +1278,15 @@ export default function CreativePage() {
             </TabsContent>
           ))}
         </Tabs>
+
+        {(() => {
+          const CSVExportModal = React.lazy(() => import('@/components/builder/CSVExportModal'));
+          return (
+            <React.Suspense fallback={null}>
+              <CSVExportModalWrapper />
+            </React.Suspense>
+          );
+        })()}
       </main>
     </div>
   );

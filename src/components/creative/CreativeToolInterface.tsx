@@ -1,4 +1,30 @@
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import CSVExportModal from "@/components/builder/CSVExportModal";
+
+function CSVExportModalWrapper() {
+  const [open, setOpen] = useState(false);
+  const [logs, setLogs] = useState<any[]>([]);
+  const [fallbackOnly, setFallbackOnly] = useState(false);
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      setLogs((window as any).__exportLogsToCSV || []);
+      setFallbackOnly(!!e.detail?.filterFallback);
+      setOpen(true);
+    };
+    window.addEventListener('open-audit-export', handler);
+    return () => window.removeEventListener('open-audit-export', handler);
+  }, []);
+
+  return (
+    <CSVExportModal 
+      open={open} 
+      onOpenChange={setOpen} 
+      logs={logs} 
+      filterFallbackOnly={fallbackOnly}
+    />
+  );
+}
 import heic2any from "heic2any";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -636,9 +662,12 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       setLoading(true);
       setStreamingContent("");
       const startTime = Date.now();
-      const decisionTrail: string[] = [`Iniciando com ${kimiModel} (Nível 1/2)`];
+      const decisionTrail: string[] = [`Tentando ${kimiModel} (Nível 1/2)`];
       
       try {
+        // Log auditing initial attempt
+        await logAuditAction("AI_Orchestration", "kimi_attempt", { model: kimiModel, temperature, maxTokens });
+
         const resp = await puter.ai.chat(prompt, { 
           model: kimiModel,
           temperature: temperature,
@@ -656,7 +685,8 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
 
         const endTime = Date.now();
         const duration = ((endTime - startTime) / 1000).toFixed(2);
-        decisionTrail.push("Sucesso via Puter.js");
+        decisionTrail.push("Sucesso via Puter.js (Kimi)");
+        await logAuditAction("AI_Orchestration", "kimi_success", { duration, model: kimiModel });
 
         // Salva o resultado no histórico da sessão
         const resultId = crypto.randomUUID();
@@ -673,7 +703,8 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
             credits: 0,
             temperature,
             max_tokens: maxTokens,
-            decision_trail: decisionTrail
+            decision_trail: decisionTrail,
+            status: "success" as any
           }
         };
         
@@ -686,6 +717,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       } catch (err: any) {
         decisionTrail.push(`Erro no Kimi: ${err.message}`);
         decisionTrail.push("Acionando Fallback para DeepSeek (Nível 3)");
+        await logAuditAction("AI_Orchestration", "fallback_triggered", { error: err.message, from_model: kimiModel });
         console.warn("Kimi falhou via Puter, tentando fallback para Nível 3 (DeepSeek)...", err);
         toast.info("Kimi indisponível. Acionando fallback DeepSeek (Nível 3)...");
         // O código continuará para o handleExecute normal abaixo, mas precisamos passar o decisionTrail
@@ -792,7 +824,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
           id: crypto.randomUUID(),
           timestamp: new Date().toLocaleTimeString(),
           prompt,
-          status: "success",
+          status: "success" as const,
           output_text: typeof data === 'string' ? data : (data?.output || "Processado com sucesso"),
           metadata: { 
             ...metadata, 
@@ -802,9 +834,10 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
             credits: cost,
             temperature,
             max_tokens: maxTokens,
-            decision_trail: decisionTrail
+            decision_trail: decisionTrail,
+            status: (decisionTrail.some(t => t.toLowerCase().includes("fallback")) ? "fallback_success" : "success") as any
           }
-        }, ...prev]);
+        }, ...prev].slice(0, 50));
       } else {
         setSessionHistory(prev => [{
           id: crypto.randomUUID(),
@@ -1262,21 +1295,59 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
             </div>
             
             {/* Resumo de Consumo Detalhado */}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="w-full h-8 text-[10px] mt-4 flex items-center gap-2 border-primary/20 hover:bg-primary/5"
+              onClick={() => {
+                const logsToExport = sessionHistory.map(h => ({
+                  id: h.id,
+                  ts: new Date().getTime(),
+                  kind: 'AI_ORCHESTRATION',
+                  message: h.prompt,
+                  status: h.metadata?.status || h.status,
+                  metadata: h.metadata
+                }));
+                (window as any).__exportLogsToCSV = logsToExport;
+                window.dispatchEvent(new CustomEvent('open-audit-export', { detail: { filterFallback: false } }));
+              }}
+            >
+              <FileText className="h-3.5 w-3.5" /> Exportar Auditoria da Sessão (CSV)
+            </Button>
+
             {sessionHistory.length > 0 && (
               <div className="mt-4 p-3 bg-primary/5 rounded-xl border border-primary/10 space-y-3">
                 <h5 className="text-[10px] font-bold uppercase text-primary flex items-center gap-2">
                   <Sparkles className="h-3 w-3" /> Resumo Detalhado da Sessão
                 </h5>
+                <p className="text-[9px] text-muted-foreground mb-2">Relatório de orquestração Kimi + DeepSeek para auditoria.</p>
                 
                 <div className="max-h-[150px] overflow-auto space-y-2 pr-2 custom-scrollbar">
                   {sessionHistory.map((item, idx) => (
-                    <div key={idx} className="flex items-center justify-between text-[10px] py-1 border-b border-primary/5 last:border-0">
-                      <span className="opacity-70 truncate max-w-[150px]">{item.prompt}</span>
-                      <div className="flex items-center gap-3">
-                        <span className="font-mono">{item.metadata?.model?.split('/').pop()}</span>
-                        <span className="text-amber-500 font-bold">{item.metadata?.credits || 0}c</span>
-                        <span className="opacity-60">{item.metadata?.duration || '0s'}</span>
+                    <div key={idx} className="space-y-2 py-2 border-b border-primary/5 last:border-0">
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="opacity-70 truncate max-w-[150px] font-medium">{item.prompt}</span>
+                        <div className="flex items-center gap-3">
+                          <span className="font-mono bg-muted/50 px-1 rounded">{item.metadata?.model?.split('/').pop()}</span>
+                          <span className="text-amber-500 font-bold">{item.metadata?.credits || 0}c</span>
+                          <span className="opacity-60">{item.metadata?.duration || '0s'}</span>
+                        </div>
                       </div>
+                      
+                      {(item.metadata?.decision_trail) && (
+                        <div className="bg-muted/20 p-1.5 rounded text-[9px] text-muted-foreground">
+                          <div className="flex items-center gap-1 font-bold uppercase mb-1 opacity-60">
+                            <History className="h-2.5 w-2.5" /> Trilha:
+                          </div>
+                          <ul className="space-y-0.5">
+                            {item.metadata.decision_trail.map((t: string, i: number) => (
+                              <li key={i} className={cn("truncate", t.toLowerCase().includes('fallback') && "text-purple-500")}>
+                                • {t}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1627,6 +1698,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <CSVExportModalWrapper />
     </div>
   );
 }
