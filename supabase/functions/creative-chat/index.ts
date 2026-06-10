@@ -50,7 +50,8 @@ Deno.serve(async (req) => {
     const payload = { messages: [sys, ...messages], stream: true };
 
     const tries: Array<{ name: string; url: string; key?: string; model: string }> = [];
-    if (OR) tries.push({ name: "openrouter", url: "https://openrouter.ai/api/v1/chat/completions", key: OR, model: "openai/gpt-4o-mini" });
+    if (OR) tries.push({ name: "openrouter", url: "https://openrouter.ai/api/v1/chat/completions", key: OR, model: "moonshotai/kimi-k2.6" });
+    if (OR) tries.push({ name: "openrouter_fallback", url: "https://openrouter.ai/api/v1/chat/completions", key: OR, model: "openai/gpt-4o-mini" });
     if (LK) tries.push({ name: "lovable", url: "https://ai.gateway.lovable.dev/v1/chat/completions", key: LK, model: "google/gemini-3-flash-preview" });
 
     for (const t of tries) {

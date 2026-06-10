@@ -231,6 +231,8 @@ serve(async (req) => {
       }
     } else {
       console.log("Routing: Kimi → DeepSeek → Lovable AI");
+      // Fluxo otimizado: Front-end tenta Puter.js primeiro (Nível 1).
+      // Se cair aqui, é fallback ou processamento de back-end.
 
       if (KIMI_API_KEY) {
         const result = await tryProvider("Kimi", () => callKimi(KIMI_API_KEY, fullMessages), failures);
