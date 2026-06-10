@@ -1113,15 +1113,15 @@ export default function CreativePage() {
                         <Button 
                           variant="secondary" 
                           onClick={() => {
-                             const auditLogs = sessionHistory.map(h => ({
+                             const auditLogs = history.map(h => ({
                                id: h.id,
-                               ts: new Date(h.timestamp).getTime(),
-                               kind: 'CHAT',
+                               ts: new Date(h.created_at).getTime(),
+                               kind: 'TOOL_EXECUTION',
                                message: h.prompt,
-                               model: h.metadata?.model,
-                               credits: h.metadata?.credits,
-                               duration: h.metadata?.duration,
-                               status: h.metadata?.status || h.status
+                               model: h.metadata?.model || 'default',
+                               credits: h.metadata?.credits || 0,
+                               duration: h.metadata?.duration || '0s',
+                               status: h.status
                              }));
                              (window as any).__exportLogsToCSV = auditLogs;
                              window.dispatchEvent(new CustomEvent('open-audit-export', { detail: { filterFallback: false } }));
