@@ -1269,11 +1269,32 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
             </div>
             
             {/* Resumo de Consumo Detalhado */}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="w-full h-8 text-[10px] mt-4 flex items-center gap-2 border-primary/20 hover:bg-primary/5"
+              onClick={() => {
+                const logsToExport = sessionHistory.map(h => ({
+                  id: h.id,
+                  ts: new Date().getTime(),
+                  kind: 'AI_ORCHESTRATION',
+                  message: h.prompt,
+                  status: h.metadata?.status || h.status,
+                  metadata: h.metadata
+                }));
+                (window as any).__exportLogsToCSV = logsToExport;
+                window.dispatchEvent(new CustomEvent('open-audit-export', { detail: { filterFallback: false } }));
+              }}
+            >
+              <FileText className="h-3.5 w-3.5" /> Exportar Auditoria da Sessão (CSV)
+            </Button>
+
             {sessionHistory.length > 0 && (
               <div className="mt-4 p-3 bg-primary/5 rounded-xl border border-primary/10 space-y-3">
                 <h5 className="text-[10px] font-bold uppercase text-primary flex items-center gap-2">
                   <Sparkles className="h-3 w-3" /> Resumo Detalhado da Sessão
                 </h5>
+                <p className="text-[9px] text-muted-foreground mb-2">Relatório de orquestração Kimi + DeepSeek para auditoria.</p>
                 
                 <div className="max-h-[150px] overflow-auto space-y-2 pr-2 custom-scrollbar">
                   {sessionHistory.map((item, idx) => (
