@@ -22,6 +22,7 @@ function CSVExportModalWrapper() {
       onOpenChange={setOpen} 
       logs={logs} 
       filterFallbackOnly={fallbackOnly}
+      filterRunId={(window as any).__lastAuditRunId}
     />
   );
 }
@@ -1269,6 +1270,27 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                         setTimeout(() => handleExecute(), 100);
                       }} title="Reexecutar (Normal)">
                         <Play className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-7 w-7 text-emerald-500 hover:bg-emerald-500/10" 
+                        onClick={() => {
+                          const logsToExport = [{
+                            id: item.id,
+                            ts: new Date().getTime(),
+                            kind: 'AI_ORCHESTRATION',
+                            message: item.prompt,
+                            status: item.metadata?.status || item.status,
+                            metadata: item.metadata
+                          }];
+                          (window as any).__exportLogsToCSV = logsToExport;
+                          (window as any).__lastAuditRunId = item.metadata?.run_id || item.id;
+                          window.dispatchEvent(new CustomEvent('open-audit-export', { detail: { filterFallback: false } }));
+                        }} 
+                        title="Auditoria Específica (XLSX/CSV)"
+                      >
+                        <FileSpreadsheet className="h-3.5 w-3.5" />
                       </Button>
                       {toolKey === "chat" && (
                         <Button 
