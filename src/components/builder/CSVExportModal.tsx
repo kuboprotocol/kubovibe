@@ -61,6 +61,7 @@ interface CSVExportModalProps {
   onOpenChange: (open: boolean) => void;
   logs: PreviewLogEntry[];
   filterFallbackOnly?: boolean;
+  filterRunId?: string;
 }
 
 const ALL_COLUMNS = [
@@ -133,7 +134,7 @@ function SortableColumnItem({ id, label, checked, onCheckedChange }: SortableIte
   );
 }
 
-export default function CSVExportModal({ open, onOpenChange, logs, filterFallbackOnly = false }: CSVExportModalProps) {
+export default function CSVExportModal({ open, onOpenChange, logs, filterFallbackOnly = false, filterRunId }: CSVExportModalProps) {
   const [userId, setUserId] = useState<string | null>(null);
   const [selectedColumns, setSelectedColumns] = useState<Set<string>>(new Set(ALL_COLUMNS.map(c => c.id)));
   const [columnOrder, setColumnOrder] = useState<string[]>(ALL_COLUMNS.map(c => c.id));
@@ -142,6 +143,7 @@ export default function CSVExportModal({ open, onOpenChange, logs, filterFallbac
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [internalFallbackFilter, setInternalFallbackFilter] = useState(filterFallbackOnly);
+  const [internalRunIdFilter, setInternalRunIdFilter] = useState(filterRunId || '');
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
   const validationResult = useMemo(() => {
@@ -150,6 +152,10 @@ export default function CSVExportModal({ open, onOpenChange, logs, filterFallbac
     const isValid = missing.length === 0;
     return { isValid, missing };
   }, [selectedColumns]);
+
+  useEffect(() => {
+    setInternalRunIdFilter(filterRunId || '');
+  }, [filterRunId]);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id || 'anonymous'));
@@ -232,6 +238,14 @@ export default function CSVExportModal({ open, onOpenChange, logs, filterFallbac
       });
     }
 
+    // Filtro de RunID
+    if (internalRunIdFilter) {
+      result = result.filter(log => {
+        const runId = (log as any).metadata?.run_id || (log as any).id;
+        return runId === internalRunIdFilter;
+      });
+    }
+
     // Ordenação
     if (sortConfig) {
       result.sort((a, b) => {
@@ -275,6 +289,15 @@ export default function CSVExportModal({ open, onOpenChange, logs, filterFallbac
 
     return { header, rows, totalPages: Math.ceil(filteredLogs.length / previewLimit) };
   }, [filteredLogs, selectedColumns, columnOrder, dateFormat, previewLimit, currentPage]);
+
+  const availableRunIds = useMemo(() => {
+    const ids = new Set<string>();
+    logs.forEach(log => {
+      const rid = (log as any).metadata?.run_id || (log as any).id;
+      if (rid) ids.add(rid);
+    });
+    return Array.from(ids);
+  }, [logs]);
 
   const handleDownload = () => {
     if (filteredLogs.length === 0) {
@@ -341,6 +364,23 @@ export default function CSVExportModal({ open, onOpenChange, logs, filterFallbac
     });
 
     const worksheet = XLSX.utils.json_to_sheet(dataRows);
+
+    // Validação Automática do XLSX
+    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+    const colsInSheet: string[] = [];
+    for (let C = range.s.c; C <= range.e.c; ++C) {
+      const address = XLSX.utils.encode_col(C) + "1";
+      if (worksheet[address]) colsInSheet.push(worksheet[address].v);
+    }
+
+    const requiredLabels = ['Modelo', 'Créditos', 'Tempo/Mensagem', 'Status (Sucesso/Fallback)'];
+    const missingInXlsx = requiredLabels.filter(label => !colsInSheet.includes(label));
+    
+    if (missingInXlsx.length > 0) {
+      toast.error(`Falha na validação do XLSX: colunas ${missingInXlsx.join(', ')} ausentes.`);
+      return;
+    }
+
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Audit Log");
     XLSX.writeFile(workbook, `audit-log-${Date.now()}.xlsx`);
@@ -425,6 +465,21 @@ export default function CSVExportModal({ open, onOpenChange, logs, filterFallbac
                     onCheckedChange={(v) => setInternalFallbackFilter(!!v)}
                   />
                   <Label htmlFor="filter-fallback" className="text-[10px] font-medium cursor-pointer uppercase">Apenas Fallbacks</Label>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Label className="text-[10px] uppercase font-bold text-muted-foreground">RunID:</Label>
+                  <Select value={internalRunIdFilter} onValueChange={setInternalRunIdFilter}>
+                    <SelectTrigger className="h-6 w-32 text-[9px] bg-background/50">
+                      <SelectValue placeholder="Todos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Todos</SelectItem>
+                      {availableRunIds.map(rid => (
+                        <SelectItem key={rid} value={rid}>{rid}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className={cn(
