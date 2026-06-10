@@ -843,6 +843,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
         delete (window as any).__lastDecisionTrail;
         
         // Para chat no backend (DeepSeek ou Fallback)
+        const runId = `run_${crypto.randomUUID().slice(0, 8)}`;
         setSessionHistory(prev => [{
           id: crypto.randomUUID(),
           timestamp: new Date().toLocaleTimeString(),
@@ -851,6 +852,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
           output_text: typeof data === 'string' ? data : (data?.output || "Processado com sucesso"),
           metadata: { 
             ...metadata, 
+            run_id: runId,
             model: body.model, 
             provider: "backend",
             duration: `${duration}s`,
