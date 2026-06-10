@@ -1,28 +1,32 @@
 import { motion } from "framer-motion";
-import { Plug, ArrowRight, Zap, Database, CreditCard, Bot } from "lucide-react";
+import { Plug, ArrowRight, Zap, Database, CreditCard, Bot, Server, Globe, Code } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 
-const connectors = [
+const connectorCategories = [
   {
-    icon: <Bot className="h-5 w-5" />,
-    label: "IA & Automação",
-    description: "OpenAI, Anthropic, Make, Zapier",
+    title: "IA & Automação",
+    icon: Bot,
+    accent: "from-primary/20 to-accent",
+    items: ["OpenAI", "Claude", "Gemini", "DeepSeek"],
   },
   {
-    icon: <CreditCard className="h-5 w-5" />,
-    label: "Pagamentos",
-    description: "Stripe, Mercado Pago, PagSeguro",
+    title: "Pagamentos",
+    icon: CreditCard,
+    accent: "from-blue-900/30 to-indigo-900/20",
+    items: ["Stripe", "Mercado Pago", "PayPal", "Pix"],
   },
   {
-    icon: <Database className="h-5 w-5" />,
-    label: "Banco de dados",
-    description: "Supabase, Firebase, Airtable",
+    title: "Banco de Dados",
+    icon: Database,
+    accent: "from-violet-900/30 to-purple-900/20",
+    items: ["Supabase", "PostgreSQL", "Firebase", "MongoDB"],
   },
   {
-    icon: <Zap className="h-5 w-5" />,
-    label: "Sua própria API",
-    description: "Qualquer endpoint REST ou GraphQL",
+    title: "Sua API",
+    icon: Code,
+    accent: "from-emerald-900/30 to-teal-900/20",
+    items: ["REST", "GraphQL", "Webhooks", "APIs Proprietárias"],
   },
 ];
 
@@ -30,62 +34,75 @@ const ConnectorSection = () => {
   const navigate = useNavigate();
 
   return (
-    <motion.section
-      initial={{ opacity: 0, y: 32 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.5 }}
-      className="py-24 px-6 bg-muted/30"
-    >
-      <div className="max-w-4xl mx-auto">
-        {/* Eyebrow */}
-        <p className="text-center text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-4">
-          Conectores e integrações
-        </p>
+    <section className="py-24 px-6 relative overflow-hidden">
+      <div className="absolute inset-0 dot-pattern opacity-30 pointer-events-none" />
+      
+      <div className="max-w-6xl mx-auto relative z-10">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="text-center mb-16"
+        >
+          <span className="text-xs font-medium text-primary uppercase tracking-widest mb-3 block">Integrações Ilimitadas</span>
+          <h2 className="text-3xl md:text-4xl font-display font-bold text-foreground">
+            Conecte qualquer tecnologia
+          </h2>
+          <p className="text-muted-foreground mt-4 max-w-2xl mx-auto">
+            IA, pagamentos, bancos de dados e APIs externas integradas ao seu aplicativo em poucos segundos.
+          </p>
+        </motion.div>
 
-        {/* Heading */}
-        <h2 className="text-center text-3xl md:text-4xl font-display font-bold text-foreground mb-4">
-          Seu app, seus dados, suas regras
-        </h2>
-        <p className="text-center text-muted-foreground max-w-xl mx-auto mb-12">
-          Conecte qualquer serviço ao seu app em poucos cliques — sem escrever
-          uma linha de código de integração.
-        </p>
-
-        {/* Connector grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10">
-          {connectors.map((c) => (
-            <div
-              key={c.label}
-              className="flex items-start gap-4 rounded-2xl border border-border bg-card p-6 hover:border-primary/50 transition-colors"
-            >
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 text-primary">
-                {c.icon}
-              </div>
-              <div>
-                <p className="font-semibold text-foreground text-sm mb-0.5">
-                  {c.label}
-                </p>
-                <p className="text-xs text-muted-foreground">{c.description}</p>
-              </div>
-            </div>
-          ))}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
+          {connectorCategories.map((category, index) => {
+            const Icon = category.icon;
+            return (
+              <motion.div
+                key={category.title}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: index * 0.1 }}
+                whileHover={{ y: -5 }}
+                className="group relative h-full"
+              >
+                <div className="p-6 rounded-2xl border border-border bg-card/50 backdrop-blur-sm hover:shadow-gold transition-all duration-300 h-full flex flex-col hover:border-primary/30">
+                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${category.accent} flex items-center justify-center mb-6 group-hover:scale-110 transition-transform`}>
+                    <Icon className="h-6 w-6 text-foreground" />
+                  </div>
+                  <h3 className="text-lg font-display font-semibold text-foreground mb-4">{category.title}</h3>
+                  <ul className="space-y-3 flex-grow">
+                    {category.items.map((item) => (
+                      <li key={item} className="flex items-center text-sm text-muted-foreground">
+                        <div className="w-1.5 h-1.5 rounded-full bg-primary/40 mr-2" />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </motion.div>
+            );
+          })}
         </div>
 
-        {/* CTA */}
-        <div className="flex justify-center">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="flex justify-center"
+        >
           <Button
             size="lg"
             onClick={() => navigate("/builder")}
-            className="gap-2 rounded-xl px-8"
+            className="gap-2 rounded-xl px-10 h-14 text-base font-semibold group shadow-lg hover:shadow-primary/20 transition-all"
           >
-            <Plug className="h-4 w-4" />
+            <Plug className="h-5 w-5 group-hover:rotate-12 transition-transform" />
             Adicionar conector ao meu app
-            <ArrowRight className="h-4 w-4" />
+            <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
           </Button>
-        </div>
+        </motion.div>
       </div>
-    </motion.section>
+    </section>
   );
 };
 
