@@ -199,6 +199,10 @@ export default function CSVExportModal({ open, onOpenChange, logs }: CSVExportMo
     const rows = logs.slice(0, previewLimit).map(log => {
       return activeCols.map(colId => {
         if (colId === 'iso') return formatDate(log.ts);
+        if (colId === 'model') return (log as any).metadata?.model || '';
+        if (colId === 'credits') return (log as any).metadata?.credits || 0;
+        if (colId === 'duration_msg') return (log as any).metadata?.duration || '';
+        if (colId === 'status_final') return (log as any).status || '';
         return (log as any)[colId] ?? '';
       });
     });
@@ -223,6 +227,10 @@ export default function CSVExportModal({ open, onOpenChange, logs }: CSVExportMo
       return activeCols.map(colId => {
         let val = (log as any)[colId] ?? '';
         if (colId === 'iso') val = formatDate(log.ts);
+        if (colId === 'model') val = (log as any).metadata?.model || '';
+        if (colId === 'credits') val = (log as any).metadata?.credits || 0;
+        if (colId === 'duration_msg') val = (log as any).metadata?.duration || '';
+        if (colId === 'status_final') val = (log as any).status || '';
         return csvEscape(val);
       }).join(',');
     });
