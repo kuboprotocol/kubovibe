@@ -80,20 +80,19 @@ export async function deductCredits(
 ): Promise<{ ok: true; replayed?: boolean } | { ok: false; error: string; status?: number }> {
   if (amount <= 0) return { ok: true };
   // Admin bypass (rate limit + credits)
-  const admin = supaAdmin();
-  const { data: isAdmin } = await admin.rpc("is_admin", { p_user_id: userId });
-  if (isAdmin) return { ok: true };
+  const adminClient = supaAdmin();
+  const { data: adminData } = await adminClient.rpc("is_admin", { p_user_id: userId });
+  if (adminData) return { ok: true };
 
   // Per-tool rate limit (20 req/min)
   const rl = await enforceRateLimit(userId, reason, { max: 20, windowSeconds: 60, userEmail });
   if (!rl.ok) return { ok: false, error: rl.error, status: 429 };
 
-
-  const admin = supaAdmin();
   const idem = idempotencyKey && idempotencyKey.length > 0
     ? idempotencyKey
     : `${reason}-${userId}-${Date.now()}-${crypto.randomUUID()}`;
-  const { data, error } = await admin.rpc("execute_atomic_credit_deduction", {
+    
+  const { data, error } = await adminClient.rpc("execute_atomic_credit_deduction", {
     _user_id: userId,
     _amount: amount,
     _reason: reason,
@@ -101,8 +100,17 @@ export async function deductCredits(
     _metadata: metadata,
     _idempotency_key: idem,
   });
-  if (error) return { ok: false, error: error.message };
-  if (!(data as any)?.success) return { ok: false, error: "deduction_failed" };
+  
+  if (error) {
+    console.error("[deductCredits] RPC error:", error);
+    return { ok: false, error: error.message };
+  }
+  
+  if (!(data as any)?.success) {
+    console.warn("[deductCredits] deduction failed (insufficient funds?)", data);
+    return { ok: false, error: "deduction_failed" };
+  }
+  
   return { ok: true, replayed: !!(data as any)?.replayed };
 }
 
