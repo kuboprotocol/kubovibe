@@ -543,8 +543,11 @@ export default function CSVExportModal({ open, onOpenChange, logs, filterFallbac
             {filteredLogs.length} registros prontos para exportação
           </div>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button variant="outline" onClick={handleDownloadXLSX} disabled={filteredLogs.length === 0 || selectedColumns.size === 0}>
+            <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel (.XLSX)
+          </Button>
           <Button onClick={handleDownload} disabled={filteredLogs.length === 0 || selectedColumns.size === 0}>
-            <Download className="h-4 w-4 mr-2" /> Confirmar Download CSV
+            <Download className="h-4 w-4 mr-2" /> CSV (.CSV)
           </Button>
         </DialogFooter>
       </DialogContent>
