@@ -441,35 +441,64 @@ export function SkillExecutionsList() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Settings2 className="h-5 w-5 text-primary" />
-              Configurar Exportação CSV
+              Configurar Exportação
             </DialogTitle>
             <DialogDescription>
-              Selecione as colunas que deseja incluir no arquivo.
+              Selecione o formato e as colunas desejadas.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-4 py-4">
-            {availableColumns.map((col) => (
-              <div key={col.id} className="flex items-center space-x-2">
-                <Checkbox 
-                  id={`col-${col.id}`} 
-                  checked={selectedColumns.includes(col.id)}
-                  onCheckedChange={(checked) => {
-                    if (checked) {
-                      setSelectedColumns(prev => [...prev, col.id]);
-                    } else {
-                      setSelectedColumns(prev => prev.filter(id => id !== col.id));
-                    }
-                  }}
-                />
-                <label 
-                  htmlFor={`col-${col.id}`}
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+
+          <div className="py-4 space-y-6">
+            <div className="space-y-3">
+              <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Formato do Arquivo</label>
+              <div className="flex gap-4">
+                <Button 
+                  variant={exportFormat === "csv" ? "default" : "outline"} 
+                  size="sm" 
+                  className="flex-1"
+                  onClick={() => setExportFormat("csv")}
                 >
-                  {col.label}
-                </label>
+                  <FileDown className="h-4 w-4 mr-2" /> CSV
+                </Button>
+                <Button 
+                  variant={exportFormat === "xlsx" ? "default" : "outline"} 
+                  size="sm" 
+                  className="flex-1"
+                  onClick={() => setExportFormat("xlsx")}
+                >
+                  <FileSpreadsheet className="h-4 w-4 mr-2" /> XLSX (Excel)
+                </Button>
               </div>
-            ))}
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Colunas</label>
+              <div className="grid grid-cols-2 gap-4">
+                {availableColumns.map((col) => (
+                  <div key={col.id} className="flex items-center space-x-2">
+                    <Checkbox 
+                      id={`col-${col.id}`} 
+                      checked={selectedColumns.includes(col.id)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedColumns(prev => [...prev, col.id]);
+                        } else {
+                          setSelectedColumns(prev => prev.filter(id => id !== col.id));
+                        }
+                      }}
+                    />
+                    <label 
+                      htmlFor={`col-${col.id}`}
+                      className="text-sm font-medium leading-none cursor-pointer"
+                    >
+                      {col.label}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
+
           <DialogFooter className="sm:justify-between gap-4">
             <Button
               variant="ghost"
