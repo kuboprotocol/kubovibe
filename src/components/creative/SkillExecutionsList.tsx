@@ -278,32 +278,87 @@ export function SkillExecutionsList() {
 
     try {
       const text = await file.text();
-      const imported = JSON.parse(text);
+      let imported;
+      try {
+        imported = JSON.parse(text);
+      } catch (e) {
+        toast.error("Arquivo JSON inválido.");
+        return;
+      }
       
-      if (!Array.isArray(imported)) throw new Error("Formato inválido");
+      if (!Array.isArray(imported)) {
+        toast.error("O arquivo deve conter uma lista (array) de presets.");
+        return;
+      }
 
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error("Usuário não autenticado");
 
-      // Insert each valid preset
+      let acceptedCount = 0;
+      let rejectedCount = 0;
+
       for (const p of imported) {
-        if (p.name && p.filters) {
-          await supabase.from("filter_presets").insert({
-            user_id: userData.user.id,
-            name: `${p.name} (Importado)`,
-            filters: p.filters,
-            sorting: p.sorting || { column: "created_at", direction: "desc" }
-          });
+        const isValid = p && typeof p === 'object' && p.name && p.filters;
+        
+        if (isValid) {
+          try {
+            await supabase.from("filter_presets").insert({
+              user_id: userData.user.id,
+              name: `${p.name} (Importado)`,
+              filters: p.filters,
+              sorting: p.sorting || { column: "created_at", direction: "desc" }
+            });
+            acceptedCount++;
+          } catch (err) {
+            rejectedCount++;
+          }
+        } else {
+          rejectedCount++;
         }
       }
       
       await loadPresets();
-      toast.success("Presets importados com sucesso!");
+      
+      if (acceptedCount > 0 && rejectedCount === 0) {
+        toast.success(`${acceptedCount} presets importados com sucesso!`);
+      } else if (acceptedCount > 0) {
+        toast.warning(`${acceptedCount} presets importados, ${rejectedCount} ignorados por formato inválido.`);
+      } else {
+        toast.error("Nenhum preset válido encontrado para importar.");
+      }
     } catch (error) {
       console.error("Error importing presets:", error);
-      toast.error("Erro ao importar arquivo JSON.");
+      toast.error("Falha ao processar arquivo.");
     }
     e.target.value = "";
+  };
+
+  const downloadTemplate = () => {
+    const template = [
+      {
+        name: "Busca de Sucesso",
+        filters: {
+          search: "",
+          statusFilter: "succeeded",
+          skillFilter: "all",
+          dateStart: "",
+          dateEnd: ""
+        },
+        sorting: {
+          column: "created_at",
+          direction: "desc"
+        }
+      }
+    ];
+    const data = JSON.stringify(template, null, 2);
+    const blob = new Blob([data], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `template_presets.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.info("Template de importação baixado.");
   };
 
   const filteredPresets = useMemo(() => {
