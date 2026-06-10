@@ -1329,6 +1329,11 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
               }}
             >
               <FileText className="h-3.5 w-3.5" /> Exportar Auditoria da Sessão (CSV)
+              {sessionHistory.length > 0 && (
+                <Badge variant="secondary" className="ml-auto text-[8px] h-4 bg-emerald-500/10 text-emerald-600 border-emerald-500/20">
+                  {sessionHistory.length} Registros
+                </Badge>
+              )}
             </Button>
 
             {sessionHistory.length > 0 && (
