@@ -166,6 +166,8 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
   const [latencyLimit, setLatencyLimit] = useState(() => Number(localStorage.getItem("creative_latency_limit")) || 5);
   const [fallbackRateLimit, setFallbackRateLimit] = useState(() => Number(localStorage.getItem("creative_fallback_limit")) || 30);
   const [isBatchReprocessing, setIsBatchReprocessing] = useState(false);
+  const [reprocessResults, setReprocessResults] = useState<any[]>([]);
+  const [showComparison, setShowComparison] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [lastResult, setLastResult] = useState<any>(null);
   const [sessionHistory, setSessionHistory] = useState<{ id: string; timestamp: string; prompt: string; status: "success" | "error"; assetUrl?: string; output_text?: string; metadata?: any; logs?: AvatarStepState[] }[]>(() => {
