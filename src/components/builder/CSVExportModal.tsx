@@ -81,6 +81,7 @@ const ALL_COLUMNS = [
   { id: 'duration', label: 'Duração Total (ms)' },
   { id: 'stack', label: 'Stack Trace' },
   { id: 'trail', label: 'Trilha de Decisão/Motivo' },
+  { id: 'run_id', label: 'ID de Execução (RunID)' },
 ];
 
 const LS_KEY_COLS = 'kubo:audit:export:columns';
