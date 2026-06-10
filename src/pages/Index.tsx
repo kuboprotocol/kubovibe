@@ -2,9 +2,9 @@ import Navbar from "@/components/landing/Navbar";
 import HeroSection from "@/components/landing/HeroSection";
 import CommunitySection from "@/components/landing/CommunitySection";
 import HowItWorksSection from "@/components/landing/HowItWorksSection";
+import FAQSection from "@/components/landing/FAQSection";
 import DomainSection from "@/components/landing/DomainSection";
 import ConnectorSection from "@/components/landing/ConnectorSection";
-import FAQSection from "@/components/landing/FAQSection";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -28,12 +28,14 @@ const Index = () => {
         {/* Gold divider */}
         <div className="max-w-xl mx-auto gold-line" aria-hidden="true" />
 
-        <DomainSection />
+        {/* Conectores — instiga a ligar APIs e serviços */}
+        <ConnectorSection />
 
         {/* Gold divider */}
         <div className="max-w-xl mx-auto gold-line" aria-hidden="true" />
 
-        <ConnectorSection />
+        {/* Domínio — instiga comprar ou transferir via Ionos */}
+        <DomainSection />
 
         {/* Gold divider */}
         <div className="max-w-xl mx-auto gold-line" aria-hidden="true" />
@@ -52,7 +54,8 @@ const Index = () => {
                 Pronto para construir algo incrível?
               </h1>
               <p className="text-primary-foreground/70 mb-8 max-w-md mx-auto relative z-10">
-                Junte-se a milhares de criadores que lançam apps todos os dias com KUBO VIBE.
+                Junte-se a milhares de criadores que lançam apps todos os dias
+                com KUBO VIBE.
               </p>
               <Button
                 size="lg"
@@ -73,18 +76,52 @@ const Index = () => {
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col md:flex-row items-start justify-between gap-10 mb-10">
             <div className="space-y-3">
-              <p className="text-sm font-semibold text-foreground tracking-wide">KUBO VIBE</p>
+              <p className="text-sm font-semibold text-foreground tracking-wide">
+                KUBO VIBE
+              </p>
               <p className="text-xs text-muted-foreground leading-relaxed max-w-xs">
-                A product by KUBO PROTOCOL<br />
+                A product by KUBO PROTOCOL
+                <br />
                 CNPJ: 65.822.139/0001-66
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
-              <a href="/privacy" className="hover:text-foreground transition-colors">Privacy Policy</a>
-              <a href="/terms" className="hover:text-foreground transition-colors">Terms of Service</a>
-              <a href="https://x.com/KUBOPROTOCOL" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">Twitter</a>
-              <a href="https://t.me/+WoYG4tMTuJY5ZjNh" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">Telegram</a>
-              <a href="https://github.com/kuboprotocol/kubovibe" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">GitHub</a>
+              <a
+                href="/privacy"
+                className="hover:text-foreground transition-colors"
+              >
+                Privacy Policy
+              </a>
+              <a
+                href="/terms"
+                className="hover:text-foreground transition-colors"
+              >
+                Terms of Service
+              </a>
+              <a
+                href="https://x.com/KUBOPROTOCOL"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-foreground transition-colors"
+              >
+                Twitter
+              </a>
+              <a
+                href="https://t.me/+WoYG4tMTuJY5ZjNh"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-foreground transition-colors"
+              >
+                Telegram
+              </a>
+              <a
+                href="https://github.com/kuboprotocol/kubovibe"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-foreground transition-colors"
+              >
+                GitHub
+              </a>
             </div>
           </div>
           <div className="border-t border-border pt-6">
