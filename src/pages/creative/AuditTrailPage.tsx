@@ -562,7 +562,7 @@ export default function CreativeAuditPage() {
     URL.revokeObjectURL(url);
     
     setIsExportModalOpen(false);
-    toast.success(`CSV exportado com ${entries.length} registros.`);
+    toast.success(`CSV exportado com ${entries.length} registros. Suas configurações foram salvas.`);
   };
 
   return (
@@ -1233,10 +1233,10 @@ export default function CreativeAuditPage() {
                 <h4 className="text-sm font-semibold">Selecione as Colunas</h4>
                 <div className="flex gap-2">
                   <Button variant="ghost" size="sm" className="h-7 text-[10px]" onClick={selectAllColumns}>
-                    <Check className="h-3 w-3 mr-1" /> Selecionar Tudo
+                    <ListChecks className="h-3 w-3 mr-1" /> Selecionar Tudo
                   </Button>
                   <Button variant="ghost" size="sm" className="h-7 text-[10px]" onClick={clearColumns}>
-                    <X className="h-3 w-3 mr-1" /> Limpar
+                    <X className="h-3 w-3 mr-1" /> Limpar Seleção
                   </Button>
                 </div>
               </div>
@@ -1281,7 +1281,7 @@ export default function CreativeAuditPage() {
             {selectedColumns.length > 0 && entries.length > 0 && (
               <div className="space-y-3">
                 <h4 className="text-sm font-semibold flex items-center gap-2">
-                  <ListChecks className="h-4 w-4" /> Pré-visualização (Primeiras 3 linhas)
+                  <ListChecks className="h-4 w-4" /> Pré-visualização (Primeiras 10 linhas)
                 </h4>
                 <div className="border rounded-md overflow-x-auto">
                   <table className="w-full text-[10px] border-collapse">
@@ -1295,7 +1295,7 @@ export default function CreativeAuditPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {entries.slice(0, 3).map((e, idx) => (
+                      {entries.slice(0, 10).map((e, idx) => (
                         <tr key={idx}>
                           {selectedColumns.map(colId => {
                             let val = "";
