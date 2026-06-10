@@ -16,13 +16,14 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import {
   MessageSquare, Image as ImageIcon, Download, Scissors, User2,
   Video, Music, BookOpen, Sparkles, Loader2, Coins, ArrowLeft, RotateCw, AlertTriangle, Upload,
-  FileDown, History, Check, Search, ArrowRight, Settings2, X, AlertCircle
+  FileDown, History, Check, Search, ArrowRight, Settings2, X, AlertCircle, ListTodo
 } from "lucide-react";
 import { useDebounce } from "@/hooks/use-debounce";
 import { ManusLauncher } from "@/components/creative/ManusLauncher";
 import { CreativeToolInterface } from "@/components/creative/CreativeToolInterface";
+import { SkillExecutionsList } from "@/components/creative/SkillExecutionsList";
 
-type ToolKey = "dashboard" | "chat" | "nano_banana" | "downloader" | "clips" | "avatar" | "shorts" | "music" | "ebook" | "emo";
+type ToolKey = "dashboard" | "chat" | "nano_banana" | "downloader" | "clips" | "avatar" | "shorts" | "music" | "ebook" | "emo" | "unified_history";
 
 const TOOLS: { key: ToolKey; title: string; desc: string; icon: any; cost: string }[] = [
   { key: "chat", title: "Kubo Chat", desc: "Conversas, resumos, traduções, geração de textos", icon: MessageSquare, cost: "1 crédito/msg" },
