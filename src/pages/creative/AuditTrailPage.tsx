@@ -11,8 +11,26 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { 
   ArrowLeft, Search, FileDown, ArrowUpDown, Loader2, X, Filter, 
   AlertTriangle, Save, History, ChevronRight, Info, AlertCircle, Share2, TrendingUp, Clock,
-  Layers, Copy, ArrowLeftRight, Check, ListChecks
+  Layers, Copy, ArrowLeftRight, Check, ListChecks, GripVertical, AlertOctagon
 } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { restrictToVerticalAxis, restrictToFirstScrollableAncestor } from "@dnd-kit/modifiers";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
