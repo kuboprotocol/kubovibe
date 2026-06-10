@@ -92,6 +92,12 @@ interface AuditLog {
   attachmentName: string;
   reason: string;
   status: "success" | "denied" | "info";
+  exportParams?: {
+    range?: { start: number; end: number };
+    filters?: string;
+    total?: number;
+    columns?: string[];
+  };
 }
 
 
