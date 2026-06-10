@@ -1233,10 +1233,10 @@ export default function CreativeAuditPage() {
                 <h4 className="text-sm font-semibold">Selecione as Colunas</h4>
                 <div className="flex gap-2">
                   <Button variant="ghost" size="sm" className="h-7 text-[10px]" onClick={selectAllColumns}>
-                    <Check className="h-3 w-3 mr-1" /> Selecionar Tudo
+                    <ListChecks className="h-3 w-3 mr-1" /> Selecionar Tudo
                   </Button>
                   <Button variant="ghost" size="sm" className="h-7 text-[10px]" onClick={clearColumns}>
-                    <X className="h-3 w-3 mr-1" /> Limpar
+                    <X className="h-3 w-3 mr-1" /> Limpar Seleção
                   </Button>
                 </div>
               </div>
