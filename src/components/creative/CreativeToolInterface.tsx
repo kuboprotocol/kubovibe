@@ -129,6 +129,8 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
   );
   const [loading, setLoading] = useState(false);
   const [kimiModel, setKimiModel] = useState<string>("moonshotai/kimi-k2.6");
+  const [temperature, setTemperature] = useState(0.7);
+  const [maxTokens, setMaxTokens] = useState(2000);
   const [streamingContent, setStreamingContent] = useState("");
   const [traceInfo, setTraceInfo] = useState<{ correlationId?: string; traceId?: string } | null>(null);
   const [errorState, setErrorState] = useState<{ message: string; correlationId?: string; traceId?: string; stack?: string } | null>(null);
@@ -136,7 +138,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
   const [simulationMode, setSimulationMode] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [lastResult, setLastResult] = useState<any>(null);
-  const [sessionHistory, setSessionHistory] = useState<{ id: string; timestamp: string; prompt: string; status: "success" | "error"; assetUrl?: string; metadata?: any; logs?: AvatarStepState[] }[]>(() => {
+  const [sessionHistory, setSessionHistory] = useState<{ id: string; timestamp: string; prompt: string; status: "success" | "error"; assetUrl?: string; output_text?: string; metadata?: any; logs?: AvatarStepState[] }[]>(() => {
     const saved = localStorage.getItem(`creative_history_${toolKey}`);
     return saved ? JSON.parse(saved) : [];
   });
@@ -186,10 +188,10 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
   const renderModelSelector = () => {
     if (toolKey !== "chat") return null;
     return (
-      <div className="flex flex-col gap-2 mb-4 p-3 bg-muted/20 rounded-xl border border-border/40">
+      <div className="flex flex-col gap-3 mb-4 p-3 bg-muted/20 rounded-xl border border-border/40">
         <div className="flex items-center justify-between">
           <Label className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-2">
-            <Brain className="h-3 w-3" /> Orquestrador de IA
+            <Brain className="h-3 w-3" /> Orquestrador de IA (Kimi + DeepSeek)
           </Label>
           <div className="flex items-center gap-2">
              <span className="text-[9px] font-bold text-primary flex items-center gap-1">
@@ -205,25 +207,57 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
           </div>
         </div>
         
-        <Select 
-          value={kimiModel} 
-          onValueChange={(v) => {
-            setKimiModel(v);
-            if (autoDetectMode) setAutoDetectMode(false);
-          }}
-        >
-          <SelectTrigger className="h-8 text-xs bg-background/50">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="moonshotai/kimi-k2.6">Kimi K2.6 (Nível 1 - Rápido)</SelectItem>
-            <SelectItem value="moonshotai/kimi-k2.5">Kimi K2.5 (Estável)</SelectItem>
-            <SelectItem value="moonshotai/kimi-k2-thinking">Kimi Thinking (Nível 2 - Análise)</SelectItem>
-            <SelectItem value="deepseek-chat">DeepSeek V3 (Nível 3 - Produção)</SelectItem>
-          </SelectContent>
-        </Select>
-        <p className="text-[9px] text-muted-foreground italic">
-          {kimiModel.includes('kimi') ? "Utilizando Puter.js para economia de créditos." : "Processamento avançado via OpenRouter (Custo: 1 crédito)."}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label className="text-[10px] uppercase opacity-60">Modelo</Label>
+            <Select 
+              value={kimiModel} 
+              onValueChange={(v) => {
+                setKimiModel(v);
+                if (autoDetectMode) setAutoDetectMode(false);
+              }}
+            >
+              <SelectTrigger className="h-8 text-xs bg-background/50">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="moonshotai/kimi-k2.6">Kimi K2.6 (Nível 1 - Rápido)</SelectItem>
+                <SelectItem value="moonshotai/kimi-k2-0905">Kimi K2-0905 (Legado)</SelectItem>
+                <SelectItem value="moonshotai/kimi-k2-thinking">Kimi Thinking (Nível 2 - Análise)</SelectItem>
+                <SelectItem value="moonshotai/kimi-k2.5">Kimi K2.5 (Estável)</SelectItem>
+                <SelectItem value="moonshotai/kimi-k2">Kimi K2 (Básico)</SelectItem>
+                <SelectItem value="deepseek-chat">DeepSeek V3 (Nível 3 - Produção)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1.5">
+              <Label className="text-[10px] uppercase opacity-60">Temp: {temperature}</Label>
+              <Slider 
+                value={[temperature]} 
+                min={0} max={1} step={0.1} 
+                onValueChange={(v) => setTemperature(v[0])}
+                className="py-2"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[10px] uppercase opacity-60">Tokens: {maxTokens}</Label>
+              <Input 
+                type="number" 
+                value={maxTokens} 
+                onChange={(e) => setMaxTokens(Number(e.target.value))}
+                className="h-8 text-[10px] bg-background/50"
+              />
+            </div>
+          </div>
+        </div>
+
+        <p className="text-[9px] text-muted-foreground italic flex items-center gap-1">
+          <Info className="h-2.5 w-2.5" />
+          {kimiModel.includes('kimi') 
+            ? "Utilizando Puter.js para economia de créditos. Streaming ativo." 
+            : "Processamento via Nível 3 (Custo: 1 crédito). Melhor para código."}
         </p>
       </div>
     );
@@ -595,9 +629,13 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     if (toolKey === "chat" && kimiModel.includes("kimi")) {
       setLoading(true);
       setStreamingContent("");
+      const startTime = Date.now();
+      
       try {
         const resp = await puter.ai.chat(prompt, { 
           model: kimiModel,
+          temperature: temperature,
+          max_tokens: maxTokens,
           stream: true 
         });
 
@@ -609,6 +647,9 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
           }
         }
 
+        const endTime = Date.now();
+        const duration = ((endTime - startTime) / 1000).toFixed(2);
+
         // Salva o resultado no histórico da sessão
         const resultId = crypto.randomUUID();
         const newEntry = {
@@ -617,21 +658,27 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
           prompt,
           status: "success" as const,
           output_text: fullText,
-          metadata: { model: kimiModel, provider: "puter" }
+          metadata: { 
+            model: kimiModel, 
+            provider: "puter",
+            duration: `${duration}s`,
+            credits: 0,
+            temperature,
+            max_tokens: maxTokens
+          }
         };
         
         setSessionHistory(prev => [newEntry, ...prev].slice(0, 50));
         toast.success("Kimi respondeu!");
-        
-        // Registro em background no backend (opcional, para auditoria sem custo de crédito se possível)
-        // Por enquanto mantemos apenas local para máxima economia conforme pedido
+        setPrompt("");
+        return; // Sucesso com Kimi
         
       } catch (err: any) {
-        toast.error("Erro no Kimi: " + err.message);
-      } finally {
-        setLoading(false);
+        console.warn("Kimi falhou via Puter, tentando fallback para Nível 3 (DeepSeek)...", err);
+        toast.info("Kimi indisponível. Acionando fallback DeepSeek (Nível 3)...");
+        // Fallback para o fluxo padrão (DeepSeek no backend)
+        // O código continuará para o handleExecute normal abaixo
       }
-      return;
     }
 
     const cost = config.cost;
@@ -683,7 +730,12 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       const executionStartTime = new Date().toISOString();
       
       const body: any = { prompt, metadata };
-      if (toolKey === "chat") body.messages = [{ role: "user", content: prompt }];
+      if (toolKey === "chat") {
+        body.messages = [{ role: "user", content: prompt }];
+        body.model = kimiModel === "deepseek-chat" ? "deepseek/deepseek-chat" : kimiModel;
+        body.temperature = temperature;
+        body.max_tokens = maxTokens;
+      }
       if (toolKey === "avatar") {
         body.mode = "avatar";
         body.metadata = { ...metadata, source_image: uploadedImageUrl };
@@ -716,15 +768,38 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
         throw new Error(data.error || "Erro na execução");
       }
 
-      setSessionHistory(prev => [{
-        id: crypto.randomUUID(),
-        timestamp: new Date().toLocaleTimeString(),
-        prompt,
-        status: "success",
-        assetUrl: data?.asset_url,
-        metadata: { ...metadata, uploadedImageUrl },
-        logs: progressSteps // Capture current logs
-      }, ...prev]);
+      const endTime = Date.now();
+      const duration = ((endTime - new Date(executionStartTime).getTime()) / 1000).toFixed(2);
+
+      if (toolKey === "chat") {
+        // Para chat no backend (DeepSeek ou Fallback)
+        setSessionHistory(prev => [{
+          id: crypto.randomUUID(),
+          timestamp: new Date().toLocaleTimeString(),
+          prompt,
+          status: "success",
+          output_text: typeof data === 'string' ? data : (data?.output || "Processado com sucesso"),
+          metadata: { 
+            ...metadata, 
+            model: body.model, 
+            provider: "backend",
+            duration: `${duration}s`,
+            credits: cost,
+            temperature,
+            max_tokens: maxTokens
+          }
+        }, ...prev]);
+      } else {
+        setSessionHistory(prev => [{
+          id: crypto.randomUUID(),
+          timestamp: new Date().toLocaleTimeString(),
+          prompt,
+          status: "success",
+          assetUrl: data?.asset_url,
+          metadata: { ...metadata, uploadedImageUrl, duration: `${duration}s`, credits: cost },
+          logs: progressSteps 
+        }, ...prev]);
+      }
 
       if (toolKey === "avatar") {
         updateStep("generate", "done", undefined, { 
@@ -1072,27 +1147,52 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                 .map((item) => (
                 <div key={item.id} className="flex flex-col p-2.5 rounded-lg bg-muted/20 border border-border/10 group hover:border-primary/20 transition-all">
                   <div className="flex items-start justify-between mb-1.5">
-                    <div className="flex flex-col gap-1">
+                    <div className="flex flex-col gap-1 flex-1">
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] font-mono opacity-50 bg-muted px-1.5 py-0.5 rounded">{item.timestamp}</span>
                         <Badge variant={item.status === "success" ? "secondary" : "destructive"} className="text-[8px] h-4 px-1.5 py-0 leading-none">
                           {item.status === "success" ? "Sucesso" : "Erro"}
                         </Badge>
+                        {item.metadata?.model && (
+                          <Badge variant="outline" className="text-[8px] h-4 px-1.5 py-0 leading-none border-primary/20 text-primary">
+                            {item.metadata.model}
+                          </Badge>
+                        )}
+                        {item.metadata?.duration && (
+                          <span className="text-[9px] opacity-60 flex items-center gap-1">
+                            <RotateCw className="h-2 w-2" /> {item.metadata.duration}
+                          </span>
+                        )}
+                        {item.metadata?.credits !== undefined && (
+                          <span className="text-[9px] font-bold text-amber-500 flex items-center gap-1">
+                            <Coins className="h-2 w-2" /> {item.metadata.credits} creds
+                          </span>
+                        )}
                       </div>
-                      <p className="text-[11px] font-medium leading-tight text-foreground/90 pr-4">{item.prompt || "(Sem texto)"}</p>
+                      <p className="text-[11px] font-medium leading-tight text-foreground/90 pr-4 mt-1">{item.prompt || "(Sem texto)"}</p>
+                      
+                      {item.output_text && (
+                        <div className="mt-2 p-2 bg-background/40 rounded border border-border/10 text-[10px] text-muted-foreground line-clamp-3 max-h-20 overflow-hidden">
+                          {item.output_text}
+                        </div>
+                      )}
                     </div>
                     <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                       <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-primary/10 hover:text-primary" onClick={() => {
                         setPrompt(item.prompt);
-                        if (item.metadata) setMetadata(item.metadata);
+                        if (item.metadata) {
+                          setMetadata(item.metadata);
+                          if (item.metadata.model) setKimiModel(item.metadata.model);
+                          if (item.metadata.temperature) setTemperature(item.metadata.temperature);
+                          if (item.metadata.max_tokens) setMaxTokens(item.metadata.max_tokens);
+                        }
                         toast.info("Parâmetros carregados!");
                       }} title="Carregar parâmetros">
                         <Settings2 className="h-3.5 w-3.5" />
                       </Button>
                       <Button variant="ghost" size="icon" className="h-7 w-7 text-primary hover:bg-primary/10" onClick={() => {
-                        setReexecuteItem(item);
-                        setStartAtStep("upload");
-                        setReexecuteDialogOpen(true);
+                        setPrompt(item.prompt);
+                        setTimeout(() => handleExecute(), 100);
                       }} title="Reexecutar">
                         <Play className="h-3.5 w-3.5" />
                       </Button>
@@ -1144,6 +1244,31 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                 </div>
               )}
             </div>
+            
+            {/* Resumo de Consumo */}
+            {sessionHistory.length > 0 && (
+              <div className="mt-4 p-3 bg-primary/5 rounded-xl border border-primary/10">
+                <h5 className="text-[10px] font-bold uppercase text-primary mb-2 flex items-center gap-2">
+                  <Sparkles className="h-3 w-3" /> Resumo de Consumo da Sessão
+                </h5>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex flex-col">
+                    <span className="text-[9px] text-muted-foreground uppercase">Total de Créditos</span>
+                    <span className="text-sm font-bold flex items-center gap-1.5">
+                      <Coins className="h-3.5 w-3.5 text-amber-500" />
+                      {sessionHistory.reduce((acc, item) => acc + (item.metadata?.credits || 0), 0)} creds
+                    </span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[9px] text-muted-foreground uppercase">Tempo Total</span>
+                    <span className="text-sm font-bold flex items-center gap-1.5">
+                      <RotateCw className="h-3.5 w-3.5 text-blue-500" />
+                      {sessionHistory.reduce((acc, item) => acc + (parseFloat(item.metadata?.duration) || 0), 0).toFixed(2)}s
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
