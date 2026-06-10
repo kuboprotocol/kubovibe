@@ -6,12 +6,24 @@ const COST = 5;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-  const user = await getUser(req.headers.get("Authorization"));
+  
+  const authHeader = req.headers.get("Authorization");
+  const user = await getUser(authHeader);
+  
+  console.log("[emo-animate] Início da requisição", { 
+    method: req.method, 
+    hasAuth: !!authHeader,
+    userId: user?.id 
+  });
+
   if (!user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
 
   const idempotencyKey = req.headers.get("X-Idempotency-Key") ?? undefined;
   try {
-    const { source_image: rawImg, driving_video: rawVid } = await req.json();
+    const body = await req.json().catch(() => ({}));
+    console.log("[emo-animate] Payload recebido:", body);
+    
+    const { source_image: rawImg, driving_video: rawVid } = body;
     if (!rawImg || !rawVid) throw new Error("Missing source_image or driving_video");
 
     const ded = await deductCredits(user.id, COST, "creative_emo", { rawImg, rawVid }, user.email, idempotencyKey);
