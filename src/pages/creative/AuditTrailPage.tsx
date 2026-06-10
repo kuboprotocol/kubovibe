@@ -1488,7 +1488,7 @@ export default function CreativeAuditPage() {
             <Button variant="outline" onClick={() => setIsExportModalOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleDownloadCSV} disabled={selectedColumns.length === 0}>
+            <Button onClick={handleDownloadCSV} disabled={selectedColumns.length === 0 || entries.length === 0}>
               Confirmar e Baixar CSV
             </Button>
           </DialogFooter>
