@@ -1258,9 +1258,28 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                       <Button variant="ghost" size="icon" className="h-7 w-7 text-primary hover:bg-primary/10" onClick={() => {
                         setPrompt(item.prompt);
                         setTimeout(() => handleExecute(), 100);
-                      }} title="Reexecutar">
+                      }} title="Reexecutar (Normal)">
                         <Play className="h-3.5 w-3.5" />
                       </Button>
+                      {toolKey === "chat" && (
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-7 w-7 text-amber-500 hover:bg-amber-500/10" 
+                          onClick={() => {
+                            setSimulationMode(true);
+                            setPrompt(item.prompt);
+                            setTimeout(() => {
+                              handleExecute();
+                              // Reset mode after a delay so next manual click isn't forced failure
+                              setTimeout(() => setSimulationMode(false), 2000);
+                            }, 100);
+                          }} 
+                          title="Reexecutar com Simulação de Falha"
+                        >
+                          <AlertCircle className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
                       <Popover>
                         <PopoverTrigger asChild>
                           <Button variant="ghost" size="icon" className="h-7 w-7">
@@ -1274,6 +1293,31 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                           </Button>
                           <Button variant="ghost" size="sm" className="w-full justify-start text-[10px] h-8" onClick={() => exportLogs("json", item.logs)}>
                             <FileCode className="h-3 w-3 mr-2" /> .JSON (Logs)
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="w-full justify-start text-[10px] h-8 text-primary" 
+                            onClick={() => {
+                              const auditData = {
+                                session_item: item,
+                                decision_trail: item.metadata?.decision_trail || [],
+                                model_path: item.metadata?.model || "unknown",
+                                credits_consumed: item.metadata?.credits || 0,
+                                duration: item.metadata?.duration || "0s",
+                                timestamp: item.timestamp,
+                                exported_at: new Date().toISOString()
+                              };
+                              const blob = new Blob([JSON.stringify(auditData, null, 2)], { type: 'application/json' });
+                              const url = URL.createObjectURL(blob);
+                              const link = document.createElement('a');
+                              link.href = url;
+                              link.download = `audit-trail-${item.id}.json`;
+                              link.click();
+                              toast.success("JSON de auditoria exportado!");
+                            }}
+                          >
+                            <Brain className="h-3 w-3 mr-2" /> .JSON (Auditoria Full)
                           </Button>
                         </PopoverContent>
                       </Popover>
@@ -1403,24 +1447,42 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
             <div className="grid grid-cols-3 gap-3">
               <div className="bg-emerald-500/5 border border-emerald-500/10 p-2 rounded-lg flex flex-col items-center justify-center">
                 <span className="text-[9px] text-muted-foreground uppercase mb-0.5">Latência Média</span>
-                <span className="text-sm font-bold text-emerald-600">
+                <span className={cn(
+                  "text-sm font-bold",
+                  (sessionHistory.filter(h => h.metadata?.model?.includes('kimi') && h.status === 'success').reduce((acc, h) => acc + (parseFloat(h.metadata?.duration) || 0), 0) / (sessionHistory.filter(h => h.metadata?.model?.includes('kimi') && h.status === 'success').length || 1)) > 5 ? "text-red-500 animate-pulse" : "text-emerald-600"
+                )}>
                   {(sessionHistory
                     .filter(h => h.metadata?.model?.includes('kimi') && h.status === 'success')
                     .reduce((acc, h) => acc + (parseFloat(h.metadata?.duration) || 0), 0) / 
                     (sessionHistory.filter(h => h.metadata?.model?.includes('kimi') && h.status === 'success').length || 1)).toFixed(2)}s
                 </span>
+                {(sessionHistory.filter(h => h.metadata?.model?.includes('kimi') && h.status === 'success').reduce((acc, h) => acc + (parseFloat(h.metadata?.duration) || 0), 0) / (sessionHistory.filter(h => h.metadata?.model?.includes('kimi') && h.status === 'success').length || 1)) > 5 && (
+                  <span className="text-[7px] text-red-500 font-bold uppercase">Latência Alta!</span>
+                )}
               </div>
               <div className="bg-amber-500/5 border border-amber-500/10 p-2 rounded-lg flex flex-col items-center justify-center">
                 <span className="text-[9px] text-muted-foreground uppercase mb-0.5">Taxa de Fallback</span>
-                <span className="text-sm font-bold text-amber-600">
+                <span className={cn(
+                  "text-sm font-bold",
+                  (sessionHistory.filter(h => h.metadata?.status === 'fallback_success').length / (sessionHistory.length || 1)) > 0.3 ? "text-red-500 animate-pulse" : "text-amber-600"
+                )}>
                   {((sessionHistory.filter(h => h.metadata?.status === 'fallback_success').length / (sessionHistory.length || 1)) * 100).toFixed(0)}%
                 </span>
+                {(sessionHistory.filter(h => h.metadata?.status === 'fallback_success').length / (sessionHistory.length || 1)) > 0.3 && (
+                  <span className="text-[7px] text-red-500 font-bold uppercase">Muitos Fallbacks!</span>
+                )}
               </div>
               <div className="bg-red-500/5 border border-red-500/10 p-2 rounded-lg flex flex-col items-center justify-center">
                 <span className="text-[9px] text-muted-foreground uppercase mb-0.5">Taxa de Erro</span>
-                <span className="text-sm font-bold text-red-600">
+                <span className={cn(
+                  "text-sm font-bold",
+                  (sessionHistory.filter(h => h.status === 'error').length / (sessionHistory.length || 1)) > 0.1 ? "text-red-500 animate-pulse" : "text-red-600"
+                )}>
                   {((sessionHistory.filter(h => h.status === 'error').length / (sessionHistory.length || 1)) * 100).toFixed(0)}%
                 </span>
+                {(sessionHistory.filter(h => h.status === 'error').length / (sessionHistory.length || 1)) > 0.1 && (
+                  <span className="text-[7px] text-red-500 font-bold uppercase">Erro Crítico!</span>
+                )}
               </div>
             </div>
           </div>

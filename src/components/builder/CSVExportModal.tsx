@@ -27,9 +27,10 @@ import {
   useSortable
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Download, AlertTriangle, Check, X, ListFilter, AlertCircle, ChevronUp, ChevronDown } from 'lucide-react';
+import { GripVertical, Download, AlertTriangle, Check, X, ListFilter, AlertCircle, ChevronUp, ChevronDown, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { Input } from '@/components/ui/input';
 import { 
   Select, 
   SelectContent, 
@@ -136,6 +137,8 @@ export default function CSVExportModal({ open, onOpenChange, logs, filterFallbac
   const [columnOrder, setColumnOrder] = useState<string[]>(ALL_COLUMNS.map(c => c.id));
   const [dateFormat, setDateFormat] = useState<'ISO' | 'DD/MM/AAAA'>('ISO');
   const [previewLimit, setPreviewLimit] = useState(5);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState('');
   const [internalFallbackFilter, setInternalFallbackFilter] = useState(filterFallbackOnly);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
@@ -207,6 +210,16 @@ export default function CSVExportModal({ open, onOpenChange, logs, filterFallbac
   const filteredLogs = useMemo(() => {
     let result = [...logs];
     
+    // Busca
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(log => 
+        log.message?.toLowerCase().includes(q) || 
+        (log as any).metadata?.model?.toLowerCase().includes(q) ||
+        (log as any).status?.toLowerCase().includes(q)
+      );
+    }
+
     // Filtro de fallback
     if (internalFallbackFilter) {
       result = result.filter(log => {
@@ -242,7 +255,10 @@ export default function CSVExportModal({ open, onOpenChange, logs, filterFallbac
     const activeCols = columnOrder.filter(id => selectedColumns.has(id));
     const header = activeCols.map(id => ALL_COLUMNS.find(c => c.id === id)?.label || id);
     
-    const rows = filteredLogs.slice(0, previewLimit).map(log => {
+    const start = (currentPage - 1) * previewLimit;
+    const paginated = filteredLogs.slice(start, start + previewLimit);
+
+    const rows = paginated.map(log => {
       return activeCols.map(colId => {
         if (colId === 'iso') return formatDate(log.ts);
         if (colId === 'model') return (log as any).metadata?.model || '';
@@ -254,8 +270,8 @@ export default function CSVExportModal({ open, onOpenChange, logs, filterFallbac
       });
     });
 
-    return { header, rows };
-  }, [filteredLogs, selectedColumns, columnOrder, dateFormat, previewLimit]);
+    return { header, rows, totalPages: Math.ceil(filteredLogs.length / previewLimit) };
+  }, [filteredLogs, selectedColumns, columnOrder, dateFormat, previewLimit, currentPage]);
 
   const handleDownload = () => {
     if (filteredLogs.length === 0) {
@@ -364,38 +380,65 @@ export default function CSVExportModal({ open, onOpenChange, logs, filterFallbac
               </div>
             </div>
 
-            <div className="flex items-center justify-between gap-4 p-2 bg-muted/30 rounded-md">
-              <div className="flex items-center gap-2">
-                <Checkbox 
-                  id="filter-fallback" 
-                  checked={internalFallbackFilter} 
-                  onCheckedChange={(v) => setInternalFallbackFilter(!!v)}
-                />
-                <Label htmlFor="filter-fallback" className="text-[10px] font-medium cursor-pointer uppercase">Apenas Fallbacks</Label>
+            <div className="flex flex-col gap-2 p-2 bg-muted/30 rounded-md">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2">
+                  <Checkbox 
+                    id="filter-fallback" 
+                    checked={internalFallbackFilter} 
+                    onCheckedChange={(v) => setInternalFallbackFilter(!!v)}
+                  />
+                  <Label htmlFor="filter-fallback" className="text-[10px] font-medium cursor-pointer uppercase">Apenas Fallbacks</Label>
+                </div>
+
+                <div className={cn(
+                  "flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase",
+                  validationResult.isValid ? "bg-emerald-500/10 text-emerald-500" : "bg-red-500/10 text-red-500"
+                )}>
+                  {validationResult.isValid ? (
+                    <><Check className="h-2.5 w-2.5" /> Auditoria Válida</>
+                  ) : (
+                    <><AlertCircle className="h-2.5 w-2.5" /> Colunas Ausentes: {validationResult.missing.join(', ')}</>
+                  )}
+                </div>
               </div>
 
-              <div className={cn(
-                "flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase",
-                validationResult.isValid ? "bg-emerald-500/10 text-emerald-500" : "bg-red-500/10 text-red-500"
-              )}>
-                {validationResult.isValid ? (
-                  <><Check className="h-2.5 w-2.5" /> Auditoria Válida</>
-                ) : (
-                  <><AlertCircle className="h-2.5 w-2.5" /> Colunas Ausentes: {validationResult.missing.join(', ')}</>
-                )}
+              <div className="relative">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                <Input 
+                  placeholder="Buscar no log..." 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="h-7 pl-7 text-[10px] bg-background/50"
+                />
               </div>
             </div>
 
             <div className="flex-1 overflow-hidden border rounded-lg bg-muted/20 flex flex-col">
               <div className="p-2 border-b bg-muted/40 flex items-center justify-between">
                 <span className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1">
-                  <ListFilter className="h-3 w-3" /> Visualizando {Math.min(previewLimit, filteredLogs.length)} de {filteredLogs.length} linhas
+                  <ListFilter className="h-3 w-3" /> Página {currentPage} de {previewData.totalPages || 1} ({filteredLogs.length} itens)
                 </span>
-                {filteredLogs.length > previewLimit && (
-                  <Button variant="ghost" size="sm" className="h-6 text-[9px]" onClick={() => setPreviewLimit(prev => prev + 5)}>
-                    Carregar Mais
+                <div className="flex items-center gap-1">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-6 w-6 p-0" 
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronUp className="h-3 w-3 rotate-[-90deg]" />
                   </Button>
-                )}
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-6 w-6 p-0" 
+                    onClick={() => setCurrentPage(p => Math.min(previewData.totalPages, p + 1))}
+                    disabled={currentPage === previewData.totalPages}
+                  >
+                    <ChevronUp className="h-3 w-3 rotate-[90deg]" />
+                  </Button>
+                </div>
               </div>
               <div className="flex-1 overflow-auto p-0">
                 <table className="w-full text-[10px] border-collapse">
