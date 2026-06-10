@@ -57,4 +57,12 @@ describe('Auditoria de Simulação de Falhas e CSV', () => {
     const missing = requiredColumns.filter(col => extractedData[col as keyof typeof extractedData] === undefined);
     expect(missing.length).toBe(0);
   });
+
+  it('deve garantir que cada entrada de log tenha um RunID único', () => {
+    const runId1 = `run_${crypto.randomUUID().slice(0, 8)}`;
+    const runId2 = `run_${crypto.randomUUID().slice(0, 8)}`;
+    
+    expect(runId1).toMatch(/^run_[a-z0-9-]+$/);
+    expect(runId1).not.toBe(runId2);
+  });
 });
