@@ -636,9 +636,12 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       setLoading(true);
       setStreamingContent("");
       const startTime = Date.now();
-      const decisionTrail: string[] = [`Iniciando com ${kimiModel} (Nível 1/2)`];
+      const decisionTrail: string[] = [`Tentando ${kimiModel} (Nível 1/2)`];
       
       try {
+        // Log auditing initial attempt
+        await logAuditAction("AI_Orchestration", "kimi_attempt", { model: kimiModel, temperature, maxTokens });
+
         const resp = await puter.ai.chat(prompt, { 
           model: kimiModel,
           temperature: temperature,
@@ -656,7 +659,8 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
 
         const endTime = Date.now();
         const duration = ((endTime - startTime) / 1000).toFixed(2);
-        decisionTrail.push("Sucesso via Puter.js");
+        decisionTrail.push("Sucesso via Puter.js (Kimi)");
+        await logAuditAction("AI_Orchestration", "kimi_success", { duration, model: kimiModel });
 
         // Salva o resultado no histórico da sessão
         const resultId = crypto.randomUUID();
@@ -686,6 +690,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       } catch (err: any) {
         decisionTrail.push(`Erro no Kimi: ${err.message}`);
         decisionTrail.push("Acionando Fallback para DeepSeek (Nível 3)");
+        await logAuditAction("AI_Orchestration", "fallback_triggered", { error: err.message, from_model: kimiModel });
         console.warn("Kimi falhou via Puter, tentando fallback para Nível 3 (DeepSeek)...", err);
         toast.info("Kimi indisponível. Acionando fallback DeepSeek (Nível 3)...");
         // O código continuará para o handleExecute normal abaixo, mas precisamos passar o decisionTrail

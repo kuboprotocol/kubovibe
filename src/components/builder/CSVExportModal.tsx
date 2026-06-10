@@ -57,6 +57,7 @@ interface CSVExportModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   logs: PreviewLogEntry[];
+  filterFallbackOnly?: boolean;
 }
 
 const ALL_COLUMNS = [
@@ -127,12 +128,13 @@ function SortableColumnItem({ id, label, checked, onCheckedChange }: SortableIte
   );
 }
 
-export default function CSVExportModal({ open, onOpenChange, logs }: CSVExportModalProps) {
+export default function CSVExportModal({ open, onOpenChange, logs, filterFallbackOnly = false }: CSVExportModalProps) {
   const [userId, setUserId] = useState<string | null>(null);
   const [selectedColumns, setSelectedColumns] = useState<Set<string>>(new Set(ALL_COLUMNS.map(c => c.id)));
   const [columnOrder, setColumnOrder] = useState<string[]>(ALL_COLUMNS.map(c => c.id));
   const [dateFormat, setDateFormat] = useState<'ISO' | 'DD/MM/AAAA'>('ISO');
   const [previewLimit, setPreviewLimit] = useState(5);
+  const [internalFallbackFilter, setInternalFallbackFilter] = useState(filterFallbackOnly);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id || 'anonymous'));
@@ -192,11 +194,21 @@ export default function CSVExportModal({ open, onOpenChange, logs }: CSVExportMo
     return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
   };
 
+  const filteredLogs = useMemo(() => {
+    if (!internalFallbackFilter) return logs;
+    return logs.filter(log => {
+      const metadata = (log as any).metadata;
+      const status = (log as any).status;
+      return (metadata?.decision_trail?.some((t: string) => t.toLowerCase().includes('fallback'))) || 
+             (status?.toLowerCase().includes('fallback'));
+    });
+  }, [logs, internalFallbackFilter]);
+
   const previewData = useMemo(() => {
     const activeCols = columnOrder.filter(id => selectedColumns.has(id));
     const header = activeCols.map(id => ALL_COLUMNS.find(c => c.id === id)?.label || id);
     
-    const rows = logs.slice(0, previewLimit).map(log => {
+    const rows = filteredLogs.slice(0, previewLimit).map(log => {
       return activeCols.map(colId => {
         if (colId === 'iso') return formatDate(log.ts);
         if (colId === 'model') return (log as any).metadata?.model || '';
@@ -208,11 +220,11 @@ export default function CSVExportModal({ open, onOpenChange, logs }: CSVExportMo
     });
 
     return { header, rows };
-  }, [logs, selectedColumns, columnOrder, dateFormat, previewLimit]);
+  }, [filteredLogs, selectedColumns, columnOrder, dateFormat, previewLimit]);
 
   const handleDownload = () => {
-    if (logs.length === 0) {
-      toast.error('Nenhum registro para exportar');
+    if (filteredLogs.length === 0) {
+      toast.error('Nenhum registro para exportar com os filtros atuais');
       return;
     }
     if (selectedColumns.size === 0) {
@@ -223,7 +235,7 @@ export default function CSVExportModal({ open, onOpenChange, logs }: CSVExportMo
     const activeCols = columnOrder.filter(id => selectedColumns.has(id));
     const header = activeCols.map(id => ALL_COLUMNS.find(c => c.id === id)?.label || id);
     
-    const rows = logs.map(log => {
+    const rows = filteredLogs.map(log => {
       return activeCols.map(colId => {
         let val = (log as any)[colId] ?? '';
         if (colId === 'iso') val = formatDate(log.ts);
@@ -316,12 +328,23 @@ export default function CSVExportModal({ open, onOpenChange, logs }: CSVExportMo
               </div>
             </div>
 
+            <div className="flex items-center gap-4 p-2 bg-muted/30 rounded-md">
+              <div className="flex items-center gap-2">
+                <Checkbox 
+                  id="filter-fallback" 
+                  checked={internalFallbackFilter} 
+                  onCheckedChange={(v) => setInternalFallbackFilter(!!v)}
+                />
+                <Label htmlFor="filter-fallback" className="text-[10px] font-medium cursor-pointer uppercase">Apenas Fallbacks</Label>
+              </div>
+            </div>
+
             <div className="flex-1 overflow-hidden border rounded-lg bg-muted/20 flex flex-col">
               <div className="p-2 border-b bg-muted/40 flex items-center justify-between">
                 <span className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1">
-                  <ListFilter className="h-3 w-3" /> Visualizando {Math.min(previewLimit, logs.length)} de {logs.length} linhas
+                  <ListFilter className="h-3 w-3" /> Visualizando {Math.min(previewLimit, filteredLogs.length)} de {filteredLogs.length} linhas
                 </span>
-                {logs.length > previewLimit && (
+                {filteredLogs.length > previewLimit && (
                   <Button variant="ghost" size="sm" className="h-6 text-[9px]" onClick={() => setPreviewLimit(prev => prev + 5)}>
                     Carregar Mais
                   </Button>
@@ -359,7 +382,7 @@ export default function CSVExportModal({ open, onOpenChange, logs }: CSVExportMo
               </div>
             </div>
 
-            {logs.length === 0 && (
+            {filteredLogs.length === 0 && (
               <div className="flex items-center gap-2 p-2 bg-amber-500/10 border border-amber-500/20 rounded-md text-amber-600 text-[11px] animate-pulse">
                 <AlertTriangle className="h-4 w-4" />
                 <span>Aviso: 0 registros encontrados com os filtros atuais.</span>
@@ -370,11 +393,11 @@ export default function CSVExportModal({ open, onOpenChange, logs }: CSVExportMo
 
         <DialogFooter className="gap-2 pt-4 border-t mt-4">
           <div className="flex-1 flex items-center gap-2 text-xs text-muted-foreground">
-            {logs.length > 0 && <Check className="h-3 w-3 text-emerald-500" />}
-            {logs.length} registros prontos para exportação
+            {filteredLogs.length > 0 && <Check className="h-3 w-3 text-emerald-500" />}
+            {filteredLogs.length} registros prontos para exportação
           </div>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={handleDownload} disabled={logs.length === 0 || selectedColumns.size === 0}>
+          <Button onClick={handleDownload} disabled={filteredLogs.length === 0 || selectedColumns.size === 0}>
             <Download className="h-4 w-4 mr-2" /> Confirmar Download CSV
           </Button>
         </DialogFooter>
