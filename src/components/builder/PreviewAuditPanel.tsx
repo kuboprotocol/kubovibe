@@ -18,6 +18,8 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import JSZip from 'jszip'
 import type { PreviewLogEntry, PreviewLogKind } from '@/lib/iframePreview'
+import CSVExportModal from './CSVExportModal'
+
 import {
   entriesToHAR, correlateErrors, correlationsToMarkdown,
   shareReport, revokeShare, listShares,
@@ -209,6 +211,7 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
   const lastShotErrorIdRef = useRef<string | null>(null)
   const shotsRef = useRef<{ name: string; dataUrl: string; ts: number; reason?: string }[]>([])
   const [excludedShots, setExcludedShots] = useState<Set<string>>(new Set())
+  const [exportModalOpen, setExportModalOpen] = useState(false)
 
   useEffect(() => {
     try { localStorage.setItem('kubo:audit:bundleOpts', JSON.stringify(bundleOpts)) } catch {}
@@ -295,8 +298,7 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
     toast.success('Logs exportados (JSON)')
   }
   const handleExportCSV = () => {
-    downloadBlob(entriesToCSV(filtered), `preview-logs-${Date.now()}.csv`, 'text/csv')
-    toast.success('Logs exportados (CSV)')
+    setExportModalOpen(true)
   }
   const handleCopyReport = async () => {
     try {
@@ -934,6 +936,12 @@ export default function PreviewAuditPanel({ logs, onClear, onClose, defaultOpen 
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      <CSVExportModal 
+        open={exportModalOpen} 
+        onOpenChange={setExportModalOpen} 
+        logs={filtered} 
+      />
     </div>
   )
 }
