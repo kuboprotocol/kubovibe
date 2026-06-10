@@ -680,6 +680,10 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
         // Log auditing initial attempt
         await logAuditAction("AI_Orchestration", "kimi_attempt", { model: kimiModel, temperature, maxTokens });
 
+        if (simulationMode) {
+          throw new Error("SISTEMA: Falha simulada para teste de fallback (DeepSeek)");
+        }
+
         const resp = await puter.ai.chat(prompt, { 
           model: kimiModel,
           temperature: temperature,
