@@ -1277,13 +1277,30 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                 
                 <div className="max-h-[150px] overflow-auto space-y-2 pr-2 custom-scrollbar">
                   {sessionHistory.map((item, idx) => (
-                    <div key={idx} className="flex items-center justify-between text-[10px] py-1 border-b border-primary/5 last:border-0">
-                      <span className="opacity-70 truncate max-w-[150px]">{item.prompt}</span>
-                      <div className="flex items-center gap-3">
-                        <span className="font-mono">{item.metadata?.model?.split('/').pop()}</span>
-                        <span className="text-amber-500 font-bold">{item.metadata?.credits || 0}c</span>
-                        <span className="opacity-60">{item.metadata?.duration || '0s'}</span>
+                    <div key={idx} className="space-y-2 py-2 border-b border-primary/5 last:border-0">
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="opacity-70 truncate max-w-[150px] font-medium">{item.prompt}</span>
+                        <div className="flex items-center gap-3">
+                          <span className="font-mono bg-muted/50 px-1 rounded">{item.metadata?.model?.split('/').pop()}</span>
+                          <span className="text-amber-500 font-bold">{item.metadata?.credits || 0}c</span>
+                          <span className="opacity-60">{item.metadata?.duration || '0s'}</span>
+                        </div>
                       </div>
+                      
+                      {(item.metadata?.decision_trail) && (
+                        <div className="bg-muted/20 p-1.5 rounded text-[9px] text-muted-foreground">
+                          <div className="flex items-center gap-1 font-bold uppercase mb-1 opacity-60">
+                            <History className="h-2.5 w-2.5" /> Trilha:
+                          </div>
+                          <ul className="space-y-0.5">
+                            {item.metadata.decision_trail.map((t: string, i: number) => (
+                              <li key={i} className={cn("truncate", t.toLowerCase().includes('fallback') && "text-purple-500")}>
+                                • {t}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
