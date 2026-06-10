@@ -259,8 +259,10 @@ export default function CreativeAuditPage() {
   };
 
   const saveExportSettings = () => {
-    localStorage.setItem("audit_export_columns", JSON.stringify(selectedColumns));
-    localStorage.setItem("audit_export_date_format", exportDateFormat);
+    if (user) {
+      localStorage.setItem(`audit_export_columns_${user.id}`, JSON.stringify(selectedColumns));
+      localStorage.setItem(`audit_export_date_format_${user.id}`, exportDateFormat);
+    }
   };
 
   // Update URL params when filters change
