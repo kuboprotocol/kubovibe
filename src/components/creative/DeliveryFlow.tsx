@@ -362,7 +362,13 @@ function AuditHistoryManager({
       user: userRole,
       attachmentName: `Exportação ${format.toUpperCase()} (${exportMode === "current_page" ? `Pág. ${currentPage}` : exportMode === "range" ? `Págs. ${exportRange.start}-${exportRange.end}` : "Filtrado"})`,
       reason: `Filtros: ${searchTerm || "Nenhum"}, Status: ${statusFilter}, Ordenação: ${sortField} ${sortOrder}, Colunas: ${visibleColumns.join(",")}, Recorte: ${exportMode === "range" ? `Páginas ${exportRange.start} a ${exportRange.end} (Total: ${logsToExport.length} registros, Índices: ${(exportRange.start-1)*itemsPerPage+1}-${Math.min(filteredLogs.length, exportRange.end*itemsPerPage)})` : `${logsToExport.length} registros`}, PágInicial: ${exportMode === "range" ? exportRange.start : 1}, PágFinal: ${exportMode === "range" ? exportRange.end : (exportMode === "current_page" ? 1 : totalPages)}, TotalRecorte: ${logsToExport.length}`,
-      status: "success"
+      status: "success",
+      exportParams: {
+        range: exportMode === "range" ? exportRange : undefined,
+        filters: `Busca: ${searchTerm || "Nenhuma"}, Status: ${statusFilter}`,
+        total: logsToExport.length,
+        columns: visibleColumns
+      }
     });
     
     toast.success("Histórico exportado com sucesso");
