@@ -1004,6 +1004,36 @@ export type Database = {
         }
         Relationships: []
       }
+      filter_presets: {
+        Row: {
+          created_at: string
+          filters: Json
+          id: string
+          name: string
+          sorting: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          filters?: Json
+          id?: string
+          name: string
+          sorting?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          filters?: Json
+          id?: string
+          name?: string
+          sorting?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       generated_contracts: {
         Row: {
           created_at: string
