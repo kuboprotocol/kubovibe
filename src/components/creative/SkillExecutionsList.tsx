@@ -1,8 +1,46 @@
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { 
+  Card, 
+  CardContent, 
+  CardHeader, 
+  CardTitle, 
+  CardDescription 
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, XCircle, Clock, Zap } from "lucide-react";
+import { 
+  CheckCircle2, 
+  XCircle, 
+  Clock, 
+  Zap, 
+  Search, 
+  Filter, 
+  Calendar as CalendarIcon,
+  ChevronLeft,
+  ChevronRight,
+  ArrowUpDown,
+  FileDown,
+  Eye,
+  Info
+} from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface SkillExecution {
   id: string;
@@ -20,112 +58,427 @@ interface SkillExecution {
 export function SkillExecutionsList() {
   const [executions, setExecutions] = useState<SkillExecution[]>([]);
   const [loading, setLoading] = useState(true);
+  const [totalCount, setTotalCount] = useState(0);
+  
+  // Filters & Search
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [skillFilter, setSkillFilter] = useState<string>("all");
+  const [dateStart, setDateStart] = useState("");
+  const [dateEnd, setDateEnd] = useState("");
+  
+  // Pagination & Sorting
+  const [page, setPage] = useState(1);
+  const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
+  const pageSize = 10;
+  
+  // Details Modal
+  const [selectedEx, setSelectedEx] = useState<SkillExecution | null>(null);
+  
+  // Available skills for filter
+  const [availableSkills, setAvailableSkills] = useState<{slug: string, name: string}[]>([]);
 
   useEffect(() => {
-    void fetchExecutions();
-    
-    // Subscribe to new executions
-    const channel = supabase
-      .channel("skill_executions_live")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "skill_executions" },
-        (payload) => {
-          setExecutions((prev) => [payload.new as SkillExecution, ...prev].slice(0, 50));
-        }
-      )
-      .subscribe();
-
-    return () => {
-      void supabase.removeChannel(channel);
-    };
+    fetchAvailableSkills();
   }, []);
 
-  async function fetchExecutions() {
-    const { data, error } = await supabase
-      .from("skill_executions")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(50);
+  useEffect(() => {
+    setPage(1); // Reset to first page on filter change
+    fetchExecutions();
+  }, [search, statusFilter, skillFilter, dateStart, dateEnd, sortOrder]);
 
-    if (error) {
-      console.error("Error fetching executions:", error);
-    } else {
-      setExecutions(data || []);
+  useEffect(() => {
+    fetchExecutions();
+  }, [page]);
+
+  async function fetchAvailableSkills() {
+    const { data } = await supabase
+      .from("skill_executions")
+      .select("skill_slug, skill_name")
+      .order("skill_name");
+    
+    if (data) {
+      const unique = Array.from(new Set(data.map(s => s.skill_slug))).map(slug => {
+        return {
+          slug,
+          name: data.find(s => s.skill_slug === slug)?.skill_name || slug
+        };
+      });
+      setAvailableSkills(unique);
     }
-    setLoading(false);
   }
 
-  if (loading) return <div className="text-center py-10 opacity-50">Carregando histórico unificado...</div>;
+  async function fetchExecutions() {
+    setLoading(true);
+    try {
+      let query = supabase
+        .from("skill_executions")
+        .select("*", { count: "exact" });
+
+      if (statusFilter !== "all") {
+        query = query.eq("status", statusFilter);
+      }
+      
+      if (skillFilter !== "all") {
+        query = query.eq("skill_slug", skillFilter);
+      }
+      
+      if (search) {
+        query = query.or(`skill_name.ilike.%${search}%,skill_slug.ilike.%${search}%,error_message.ilike.%${search}%`);
+      }
+      
+      if (dateStart) {
+        query = query.gte("created_at", new Date(dateStart).toISOString());
+      }
+      
+      if (dateEnd) {
+        // Set to end of day
+        const end = new Date(dateEnd);
+        end.setHours(23, 59, 59, 999);
+        query = query.lte("created_at", end.toISOString());
+      }
+
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+
+      const { data, count, error } = await query
+        .order("created_at", { ascending: sortOrder === "asc" })
+        .range(from, to);
+
+      if (error) throw error;
+      setExecutions(data || []);
+      setTotalCount(count || 0);
+    } catch (error) {
+      console.error("Error fetching executions:", error);
+      toast.error("Erro ao carregar histórico.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const exportToCSV = () => {
+    if (executions.length === 0) {
+      toast.error("Não há dados para exportar.");
+      return;
+    }
+
+    const headers = ["ID", "Skill", "Status", "Créditos", "Duração (ms)", "Data", "Input", "Output", "Erro"];
+    const rows = executions.map(ex => [
+      ex.id,
+      ex.skill_name || ex.skill_slug,
+      ex.status,
+      ex.credits_charged,
+      ex.duration_ms || "",
+      new Date(ex.created_at).toLocaleString(),
+      JSON.stringify(ex.input).replace(/"/g, '""'),
+      JSON.stringify(ex.output).replace(/"/g, '""'),
+      (ex.error_message || "").replace(/"/g, '""')
+    ]);
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(r => r.map(cell => `"${cell}"`).join(","))
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `historico_skills_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Exportação concluída!");
+  };
+
+  const totalPages = Math.ceil(totalCount / pageSize);
 
   return (
-    <div className="space-y-4">
-      {executions.length === 0 && (
-        <p className="text-sm text-muted-foreground text-center py-10">Nenhuma execução registrada ainda.</p>
-      )}
-      {executions.map((ex) => (
-        <Card key={ex.id} className="overflow-hidden border-primary/10 hover:border-primary/30 transition-colors">
-          <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between space-y-0">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-primary/10">
-                <Zap className="w-4 h-4 text-primary" />
+    <div className="space-y-6">
+      {/* Filters & Tools */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 bg-muted/20 p-4 rounded-xl border border-border/50">
+        <div className="space-y-2">
+          <label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Buscar</label>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input 
+              placeholder="Skill ou erro..." 
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 bg-background/50 h-9"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Status</label>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="h-9 bg-background/50">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="succeeded">Sucesso</SelectItem>
+              <SelectItem value="failed">Falha</SelectItem>
+              <SelectItem value="processing">Processando</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Habilidade</label>
+          <Select value={skillFilter} onValueChange={setSkillFilter}>
+            <SelectTrigger className="h-9 bg-background/50">
+              <SelectValue placeholder="Skill" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as Skills</SelectItem>
+              {availableSkills.map(s => (
+                <SelectItem key={s.slug} value={s.slug}>{s.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-end gap-2">
+          <div className="flex-1 space-y-2">
+            <label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Datas</label>
+            <div className="flex gap-2">
+              <Input 
+                type="date" 
+                value={dateStart} 
+                onChange={(e) => setDateStart(e.target.value)}
+                className="h-9 bg-background/50 text-[10px] px-2"
+              />
+              <Input 
+                type="date" 
+                value={dateEnd} 
+                onChange={(e) => setDateEnd(e.target.value)}
+                className="h-9 bg-background/50 text-[10px] px-2"
+              />
+            </div>
+          </div>
+          <Button 
+            variant="outline" 
+            size="icon" 
+            className="h-9 w-9 shrink-0"
+            onClick={() => setSortOrder(prev => prev === "desc" ? "asc" : "desc")}
+            title="Ordenar por data"
+          >
+            <ArrowUpDown className={cn("h-4 w-4", sortOrder === "asc" && "text-primary")} />
+          </Button>
+          <Button 
+            variant="secondary" 
+            size="icon" 
+            className="h-9 w-9 shrink-0"
+            onClick={exportToCSV}
+            title="Exportar CSV"
+          >
+            <FileDown className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      {/* List */}
+      <div className="space-y-4">
+        {loading ? (
+          <div className="text-center py-20">
+            <Clock className="w-8 h-8 animate-spin mx-auto text-primary/40 mb-2" />
+            <p className="text-sm text-muted-foreground">Carregando execuções...</p>
+          </div>
+        ) : executions.length === 0 ? (
+          <div className="bg-muted/10 border border-dashed rounded-xl py-20 text-center">
+            <Info className="w-8 h-8 mx-auto text-muted-foreground/30 mb-2" />
+            <p className="text-sm text-muted-foreground">Nenhuma execução encontrada.</p>
+          </div>
+        ) : (
+          <>
+            <div className="grid gap-3">
+              {executions.map((ex) => (
+                <Card 
+                  key={ex.id} 
+                  className="overflow-hidden border-primary/10 hover:border-primary/30 transition-all cursor-pointer group shadow-none hover:shadow-lg hover:shadow-primary/5"
+                  onClick={() => setSelectedEx(ex)}
+                >
+                  <CardHeader className="p-4 flex flex-row items-center justify-between space-y-0">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-xl bg-primary/5 group-hover:bg-primary/10 transition-colors">
+                        <Zap className="w-4 h-4 text-primary" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <CardTitle className="text-sm font-bold font-orbitron">
+                            {ex.skill_name || ex.skill_slug}
+                          </CardTitle>
+                          <Badge variant="outline" className="text-[9px] h-4 py-0 px-1 font-mono opacity-60">
+                            {ex.id.slice(0, 8)}
+                          </Badge>
+                        </div>
+                        <CardDescription className="text-[10px] flex items-center gap-2 mt-0.5">
+                          <CalendarIcon className="w-3 h-3" />
+                          {new Date(ex.created_at).toLocaleString()}
+                        </CardDescription>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="text-right hidden sm:block">
+                        <div className="text-[10px] font-bold text-primary">{ex.credits_charged}c</div>
+                        <div className="text-[9px] text-muted-foreground opacity-60">créditos</div>
+                      </div>
+                      <div className="h-8 w-px bg-border/50 mx-1 hidden sm:block" />
+                      {ex.status === "succeeded" || ex.status === "completed" ? (
+                        <Badge className="bg-green-500/10 text-green-500 border-green-500/20 hover:bg-green-500/20 transition-colors">
+                          <CheckCircle2 className="w-3 h-3 mr-1" /> Sucesso
+                        </Badge>
+                      ) : ex.status === "failed" ? (
+                        <Badge variant="destructive" className="bg-destructive/10 text-destructive border-destructive/20">
+                          <XCircle className="w-3 h-3 mr-1" /> Falha
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="animate-pulse">
+                          <Clock className="w-3 h-3 mr-1" /> {ex.status}
+                        </Badge>
+                      )}
+                      <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardHeader>
+                </Card>
+              ))}
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-2 pt-4">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">
+                  Página {page} de {totalPages} ({totalCount} registros)
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    className="h-8 px-3"
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-1" /> Anterior
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                    disabled={page === totalPages}
+                    className="h-8 px-3"
+                  >
+                    Próximo <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Details Modal */}
+      <Dialog open={!!selectedEx} onOpenChange={(open) => !open && setSelectedEx(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 rounded-xl bg-primary/10">
+                <Zap className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <CardTitle className="text-sm font-bold font-orbitron">{ex.skill_name || ex.skill_slug}</CardTitle>
-                <CardDescription className="text-[10px]">{new Date(ex.created_at).toLocaleString()}</CardDescription>
+                <DialogTitle className="font-orbitron text-xl">
+                  Detalhes da Execução
+                </DialogTitle>
+                <DialogDescription className="text-xs uppercase tracking-widest font-bold opacity-60">
+                  ID: {selectedEx?.id}
+                </DialogDescription>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="text-[10px] h-5 font-mono">
-                {ex.credits_charged}c
-              </Badge>
-              {ex.status === "succeeded" || ex.status === "completed" ? (
-                <CheckCircle2 className="w-4 h-4 text-green-500" />
-              ) : ex.status === "failed" ? (
-                <XCircle className="w-4 h-4 text-destructive" />
-              ) : (
-                <Clock className="w-4 h-4 text-amber-500 animate-pulse" />
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="p-4 pt-0">
-            <div className="mt-2 text-[11px] space-y-2">
-              {ex.error_message && (
-                <p className="text-destructive font-semibold bg-destructive/10 p-2 rounded">{ex.error_message}</p>
-              )}
-              {ex.input && (
-                <div className="bg-muted/30 p-2 rounded">
-                  <span className="text-muted-foreground block mb-1 uppercase tracking-wider text-[9px]">Entrada:</span>
-                  <pre className="whitespace-pre-wrap line-clamp-2 italic opacity-80">
-                    {typeof ex.input === 'object' ? JSON.stringify(ex.input) : ex.input}
-                  </pre>
+          </DialogHeader>
+
+          {selectedEx && (
+            <div className="space-y-6 py-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="bg-muted/30 p-3 rounded-xl border border-border/50">
+                  <span className="text-[9px] uppercase font-bold text-muted-foreground block mb-1">Status</span>
+                  <div className="flex items-center gap-2">
+                    {selectedEx.status === "succeeded" ? (
+                      <CheckCircle2 className="w-4 h-4 text-green-500" />
+                    ) : (
+                      <XCircle className="w-4 h-4 text-destructive" />
+                    )}
+                    <span className="text-xs font-bold capitalize">{selectedEx.status}</span>
+                  </div>
+                </div>
+                <div className="bg-muted/30 p-3 rounded-xl border border-border/50">
+                  <span className="text-[9px] uppercase font-bold text-muted-foreground block mb-1">Créditos</span>
+                  <div className="flex items-center gap-1">
+                    <Zap className="w-3 h-3 text-primary" />
+                    <span className="text-xs font-bold">{selectedEx.credits_charged}c</span>
+                  </div>
+                </div>
+                <div className="bg-muted/30 p-3 rounded-xl border border-border/50">
+                  <span className="text-[9px] uppercase font-bold text-muted-foreground block mb-1">Duração</span>
+                  <span className="text-xs font-bold font-mono">{selectedEx.duration_ms || 0}ms</span>
+                </div>
+                <div className="bg-muted/30 p-3 rounded-xl border border-border/50">
+                  <span className="text-[9px] uppercase font-bold text-muted-foreground block mb-1">Data</span>
+                  <span className="text-[10px] font-bold">{new Date(selectedEx.created_at).toLocaleString()}</span>
+                </div>
+              </div>
+
+              {selectedEx.error_message && (
+                <div className="bg-destructive/10 border border-destructive/20 p-4 rounded-xl">
+                  <span className="text-[10px] font-bold text-destructive uppercase block mb-2">Erro de Execução</span>
+                  <p className="text-sm font-medium text-destructive/90">{selectedEx.error_message}</p>
                 </div>
               )}
-              {ex.output && Object.keys(ex.output).length > 0 && (
-                <div className="bg-primary/5 p-2 rounded border border-primary/10">
-                  <span className="text-primary/70 block mb-1 uppercase tracking-wider text-[9px]">Resultado:</span>
-                  <div className="max-h-32 overflow-auto scrollbar-hide">
-                    {ex.output.url ? (
-                      <a href={ex.output.url} target="_blank" rel="noreferrer" className="text-primary hover:underline break-all">
-                        Ver arquivo gerado →
-                      </a>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <h4 className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest flex items-center gap-2">
+                    <ArrowUpDown className="w-3 h-3 rotate-90" /> Parâmetros de Entrada
+                  </h4>
+                  <pre className="bg-muted/50 p-4 rounded-xl border border-border/30 text-[11px] font-mono overflow-auto max-h-48 scrollbar-hide italic opacity-80">
+                    {JSON.stringify(selectedEx.input, null, 2)}
+                  </pre>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="text-[10px] font-bold uppercase text-primary tracking-widest flex items-center gap-2">
+                    <Zap className="w-3 h-3" /> Resultado Gerado
+                  </h4>
+                  <div className="bg-primary/5 p-4 rounded-xl border border-primary/10 min-h-[100px]">
+                    {selectedEx.output?.url ? (
+                      <div className="flex flex-col items-center justify-center py-6 gap-3">
+                        <Badge className="bg-primary/20 text-primary hover:bg-primary/30 border-none px-4 py-1">
+                          Arquivo de Mídia Disponível
+                        </Badge>
+                        <a 
+                          href={selectedEx.output.url} 
+                          target="_blank" 
+                          rel="noreferrer" 
+                          className="flex items-center gap-2 text-sm font-bold text-primary hover:underline bg-primary/10 px-4 py-2 rounded-lg"
+                        >
+                          <FileDown className="w-4 h-4" />
+                          Abrir Link Original
+                        </a>
+                      </div>
                     ) : (
-                      <pre className="whitespace-pre-wrap opacity-90">
-                        {typeof ex.output === 'object' ? JSON.stringify(ex.output, null, 2) : ex.output}
+                      <pre className="text-[11px] font-mono overflow-auto max-h-64 scrollbar-hide">
+                        {JSON.stringify(selectedEx.output, null, 2)}
                       </pre>
                     )}
                   </div>
                 </div>
-              )}
-              {ex.duration_ms && (
-                <div className="text-right text-[9px] text-muted-foreground opacity-50">
-                  Duração: {ex.duration_ms}ms
-                </div>
-              )}
+              </div>
             </div>
-          </CardContent>
-        </Card>
-      ))}
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
