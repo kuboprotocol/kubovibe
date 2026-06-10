@@ -92,6 +92,12 @@ interface AuditLog {
   attachmentName: string;
   reason: string;
   status: "success" | "denied" | "info";
+  exportParams?: {
+    range?: { start: number; end: number };
+    filters?: string;
+    total?: number;
+    columns?: string[];
+  };
 }
 
 
@@ -202,7 +208,10 @@ function AuditHistoryManager({
   const paginatedLogs = filteredLogs.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const [isExportLogOpen, setIsExportLogOpen] = useState(false);
+  const [selectedLogForDetails, setSelectedLogForDetails] = useState<AuditLog | null>(null);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [isLogExportDialogOpen, setIsLogExportDialogOpen] = useState(false);
+  const [logExportColumns, setLogExportColumns] = useState<string[]>(["timestamp", "user", "attachmentName", "reason", "status"]);
   const [exportFormat, setExportFormat] = useState<"csv" | "pdf">("csv");
   const [exportMode, setExportMode] = useState<"filtered" | "current_page" | "range">(() => {
     const saved = localStorage.getItem("audit_last_exportMode");
@@ -353,7 +362,13 @@ function AuditHistoryManager({
       user: userRole,
       attachmentName: `Exportação ${format.toUpperCase()} (${exportMode === "current_page" ? `Pág. ${currentPage}` : exportMode === "range" ? `Págs. ${exportRange.start}-${exportRange.end}` : "Filtrado"})`,
       reason: `Filtros: ${searchTerm || "Nenhum"}, Status: ${statusFilter}, Ordenação: ${sortField} ${sortOrder}, Colunas: ${visibleColumns.join(",")}, Recorte: ${exportMode === "range" ? `Páginas ${exportRange.start} a ${exportRange.end} (Total: ${logsToExport.length} registros, Índices: ${(exportRange.start-1)*itemsPerPage+1}-${Math.min(filteredLogs.length, exportRange.end*itemsPerPage)})` : `${logsToExport.length} registros`}, PágInicial: ${exportMode === "range" ? exportRange.start : 1}, PágFinal: ${exportMode === "range" ? exportRange.end : (exportMode === "current_page" ? 1 : totalPages)}, TotalRecorte: ${logsToExport.length}`,
-      status: "success"
+      status: "success",
+      exportParams: {
+        range: exportMode === "range" ? exportRange : undefined,
+        filters: `Busca: ${searchTerm || "Nenhuma"}, Status: ${statusFilter}`,
+        total: logsToExport.length,
+        columns: visibleColumns
+      }
     });
     
     toast.success("Histórico exportado com sucesso");
@@ -513,17 +528,132 @@ function AuditHistoryManager({
                 variant="outline" 
                 size="sm" 
                 className="h-8 text-[11px]"
-                onClick={() => {
+                onClick={() => setIsLogExportDialogOpen(true)}
+              >
+                <FileSpreadsheet className="h-3.5 w-3.5 mr-2" />
+                Exportar Histórico de Logs
+              </Button>
+            </div>
+          </DialogHeader>
+
+          {/* Modal de Detalhes do Log */}
+          <Dialog open={!!selectedLogForDetails} onOpenChange={(open) => !open && setSelectedLogForDetails(null)}>
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-sm">
+                  <Eye className="h-4 w-4 text-primary" />
+                  Detalhes da Exportação
+                </DialogTitle>
+              </DialogHeader>
+              {selectedLogForDetails && (
+                <div className="space-y-4 py-2">
+                  <div className="grid grid-cols-2 gap-4 text-[11px]">
+                    <div className="space-y-1">
+                      <p className="text-muted-foreground uppercase font-bold text-[9px]">ID do Log</p>
+                      <p className="font-mono">{selectedLogForDetails.id}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-muted-foreground uppercase font-bold text-[9px]">Data/Hora</p>
+                      <p>{new Date(selectedLogForDetails.timestamp).toLocaleString()}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-muted-foreground uppercase font-bold text-[9px]">Usuário</p>
+                      <p>{selectedLogForDetails.user}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-muted-foreground uppercase font-bold text-[9px]">Tipo/Arquivo</p>
+                      <p>{selectedLogForDetails.attachmentName}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 p-3 bg-muted/40 rounded-lg border border-border/20">
+                    <p className="text-[10px] font-bold uppercase text-primary">Parâmetros do Export</p>
+                    <div className="grid grid-cols-2 gap-3 text-[11px]">
+                      <div className="space-y-1">
+                        <p className="text-muted-foreground font-medium">Intervalo:</p>
+                        <p>{selectedLogForDetails.exportParams?.range ? `Páginas ${selectedLogForDetails.exportParams.range.start} a ${selectedLogForDetails.exportParams.range.end}` : "N/A"}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-muted-foreground font-medium">Total de Registros:</p>
+                        <p>{selectedLogForDetails.exportParams?.total || "N/A"}</p>
+                      </div>
+                      <div className="col-span-2 space-y-1">
+                        <p className="text-muted-foreground font-medium">Filtros Aplicados:</p>
+                        <p className="bg-background p-1.5 rounded border text-[10px]">{selectedLogForDetails.exportParams?.filters || "Nenhum"}</p>
+                      </div>
+                      <div className="col-span-2 space-y-1">
+                        <p className="text-muted-foreground font-medium">Colunas Incluídas:</p>
+                        <div className="flex flex-wrap gap-1">
+                          {selectedLogForDetails.exportParams?.columns?.map(c => (
+                            <Badge key={c} variant="outline" className="text-[8px] h-4 py-0">{c}</Badge>
+                          )) || "N/A"}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex justify-end gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setSelectedLogForDetails(null)}>Fechar</Button>
+                    <Button size="sm" onClick={() => {
+                      // Trigger re-export logic if needed, but for now just close
+                      setSelectedLogForDetails(null);
+                      setIsExportDialogOpen(true);
+                      toast.info("Configurações carregadas para nova exportação");
+                    }}>
+                      Exportar Novamente
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
+
+          {/* Modal de Configuração de Colunas do Log CSV */}
+          <Dialog open={isLogExportDialogOpen} onOpenChange={setIsLogExportDialogOpen}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <FileSpreadsheet className="h-5 w-5 text-primary" />
+                  Configurar Colunas do Log (CSV)
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <p className="text-xs text-muted-foreground">Selecione as colunas que deseja incluir no arquivo CSV do histórico de exportações.</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { id: "timestamp", label: "Data/Hora" },
+                    { id: "user", label: "Usuário" },
+                    { id: "attachmentName", label: "Tipo de Exportação" },
+                    { id: "reason", label: "Detalhes (Intervalo/Filtros)" },
+                    { id: "status", label: "Status" }
+                  ].map(col => (
+                    <div key={col.id} className="flex items-center space-x-2">
+                      <Checkbox 
+                        id={`log-col-${col.id}`} 
+                        checked={logExportColumns.includes(col.id)}
+                        onCheckedChange={(checked) => {
+                          if (checked) setLogExportColumns([...logExportColumns, col.id]);
+                          else if (logExportColumns.length > 1) setLogExportColumns(logExportColumns.filter(c => c !== col.id));
+                        }}
+                      />
+                      <label htmlFor={`log-col-${col.id}`} className="text-xs cursor-pointer">{col.label}</label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" size="sm" onClick={() => setIsLogExportDialogOpen(false)}>Cancelar</Button>
+                <Button size="sm" onClick={() => {
                   const exportLogs = logs.filter(l => l.action === "download_authorized");
-                  const headers = ["ID", "Timestamp", "Usuário", "Tipo de Exportação", "Detalhes do Recorte", "Status"];
-                  const rows = exportLogs.map(l => [
-                    l.id,
-                    new Date(l.timestamp).toLocaleString(),
-                    l.user,
-                    l.attachmentName,
-                    l.reason,
-                    l.status
-                  ]);
+                  const headers = logExportColumns.map(c => {
+                    const map: any = { timestamp: "Data/Hora", user: "Usuário", attachmentName: "Tipo", reason: "Detalhes", status: "Status" };
+                    return map[c];
+                  });
+                  const rows = exportLogs.map(l => logExportColumns.map(c => {
+                    if (c === "timestamp") return new Date(l.timestamp).toLocaleString();
+                    return (l as any)[c];
+                  }));
+                  
                   const csvContent = [headers, ...rows].map(e => e.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
                   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
                   const url = URL.createObjectURL(blob);
@@ -533,14 +663,14 @@ function AuditHistoryManager({
                   document.body.appendChild(link);
                   link.click();
                   document.body.removeChild(link);
+                  setIsLogExportDialogOpen(false);
                   toast.success("Histórico de logs exportado!");
-                }}
-              >
-                <FileSpreadsheet className="h-3.5 w-3.5 mr-2" />
-                Exportar Histórico de Logs
-              </Button>
-            </div>
-          </DialogHeader>
+                }}>
+                  Baixar CSV
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           <div className="flex-1 overflow-hidden mt-4">
             <AuditHistoryManager 
               logs={logs.filter(l => l.action === "download_authorized")}
@@ -787,7 +917,8 @@ function AuditHistoryManager({
               {paginatedLogs.map((log) => (
                 <div
                   key={log.id}
-                  className="grid grid-cols-7 gap-2 px-3 py-2 items-center text-[10px] hover:bg-muted/30 transition-colors"
+                  className="grid grid-cols-7 gap-2 px-3 py-2 items-center text-[10px] hover:bg-muted/30 transition-colors cursor-pointer"
+                  onClick={() => setSelectedLogForDetails(log)}
                 >
                   {visibleColumns.includes("timestamp") && (
                     <div className="text-muted-foreground whitespace-nowrap">
