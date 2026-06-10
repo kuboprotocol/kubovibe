@@ -203,14 +203,38 @@ export default function CSVExportModal({ open, onOpenChange, logs, filterFallbac
   };
 
   const filteredLogs = useMemo(() => {
-    if (!internalFallbackFilter) return logs;
-    return logs.filter(log => {
-      const metadata = (log as any).metadata;
-      const status = (log as any).status;
-      return (metadata?.decision_trail?.some((t: string) => t.toLowerCase().includes('fallback'))) || 
-             (status?.toLowerCase().includes('fallback'));
-    });
-  }, [logs, internalFallbackFilter]);
+    let result = [...logs];
+    
+    // Filtro de fallback
+    if (internalFallbackFilter) {
+      result = result.filter(log => {
+        const metadata = (log as any).metadata;
+        const status = (log as any).status;
+        return (metadata?.decision_trail?.some((t: string) => t.toLowerCase().includes('fallback'))) || 
+               (status?.toLowerCase().includes('fallback'));
+      });
+    }
+
+    // Ordenação
+    if (sortConfig) {
+      result.sort((a, b) => {
+        let valA: any = (a as any)[sortConfig.key];
+        let valB: any = (b as any)[sortConfig.key];
+
+        // Mapear campos de metadados se necessário
+        if (sortConfig.key === 'model') { valA = (a as any).metadata?.model; valB = (b as any).metadata?.model; }
+        if (sortConfig.key === 'credits') { valA = (a as any).metadata?.credits; valB = (b as any).metadata?.credits; }
+        if (sortConfig.key === 'duration_msg') { valA = parseFloat((a as any).metadata?.duration) || 0; valB = parseFloat((b as any).metadata?.duration) || 0; }
+        if (sortConfig.key === 'status_final') { valA = (a as any).status; valB = (b as any).status; }
+
+        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return result;
+  }, [logs, internalFallbackFilter, sortConfig]);
 
   const previewData = useMemo(() => {
     const activeCols = columnOrder.filter(id => selectedColumns.has(id));
