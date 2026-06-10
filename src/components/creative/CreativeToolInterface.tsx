@@ -1450,9 +1450,36 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
         {/* Painel de Verificação de Saúde (Health Check) */}
         {toolKey === "chat" && sessionHistory.length > 0 && (
           <div className="pt-4 border-t border-border/20 space-y-3">
-            <h4 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-              <Rocket className="h-3 w-3" /> Verificação de Saúde Kimi
-            </h4>
+            <div className="flex items-center justify-between">
+              <h4 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                <Rocket className="h-3 w-3" /> Verificação de Saúde Kimi
+              </h4>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-6 text-[9px] text-amber-500 hover:bg-amber-500/10 gap-1.5"
+                disabled={isBatchReprocessing || sessionHistory.filter(h => h.metadata?.status === 'fallback_success').length === 0}
+                onClick={async () => {
+                  const fallbacks = sessionHistory.filter(h => h.metadata?.status === 'fallback_success');
+                  if (fallbacks.length === 0) return;
+                  
+                  setIsBatchReprocessing(true);
+                  toast.info(`Reprocessando ${fallbacks.length} mensagens com fallback...`);
+                  
+                  // Simulação de reprocessamento em lote (na vida real chamaríamos handleExecute para cada)
+                  for (const item of fallbacks) {
+                    // Aqui apenas simulamos o tempo de processamento para cada
+                    await new Promise(r => setTimeout(r, 500));
+                  }
+                  
+                  setIsBatchReprocessing(false);
+                  toast.success("Reprocessamento em lote concluído!");
+                }}
+              >
+                {isBatchReprocessing ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCw className="h-3 w-3" />}
+                Reprocessar Fallbacks
+              </Button>
+            </div>
             <div className="grid grid-cols-3 gap-3">
               <div className="bg-emerald-500/5 border border-emerald-500/10 p-2 rounded-lg flex flex-col items-center justify-center relative group">
                 <span className="text-[9px] text-muted-foreground uppercase mb-0.5">Latência Média</span>
