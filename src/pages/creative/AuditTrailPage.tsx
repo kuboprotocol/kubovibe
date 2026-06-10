@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { 
   ArrowLeft, Search, FileDown, ArrowUpDown, Loader2, X, Filter, 
   AlertTriangle, Save, History, ChevronRight, Info, AlertCircle, Share2, TrendingUp, Clock,
-  Layers, Copy, ArrowLeftRight
+  Layers, Copy, ArrowLeftRight, Check, ListChecks
 } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -33,6 +33,16 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
 type AuditTrail = {
   id: string;
@@ -108,6 +118,46 @@ export default function CreativeAuditPage() {
   });
   const [showConfig, setShowConfig] = useState(false);
   const [expandedCorrelations, setExpandedCorrelations] = useState<Set<string>>(new Set());
+
+  // Export CSV State
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [exportDateFormat, setExportDateFormat] = useState<"DD/MM/AAAA" | "ISO">(() => {
+    return (localStorage.getItem("audit_export_date_format") as "DD/MM/AAAA" | "ISO") || "DD/MM/AAAA";
+  });
+  const [selectedColumns, setSelectedColumns] = useState<string[]>(() => {
+    const saved = localStorage.getItem("audit_export_columns");
+    return saved ? JSON.parse(saved) : ["created_at", "user", "step", "action", "correlation_id"];
+  });
+
+  const availableColumns = [
+    { id: "id", label: "ID" },
+    { id: "created_at", label: "Data/Hora" },
+    { id: "user", label: "Usuário" },
+    { id: "step", label: "Etapa" },
+    { id: "action", label: "Ação" },
+    { id: "correlation_id", label: "ID de Correlação" },
+    { id: "trace_id", label: "ID de Trace" },
+    { id: "params", label: "Parâmetros" },
+  ];
+
+  const toggleColumn = (colId: string) => {
+    setSelectedColumns(prev => 
+      prev.includes(colId) ? prev.filter(id => id !== colId) : [...prev, colId]
+    );
+  };
+
+  const selectAllColumns = () => {
+    setSelectedColumns(availableColumns.map(c => c.id));
+  };
+
+  const clearColumns = () => {
+    setSelectedColumns([]);
+  };
+
+  const saveExportSettings = () => {
+    localStorage.setItem("audit_export_columns", JSON.stringify(selectedColumns));
+    localStorage.setItem("audit_export_date_format", exportDateFormat);
+  };
 
   // Update URL params when filters change
   useEffect(() => {
@@ -453,31 +503,14 @@ export default function CreativeAuditPage() {
   const exportData = (format: "json" | "csv") => {
     if (entries.length === 0) return toast.error("Sem dados para exportar");
     
-    const filename = `creative-audit-filtered-${new Date().toISOString()}.${format}`;
-    let content: string;
-    let mime: string;
-
-    if (format === "json") {
-      content = JSON.stringify(entries, null, 2);
-      mime = "application/json";
-    } else {
-      const headers = ["ID", "User", "Step", "Action", "Correlation ID", "Trace ID", "Created At", "Params"];
-      const rows = entries.map(e => [
-        e.id,
-        e.user_email || e.user_id,
-        e.step,
-        e.action,
-        e.correlation_id || "",
-        e.trace_id || "",
-        e.created_at,
-        JSON.stringify(e.params).replace(/"/g, '""')
-      ].map(v => `"${v}"`).join(","));
-      
-      content = [headers.join(","), ...rows].join("\n");
-      mime = "text/csv";
+    if (format === "csv") {
+      setIsExportModalOpen(true);
+      return;
     }
 
-    const blob = new Blob([content], { type: mime });
+    const filename = `creative-audit-filtered-${new Date().toISOString()}.json`;
+    const content = JSON.stringify(entries, null, 2);
+    const blob = new Blob([content], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -485,6 +518,51 @@ export default function CreativeAuditPage() {
     link.click();
     URL.revokeObjectURL(url);
     toast.success(`Exportado (${entries.length} registros filtrados)`);
+  };
+
+  const handleDownloadCSV = () => {
+    if (selectedColumns.length === 0) {
+      toast.error("Selecione pelo menos uma coluna para exportar.");
+      return;
+    }
+
+    saveExportSettings();
+
+    const filename = `creative-audit-${new Date().toISOString()}.csv`;
+    const headers = selectedColumns.map(colId => availableColumns.find(c => c.id === colId)?.label || colId);
+    
+    const rows = entries.map(e => {
+      return selectedColumns.map(colId => {
+        let value = "";
+        if (colId === "id") value = e.id;
+        else if (colId === "created_at") {
+          const date = new Date(e.created_at);
+          value = exportDateFormat === "DD/MM/AAAA" 
+            ? date.toLocaleString('pt-BR') 
+            : date.toISOString();
+        }
+        else if (colId === "user") value = e.user_email || e.user_id;
+        else if (colId === "step") value = e.step;
+        else if (colId === "action") value = e.action;
+        else if (colId === "correlation_id") value = e.correlation_id || "";
+        else if (colId === "trace_id") value = e.trace_id || "";
+        else if (colId === "params") value = JSON.stringify(e.params);
+        
+        return `"${value.replace(/"/g, '""')}"`;
+      }).join(",");
+    });
+
+    const content = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+    
+    setIsExportModalOpen(false);
+    toast.success(`CSV exportado com ${entries.length} registros.`);
   };
 
   return (
@@ -1118,6 +1196,142 @@ export default function CreativeAuditPage() {
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Export CSV Dialog */}
+      <Dialog open={isExportModalOpen} onOpenChange={setIsExportModalOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileDown className="h-5 w-5 text-primary" /> Exportar Auditoria (CSV)
+            </DialogTitle>
+            <DialogDescription>
+              Personalize seu relatório antes de baixar.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-6 py-4">
+            {/* Summary Section */}
+            <div className="bg-accent/20 p-4 rounded-lg border border-accent/50">
+              <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                <Info className="h-4 w-4" /> Resumo da Exportação
+              </h4>
+              <div className="grid grid-cols-2 gap-y-2 text-xs">
+                <div className="text-muted-foreground">Total de registros:</div>
+                <div className="font-medium">{count} registros filtrados</div>
+                <div className="text-muted-foreground">Intervalo de datas:</div>
+                <div className="font-medium">
+                  {startDate || "Início"} até {endDate || "Hoje"}
+                </div>
+                <div className="text-muted-foreground">Colunas selecionadas:</div>
+                <div className="font-medium">{selectedColumns.length} de {availableColumns.length}</div>
+              </div>
+            </div>
+
+            {/* Column Selection */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-semibold">Selecione as Colunas</h4>
+                <div className="flex gap-2">
+                  <Button variant="ghost" size="sm" className="h-7 text-[10px]" onClick={selectAllColumns}>
+                    <Check className="h-3 w-3 mr-1" /> Selecionar Tudo
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-7 text-[10px]" onClick={clearColumns}>
+                    <X className="h-3 w-3 mr-1" /> Limpar
+                  </Button>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {availableColumns.map((col) => (
+                  <div key={col.id} className="flex items-center space-x-2">
+                    <Checkbox 
+                      id={`col-${col.id}`} 
+                      checked={selectedColumns.includes(col.id)} 
+                      onCheckedChange={() => toggleColumn(col.id)}
+                    />
+                    <Label htmlFor={`col-${col.id}`} className="text-xs cursor-pointer">{col.label}</Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Formatting Options */}
+            <div className="space-y-3">
+              <h4 className="text-sm font-semibold">Formatação de Datas</h4>
+              <div className="flex gap-4">
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="date-br" 
+                    checked={exportDateFormat === "DD/MM/AAAA"} 
+                    onCheckedChange={() => setExportDateFormat("DD/MM/AAAA")}
+                  />
+                  <Label htmlFor="date-br" className="text-xs cursor-pointer">DD/MM/AAAA (Brasil)</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="date-iso" 
+                    checked={exportDateFormat === "ISO"} 
+                    onCheckedChange={() => setExportDateFormat("ISO")}
+                  />
+                  <Label htmlFor="date-iso" className="text-xs cursor-pointer">ISO (AAAA-MM-DD)</Label>
+                </div>
+              </div>
+            </div>
+
+            {/* Preview Section */}
+            {selectedColumns.length > 0 && entries.length > 0 && (
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold flex items-center gap-2">
+                  <ListChecks className="h-4 w-4" /> Pré-visualização (Primeiras 3 linhas)
+                </h4>
+                <div className="border rounded-md overflow-x-auto">
+                  <table className="w-full text-[10px] border-collapse">
+                    <thead className="bg-muted">
+                      <tr>
+                        {selectedColumns.map(colId => (
+                          <th key={colId} className="p-2 border text-left whitespace-nowrap">
+                            {availableColumns.find(c => c.id === colId)?.label}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {entries.slice(0, 3).map((e, idx) => (
+                        <tr key={idx}>
+                          {selectedColumns.map(colId => {
+                            let val = "";
+                            if (colId === "id") val = e.id.slice(0, 8);
+                            else if (colId === "created_at") val = exportDateFormat === "DD/MM/AAAA" ? new Date(e.created_at).toLocaleString() : e.created_at;
+                            else if (colId === "user") val = (e.user_email || e.user_id).slice(0, 15);
+                            else if (colId === "step") val = e.step;
+                            else if (colId === "action") val = e.action;
+                            else if (colId === "correlation_id") val = (e.correlation_id || "").slice(0, 8);
+                            else if (colId === "trace_id") val = (e.trace_id || "").slice(0, 8);
+                            else if (colId === "params") val = "{...}";
+                            return (
+                              <td key={colId} className="p-2 border truncate max-w-[120px]" title={val}>
+                                {val}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setIsExportModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleDownloadCSV} disabled={selectedColumns.length === 0}>
+              Confirmar e Baixar CSV
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
