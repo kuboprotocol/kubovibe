@@ -319,6 +319,14 @@ export default function CSVExportModal({ open, onOpenChange, logs, filterFallbac
 
     const header = activeLabels;
     
+    // Validação de Ordem (Opcional: garantir que colunas essenciais sigam uma lógica se presentes)
+    const orderIndices = requiredLabels.map(label => header.indexOf(label));
+    const isOrdered = orderIndices.every((val, i) => i === 0 || val >= orderIndices[i - 1]);
+
+    if (!isOrdered) {
+      toast.error("Aviso: As colunas obrigatórias não estão na ordem recomendada, mas o CSV será gerado.");
+    }
+
     const rows = filteredLogs.map(log => {
       return activeCols.map(colId => {
         let val = (log as any)[colId] ?? '';
