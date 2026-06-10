@@ -677,7 +677,8 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
             credits: 0,
             temperature,
             max_tokens: maxTokens,
-            decision_trail: decisionTrail
+            decision_trail: decisionTrail,
+            status: "success" as any
           }
         };
         
@@ -808,7 +809,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
             temperature,
             max_tokens: maxTokens,
             decision_trail: decisionTrail,
-            status: decisionTrail.some(t => t.toLowerCase().includes("fallback")) ? "fallback_success" : "success"
+            status: (decisionTrail.some(t => t.toLowerCase().includes("fallback")) ? "fallback_success" : "success") as any
           }
         }, ...prev].slice(0, 50));
       } else {
