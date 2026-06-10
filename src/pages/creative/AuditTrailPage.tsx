@@ -1333,10 +1333,13 @@ export default function CreativeAuditPage() {
               </div>
             </div>
 
-            {/* Column Selection */}
+            {/* Column Selection with Drag and Drop */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h4 className="text-sm font-semibold">Selecione as Colunas</h4>
+                <div className="space-y-0.5">
+                  <h4 className="text-sm font-semibold">Selecione e Reordene as Colunas</h4>
+                  <p className="text-[10px] text-muted-foreground">Arraste para mudar a ordem no CSV</p>
+                </div>
                 <div className="flex gap-2">
                   <Button variant="ghost" size="sm" className="h-7 text-[10px]" onClick={selectAllColumns}>
                     <ListChecks className="h-3 w-3 mr-1" /> Selecionar Tudo
@@ -1346,15 +1349,45 @@ export default function CreativeAuditPage() {
                   </Button>
                 </div>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {availableColumns.map((col) => (
-                  <div key={col.id} className="flex items-center space-x-2">
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[200px] overflow-y-auto p-1">
+                <DndContext 
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
+                  modifiers={[restrictToVerticalAxis, restrictToFirstScrollableAncestor]}
+                >
+                  <SortableContext 
+                    items={selectedColumns}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    {/* Render selected/sorted columns first */}
+                    {selectedColumns.map((colId) => {
+                      const col = availableColumns.find(c => c.id === colId);
+                      if (!col) return null;
+                      return (
+                        <SortableItem 
+                          key={col.id} 
+                          id={col.id} 
+                          label={col.label} 
+                          isChecked={true} 
+                          onToggle={() => toggleColumn(col.id)} 
+                        />
+                      );
+                    })}
+                  </SortableContext>
+                </DndContext>
+
+                {/* Render unselected columns */}
+                {availableColumns.filter(c => !selectedColumns.includes(c.id)).map((col) => (
+                  <div key={col.id} className="flex items-center space-x-2 p-2 rounded-md border bg-muted/20">
+                    <div className="w-6" /> {/* Spacer for drag handle */}
                     <Checkbox 
                       id={`col-${col.id}`} 
-                      checked={selectedColumns.includes(col.id)} 
+                      checked={false} 
                       onCheckedChange={() => toggleColumn(col.id)}
                     />
-                    <Label htmlFor={`col-${col.id}`} className="text-xs cursor-pointer">{col.label}</Label>
+                    <Label htmlFor={`col-${col.id}`} className="text-xs cursor-pointer flex-1 py-1">{col.label}</Label>
                   </div>
                 ))}
               </div>
