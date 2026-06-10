@@ -908,16 +908,25 @@ ${JSON.stringify(ex.output, null, 2)}
                           <Button 
                             variant="ghost" 
                             size="icon" 
-                            className="h-8 w-8 text-muted-foreground hover:text-primary"
-                            onClick={() => { setEditingPresetId(p.id); setEditPresetName(p.name); }}
-                            title="Renomear"
+                            className="h-8 w-8 text-primary"
+                            onClick={() => applyPreset(p)}
+                            title="Aplicar"
                           >
-                            <Info className="h-4 w-4" />
+                            <Check className="h-4 w-4" />
                           </Button>
                           <Button 
                             variant="ghost" 
                             size="icon" 
                             className="h-8 w-8 text-muted-foreground hover:text-primary"
+                            onClick={() => { setEditingPresetId(p.id); setEditPresetName(p.name); }}
+                            title="Renomear"
+                          >
+                            <Settings2 className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-sky-400 hover:bg-sky-400/10"
                             onClick={() => duplicatePreset(p)}
                             title="Duplicar"
                           >
