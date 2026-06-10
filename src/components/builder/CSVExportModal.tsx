@@ -398,9 +398,29 @@ export default function CSVExportModal({ open, onOpenChange, logs, filterFallbac
                 <table className="w-full text-[10px] border-collapse">
                   <thead className="sticky top-0 bg-muted/80 backdrop-blur">
                     <tr>
-                      {previewData.header.map((h, i) => (
-                        <th key={i} className="px-2 py-1.5 text-left border-b font-bold whitespace-nowrap">{h}</th>
-                      ))}
+                      {previewData.header.map((h, i) => {
+                        const colId = columnOrder.filter(id => selectedColumns.has(id))[i];
+                        const isSorted = sortConfig?.key === colId;
+                        return (
+                          <th 
+                            key={i} 
+                            className="px-2 py-1.5 text-left border-b font-bold whitespace-nowrap cursor-pointer hover:bg-muted transition-colors select-none"
+                            onClick={() => {
+                              setSortConfig(current => ({
+                                key: colId,
+                                direction: current?.key === colId && current.direction === 'asc' ? 'desc' : 'asc'
+                              }));
+                            }}
+                          >
+                            <div className="flex items-center gap-1">
+                              {h}
+                              {isSorted && (
+                                sortConfig.direction === 'asc' ? <ChevronUp className="h-2 w-2" /> : <ChevronDown className="h-2 w-2" />
+                              )}
+                            </div>
+                          </th>
+                        );
+                      })}
                     </tr>
                   </thead>
                   <tbody>
