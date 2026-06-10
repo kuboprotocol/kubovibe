@@ -764,7 +764,7 @@ ${JSON.stringify(ex.output, null, 2)}
 
       {/* Presets Management Modal */}
       <Dialog open={isPresetsModalOpen} onOpenChange={setIsPresetsModalOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Settings2 className="h-5 w-5 text-primary" />
@@ -775,70 +775,133 @@ ${JSON.stringify(ex.output, null, 2)}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="py-4 space-y-3 max-h-[400px] overflow-y-auto pr-2 scrollbar-hide">
-            {presets.length === 0 ? (
-              <p className="text-center text-sm text-muted-foreground py-8">Nenhum preset salvo ainda.</p>
-            ) : (
-              presets.map(p => (
-                <div key={p.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/30 border border-border/50 group">
-                  {editingPresetId === p.id ? (
-                    <div className="flex-1 flex gap-2">
-                      <Input 
-                        value={editPresetName} 
-                        onChange={e => setEditPresetName(e.target.value)}
-                        className="h-8 text-xs"
-                        autoFocus
-                      />
-                      <Button size="icon" className="h-8 w-8" onClick={() => updatePreset(p.id, editPresetName)}>
-                        <Check className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingPresetId(null)}>
-                        <XCircle className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex-1">
-                        <p className="text-sm font-bold">{p.name}</p>
-                        <p className="text-[10px] text-muted-foreground opacity-70">
-                          {Object.entries(p.filters).filter(([_, v]) => v && v !== 'all').map(([k, v]) => `${k}: ${v}`).join(', ') || 'Sem filtros específicos'}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8 text-muted-foreground hover:text-primary"
-                          onClick={() => { setEditingPresetId(p.id); setEditPresetName(p.name); }}
-                          title="Renomear"
-                        >
-                          <Info className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8 text-muted-foreground hover:text-primary"
-                          onClick={() => duplicatePreset(p)}
-                          title="Duplicar"
-                        >
-                          <Copy className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8 text-destructive opacity-50 hover:opacity-100"
-                          onClick={() => deletePreset(p.id)}
-                          title="Excluir"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </>
-                  )}
+          <div className="flex flex-col gap-4 mt-2">
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input 
+                  placeholder="Buscar preset..." 
+                  value={presetSearch}
+                  onChange={e => setPresetSearch(e.target.value)}
+                  className="pl-9 h-9 text-xs"
+                />
+              </div>
+              <Select value={presetSort} onValueChange={(v: any) => setPresetSort(v)}>
+                <SelectTrigger className="h-9 w-32 text-xs">
+                  <SelectValue placeholder="Ordenar" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name">Nome (A-Z)</SelectItem>
+                  <SelectItem value="recent">Mais Recentes</SelectItem>
+                </SelectContent>
+              </Select>
+              <div className="flex items-center gap-1 border-l pl-2">
+                <Button variant="outline" size="icon" className="h-9 w-9" onClick={exportPresets} title="Exportar Presets (JSON)">
+                  <Upload className="h-4 w-4 rotate-180" />
+                </Button>
+                <div className="relative">
+                  <input 
+                    type="file" 
+                    accept=".json" 
+                    className="absolute inset-0 opacity-0 cursor-pointer" 
+                    onChange={importPresets}
+                    title="Importar Presets (JSON)"
+                  />
+                  <Button variant="outline" size="icon" className="h-9 w-9">
+                    <Download className="h-4 w-4 rotate-180" />
+                  </Button>
                 </div>
-              ))
-            )}
+              </div>
+            </div>
+
+            <div className="py-2 space-y-3 max-h-[400px] overflow-y-auto pr-2 scrollbar-hide">
+              {filteredPresets.length === 0 ? (
+                <p className="text-center text-sm text-muted-foreground py-8">
+                  {presetSearch ? "Nenhum preset encontrado para esta busca." : "Nenhum preset salvo ainda."}
+                </p>
+              ) : (
+                filteredPresets.map(p => (
+                  <div key={p.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/30 border border-border/50 group">
+                    {editingPresetId === p.id ? (
+                      <div className="flex-1 flex gap-2">
+                        <Input 
+                          value={editPresetName} 
+                          onChange={e => setEditPresetName(e.target.value)}
+                          className="h-8 text-xs"
+                          autoFocus
+                        />
+                        <Button size="icon" className="h-8 w-8" onClick={() => updatePreset(p.id, editPresetName)}>
+                          <Check className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingPresetId(null)}>
+                          <XCircle className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex-1">
+                          <p className="text-sm font-bold">{p.name}</p>
+                          <p className="text-[10px] text-muted-foreground opacity-70">
+                            {Object.entries(p.filters).filter(([_, v]) => v && v !== 'all').map(([k, v]) => `${k}: ${v}`).join(', ') || 'Sem filtros específicos'}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-muted-foreground hover:text-primary"
+                            onClick={() => { setEditingPresetId(p.id); setEditPresetName(p.name); }}
+                            title="Renomear"
+                          >
+                            <Info className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-muted-foreground hover:text-primary"
+                            onClick={() => duplicatePreset(p)}
+                            title="Duplicar"
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-destructive opacity-50 hover:opacity-100"
+                            onClick={() => setPresetToDelete(p.id)}
+                            title="Excluir"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Modal */}
+      <Dialog open={!!presetToDelete} onOpenChange={(open) => !open && setPresetToDelete(null)}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Confirmar Exclusão
+            </DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja excluir este preset? Esta ação não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="ghost" onClick={() => setPresetToDelete(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={() => { if (presetToDelete) { deletePreset(presetToDelete); setPresetToDelete(null); } }}>
+              Excluir Preset
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
