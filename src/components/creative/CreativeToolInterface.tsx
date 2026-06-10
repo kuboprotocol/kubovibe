@@ -798,7 +798,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
           id: crypto.randomUUID(),
           timestamp: new Date().toLocaleTimeString(),
           prompt,
-          status: "success",
+          status: "success" as const,
           output_text: typeof data === 'string' ? data : (data?.output || "Processado com sucesso"),
           metadata: { 
             ...metadata, 
