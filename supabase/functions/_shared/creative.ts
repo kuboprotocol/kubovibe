@@ -114,6 +114,39 @@ export async function deductCredits(
   return { ok: true, replayed: !!(data as any)?.replayed };
 }
 
+export async function recordSkillExecution(
+  userId: string,
+  payload: {
+    skill_slug: string;
+    skill_name?: string;
+    input?: Record<string, unknown>;
+    output?: Record<string, unknown>;
+    status?: string;
+    error_message?: string;
+    credits_charged?: number;
+    duration_ms?: number;
+  },
+) {
+  const admin = supaAdmin();
+  const { data, error } = await admin
+    .from("skill_executions")
+    .insert({
+      user_id: userId,
+      skill_slug: payload.skill_slug,
+      skill_name: payload.skill_name ?? payload.skill_slug,
+      input: payload.input ?? {},
+      output: payload.output ?? {},
+      status: payload.status ?? "succeeded",
+      error_message: payload.error_message,
+      credits_charged: payload.credits_charged ?? 0,
+      duration_ms: payload.duration_ms,
+    })
+    .select("id")
+    .single();
+  if (error) console.error("recordSkillExecution error", error);
+  return data?.id as string | undefined;
+}
+
 export async function recordAsset(
   userId: string,
   payload: {
@@ -127,6 +160,16 @@ export async function recordAsset(
   },
 ) {
   const admin = supaAdmin();
+  
+  // Record in skill_executions too for unified history
+  await recordSkillExecution(userId, {
+    skill_slug: payload.tool,
+    input: { prompt: payload.prompt, ...payload.metadata },
+    output: { url: payload.output_url, text: payload.output_text },
+    status: payload.status,
+    credits_charged: payload.credits_spent,
+  });
+
   const { data, error } = await admin
     .from("creative_assets")
     .insert({
