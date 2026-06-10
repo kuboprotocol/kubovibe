@@ -119,6 +119,46 @@ export default function CreativeAuditPage() {
   const [showConfig, setShowConfig] = useState(false);
   const [expandedCorrelations, setExpandedCorrelations] = useState<Set<string>>(new Set());
 
+  // Export CSV State
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [exportDateFormat, setExportDateFormat] = useState<"DD/MM/AAAA" | "ISO">(() => {
+    return (localStorage.getItem("audit_export_date_format") as "DD/MM/AAAA" | "ISO") || "DD/MM/AAAA";
+  });
+  const [selectedColumns, setSelectedColumns] = useState<string[]>(() => {
+    const saved = localStorage.getItem("audit_export_columns");
+    return saved ? JSON.parse(saved) : ["created_at", "user", "step", "action", "correlation_id"];
+  });
+
+  const availableColumns = [
+    { id: "id", label: "ID" },
+    { id: "created_at", label: "Data/Hora" },
+    { id: "user", label: "Usuário" },
+    { id: "step", label: "Etapa" },
+    { id: "action", label: "Ação" },
+    { id: "correlation_id", label: "ID de Correlação" },
+    { id: "trace_id", label: "ID de Trace" },
+    { id: "params", label: "Parâmetros" },
+  ];
+
+  const toggleColumn = (colId: string) => {
+    setSelectedColumns(prev => 
+      prev.includes(colId) ? prev.filter(id => id !== colId) : [...prev, colId]
+    );
+  };
+
+  const selectAllColumns = () => {
+    setSelectedColumns(availableColumns.map(c => c.id));
+  };
+
+  const clearColumns = () => {
+    setSelectedColumns([]);
+  };
+
+  const saveExportSettings = () => {
+    localStorage.setItem("audit_export_columns", JSON.stringify(selectedColumns));
+    localStorage.setItem("audit_export_date_format", exportDateFormat);
+  };
+
   // Update URL params when filters change
   useEffect(() => {
     const params: Record<string, string> = {};
