@@ -396,6 +396,16 @@ export default function CSVExportModal({ open, onOpenChange, logs, filterFallbac
       return;
     }
 
+    // Validação de Ordem Estrita
+    const presentRequired = requiredLabels.filter(l => colsInSheet.includes(l));
+    const sheetRequiredOrder = colsInSheet.filter(l => requiredLabels.includes(l));
+    const isOrderCorrect = JSON.stringify(presentRequired) === JSON.stringify(sheetRequiredOrder);
+
+    if (!isOrderCorrect) {
+      toast.error("Falha na validação: As colunas obrigatórias devem estar na ordem: Modelo > Créditos > Tempo > Status.");
+      return;
+    }
+
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Audit Log");
     XLSX.writeFile(workbook, `audit-log-${Date.now()}.xlsx`);
