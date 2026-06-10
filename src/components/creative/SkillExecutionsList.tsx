@@ -103,7 +103,7 @@ export function SkillExecutionsList() {
   const [availableSkills, setAvailableSkills] = useState<{slug: string, name: string}[]>([]);
 
   // Presets
-  const [presets, setPresets] = useState<{ id: string, name: string, filters: any, sorting: any }[]>([]);
+  const [presets, setPresets] = useState<{ id: string, name: string, filters: any, sorting: any, created_at?: string }[]>([]);
   const [newPresetName, setNewPresetName] = useState("");
   const [isSavingPreset, setIsSavingPreset] = useState(false);
   const [isPresetsModalOpen, setIsPresetsModalOpen] = useState(false);
@@ -112,6 +112,13 @@ export function SkillExecutionsList() {
   const [presetSearch, setPresetSearch] = useState("");
   const [presetSort, setPresetSort] = useState<"name" | "recent">("name");
   const [presetToDelete, setPresetToDelete] = useState<string | null>(null);
+  
+  // Import/Export Presets
+  const [selectedPresetIds, setSelectedPresetIds] = useState<string[]>([]);
+  const [importHistory, setImportHistory] = useState<{ timestamp: string, status: "success" | "partial" | "error", message: string, errors?: string[] }[]>([]);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importValidationResults, setImportValidationResults] = useState<{ valid: boolean, errors: string[], preview: any[] } | null>(null);
+  const [mergeOption, setMergeOption] = useState<"create" | "merge">("create");
 
   // Export Configuration
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
