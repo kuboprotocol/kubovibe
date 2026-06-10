@@ -147,6 +147,29 @@ export async function recordSkillExecution(
   return data?.id as string | undefined;
 }
 
+export async function updateSkillExecution(
+  id: string,
+  payload: {
+    status?: string;
+    output?: Record<string, unknown>;
+    error_message?: string;
+    duration_ms?: number;
+  },
+) {
+  const admin = supaAdmin();
+  const { error } = await admin
+    .from("skill_executions")
+    .update({
+      status: payload.status,
+      output: payload.output,
+      error_message: payload.error_message,
+      duration_ms: payload.duration_ms,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+  if (error) console.error("updateSkillExecution error", error);
+}
+
 export async function recordAsset(
   userId: string,
   payload: {
