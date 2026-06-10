@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { 
@@ -31,7 +31,9 @@ import {
   Copy,
   Download,
   FileText,
-  Keyboard
+  Keyboard,
+  Upload,
+  AlertTriangle
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -106,6 +108,9 @@ export function SkillExecutionsList() {
   const [isPresetsModalOpen, setIsPresetsModalOpen] = useState(false);
   const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
   const [editPresetName, setEditPresetName] = useState("");
+  const [presetSearch, setPresetSearch] = useState("");
+  const [presetSort, setPresetSort] = useState<"name" | "recent">("name");
+  const [presetToDelete, setPresetToDelete] = useState<string | null>(null);
 
   // Export Configuration
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -249,6 +254,72 @@ export function SkillExecutionsList() {
       toast.error("Erro ao renomear preset.");
     }
   };
+
+  const exportPresets = () => {
+    if (presets.length === 0) {
+      toast.error("Nenhum preset para exportar.");
+      return;
+    }
+    const data = JSON.stringify(presets, null, 2);
+    const blob = new Blob([data], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `presets_history_${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success("Presets exportados com sucesso!");
+  };
+
+  const importPresets = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const imported = JSON.parse(text);
+      
+      if (!Array.isArray(imported)) throw new Error("Formato inválido");
+
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error("Usuário não autenticado");
+
+      // Insert each valid preset
+      for (const p of imported) {
+        if (p.name && p.filters) {
+          await supabase.from("filter_presets").insert({
+            user_id: userData.user.id,
+            name: `${p.name} (Importado)`,
+            filters: p.filters,
+            sorting: p.sorting || { column: "created_at", direction: "desc" }
+          });
+        }
+      }
+      
+      await loadPresets();
+      toast.success("Presets importados com sucesso!");
+    } catch (error) {
+      console.error("Error importing presets:", error);
+      toast.error("Erro ao importar arquivo JSON.");
+    }
+    e.target.value = "";
+  };
+
+  const filteredPresets = useMemo(() => {
+    let result = [...presets];
+    if (presetSearch) {
+      result = result.filter(p => p.name.toLowerCase().includes(presetSearch.toLowerCase()));
+    }
+    if (presetSort === "name") {
+      result.sort((a, b) => a.name.localeCompare(b.name));
+    } else {
+      // Logic for "recent" depends on if we have updated_at or created_at in the interface
+      // Since it's from DB, we can assume alphabetical for now if not present, but usually we have it.
+      // @ts-ignore
+      result.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+    }
+    return result;
+  }, [presets, presetSearch, presetSort]);
 
   const duplicatePreset = async (preset: any) => {
     try {
@@ -693,7 +764,7 @@ ${JSON.stringify(ex.output, null, 2)}
 
       {/* Presets Management Modal */}
       <Dialog open={isPresetsModalOpen} onOpenChange={setIsPresetsModalOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Settings2 className="h-5 w-5 text-primary" />
@@ -704,70 +775,133 @@ ${JSON.stringify(ex.output, null, 2)}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="py-4 space-y-3 max-h-[400px] overflow-y-auto pr-2 scrollbar-hide">
-            {presets.length === 0 ? (
-              <p className="text-center text-sm text-muted-foreground py-8">Nenhum preset salvo ainda.</p>
-            ) : (
-              presets.map(p => (
-                <div key={p.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/30 border border-border/50 group">
-                  {editingPresetId === p.id ? (
-                    <div className="flex-1 flex gap-2">
-                      <Input 
-                        value={editPresetName} 
-                        onChange={e => setEditPresetName(e.target.value)}
-                        className="h-8 text-xs"
-                        autoFocus
-                      />
-                      <Button size="icon" className="h-8 w-8" onClick={() => updatePreset(p.id, editPresetName)}>
-                        <Check className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingPresetId(null)}>
-                        <XCircle className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex-1">
-                        <p className="text-sm font-bold">{p.name}</p>
-                        <p className="text-[10px] text-muted-foreground opacity-70">
-                          {Object.entries(p.filters).filter(([_, v]) => v && v !== 'all').map(([k, v]) => `${k}: ${v}`).join(', ') || 'Sem filtros específicos'}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8 text-muted-foreground hover:text-primary"
-                          onClick={() => { setEditingPresetId(p.id); setEditPresetName(p.name); }}
-                          title="Renomear"
-                        >
-                          <Info className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8 text-muted-foreground hover:text-primary"
-                          onClick={() => duplicatePreset(p)}
-                          title="Duplicar"
-                        >
-                          <Copy className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8 text-destructive opacity-50 hover:opacity-100"
-                          onClick={() => deletePreset(p.id)}
-                          title="Excluir"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </>
-                  )}
+          <div className="flex flex-col gap-4 mt-2">
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input 
+                  placeholder="Buscar preset..." 
+                  value={presetSearch}
+                  onChange={e => setPresetSearch(e.target.value)}
+                  className="pl-9 h-9 text-xs"
+                />
+              </div>
+              <Select value={presetSort} onValueChange={(v: any) => setPresetSort(v)}>
+                <SelectTrigger className="h-9 w-32 text-xs">
+                  <SelectValue placeholder="Ordenar" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name">Nome (A-Z)</SelectItem>
+                  <SelectItem value="recent">Mais Recentes</SelectItem>
+                </SelectContent>
+              </Select>
+              <div className="flex items-center gap-1 border-l pl-2">
+                <Button variant="outline" size="icon" className="h-9 w-9" onClick={exportPresets} title="Exportar Presets (JSON)">
+                  <Upload className="h-4 w-4 rotate-180" />
+                </Button>
+                <div className="relative">
+                  <input 
+                    type="file" 
+                    accept=".json" 
+                    className="absolute inset-0 opacity-0 cursor-pointer" 
+                    onChange={importPresets}
+                    title="Importar Presets (JSON)"
+                  />
+                  <Button variant="outline" size="icon" className="h-9 w-9">
+                    <Download className="h-4 w-4 rotate-180" />
+                  </Button>
                 </div>
-              ))
-            )}
+              </div>
+            </div>
+
+            <div className="py-2 space-y-3 max-h-[400px] overflow-y-auto pr-2 scrollbar-hide">
+              {filteredPresets.length === 0 ? (
+                <p className="text-center text-sm text-muted-foreground py-8">
+                  {presetSearch ? "Nenhum preset encontrado para esta busca." : "Nenhum preset salvo ainda."}
+                </p>
+              ) : (
+                filteredPresets.map(p => (
+                  <div key={p.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/30 border border-border/50 group">
+                    {editingPresetId === p.id ? (
+                      <div className="flex-1 flex gap-2">
+                        <Input 
+                          value={editPresetName} 
+                          onChange={e => setEditPresetName(e.target.value)}
+                          className="h-8 text-xs"
+                          autoFocus
+                        />
+                        <Button size="icon" className="h-8 w-8" onClick={() => updatePreset(p.id, editPresetName)}>
+                          <Check className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingPresetId(null)}>
+                          <XCircle className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex-1">
+                          <p className="text-sm font-bold">{p.name}</p>
+                          <p className="text-[10px] text-muted-foreground opacity-70">
+                            {Object.entries(p.filters).filter(([_, v]) => v && v !== 'all').map(([k, v]) => `${k}: ${v}`).join(', ') || 'Sem filtros específicos'}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-muted-foreground hover:text-primary"
+                            onClick={() => { setEditingPresetId(p.id); setEditPresetName(p.name); }}
+                            title="Renomear"
+                          >
+                            <Info className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-muted-foreground hover:text-primary"
+                            onClick={() => duplicatePreset(p)}
+                            title="Duplicar"
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-destructive opacity-50 hover:opacity-100"
+                            onClick={() => setPresetToDelete(p.id)}
+                            title="Excluir"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Modal */}
+      <Dialog open={!!presetToDelete} onOpenChange={(open) => !open && setPresetToDelete(null)}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Confirmar Exclusão
+            </DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja excluir este preset? Esta ação não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="ghost" onClick={() => setPresetToDelete(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={() => { if (presetToDelete) { deletePreset(presetToDelete); setPresetToDelete(null); } }}>
+              Excluir Preset
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
