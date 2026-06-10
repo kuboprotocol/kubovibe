@@ -103,7 +103,7 @@ export function SkillExecutionsList() {
   const [availableSkills, setAvailableSkills] = useState<{slug: string, name: string}[]>([]);
 
   // Presets
-  const [presets, setPresets] = useState<{ id: string, name: string, filters: any, sorting: any }[]>([]);
+  const [presets, setPresets] = useState<{ id: string, name: string, filters: any, sorting: any, created_at?: string }[]>([]);
   const [newPresetName, setNewPresetName] = useState("");
   const [isSavingPreset, setIsSavingPreset] = useState(false);
   const [isPresetsModalOpen, setIsPresetsModalOpen] = useState(false);
@@ -112,6 +112,13 @@ export function SkillExecutionsList() {
   const [presetSearch, setPresetSearch] = useState("");
   const [presetSort, setPresetSort] = useState<"name" | "recent">("name");
   const [presetToDelete, setPresetToDelete] = useState<string | null>(null);
+  
+  // Import/Export Presets
+  const [selectedPresetIds, setSelectedPresetIds] = useState<string[]>([]);
+  const [importHistory, setImportHistory] = useState<{ timestamp: string, status: "success" | "partial" | "error", message: string, errors?: string[] }[]>([]);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importValidationResults, setImportValidationResults] = useState<{ valid: boolean, errors: string[], preview: any[] } | null>(null);
+  const [mergeOption, setMergeOption] = useState<"create" | "merge">("create");
 
   // Export Configuration
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -256,109 +263,182 @@ export function SkillExecutionsList() {
     }
   };
 
-  const exportPresets = () => {
-    if (presets.length === 0) {
-      toast.error("Nenhum preset para exportar.");
+  const exportPresets = (selectedOnly = false) => {
+    const toExport = selectedOnly 
+      ? presets.filter(p => selectedPresetIds.includes(p.id))
+      : presets;
+
+    if (toExport.length === 0) {
+      toast.error(selectedOnly ? "Selecione ao menos um preset para exportar." : "Nenhum preset para exportar.");
       return;
     }
-    const data = JSON.stringify(presets, null, 2);
+
+    const exportData = {
+      version: "1.0.0",
+      timestamp: new Date().toISOString(),
+      presets: toExport.map(p => ({
+        name: p.name,
+        filters: p.filters,
+        sorting: p.sorting
+      }))
+    };
+
+    const data = JSON.stringify(exportData, null, 2);
     const blob = new Blob([data], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `presets_history_${new Date().toISOString().split('T')[0]}.json`;
+    link.download = `presets_history_${selectedOnly ? 'selected_' : ''}${new Date().toISOString().split('T')[0]}.json`;
     link.click();
     URL.revokeObjectURL(url);
-    toast.success("Presets exportados com sucesso!");
+    toast.success(`${toExport.length} presets exportados com sucesso!`);
   };
 
-  const importPresets = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const validatePresetFile = async (file: File) => {
     try {
       const text = await file.text();
       let imported;
       try {
         imported = JSON.parse(text);
       } catch (e) {
-        toast.error("Arquivo JSON inválido.");
-        return;
-      }
-      
-      if (!Array.isArray(imported)) {
-        toast.error("O arquivo deve conter uma lista (array) de presets.");
-        return;
+        return { valid: false, errors: ["Arquivo JSON malformado."], preview: [] };
       }
 
+      // Handle both legacy array and new versioned object
+      const presetsList = Array.isArray(imported) ? imported : (imported.presets || []);
+      
+      if (!Array.isArray(presetsList)) {
+        return { valid: false, errors: ["O arquivo deve conter uma lista de presets."], preview: [] };
+      }
+
+      const errors: string[] = [];
+      const validPresets: any[] = [];
+
+      presetsList.forEach((p, index) => {
+        const itemErrors: string[] = [];
+        if (!p.name) itemErrors.push(`Preset #${index + 1}: Nome ausente.`);
+        if (!p.filters) itemErrors.push(`Preset #${index + 1}: Filtros ausentes.`);
+        
+        if (itemErrors.length > 0) {
+          errors.push(...itemErrors);
+        } else {
+          validPresets.push(p);
+        }
+      });
+
+      return { valid: validPresets.length > 0, errors, preview: validPresets };
+    } catch (e) {
+      return { valid: false, errors: ["Erro ao ler o arquivo."], preview: [] };
+    }
+  };
+
+  const handleImportFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    const results = await validatePresetFile(file);
+    setImportValidationResults(results);
+    setIsImportModalOpen(true);
+    e.target.value = "";
+  };
+
+  const executeImport = async () => {
+    if (!importValidationResults || importValidationResults.preview.length === 0) return;
+
+    try {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error("Usuário não autenticado");
 
       let acceptedCount = 0;
-      let rejectedCount = 0;
+      let updatedCount = 0;
+      const errors: string[] = [];
 
-      for (const p of imported) {
-        const isValid = p && typeof p === 'object' && p.name && p.filters;
-        
-        if (isValid) {
-          try {
-            await supabase.from("filter_presets").insert({
+      for (const p of importValidationResults.preview) {
+        try {
+          // Check for conflict if merge is selected
+          const existing = mergeOption === "merge" 
+            ? presets.find(ex => ex.name === p.name || ex.name === `${p.name} (Importado)`)
+            : null;
+
+          if (existing) {
+            const { error } = await supabase
+              .from("filter_presets")
+              .update({
+                filters: p.filters,
+                sorting: p.sorting || { column: "created_at", direction: "desc" }
+              })
+              .eq("id", existing.id);
+            if (error) throw error;
+            updatedCount++;
+          } else {
+            const { error } = await supabase.from("filter_presets").insert({
               user_id: userData.user.id,
-              name: `${p.name} (Importado)`,
+              name: mergeOption === "merge" ? p.name : `${p.name} (Importado)`,
               filters: p.filters,
               sorting: p.sorting || { column: "created_at", direction: "desc" }
             });
+            if (error) throw error;
             acceptedCount++;
-          } catch (err) {
-            rejectedCount++;
           }
-        } else {
-          rejectedCount++;
+        } catch (err: any) {
+          errors.push(`Erro ao importar "${p.name}": ${err.message || 'Erro desconhecido'}`);
         }
       }
+
+      const totalHandled = acceptedCount + updatedCount;
+      const status = errors.length === 0 ? "success" : (totalHandled > 0 ? "partial" : "error");
+      const message = `${acceptedCount} criados, ${updatedCount} atualizados, ${errors.length} erros.`;
       
+      setImportHistory(prev => [{
+        timestamp: new Date().toISOString(),
+        status,
+        message,
+        errors: errors.length > 0 ? errors : undefined
+      }, ...prev]);
+
       await loadPresets();
+      setIsImportModalOpen(false);
+      setImportValidationResults(null);
       
-      if (acceptedCount > 0 && rejectedCount === 0) {
-        toast.success(`${acceptedCount} presets importados com sucesso!`);
-      } else if (acceptedCount > 0) {
-        toast.warning(`${acceptedCount} presets importados, ${rejectedCount} ignorados por formato inválido.`);
-      } else {
-        toast.error("Nenhum preset válido encontrado para importar.");
-      }
+      if (status === "success") toast.success("Importação concluída!");
+      else if (status === "partial") toast.warning("Importação concluída com alguns avisos.");
+      else toast.error("Falha na importação.");
+
     } catch (error) {
-      console.error("Error importing presets:", error);
-      toast.error("Falha ao processar arquivo.");
+      console.error("Error executing import:", error);
+      toast.error("Erro crítico na importação.");
     }
-    e.target.value = "";
   };
 
   const downloadTemplate = () => {
-    const template = [
-      {
-        name: "Busca de Sucesso",
-        filters: {
-          search: "",
-          statusFilter: "succeeded",
-          skillFilter: "all",
-          dateStart: "",
-          dateEnd: ""
-        },
-        sorting: {
-          column: "created_at",
-          direction: "desc"
+    const template = {
+      version: "1.0.0",
+      presets: [
+        {
+          name: "Exemplo: Sucessos Recentes",
+          filters: {
+            search: "",
+            statusFilter: "succeeded",
+            skillFilter: "all",
+            dateStart: "",
+            dateEnd: ""
+          },
+          sorting: {
+            column: "created_at",
+            direction: "desc"
+          }
         }
-      }
-    ];
+      ]
+    };
     const data = JSON.stringify(template, null, 2);
     const blob = new Blob([data], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `template_presets.json`;
+    link.download = `template_presets_v1.json`;
     link.click();
     URL.revokeObjectURL(url);
-    toast.info("Template de importação baixado.");
+    toast.info("Template v1 baixado.");
   };
 
   const filteredPresets = useMemo(() => {
@@ -820,14 +900,14 @@ ${JSON.stringify(ex.output, null, 2)}
 
       {/* Presets Management Modal */}
       <Dialog open={isPresetsModalOpen} onOpenChange={setIsPresetsModalOpen}>
-        <DialogContent className="sm:max-w-xl">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Settings2 className="h-5 w-5 text-primary" />
               Gerenciar Presets de Filtros
             </DialogTitle>
             <DialogDescription>
-              Organize seus filtros salvos para acesso rápido.
+              Organize seus filtros salvos para acesso rápido. {selectedPresetIds.length > 0 && `(${selectedPresetIds.length} selecionados)`}
             </DialogDescription>
           </DialogHeader>
 
@@ -855,7 +935,13 @@ ${JSON.stringify(ex.output, null, 2)}
                 <Button variant="outline" size="icon" className="h-9 w-9" onClick={downloadTemplate} title="Baixar Template (JSON)">
                   <FileCode className="h-4 w-4 text-sky-400" />
                 </Button>
-                <Button variant="outline" size="icon" className="h-9 w-9" onClick={exportPresets} title="Exportar Presets (JSON)">
+                <Button 
+                  variant={selectedPresetIds.length > 0 ? "default" : "outline"} 
+                  size="icon" 
+                  className="h-9 w-9" 
+                  onClick={() => exportPresets(selectedPresetIds.length > 0)} 
+                  title={selectedPresetIds.length > 0 ? "Exportar Selecionados" : "Exportar Todos"}
+                >
                   <Upload className="h-4 w-4 rotate-180" />
                 </Button>
                 <div className="relative">
@@ -863,7 +949,7 @@ ${JSON.stringify(ex.output, null, 2)}
                     type="file" 
                     accept=".json" 
                     className="absolute inset-0 opacity-0 cursor-pointer" 
-                    onChange={importPresets}
+                    onChange={handleImportFileChange}
                     title="Importar Presets (JSON)"
                   />
                   <Button variant="outline" size="icon" className="h-9 w-9">
@@ -873,6 +959,21 @@ ${JSON.stringify(ex.output, null, 2)}
               </div>
             </div>
 
+            {importHistory.length > 0 && (
+              <div className="bg-muted/30 p-2 rounded-lg border border-border/50 max-h-24 overflow-y-auto">
+                <h5 className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Histórico de Importação</h5>
+                {importHistory.map((h, i) => (
+                  <div key={i} className="text-[10px] flex items-center justify-between py-1 border-b last:border-0">
+                    <span className={cn(
+                      "font-medium",
+                      h.status === "success" ? "text-green-500" : h.status === "partial" ? "text-yellow-500" : "text-destructive"
+                    )}>{h.message}</span>
+                    <span className="opacity-60">{new Date(h.timestamp).toLocaleTimeString()}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className="py-2 space-y-3 max-h-[400px] overflow-y-auto pr-2 scrollbar-hide">
               {filteredPresets.length === 0 ? (
                 <p className="text-center text-sm text-muted-foreground py-8">
@@ -880,7 +981,16 @@ ${JSON.stringify(ex.output, null, 2)}
                 </p>
               ) : (
                 filteredPresets.map(p => (
-                  <div key={p.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/30 border border-border/50 group">
+                  <div key={p.id} className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 border border-border/50 group">
+                    <Checkbox 
+                      checked={selectedPresetIds.includes(p.id)}
+                      onCheckedChange={(checked) => {
+                        if (checked) setSelectedPresetIds(prev => [...prev, p.id]);
+                        else setSelectedPresetIds(prev => prev.filter(id => id !== p.id));
+                      }}
+                      className="h-4 w-4"
+                    />
+                    
                     {editingPresetId === p.id ? (
                       <div className="flex-1 flex gap-2">
                         <Input 
@@ -949,6 +1059,67 @@ ${JSON.stringify(ex.output, null, 2)}
               )}
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Validation & Merge Modal */}
+      <Dialog open={isImportModalOpen} onOpenChange={setIsImportModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Download className="h-5 w-5 text-sky-500" />
+              Validar Importação
+            </DialogTitle>
+            <DialogDescription>
+              Revise os presets antes de importar para o seu ambiente.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4 space-y-4">
+            {importValidationResults?.errors && importValidationResults.errors.length > 0 && (
+              <div className="bg-destructive/10 p-3 rounded-lg border border-destructive/20">
+                <h5 className="text-[10px] font-bold text-destructive uppercase mb-2">Campos Inválidos / Erros</h5>
+                <ul className="text-[10px] text-destructive/80 space-y-1">
+                  {importValidationResults.errors.map((err, i) => <li key={i} className="flex gap-2">• {err}</li>)}
+                </ul>
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <label className="text-[10px] font-bold uppercase text-muted-foreground">Conflitos de Nome</label>
+              <Select value={mergeOption} onValueChange={(v: any) => setMergeOption(v)}>
+                <SelectTrigger className="h-9 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="create">Criar novos (adicionar "Importado")</SelectItem>
+                  <SelectItem value="merge">Mesclar (atualizar existentes)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase text-muted-foreground">Preview ({importValidationResults?.preview?.length || 0})</label>
+              <div className="bg-muted/50 p-2 rounded-lg border border-border/50 max-h-32 overflow-y-auto text-[10px] space-y-1">
+                {importValidationResults?.preview?.map((p, i) => (
+                  <div key={i} className="flex justify-between opacity-80">
+                    <span>{p.name}</span>
+                    <span className="font-mono text-[8px]">{Object.keys(p.filters).length} filtros</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => { setIsImportModalOpen(false); setImportValidationResults(null); }}>Cancelar</Button>
+            <Button 
+              disabled={!importValidationResults?.valid || importValidationResults.preview.length === 0} 
+              onClick={executeImport}
+            >
+              Confirmar Importação
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
