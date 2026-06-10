@@ -2097,6 +2097,51 @@ export type Database = {
         }
         Relationships: []
       }
+      skill_executions: {
+        Row: {
+          created_at: string
+          credits_charged: number | null
+          duration_ms: number | null
+          error_message: string | null
+          id: string
+          input: Json
+          output: Json | null
+          skill_name: string | null
+          skill_slug: string
+          status: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          credits_charged?: number | null
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          input?: Json
+          output?: Json | null
+          skill_name?: string | null
+          skill_slug: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          credits_charged?: number | null
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          input?: Json
+          output?: Json | null
+          skill_name?: string | null
+          skill_slug?: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       skill_imports: {
         Row: {
           cancel_requested: boolean
