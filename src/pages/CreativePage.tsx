@@ -16,13 +16,14 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import {
   MessageSquare, Image as ImageIcon, Download, Scissors, User2,
   Video, Music, BookOpen, Sparkles, Loader2, Coins, ArrowLeft, RotateCw, AlertTriangle, Upload,
-  FileDown, History, Check, Search, ArrowRight, Settings2, X, AlertCircle
+  FileDown, History, Check, Search, ArrowRight, Settings2, X, AlertCircle, ListTodo
 } from "lucide-react";
 import { useDebounce } from "@/hooks/use-debounce";
 import { ManusLauncher } from "@/components/creative/ManusLauncher";
 import { CreativeToolInterface } from "@/components/creative/CreativeToolInterface";
+import { SkillExecutionsList } from "@/components/creative/SkillExecutionsList";
 
-type ToolKey = "dashboard" | "chat" | "nano_banana" | "downloader" | "clips" | "avatar" | "shorts" | "music" | "ebook" | "emo";
+type ToolKey = "dashboard" | "chat" | "nano_banana" | "downloader" | "clips" | "avatar" | "shorts" | "music" | "ebook" | "emo" | "unified_history";
 
 const TOOLS: { key: ToolKey; title: string; desc: string; icon: any; cost: string }[] = [
   { key: "chat", title: "Kubo Chat", desc: "Conversas, resumos, traduções, geração de textos", icon: MessageSquare, cost: "1 crédito/msg" },
@@ -1083,6 +1084,11 @@ export default function CreativePage() {
         </div>
 
         <Tabs value={active} onValueChange={(v) => { setActive(v as ToolKey); navigate(v === "dashboard" ? "/creative" : `/creative/${v}`); }}>
+          <TabsList className="mb-6 grid grid-cols-2 max-w-md mx-auto bg-muted/20">
+            <TabsTrigger value="dashboard">Painel de Ferramentas</TabsTrigger>
+            <TabsTrigger value="unified_history">Histórico Unificado</TabsTrigger>
+          </TabsList>
+
           <TabsContent value="dashboard">
              <div className="space-y-6">
                <ManusLauncher setActive={(k) => { setActive(k as ToolKey); navigate(k === "dashboard" ? "/creative" : `/creative/${k}`); }} />
@@ -1258,8 +1264,23 @@ export default function CreativePage() {
                  </Card>
                </div>
              </div>
-          </TabsContent>
+           </TabsContent>
           
+          <TabsContent value="unified_history">
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold font-orbitron">Histórico de Habilidades</h2>
+                  <p className="text-sm text-muted-foreground">Registro unificado de todas as ferramentas executadas.</p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => { setActive("dashboard"); navigate("/creative"); }}>
+                   <ArrowLeft className="h-4 w-4 mr-2" /> Voltar
+                </Button>
+              </div>
+              <SkillExecutionsList />
+            </div>
+          </TabsContent>
+
           {TOOLS.map((t) => (
             <TabsContent key={t.key} value={t.key}>
               <div className="space-y-6">
