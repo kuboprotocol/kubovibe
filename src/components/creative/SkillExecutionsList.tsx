@@ -23,7 +23,10 @@ import {
   Eye,
   Info,
   Settings2,
-  Check
+  Check,
+  Save,
+  Trash2,
+  FileSpreadsheet
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -50,6 +53,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import * as XLSX from 'xlsx';
 
 interface SkillExecution {
   id: string;
@@ -83,12 +87,20 @@ export function SkillExecutionsList() {
   
   // Details Modal
   const [selectedEx, setSelectedEx] = useState<SkillExecution | null>(null);
+  const [logPage, setLogPage] = useState(1);
+  const logPageSize = 50;
   
   // Available skills for filter
   const [availableSkills, setAvailableSkills] = useState<{slug: string, name: string}[]>([]);
 
+  // Presets
+  const [presets, setPresets] = useState<{ id: string, name: string, config: any }[]>([]);
+  const [newPresetName, setNewPresetName] = useState("");
+  const [isSavingPreset, setIsSavingPreset] = useState(false);
+
   // Export Configuration
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [exportFormat, setExportFormat] = useState<"csv" | "xlsx">("csv");
   const [selectedColumns, setSelectedColumns] = useState<string[]>([
     "id", "skill_name", "status", "credits_charged", "duration_ms", "created_at", "error_message"
   ]);
@@ -106,9 +118,55 @@ export function SkillExecutionsList() {
     { id: "output", label: "Saída (JSON)" },
   ];
 
+
   useEffect(() => {
     fetchAvailableSkills();
+    loadPresets();
   }, []);
+
+  const loadPresets = () => {
+    try {
+      const saved = localStorage.getItem("skill_history_presets");
+      if (saved) setPresets(JSON.parse(saved));
+    } catch (e) {
+      console.error("Error loading presets", e);
+    }
+  };
+
+  const savePreset = () => {
+    if (!newPresetName) {
+      toast.error("Dê um nome ao seu preset.");
+      return;
+    }
+    const newPreset = {
+      id: crypto.randomUUID(),
+      name: newPresetName,
+      config: { search, statusFilter, skillFilter, dateStart, dateEnd, sortOrder }
+    };
+    const updated = [...presets, newPreset];
+    setPresets(updated);
+    localStorage.setItem("skill_history_presets", JSON.stringify(updated));
+    setNewPresetName("");
+    setIsSavingPreset(false);
+    toast.success("Preset salvo!");
+  };
+
+  const applyPreset = (preset: any) => {
+    setSearch(preset.config.search || "");
+    setStatusFilter(preset.config.statusFilter || "all");
+    setSkillFilter(preset.config.skillFilter || "all");
+    setDateStart(preset.config.dateStart || "");
+    setDateEnd(preset.config.dateEnd || "");
+    setSortOrder(preset.config.sortOrder || "desc");
+    toast.info(`Preset "${preset.name}" aplicado.`);
+  };
+
+  const deletePreset = (id: string) => {
+    const updated = presets.filter(p => p.id !== id);
+    setPresets(updated);
+    localStorage.setItem("skill_history_presets", JSON.stringify(updated));
+  };
+
 
 
   useEffect(() => {
@@ -195,32 +253,51 @@ export function SkillExecutionsList() {
       availableColumns.find(c => c.id === colId)?.label || colId
     );
 
-    const rows = executions.map(ex => {
-      return selectedColumns.map(colId => {
+    const dataRows = executions.map(ex => {
+      const row: any = {};
+      selectedColumns.forEach(colId => {
+        const label = availableColumns.find(c => c.id === colId)?.label || colId;
         const val = (ex as any)[colId];
-        if (val === null || val === undefined) return "";
-        if (typeof val === 'object') return JSON.stringify(val).replace(/"/g, '""');
-        if (colId === 'created_at') return new Date(val).toLocaleString();
-        return String(val).replace(/"/g, '""');
+        if (val === null || val === undefined) {
+          row[label] = "";
+        } else if (typeof val === 'object') {
+          row[label] = JSON.stringify(val);
+        } else if (colId === 'created_at') {
+          row[label] = new Date(val).toLocaleString();
+        } else {
+          row[label] = val;
+        }
       });
+      return row;
     });
 
-    const csvContent = [
-      headers.join(","),
-      ...rows.map(r => r.map(cell => `"${cell}"`).join(","))
-    ].join("\n");
+    if (exportFormat === "csv") {
+      const csvContent = [
+        headers.join(","),
+        ...dataRows.map(row => 
+          headers.map(h => `"${String(row[h] || "").replace(/"/g, '""')}"`).join(",")
+        )
+      ].join("\n");
 
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `historico_skills_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `historico_skills_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      const worksheet = XLSX.utils.json_to_sheet(dataRows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Histórico");
+      XLSX.writeFile(workbook, `historico_skills_${new Date().toISOString().split('T')[0]}.xlsx`);
+    }
+
     toast.success("Exportação concluída!");
     setIsExportModalOpen(false);
   };
+
 
 
   const totalPages = Math.ceil(totalCount / pageSize);
@@ -304,12 +381,59 @@ export function SkillExecutionsList() {
             size="icon" 
             className="h-9 w-9 shrink-0"
             onClick={() => setIsExportModalOpen(true)}
-            title="Exportar CSV Configurável"
+            title="Exportar Histórico"
           >
-            <FileDown className="h-4 w-4" />
+            <FileSpreadsheet className="h-4 w-4" />
           </Button>
+
+          <Popover open={isSavingPreset} onOpenChange={setIsSavingPreset}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" title="Salvar Filtros">
+                <Save className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64">
+              <div className="space-y-3">
+                <h4 className="font-bold text-xs uppercase tracking-wider">Salvar Filtros</h4>
+                <Input 
+                  placeholder="Nome do preset..." 
+                  value={newPresetName} 
+                  onChange={e => setNewPresetName(e.target.value)}
+                  className="h-8 text-xs"
+                />
+                <Button size="sm" className="w-full h-8" onClick={savePreset}>Salvar Preset</Button>
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          {presets.length > 0 && (
+            <Select onValueChange={(v) => {
+              const p = presets.find(p => p.id === v);
+              if (p) applyPreset(p);
+            }}>
+              <SelectTrigger className="h-9 w-32 bg-background/50">
+                <SelectValue placeholder="Presets" />
+              </SelectTrigger>
+              <SelectContent>
+                {presets.map(p => (
+                  <div key={p.id} className="flex items-center justify-between px-2 py-1">
+                    <SelectItem value={p.id} className="flex-1 cursor-pointer">{p.name}</SelectItem>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-6 w-6 text-destructive opacity-50 hover:opacity-100"
+                      onClick={(e) => { e.stopPropagation(); deletePreset(p.id); }}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
       </div>
+
 
       {/* Export Configuration Modal */}
       <Dialog open={isExportModalOpen} onOpenChange={setIsExportModalOpen}>
@@ -317,35 +441,64 @@ export function SkillExecutionsList() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Settings2 className="h-5 w-5 text-primary" />
-              Configurar Exportação CSV
+              Configurar Exportação
             </DialogTitle>
             <DialogDescription>
-              Selecione as colunas que deseja incluir no arquivo.
+              Selecione o formato e as colunas desejadas.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-4 py-4">
-            {availableColumns.map((col) => (
-              <div key={col.id} className="flex items-center space-x-2">
-                <Checkbox 
-                  id={`col-${col.id}`} 
-                  checked={selectedColumns.includes(col.id)}
-                  onCheckedChange={(checked) => {
-                    if (checked) {
-                      setSelectedColumns(prev => [...prev, col.id]);
-                    } else {
-                      setSelectedColumns(prev => prev.filter(id => id !== col.id));
-                    }
-                  }}
-                />
-                <label 
-                  htmlFor={`col-${col.id}`}
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+
+          <div className="py-4 space-y-6">
+            <div className="space-y-3">
+              <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Formato do Arquivo</label>
+              <div className="flex gap-4">
+                <Button 
+                  variant={exportFormat === "csv" ? "default" : "outline"} 
+                  size="sm" 
+                  className="flex-1"
+                  onClick={() => setExportFormat("csv")}
                 >
-                  {col.label}
-                </label>
+                  <FileDown className="h-4 w-4 mr-2" /> CSV
+                </Button>
+                <Button 
+                  variant={exportFormat === "xlsx" ? "default" : "outline"} 
+                  size="sm" 
+                  className="flex-1"
+                  onClick={() => setExportFormat("xlsx")}
+                >
+                  <FileSpreadsheet className="h-4 w-4 mr-2" /> XLSX (Excel)
+                </Button>
               </div>
-            ))}
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Colunas</label>
+              <div className="grid grid-cols-2 gap-4">
+                {availableColumns.map((col) => (
+                  <div key={col.id} className="flex items-center space-x-2">
+                    <Checkbox 
+                      id={`col-${col.id}`} 
+                      checked={selectedColumns.includes(col.id)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedColumns(prev => [...prev, col.id]);
+                        } else {
+                          setSelectedColumns(prev => prev.filter(id => id !== col.id));
+                        }
+                      }}
+                    />
+                    <label 
+                      htmlFor={`col-${col.id}`}
+                      className="text-sm font-medium leading-none cursor-pointer"
+                    >
+                      {col.label}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
+
           <DialogFooter className="sm:justify-between gap-4">
             <Button
               variant="ghost"
@@ -354,9 +507,10 @@ export function SkillExecutionsList() {
             >
               Selecionar Todas
             </Button>
-            <Button type="button" onClick={handleExport}>
-              Baixar CSV
+            <Button type="button" onClick={handleExport} className="min-w-[120px]">
+              Baixar Arquivo
             </Button>
+
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -464,7 +618,7 @@ export function SkillExecutionsList() {
       </div>
 
       {/* Details Modal */}
-      <Dialog open={!!selectedEx} onOpenChange={(open) => !open && setSelectedEx(null)}>
+      <Dialog open={!!selectedEx} onOpenChange={(open) => { if (!open) { setSelectedEx(null); setLogPage(1); } }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <div className="flex items-center gap-3 mb-2">
@@ -522,19 +676,28 @@ export function SkillExecutionsList() {
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <h4 className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest flex items-center gap-2">
-                    <ArrowUpDown className="w-3 h-3 rotate-90" /> Parâmetros de Entrada
-                  </h4>
-                  <pre className="bg-muted/50 p-4 rounded-xl border border-border/30 text-[11px] font-mono overflow-auto max-h-48 scrollbar-hide italic opacity-80">
-                    {JSON.stringify(selectedEx.input, null, 2)}
-                  </pre>
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest flex items-center gap-2">
+                      <ArrowUpDown className="w-3 h-3 rotate-90" /> Parâmetros de Entrada
+                    </h4>
+                  </div>
+                  <div className="relative group">
+                    <pre className="bg-slate-950 text-emerald-400 p-4 rounded-xl border border-white/5 text-[11px] font-mono overflow-auto max-h-64 scrollbar-hide italic">
+                      {JSON.stringify(selectedEx.input, null, 2)}
+                    </pre>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
-                  <h4 className="text-[10px] font-bold uppercase text-primary tracking-widest flex items-center gap-2">
-                    <Zap className="w-3 h-3" /> Resultado Gerado
-                  </h4>
-                  <div className="bg-primary/5 p-4 rounded-xl border border-primary/10 min-h-[100px]">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-[10px] font-bold uppercase text-primary tracking-widest flex items-center gap-2">
+                      <Zap className="w-3 h-3" /> Resultado Gerado
+                    </h4>
+                  </div>
+                  <div className={cn(
+                    "bg-slate-950 p-4 rounded-xl border border-primary/20 min-h-[100px] overflow-hidden",
+                    selectedEx.status === "failed" && "border-destructive/30"
+                  )}>
                     {selectedEx.output?.url ? (
                       <div className="flex flex-col items-center justify-center py-6 gap-3">
                         <Badge className="bg-primary/20 text-primary hover:bg-primary/30 border-none px-4 py-1">
@@ -551,13 +714,48 @@ export function SkillExecutionsList() {
                         </a>
                       </div>
                     ) : (
-                      <pre className="text-[11px] font-mono overflow-auto max-h-64 scrollbar-hide">
-                        {JSON.stringify(selectedEx.output, null, 2)}
+                      <pre className={cn(
+                        "text-[11px] font-mono overflow-auto max-h-96 scrollbar-hide",
+                        selectedEx.status === "failed" ? "text-rose-400" : "text-sky-300"
+                      )}>
+                        {(() => {
+                          const jsonStr = JSON.stringify(selectedEx.output, null, 2);
+                          const lines = jsonStr.split('\n');
+                          const totalLines = lines.length;
+                          const visibleLines = lines.slice((logPage - 1) * logPageSize, logPage * logPageSize);
+                          return (
+                            <>
+                              {visibleLines.join('\n')}
+                              {totalLines > logPageSize && (
+                                <div className="mt-4 pt-4 border-t border-white/10 flex items-center justify-between text-[10px] text-muted-foreground">
+                                  <span>Mostrando {visibleLines.length} de {totalLines} linhas</span>
+                                  <div className="flex gap-2">
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm" 
+                                      className="h-6 text-[10px]" 
+                                      disabled={logPage === 1}
+                                      onClick={() => setLogPage(p => p - 1)}
+                                    >Anterior</Button>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm" 
+                                      className="h-6 text-[10px]" 
+                                      disabled={logPage * logPageSize >= totalLines}
+                                      onClick={() => setLogPage(p => p + 1)}
+                                    >Próximo</Button>
+                                  </div>
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
                       </pre>
                     )}
                   </div>
                 </div>
               </div>
+
             </div>
           )}
         </DialogContent>
