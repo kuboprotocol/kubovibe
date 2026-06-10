@@ -304,13 +304,20 @@ export default function CSVExportModal({ open, onOpenChange, logs, filterFallbac
       toast.error('Nenhum registro para exportar com os filtros atuais');
       return;
     }
-    if (selectedColumns.size === 0) {
-      toast.error('Selecione pelo menos uma coluna');
+
+    const activeCols = columnOrder.filter(id => selectedColumns.has(id));
+    
+    // Validação Automática do CSV
+    const requiredLabels = ['Modelo', 'Créditos', 'Tempo/Mensagem', 'Status (Sucesso/Fallback)'];
+    const activeLabels = activeCols.map(id => ALL_COLUMNS.find(c => c.id === id)?.label || id);
+    const missingInCsv = requiredLabels.filter(label => !activeLabels.includes(label));
+    
+    if (missingInCsv.length > 0) {
+      toast.error(`Falha na validação do CSV: colunas ${missingInCsv.join(', ')} ausentes.`);
       return;
     }
 
-    const activeCols = columnOrder.filter(id => selectedColumns.has(id));
-    const header = activeCols.map(id => ALL_COLUMNS.find(c => c.id === id)?.label || id);
+    const header = activeLabels;
     
     const rows = filteredLogs.map(log => {
       return activeCols.map(colId => {

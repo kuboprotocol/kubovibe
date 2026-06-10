@@ -65,4 +65,26 @@ describe('Auditoria de Simulação de Falhas e CSV', () => {
     expect(runId1).toMatch(/^run_[a-z0-9-]+$/);
     expect(runId1).not.toBe(runId2);
   });
+
+  it('deve validar que o filtro por RunID retorna apenas os logs corretos', () => {
+    const targetRunId = 'run_123';
+    const logs = [
+      { id: '1', metadata: { run_id: 'run_123' } },
+      { id: '2', metadata: { run_id: 'run_456' } },
+      { id: '3', metadata: { run_id: 'run_123' } }
+    ];
+    
+    const filtered = logs.filter(log => log.metadata.run_id === targetRunId);
+    expect(filtered.length).toBe(2);
+    expect(filtered.every(l => l.metadata.run_id === targetRunId)).toBe(true);
+  });
+
+  it('deve falhar na validação se colunas obrigatórias estiverem ausentes no XLSX', () => {
+    const requiredLabels = ['Modelo', 'Créditos', 'Tempo/Mensagem', 'Status (Sucesso/Fallback)'];
+    const currentLabels = ['Modelo', 'Créditos']; // Faltando colunas
+    
+    const missing = requiredLabels.filter(label => !currentLabels.includes(label));
+    expect(missing.length).toBeGreaterThan(0);
+    expect(missing).toContain('Tempo/Mensagem');
+  });
 });

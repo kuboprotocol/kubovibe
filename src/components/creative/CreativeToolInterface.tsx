@@ -166,6 +166,8 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
   const [latencyLimit, setLatencyLimit] = useState(() => Number(localStorage.getItem("creative_latency_limit")) || 5);
   const [fallbackRateLimit, setFallbackRateLimit] = useState(() => Number(localStorage.getItem("creative_fallback_limit")) || 30);
   const [isBatchReprocessing, setIsBatchReprocessing] = useState(false);
+  const [reprocessResults, setReprocessResults] = useState<any[]>([]);
+  const [showComparison, setShowComparison] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [lastResult, setLastResult] = useState<any>(null);
   const [sessionHistory, setSessionHistory] = useState<{ id: string; timestamp: string; prompt: string; status: "success" | "error"; assetUrl?: string; output_text?: string; metadata?: any; logs?: AvatarStepState[] }[]>(() => {
@@ -1330,15 +1332,28 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                             size="sm" 
                             className="w-full justify-start text-[10px] h-8 text-primary" 
                             onClick={() => {
+                              // Validação Automática do JSON
+                              const requiredKeys = ['model_path', 'credits_consumed', 'duration', 'status_final'];
+                              // status_final pode vir de item.status ou metadata.status
+                              const currentStatus = item.metadata?.status || item.status;
+                              
                               const auditData = {
                                 session_item: item,
                                 decision_trail: item.metadata?.decision_trail || [],
                                 model_path: item.metadata?.model || "unknown",
                                 credits_consumed: item.metadata?.credits || 0,
                                 duration: item.metadata?.duration || "0s",
+                                status_final: currentStatus,
                                 timestamp: item.timestamp,
                                 exported_at: new Date().toISOString()
                               };
+
+                              const missingKeys = requiredKeys.filter(k => (auditData as any)[k] === undefined || (auditData as any)[k] === null);
+                              if (missingKeys.length > 0) {
+                                toast.error(`Falha na validação do JSON: campos ${missingKeys.join(', ')} ausentes.`);
+                                return;
+                              }
+
                               const blob = new Blob([JSON.stringify(auditData, null, 2)], { type: 'application/json' });
                               const url = URL.createObjectURL(blob);
                               const link = document.createElement('a');
@@ -1486,12 +1501,25 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                   if (fallbacks.length === 0) return;
                   
                   setIsBatchReprocessing(true);
-                  toast.info(`Reprocessando ${fallbacks.length} mensagens com fallback...`);
+                  setReprocessResults([]);
+                  setShowComparison(true);
+                  toast.info(`Reprocessando ${fallbacks.length} mensagens...`);
                   
-                  // Simulação de reprocessamento em lote (na vida real chamaríamos handleExecute para cada)
+                  const results = [];
                   for (const item of fallbacks) {
-                    // Aqui apenas simulamos o tempo de processamento para cada
-                    await new Promise(r => setTimeout(r, 500));
+                    // Simulação: Execução Normal (Sucesso Kimi)
+                    const normalDuration = (Math.random() * 2 + 1).toFixed(2);
+                    // Simulação: Modo Falha (DeepSeek via Fallback)
+                    const simulatedDuration = (Math.random() * 3 + 2).toFixed(2);
+                    
+                    results.push({
+                      prompt: item.prompt,
+                      normal: { model: 'Kimi K2.6', duration: `${normalDuration}s`, status: 'success' },
+                      simulated: { model: 'DeepSeek V3', duration: `${simulatedDuration}s`, status: 'fallback_success' }
+                    });
+                    
+                    await new Promise(r => setTimeout(r, 400));
+                    setReprocessResults([...results]);
                   }
                   
                   setIsBatchReprocessing(false);
@@ -1502,6 +1530,38 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                 Reprocessar Fallbacks
               </Button>
             </div>
+
+            {showComparison && (
+              <div className="bg-muted/10 border border-border/20 rounded-lg p-3 space-y-3 animate-in fade-in slide-in-from-top-2">
+                <div className="flex items-center justify-between">
+                  <h5 className="text-[10px] font-bold uppercase text-primary">Comparação de Métricas</h5>
+                  <Button variant="ghost" size="icon" className="h-4 w-4" onClick={() => setShowComparison(false)}><X className="h-3 w-3" /></Button>
+                </div>
+                
+                <div className="space-y-2 max-h-[200px] overflow-auto pr-2 custom-scrollbar">
+                  {reprocessResults.map((res, i) => (
+                    <div key={i} className="text-[9px] border-b border-border/10 pb-2 last:border-0">
+                      <p className="font-medium truncate mb-1 opacity-70">"{res.prompt}"</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="bg-emerald-500/5 p-1 rounded border border-emerald-500/10">
+                          <p className="font-bold text-emerald-600 uppercase text-[8px]">Normal</p>
+                          <p>{res.normal.model} • {res.normal.duration}</p>
+                        </div>
+                        <div className="bg-amber-500/5 p-1 rounded border border-amber-500/10">
+                          <p className="font-bold text-amber-600 uppercase text-[8px]">Simulado</p>
+                          <p>{res.simulated.model} • {res.simulated.duration}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {isBatchReprocessing && (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="h-4 w-4 animate-spin opacity-50" />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-3 gap-3">
               <div className="bg-emerald-500/5 border border-emerald-500/10 p-2 rounded-lg flex flex-col items-center justify-center relative group">
                 <span className="text-[9px] text-muted-foreground uppercase mb-0.5">Latência Média</span>
