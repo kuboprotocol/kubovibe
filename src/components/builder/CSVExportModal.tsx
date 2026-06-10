@@ -268,6 +268,7 @@ export default function CSVExportModal({ open, onOpenChange, logs, filterFallbac
         if (colId === 'duration_msg') return (log as any).metadata?.duration || '';
         if (colId === 'status_final') return (log as any).status || '';
         if (colId === 'trail') return (log as any).metadata?.decision_trail?.join(' | ') || '';
+        if (colId === 'run_id') return (log as any).metadata?.run_id || (log as any).id || '';
         return (log as any)[colId] ?? '';
       });
     });
