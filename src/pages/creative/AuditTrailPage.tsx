@@ -503,31 +503,14 @@ export default function CreativeAuditPage() {
   const exportData = (format: "json" | "csv") => {
     if (entries.length === 0) return toast.error("Sem dados para exportar");
     
-    const filename = `creative-audit-filtered-${new Date().toISOString()}.${format}`;
-    let content: string;
-    let mime: string;
-
-    if (format === "json") {
-      content = JSON.stringify(entries, null, 2);
-      mime = "application/json";
-    } else {
-      const headers = ["ID", "User", "Step", "Action", "Correlation ID", "Trace ID", "Created At", "Params"];
-      const rows = entries.map(e => [
-        e.id,
-        e.user_email || e.user_id,
-        e.step,
-        e.action,
-        e.correlation_id || "",
-        e.trace_id || "",
-        e.created_at,
-        JSON.stringify(e.params).replace(/"/g, '""')
-      ].map(v => `"${v}"`).join(","));
-      
-      content = [headers.join(","), ...rows].join("\n");
-      mime = "text/csv";
+    if (format === "csv") {
+      setIsExportModalOpen(true);
+      return;
     }
 
-    const blob = new Blob([content], { type: mime });
+    const filename = `creative-audit-filtered-${new Date().toISOString()}.json`;
+    const content = JSON.stringify(entries, null, 2);
+    const blob = new Blob([content], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -535,6 +518,51 @@ export default function CreativeAuditPage() {
     link.click();
     URL.revokeObjectURL(url);
     toast.success(`Exportado (${entries.length} registros filtrados)`);
+  };
+
+  const handleDownloadCSV = () => {
+    if (selectedColumns.length === 0) {
+      toast.error("Selecione pelo menos uma coluna para exportar.");
+      return;
+    }
+
+    saveExportSettings();
+
+    const filename = `creative-audit-${new Date().toISOString()}.csv`;
+    const headers = selectedColumns.map(colId => availableColumns.find(c => c.id === colId)?.label || colId);
+    
+    const rows = entries.map(e => {
+      return selectedColumns.map(colId => {
+        let value = "";
+        if (colId === "id") value = e.id;
+        else if (colId === "created_at") {
+          const date = new Date(e.created_at);
+          value = exportDateFormat === "DD/MM/AAAA" 
+            ? date.toLocaleString('pt-BR') 
+            : date.toISOString();
+        }
+        else if (colId === "user") value = e.user_email || e.user_id;
+        else if (colId === "step") value = e.step;
+        else if (colId === "action") value = e.action;
+        else if (colId === "correlation_id") value = e.correlation_id || "";
+        else if (colId === "trace_id") value = e.trace_id || "";
+        else if (colId === "params") value = JSON.stringify(e.params);
+        
+        return `"${value.replace(/"/g, '""')}"`;
+      }).join(",");
+    });
+
+    const content = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+    
+    setIsExportModalOpen(false);
+    toast.success(`CSV exportado com ${entries.length} registros.`);
   };
 
   return (
