@@ -1,4 +1,30 @@
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import CSVExportModal from "@/components/builder/CSVExportModal";
+
+function CSVExportModalWrapper() {
+  const [open, setOpen] = useState(false);
+  const [logs, setLogs] = useState<any[]>([]);
+  const [fallbackOnly, setFallbackOnly] = useState(false);
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      setLogs((window as any).__exportLogsToCSV || []);
+      setFallbackOnly(!!e.detail?.filterFallback);
+      setOpen(true);
+    };
+    window.addEventListener('open-audit-export', handler);
+    return () => window.removeEventListener('open-audit-export', handler);
+  }, []);
+
+  return (
+    <CSVExportModal 
+      open={open} 
+      onOpenChange={setOpen} 
+      logs={logs} 
+      filterFallbackOnly={fallbackOnly}
+    />
+  );
+}
 import heic2any from "heic2any";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -1672,6 +1698,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <CSVExportModalWrapper />
     </div>
   );
 }
