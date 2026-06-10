@@ -562,7 +562,7 @@ export default function CreativeAuditPage() {
     URL.revokeObjectURL(url);
     
     setIsExportModalOpen(false);
-    toast.success(`CSV exportado com ${entries.length} registros.`);
+    toast.success(`CSV exportado com ${entries.length} registros. Suas configurações foram salvas.`);
   };
 
   return (
