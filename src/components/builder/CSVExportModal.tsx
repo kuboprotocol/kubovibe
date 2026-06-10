@@ -36,7 +36,6 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface PreviewLogEntry {
@@ -125,24 +124,36 @@ function SortableColumnItem({ id, label, checked, onCheckedChange }: SortableIte
 }
 
 export default function CSVExportModal({ open, onOpenChange, logs }: CSVExportModalProps) {
-  const [selectedColumns, setSelectedColumns] = useState<Set<string>>(() => {
-    try {
-      const saved = localStorage.getItem(LS_KEY_COLS);
-      if (saved) return new Set(JSON.parse(saved));
-    } catch {}
-    return new Set(ALL_COLUMNS.map(c => c.id));
-  });
-
-  const [columnOrder, setColumnOrder] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem(LS_KEY_ORDER);
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    return ALL_COLUMNS.map(c => c.id);
-  });
-
+  const [userId, setUserId] = useState<string | null>(null);
+  const [selectedColumns, setSelectedColumns] = useState<Set<string>>(new Set(ALL_COLUMNS.map(c => c.id)));
+  const [columnOrder, setColumnOrder] = useState<string[]>(ALL_COLUMNS.map(c => c.id));
   const [dateFormat, setDateFormat] = useState<'ISO' | 'DD/MM/AAAA'>('ISO');
   const [previewLimit, setPreviewLimit] = useState(5);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id || 'anonymous'));
+  }, []);
+
+  useEffect(() => {
+    if (!userId) return;
+    try {
+      const savedCols = localStorage.getItem(`${LS_KEY_COLS}_${userId}`);
+      if (savedCols) setSelectedColumns(new Set(JSON.parse(savedCols)));
+      
+      const savedOrder = localStorage.getItem(`${LS_KEY_ORDER}_${userId}`);
+      if (savedOrder) setColumnOrder(JSON.parse(savedOrder));
+
+      const savedFmt = localStorage.getItem(`${LS_KEY_DATE_FMT}_${userId}`);
+      if (savedFmt) setDateFormat(savedFmt as any);
+    } catch {}
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    localStorage.setItem(`${LS_KEY_COLS}_${userId}`, JSON.stringify([...selectedColumns]));
+    localStorage.setItem(`${LS_KEY_ORDER}_${userId}`, JSON.stringify(columnOrder));
+    localStorage.setItem(`${LS_KEY_DATE_FMT}_${userId}`, dateFormat);
+  }, [selectedColumns, columnOrder, dateFormat, userId]);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -150,12 +161,6 @@ export default function CSVExportModal({ open, onOpenChange, logs }: CSVExportMo
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
-
-  useEffect(() => {
-    localStorage.setItem(LS_KEY_COLS, JSON.stringify([...selectedColumns]));
-    localStorage.setItem(LS_KEY_ORDER, JSON.stringify(columnOrder));
-    localStorage.setItem(LS_KEY_DATE_FMT, dateFormat);
-  }, [selectedColumns, columnOrder, dateFormat]);
 
   const handleDragEnd = (event: any) => {
     const { active, over } = event;
