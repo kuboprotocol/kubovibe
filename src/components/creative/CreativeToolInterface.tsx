@@ -6,7 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Sparkles, Send, Coins, Settings2, Info, AlertCircle, Wallet, RotateCw, Upload, X, Image as ImageIcon, Download, Crop as CropIcon, Trash2, Sliders, History, FileText, FileCode, Play, Search, Filter, PlayCircle, Package } from "lucide-react";
+import { 
+  Loader2, Sparkles, Send, Coins, Settings2, Info, AlertCircle, Wallet, RotateCw, Upload, X, 
+  Image as ImageIcon, Download, Crop as CropIcon, Trash2, Sliders, History, FileText, FileCode, 
+  Play, Search, Filter, PlayCircle, Package, Brain, Rocket, Zap
+} from "lucide-react";
 import { useSubscription } from "@/hooks/useSubscription";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
@@ -18,6 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AvatarCropDialog } from "./AvatarCropDialog";
 import { AvatarProgressSteps, type AvatarStepState, type AvatarStepKey } from "./AvatarProgressSteps";
 import { cn } from "@/lib/utils";
+import { puter } from "@heyputer/puter.js";
 
 type ToolKey = "chat" | "nano_banana" | "downloader" | "clips" | "avatar" | "shorts" | "music" | "ebook" | "emo";
 
@@ -123,6 +128,8 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     config.options?.reduce((acc, opt) => ({ ...acc, [opt.key]: opt.default }), {}) || {}
   );
   const [loading, setLoading] = useState(false);
+  const [kimiModel, setKimiModel] = useState<string>("moonshotai/kimi-k2.6");
+  const [streamingContent, setStreamingContent] = useState("");
   const [traceInfo, setTraceInfo] = useState<{ correlationId?: string; traceId?: string } | null>(null);
   const [errorState, setErrorState] = useState<{ message: string; correlationId?: string; traceId?: string; stack?: string } | null>(null);
   const [showErrorModal, setShowErrorModal] = useState(false);

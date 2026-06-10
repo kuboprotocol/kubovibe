@@ -38,6 +38,7 @@ Deno.serve(async (req) => {
     ];
     let script = "";
     const aiTries: Array<{ url: string; key?: string; model: string }> = [];
+    if (OR) aiTries.push({ url: "https://openrouter.ai/api/v1/chat/completions", key: OR, model: "moonshotai/kimi-k2.6" });
     if (DS) aiTries.push({ url: "https://api.deepseek.com/chat/completions", key: DS, model: "deepseek-chat" });
     if (LK) aiTries.push({ url: "https://ai.gateway.lovable.dev/v1/chat/completions", key: LK, model: "google/gemini-3-flash-preview" });
     for (const t of aiTries) {
