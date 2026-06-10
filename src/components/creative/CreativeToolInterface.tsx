@@ -1275,6 +1275,31 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                           <Button variant="ghost" size="sm" className="w-full justify-start text-[10px] h-8" onClick={() => exportLogs("json", item.logs)}>
                             <FileCode className="h-3 w-3 mr-2" /> .JSON (Logs)
                           </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="w-full justify-start text-[10px] h-8 text-primary" 
+                            onClick={() => {
+                              const auditData = {
+                                session_item: item,
+                                decision_trail: item.metadata?.decision_trail || [],
+                                model_path: item.metadata?.model || "unknown",
+                                credits_consumed: item.metadata?.credits || 0,
+                                duration: item.metadata?.duration || "0s",
+                                timestamp: item.timestamp,
+                                exported_at: new Date().toISOString()
+                              };
+                              const blob = new Blob([JSON.stringify(auditData, null, 2)], { type: 'application/json' });
+                              const url = URL.createObjectURL(blob);
+                              const link = document.createElement('a');
+                              link.href = url;
+                              link.download = `audit-trail-${item.id}.json`;
+                              link.click();
+                              toast.success("JSON de auditoria exportado!");
+                            }}
+                          >
+                            <Brain className="h-3 w-3 mr-2" /> .JSON (Auditoria Full)
+                          </Button>
                         </PopoverContent>
                       </Popover>
                       <Button 
