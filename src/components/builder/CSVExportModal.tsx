@@ -64,13 +64,17 @@ const ALL_COLUMNS = [
   { id: 'iso', label: 'Data (ISO)' },
   { id: 'kind', label: 'Tipo' },
   { id: 'message', label: 'Mensagem' },
+  { id: 'model', label: 'Modelo' },
+  { id: 'credits', label: 'Créditos' },
+  { id: 'duration_msg', label: 'Tempo/Mensagem' },
+  { id: 'status_final', label: 'Status (Sucesso/Fallback)' },
   { id: 'source', label: 'Fonte' },
   { id: 'line', label: 'Linha' },
   { id: 'col', label: 'Coluna' },
   { id: 'method', label: 'Método' },
-  { id: 'status', label: 'Status' },
+  { id: 'status', label: 'Status HTTP' },
   { id: 'url', label: 'URL' },
-  { id: 'duration', label: 'Duração (ms)' },
+  { id: 'duration', label: 'Duração Total (ms)' },
   { id: 'stack', label: 'Stack Trace' },
 ];
 
@@ -195,6 +199,10 @@ export default function CSVExportModal({ open, onOpenChange, logs }: CSVExportMo
     const rows = logs.slice(0, previewLimit).map(log => {
       return activeCols.map(colId => {
         if (colId === 'iso') return formatDate(log.ts);
+        if (colId === 'model') return (log as any).metadata?.model || '';
+        if (colId === 'credits') return (log as any).metadata?.credits || 0;
+        if (colId === 'duration_msg') return (log as any).metadata?.duration || '';
+        if (colId === 'status_final') return (log as any).status || '';
         return (log as any)[colId] ?? '';
       });
     });
@@ -219,6 +227,10 @@ export default function CSVExportModal({ open, onOpenChange, logs }: CSVExportMo
       return activeCols.map(colId => {
         let val = (log as any)[colId] ?? '';
         if (colId === 'iso') val = formatDate(log.ts);
+        if (colId === 'model') val = (log as any).metadata?.model || '';
+        if (colId === 'credits') val = (log as any).metadata?.credits || 0;
+        if (colId === 'duration_msg') val = (log as any).metadata?.duration || '';
+        if (colId === 'status_final') val = (log as any).status || '';
         return csvEscape(val);
       }).join(',');
     });
