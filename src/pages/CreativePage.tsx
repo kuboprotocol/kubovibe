@@ -1264,8 +1264,23 @@ export default function CreativePage() {
                  </Card>
                </div>
              </div>
-          </TabsContent>
+           </TabsContent>
           
+          <TabsContent value="unified_history">
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold font-orbitron">Histórico de Habilidades</h2>
+                  <p className="text-sm text-muted-foreground">Registro unificado de todas as ferramentas executadas.</p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => { setActive("dashboard"); navigate("/creative"); }}>
+                   <ArrowLeft className="h-4 w-4 mr-2" /> Voltar
+                </Button>
+              </div>
+              <SkillExecutionsList />
+            </div>
+          </TabsContent>
+
           {TOOLS.map((t) => (
             <TabsContent key={t.key} value={t.key}>
               <div className="space-y-6">
