@@ -1084,6 +1084,11 @@ export default function CreativePage() {
         </div>
 
         <Tabs value={active} onValueChange={(v) => { setActive(v as ToolKey); navigate(v === "dashboard" ? "/creative" : `/creative/${v}`); }}>
+          <TabsList className="mb-6 grid grid-cols-2 max-w-md mx-auto bg-muted/20">
+            <TabsTrigger value="dashboard">Painel de Ferramentas</TabsTrigger>
+            <TabsTrigger value="unified_history">Histórico Unificado</TabsTrigger>
+          </TabsList>
+
           <TabsContent value="dashboard">
              <div className="space-y-6">
                <ManusLauncher setActive={(k) => { setActive(k as ToolKey); navigate(k === "dashboard" ? "/creative" : `/creative/${k}`); }} />
