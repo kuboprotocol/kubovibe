@@ -813,7 +813,15 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       if (toolKey === "shorts") body.mode = "shorts";
       if (toolKey === "ebook") body.topic = prompt;
       
-      const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${fnName}`, {
+      const endpoint = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${fnName}`;
+      console.log(`[CreativeToolInterface] Invocando ferramenta: ${toolKey}`, {
+        endpoint,
+        fnName,
+        payload: body,
+        hasToken: !!session?.access_token
+      });
+
+      const r = await fetch(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
