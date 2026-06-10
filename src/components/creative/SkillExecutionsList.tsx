@@ -87,9 +87,29 @@ export function SkillExecutionsList() {
   // Available skills for filter
   const [availableSkills, setAvailableSkills] = useState<{slug: string, name: string}[]>([]);
 
+  // Export Configuration
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [selectedColumns, setSelectedColumns] = useState<string[]>([
+    "id", "skill_name", "status", "credits_charged", "duration_ms", "created_at", "error_message"
+  ]);
+
+  const availableColumns = [
+    { id: "id", label: "ID da Execução" },
+    { id: "skill_name", label: "Nome da Skill" },
+    { id: "skill_slug", label: "Slug da Skill" },
+    { id: "status", label: "Status" },
+    { id: "credits_charged", label: "Créditos" },
+    { id: "duration_ms", label: "Duração (ms)" },
+    { id: "created_at", label: "Data/Hora" },
+    { id: "error_message", label: "Erro" },
+    { id: "input", label: "Entrada (JSON)" },
+    { id: "output", label: "Saída (JSON)" },
+  ];
+
   useEffect(() => {
     fetchAvailableSkills();
   }, []);
+
 
   useEffect(() => {
     setPage(1); // Reset to first page on filter change
@@ -165,24 +185,25 @@ export function SkillExecutionsList() {
     }
   }
 
-  const exportToCSV = () => {
+  const handleExport = () => {
     if (executions.length === 0) {
       toast.error("Não há dados para exportar.");
       return;
     }
 
-    const headers = ["ID", "Skill", "Status", "Créditos", "Duração (ms)", "Data", "Input", "Output", "Erro"];
-    const rows = executions.map(ex => [
-      ex.id,
-      ex.skill_name || ex.skill_slug,
-      ex.status,
-      ex.credits_charged,
-      ex.duration_ms || "",
-      new Date(ex.created_at).toLocaleString(),
-      JSON.stringify(ex.input).replace(/"/g, '""'),
-      JSON.stringify(ex.output).replace(/"/g, '""'),
-      (ex.error_message || "").replace(/"/g, '""')
-    ]);
+    const headers = selectedColumns.map(colId => 
+      availableColumns.find(c => c.id === colId)?.label || colId
+    );
+
+    const rows = executions.map(ex => {
+      return selectedColumns.map(colId => {
+        const val = (ex as any)[colId];
+        if (val === null || val === undefined) return "";
+        if (typeof val === 'object') return JSON.stringify(val).replace(/"/g, '""');
+        if (colId === 'created_at') return new Date(val).toLocaleString();
+        return String(val).replace(/"/g, '""');
+      });
+    });
 
     const csvContent = [
       headers.join(","),
@@ -198,7 +219,9 @@ export function SkillExecutionsList() {
     link.click();
     document.body.removeChild(link);
     toast.success("Exportação concluída!");
+    setIsExportModalOpen(false);
   };
+
 
   const totalPages = Math.ceil(totalCount / pageSize);
 
@@ -280,13 +303,64 @@ export function SkillExecutionsList() {
             variant="secondary" 
             size="icon" 
             className="h-9 w-9 shrink-0"
-            onClick={exportToCSV}
-            title="Exportar CSV"
+            onClick={() => setIsExportModalOpen(true)}
+            title="Exportar CSV Configurável"
           >
             <FileDown className="h-4 w-4" />
           </Button>
         </div>
       </div>
+
+      {/* Export Configuration Modal */}
+      <Dialog open={isExportModalOpen} onOpenChange={setIsExportModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings2 className="h-5 w-5 text-primary" />
+              Configurar Exportação CSV
+            </DialogTitle>
+            <DialogDescription>
+              Selecione as colunas que deseja incluir no arquivo.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-4 py-4">
+            {availableColumns.map((col) => (
+              <div key={col.id} className="flex items-center space-x-2">
+                <Checkbox 
+                  id={`col-${col.id}`} 
+                  checked={selectedColumns.includes(col.id)}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      setSelectedColumns(prev => [...prev, col.id]);
+                    } else {
+                      setSelectedColumns(prev => prev.filter(id => id !== col.id));
+                    }
+                  }}
+                />
+                <label 
+                  htmlFor={`col-${col.id}`}
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                >
+                  {col.label}
+                </label>
+              </div>
+            ))}
+          </div>
+          <DialogFooter className="sm:justify-between gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedColumns(availableColumns.map(c => c.id))}
+            >
+              Selecionar Todas
+            </Button>
+            <Button type="button" onClick={handleExport}>
+              Baixar CSV
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
 
       {/* List */}
       <div className="space-y-4">
