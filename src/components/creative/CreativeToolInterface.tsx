@@ -807,9 +807,10 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
             credits: cost,
             temperature,
             max_tokens: maxTokens,
-            decision_trail: decisionTrail
+            decision_trail: decisionTrail,
+            status: decisionTrail.some(t => t.toLowerCase().includes("fallback")) ? "fallback_success" : "success"
           }
-        }, ...prev]);
+        }, ...prev].slice(0, 50));
       } else {
         setSessionHistory(prev => [{
           id: crypto.randomUUID(),
