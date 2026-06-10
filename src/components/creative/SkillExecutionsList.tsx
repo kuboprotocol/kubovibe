@@ -769,9 +769,8 @@ ${JSON.stringify(ex.output, null, 2)}
             )}
           </div>
         </DialogContent>
+      </Dialog>
 
-
-      {/* List */}
       <div className="space-y-4">
         {loading ? (
           <div className="text-center py-20">
