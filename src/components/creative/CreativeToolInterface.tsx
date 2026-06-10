@@ -159,8 +159,29 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
   const [reexecuteDialogOpen, setReexecuteDialogOpen] = useState(false);
   const [reexecuteItem, setReexecuteItem] = useState<any>(null);
   const [startAtStep, setStartAtStep] = useState<AvatarStepKey>("upload");
+  const [autoDetectMode, setAutoDetectMode] = useState(true);
 
   const [showDelivery, setShowDelivery] = useState(false);
+
+  // Orquestrador de Modelo Nível 1, 2, 3
+  useEffect(() => {
+    if (!autoDetectMode || toolKey !== "chat") return;
+    
+    const lower = prompt.toLowerCase();
+    const len = lower.length;
+
+    // Nível 3 (Ship) - Produção e Código Pesado -> DeepSeek
+    const shipKeywords = ['app completo', 'sistema completo', 'ecommerce', 'marketplace', 'plataforma', 'clone', 'produção', 'saas'];
+    if (shipKeywords.some(kw => lower.includes(kw)) || len > 500) {
+      setKimiModel("deepseek-chat"); // Usamos o slug que o roteador aceita
+      return;
+    }
+
+    // Nível 1 & 2 (Flow/Think) - Rápido e Análise -> Kimi
+    if (len > 15) {
+      setKimiModel("moonshotai/kimi-k2.6");
+    }
+  }, [prompt, autoDetectMode, toolKey]);
 
   const buildSteps = (needsConvert: boolean, initialDetails?: Record<string, any>, currentSteps?: AvatarStepState[]): AvatarStepState[] => {
     const now = new Date().toLocaleTimeString();
