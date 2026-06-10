@@ -128,9 +128,9 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     config.options?.reduce((acc, opt) => ({ ...acc, [opt.key]: opt.default }), {}) || {}
   );
   const [loading, setLoading] = useState(false);
-  const [kimiModel, setKimiModel] = useState<string>("moonshotai/kimi-k2.6");
-  const [temperature, setTemperature] = useState(0.7);
-  const [maxTokens, setMaxTokens] = useState(2000);
+  const [kimiModel, setKimiModel] = useState<string>(() => localStorage.getItem("creative_kimi_model") || "moonshotai/kimi-k2.6");
+  const [temperature, setTemperature] = useState(() => Number(localStorage.getItem("creative_temperature")) || 0.7);
+  const [maxTokens, setMaxTokens] = useState(() => Number(localStorage.getItem("creative_max_tokens")) || 2000);
   const [streamingContent, setStreamingContent] = useState("");
   const [traceInfo, setTraceInfo] = useState<{ correlationId?: string; traceId?: string } | null>(null);
   const [errorState, setErrorState] = useState<{ message: string; correlationId?: string; traceId?: string; stack?: string } | null>(null);
@@ -316,6 +316,12 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
   useEffect(() => {
     localStorage.setItem(`creative_history_${toolKey}`, JSON.stringify(sessionHistory));
   }, [sessionHistory, toolKey]);
+
+  useEffect(() => {
+    localStorage.setItem("creative_kimi_model", kimiModel);
+    localStorage.setItem("creative_temperature", String(temperature));
+    localStorage.setItem("creative_max_tokens", String(maxTokens));
+  }, [kimiModel, temperature, maxTokens]);
 
   const logAuditAction = useCallback(async (step: string, action: string, params: any = {}, correlationId?: string, traceId?: string) => {
     // Audit logs for deployment and agent improvements
@@ -630,6 +636,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       setLoading(true);
       setStreamingContent("");
       const startTime = Date.now();
+      const decisionTrail: string[] = [`Iniciando com ${kimiModel} (Nível 1/2)`];
       
       try {
         const resp = await puter.ai.chat(prompt, { 
@@ -649,6 +656,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
 
         const endTime = Date.now();
         const duration = ((endTime - startTime) / 1000).toFixed(2);
+        decisionTrail.push("Sucesso via Puter.js");
 
         // Salva o resultado no histórico da sessão
         const resultId = crypto.randomUUID();
@@ -664,20 +672,24 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
             duration: `${duration}s`,
             credits: 0,
             temperature,
-            max_tokens: maxTokens
+            max_tokens: maxTokens,
+            decision_trail: decisionTrail
           }
         };
         
         setSessionHistory(prev => [newEntry, ...prev].slice(0, 50));
         toast.success("Kimi respondeu!");
         setPrompt("");
+        setLoading(false);
         return; // Sucesso com Kimi
         
       } catch (err: any) {
+        decisionTrail.push(`Erro no Kimi: ${err.message}`);
+        decisionTrail.push("Acionando Fallback para DeepSeek (Nível 3)");
         console.warn("Kimi falhou via Puter, tentando fallback para Nível 3 (DeepSeek)...", err);
         toast.info("Kimi indisponível. Acionando fallback DeepSeek (Nível 3)...");
-        // Fallback para o fluxo padrão (DeepSeek no backend)
-        // O código continuará para o handleExecute normal abaixo
+        // O código continuará para o handleExecute normal abaixo, mas precisamos passar o decisionTrail
+        (window as any).__lastDecisionTrail = decisionTrail;
       }
     }
 
@@ -772,6 +784,9 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       const duration = ((endTime - new Date(executionStartTime).getTime()) / 1000).toFixed(2);
 
       if (toolKey === "chat") {
+        const decisionTrail = (window as any).__lastDecisionTrail || [`Iniciando diretamente via ${body.model} (Nível 3)`];
+        delete (window as any).__lastDecisionTrail;
+        
         // Para chat no backend (DeepSeek ou Fallback)
         setSessionHistory(prev => [{
           id: crypto.randomUUID(),
@@ -786,7 +801,8 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
             duration: `${duration}s`,
             credits: cost,
             temperature,
-            max_tokens: maxTokens
+            max_tokens: maxTokens,
+            decision_trail: decisionTrail
           }
         }, ...prev]);
       } else {
@@ -1245,23 +1261,37 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
               )}
             </div>
             
-            {/* Resumo de Consumo */}
+            {/* Resumo de Consumo Detalhado */}
             {sessionHistory.length > 0 && (
-              <div className="mt-4 p-3 bg-primary/5 rounded-xl border border-primary/10">
-                <h5 className="text-[10px] font-bold uppercase text-primary mb-2 flex items-center gap-2">
-                  <Sparkles className="h-3 w-3" /> Resumo de Consumo da Sessão
+              <div className="mt-4 p-3 bg-primary/5 rounded-xl border border-primary/10 space-y-3">
+                <h5 className="text-[10px] font-bold uppercase text-primary flex items-center gap-2">
+                  <Sparkles className="h-3 w-3" /> Resumo Detalhado da Sessão
                 </h5>
-                <div className="grid grid-cols-2 gap-4">
+                
+                <div className="max-h-[150px] overflow-auto space-y-2 pr-2 custom-scrollbar">
+                  {sessionHistory.map((item, idx) => (
+                    <div key={idx} className="flex items-center justify-between text-[10px] py-1 border-b border-primary/5 last:border-0">
+                      <span className="opacity-70 truncate max-w-[150px]">{item.prompt}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="font-mono">{item.metadata?.model?.split('/').pop()}</span>
+                        <span className="text-amber-500 font-bold">{item.metadata?.credits || 0}c</span>
+                        <span className="opacity-60">{item.metadata?.duration || '0s'}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="pt-2 border-t border-primary/10 grid grid-cols-2 gap-4">
                   <div className="flex flex-col">
-                    <span className="text-[9px] text-muted-foreground uppercase">Total de Créditos</span>
+                    <span className="text-[9px] text-muted-foreground uppercase">Custo Total Consolidado</span>
                     <span className="text-sm font-bold flex items-center gap-1.5">
                       <Coins className="h-3.5 w-3.5 text-amber-500" />
-                      {sessionHistory.reduce((acc, item) => acc + (item.metadata?.credits || 0), 0)} creds
+                      {sessionHistory.reduce((acc, item) => acc + (item.metadata?.credits || 0), 0)} créditos
                     </span>
                   </div>
-                  <div className="flex flex-col">
+                  <div className="flex flex-col text-right">
                     <span className="text-[9px] text-muted-foreground uppercase">Tempo Total</span>
-                    <span className="text-sm font-bold flex items-center gap-1.5">
+                    <span className="text-sm font-bold flex items-center gap-1.5 justify-end">
                       <RotateCw className="h-3.5 w-3.5 text-blue-500" />
                       {sessionHistory.reduce((acc, item) => acc + (parseFloat(item.metadata?.duration) || 0), 0).toFixed(2)}s
                     </span>
