@@ -162,8 +162,9 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
   const [errorState, setErrorState] = useState<{ message: string; correlationId?: string; traceId?: string; stack?: string } | null>(null);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [simulationMode, setSimulationMode] = useState(() => localStorage.getItem("creative_simulation_mode") === "true");
-  const [isUploading, setIsUploading] = useState(false);
-  const [lastResult, setLastResult] = useState<any>(null);
+  const [latencyLimit, setLatencyLimit] = useState(() => Number(localStorage.getItem("creative_latency_limit")) || 5);
+  const [fallbackRateLimit, setFallbackRateLimit] = useState(() => Number(localStorage.getItem("creative_fallback_limit")) || 30);
+  const [isBatchReprocessing, setIsBatchReprocessing] = useState(false);
   const [sessionHistory, setSessionHistory] = useState<{ id: string; timestamp: string; prompt: string; status: "success" | "error"; assetUrl?: string; output_text?: string; metadata?: any; logs?: AvatarStepState[] }[]>(() => {
     const saved = localStorage.getItem(`creative_history_${toolKey}`);
     return saved ? JSON.parse(saved) : [];
