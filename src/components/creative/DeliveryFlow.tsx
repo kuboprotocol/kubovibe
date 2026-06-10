@@ -477,55 +477,63 @@ function AuditHistoryManager({
                     <AlertCircle className="h-3 w-3" /> Página final ({exportRange.end}) excede o total ({totalPages}).
                   </p>
                 )}
-                {filteredLogs.length === 0 && (
-                  <p className="text-[9px] text-destructive font-bold flex items-center gap-1 mt-1">
-                    <AlertCircle className="h-3 w-3" /> Recorte vazio: não há registros com os filtros atuais.
-                  </p>
-                )}
               </div>
             )}
 
-            <div className="p-4 rounded-lg bg-muted/50 border border-border/40 space-y-2">
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Registros a exportar:</span>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase text-muted-foreground">Colunas no CSV/PDF</label>
+              <div className="grid grid-cols-2 gap-2 p-2 rounded-md border border-border/40 bg-muted/20">
+                {[
+                  { id: "timestamp", label: "Data/Hora" },
+                  { id: "user", label: "Usuário" },
+                  { id: "range", label: "Intervalo" },
+                  { id: "filters", label: "Filtros" },
+                  { id: "total", label: "Total" },
+                  { id: "attachmentName", label: "Anexo" },
+                  { id: "status", label: "Status" }
+                ].map(col => (
+                  <div key={col.id} className="flex items-center space-x-2">
+                    <Checkbox 
+                      id={`export-col-${col.id}`} 
+                      checked={logExportColumns.includes(col.id)}
+                      onCheckedChange={(checked) => {
+                        if (checked) setLogExportColumns([...logExportColumns, col.id]);
+                        else setLogExportColumns(logExportColumns.filter(c => c !== col.id));
+                      }}
+                    />
+                    <label htmlFor={`export-col-${col.id}`} className="text-[10px] cursor-pointer leading-none truncate">{col.label}</label>
+                  </div>
+                ))}
+              </div>
+              {logExportColumns.length === 0 && (
+                <p className="text-[9px] text-destructive font-bold flex items-center gap-1 mt-1">
+                  <AlertCircle className="h-3 w-3" /> Selecione ao menos uma coluna.
+                </p>
+              )}
+            </div>
+
+            <div className="p-3 rounded-lg bg-muted/50 border border-border/40 space-y-1.5">
+              <div className="flex justify-between text-[10px]">
+                <span className="text-muted-foreground">Registros:</span>
                 <span className="font-bold">
                   {exportMode === "current_page" ? paginatedLogs.length : 
                    exportMode === "range" ? Math.min(filteredLogs.length, (exportRange.end - exportRange.start + 1) * itemsPerPage) : 
                    filteredLogs.length}
                 </span>
               </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Índices (Início - Fim):</span>
-                <span className="font-bold">
-                  {exportMode === "current_page" ? `${(currentPage - 1) * itemsPerPage + 1} - ${Math.min(filteredLogs.length, currentPage * itemsPerPage)}` : 
-                   exportMode === "range" ? `${(exportRange.start - 1) * itemsPerPage + 1} - ${Math.min(filteredLogs.length, exportRange.end * itemsPerPage)}` : 
-                   `1 - ${filteredLogs.length}`}
-                </span>
+              <div className="flex justify-between text-[10px]">
+                <span className="text-muted-foreground">Colunas:</span>
+                <span className="font-bold">{logExportColumns.length}</span>
               </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Escopo / Páginas:</span>
-                <span className="font-bold">
-                  {exportMode === "current_page" ? `Página ${currentPage}` : 
-                   exportMode === "range" ? `Páginas ${exportRange.start} a ${exportRange.end}` : 
-                   `Todas (${totalPages} págs)`}
-                </span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Colunas incluídas:</span>
-                <span className="font-bold">{visibleColumns.length} colunas</span>
-              </div>
-              {(exportMode === "filtered" ? filteredLogs.length : 
-                exportMode === "range" ? (exportRange.end - exportRange.start + 1) * itemsPerPage : 
-                paginatedLogs.length) > MAX_EXPORT_LIMIT && (
-                <div className="pt-2 mt-2 border-t border-destructive/20 text-destructive text-[10px] font-bold flex items-center gap-1">
-                  <AlertCircle className="h-3 w-3" /> * Apenas os primeiros {MAX_EXPORT_LIMIT} registros serão exportados.
-                </div>
-              )}
             </div>
           </div>
           <DialogFooter className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => setIsExportDialogOpen(false)}>Cancelar</Button>
-            <Button size="sm" onClick={() => handleExport(exportFormat)} disabled={filteredLogs.length === 0 || exportRange.start < 1 || exportRange.start > totalPages || exportRange.end < exportRange.start || exportRange.end > totalPages}>
+            <Button 
+              size="sm" 
+              onClick={() => handleExport(exportFormat)} 
+              disabled={logExportColumns.length === 0 || filteredLogs.length === 0 || (exportMode === "range" && (exportRange.start < 1 || exportRange.start > totalPages || exportRange.end < exportRange.start || exportRange.end > totalPages))}
+            >
               <Keyboard className="h-3 w-3 mr-2 opacity-50" />
               Confirmar Download (Ctrl+Enter)
             </Button>
