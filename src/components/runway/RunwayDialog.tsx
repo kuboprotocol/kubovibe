@@ -53,9 +53,10 @@ export default function RunwayDialog({ open, onOpenChange, defaultImageUrl, onRe
     try {
       setUploading(true);
       const { data: u } = await supabase.auth.getUser();
-      const uid = u.user?.id ?? "anon";
+      const uid = u.user?.id;
+      if (!uid) throw new Error("Usuário não autenticado");
       const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
-      const path = `runway/${uid}/${Date.now()}.${ext}`;
+      const path = `${uid}/runway/${Date.now()}.${ext}`;
       const { error } = await supabase.storage.from("uploads").upload(path, file, {
         cacheControl: "3600", upsert: false, contentType: file.type,
       });
