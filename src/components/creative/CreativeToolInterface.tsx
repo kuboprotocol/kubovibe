@@ -710,6 +710,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
         await logAuditAction("AI_Orchestration", "kimi_success", { duration, model: kimiModel });
 
         // Salva o resultado no histórico da sessão
+        const runId = `run_${crypto.randomUUID().slice(0, 8)}`;
         const resultId = crypto.randomUUID();
         const newEntry = {
           id: resultId,
@@ -718,6 +719,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
           status: "success" as const,
           output_text: fullText,
           metadata: { 
+            run_id: runId,
             model: kimiModel, 
             provider: "puter",
             duration: `${duration}s`,
