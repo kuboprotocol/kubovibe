@@ -852,6 +852,9 @@ ${JSON.stringify(ex.output, null, 2)}
                 </SelectContent>
               </Select>
               <div className="flex items-center gap-1 border-l pl-2">
+                <Button variant="outline" size="icon" className="h-9 w-9" onClick={downloadTemplate} title="Baixar Template (JSON)">
+                  <FileCode className="h-4 w-4 text-sky-400" />
+                </Button>
                 <Button variant="outline" size="icon" className="h-9 w-9" onClick={exportPresets} title="Exportar Presets (JSON)">
                   <Upload className="h-4 w-4 rotate-180" />
                 </Button>
