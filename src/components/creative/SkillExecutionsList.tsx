@@ -263,109 +263,182 @@ export function SkillExecutionsList() {
     }
   };
 
-  const exportPresets = () => {
-    if (presets.length === 0) {
-      toast.error("Nenhum preset para exportar.");
+  const exportPresets = (selectedOnly = false) => {
+    const toExport = selectedOnly 
+      ? presets.filter(p => selectedPresetIds.includes(p.id))
+      : presets;
+
+    if (toExport.length === 0) {
+      toast.error(selectedOnly ? "Selecione ao menos um preset para exportar." : "Nenhum preset para exportar.");
       return;
     }
-    const data = JSON.stringify(presets, null, 2);
+
+    const exportData = {
+      version: "1.0.0",
+      timestamp: new Date().toISOString(),
+      presets: toExport.map(p => ({
+        name: p.name,
+        filters: p.filters,
+        sorting: p.sorting
+      }))
+    };
+
+    const data = JSON.stringify(exportData, null, 2);
     const blob = new Blob([data], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `presets_history_${new Date().toISOString().split('T')[0]}.json`;
+    link.download = `presets_history_${selectedOnly ? 'selected_' : ''}${new Date().toISOString().split('T')[0]}.json`;
     link.click();
     URL.revokeObjectURL(url);
-    toast.success("Presets exportados com sucesso!");
+    toast.success(`${toExport.length} presets exportados com sucesso!`);
   };
 
-  const importPresets = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const validatePresetFile = async (file: File) => {
     try {
       const text = await file.text();
       let imported;
       try {
         imported = JSON.parse(text);
       } catch (e) {
-        toast.error("Arquivo JSON inválido.");
-        return;
-      }
-      
-      if (!Array.isArray(imported)) {
-        toast.error("O arquivo deve conter uma lista (array) de presets.");
-        return;
+        return { valid: false, errors: ["Arquivo JSON malformado."], preview: [] };
       }
 
+      // Handle both legacy array and new versioned object
+      const presetsList = Array.isArray(imported) ? imported : (imported.presets || []);
+      
+      if (!Array.isArray(presetsList)) {
+        return { valid: false, errors: ["O arquivo deve conter uma lista de presets."], preview: [] };
+      }
+
+      const errors: string[] = [];
+      const validPresets: any[] = [];
+
+      presetsList.forEach((p, index) => {
+        const itemErrors: string[] = [];
+        if (!p.name) itemErrors.push(`Preset #${index + 1}: Nome ausente.`);
+        if (!p.filters) itemErrors.push(`Preset #${index + 1}: Filtros ausentes.`);
+        
+        if (itemErrors.length > 0) {
+          errors.push(...itemErrors);
+        } else {
+          validPresets.push(p);
+        }
+      });
+
+      return { valid: validPresets.length > 0, errors, preview: validPresets };
+    } catch (e) {
+      return { valid: false, errors: ["Erro ao ler o arquivo."], preview: [] };
+    }
+  };
+
+  const handleImportFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    const results = await validatePresetFile(file);
+    setImportValidationResults(results);
+    setIsImportModalOpen(true);
+    e.target.value = "";
+  };
+
+  const executeImport = async () => {
+    if (!importValidationResults || importValidationResults.preview.length === 0) return;
+
+    try {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error("Usuário não autenticado");
 
       let acceptedCount = 0;
-      let rejectedCount = 0;
+      let updatedCount = 0;
+      const errors: string[] = [];
 
-      for (const p of imported) {
-        const isValid = p && typeof p === 'object' && p.name && p.filters;
-        
-        if (isValid) {
-          try {
-            await supabase.from("filter_presets").insert({
+      for (const p of importValidationResults.preview) {
+        try {
+          // Check for conflict if merge is selected
+          const existing = mergeOption === "merge" 
+            ? presets.find(ex => ex.name === p.name || ex.name === `${p.name} (Importado)`)
+            : null;
+
+          if (existing) {
+            const { error } = await supabase
+              .from("filter_presets")
+              .update({
+                filters: p.filters,
+                sorting: p.sorting || { column: "created_at", direction: "desc" }
+              })
+              .eq("id", existing.id);
+            if (error) throw error;
+            updatedCount++;
+          } else {
+            const { error } = await supabase.from("filter_presets").insert({
               user_id: userData.user.id,
-              name: `${p.name} (Importado)`,
+              name: mergeOption === "merge" ? p.name : `${p.name} (Importado)`,
               filters: p.filters,
               sorting: p.sorting || { column: "created_at", direction: "desc" }
             });
+            if (error) throw error;
             acceptedCount++;
-          } catch (err) {
-            rejectedCount++;
           }
-        } else {
-          rejectedCount++;
+        } catch (err: any) {
+          errors.push(`Erro ao importar "${p.name}": ${err.message || 'Erro desconhecido'}`);
         }
       }
+
+      const totalHandled = acceptedCount + updatedCount;
+      const status = errors.length === 0 ? "success" : (totalHandled > 0 ? "partial" : "error");
+      const message = `${acceptedCount} criados, ${updatedCount} atualizados, ${errors.length} erros.`;
       
+      setImportHistory(prev => [{
+        timestamp: new Date().toISOString(),
+        status,
+        message,
+        errors: errors.length > 0 ? errors : undefined
+      }, ...prev]);
+
       await loadPresets();
+      setIsImportModalOpen(false);
+      setImportValidationResults(null);
       
-      if (acceptedCount > 0 && rejectedCount === 0) {
-        toast.success(`${acceptedCount} presets importados com sucesso!`);
-      } else if (acceptedCount > 0) {
-        toast.warning(`${acceptedCount} presets importados, ${rejectedCount} ignorados por formato inválido.`);
-      } else {
-        toast.error("Nenhum preset válido encontrado para importar.");
-      }
+      if (status === "success") toast.success("Importação concluída!");
+      else if (status === "partial") toast.warning("Importação concluída com alguns avisos.");
+      else toast.error("Falha na importação.");
+
     } catch (error) {
-      console.error("Error importing presets:", error);
-      toast.error("Falha ao processar arquivo.");
+      console.error("Error executing import:", error);
+      toast.error("Erro crítico na importação.");
     }
-    e.target.value = "";
   };
 
   const downloadTemplate = () => {
-    const template = [
-      {
-        name: "Busca de Sucesso",
-        filters: {
-          search: "",
-          statusFilter: "succeeded",
-          skillFilter: "all",
-          dateStart: "",
-          dateEnd: ""
-        },
-        sorting: {
-          column: "created_at",
-          direction: "desc"
+    const template = {
+      version: "1.0.0",
+      presets: [
+        {
+          name: "Exemplo: Sucessos Recentes",
+          filters: {
+            search: "",
+            statusFilter: "succeeded",
+            skillFilter: "all",
+            dateStart: "",
+            dateEnd: ""
+          },
+          sorting: {
+            column: "created_at",
+            direction: "desc"
+          }
         }
-      }
-    ];
+      ]
+    };
     const data = JSON.stringify(template, null, 2);
     const blob = new Blob([data], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `template_presets.json`;
+    link.download = `template_presets_v1.json`;
     link.click();
     URL.revokeObjectURL(url);
-    toast.info("Template de importação baixado.");
+    toast.info("Template v1 baixado.");
   };
 
   const filteredPresets = useMemo(() => {
