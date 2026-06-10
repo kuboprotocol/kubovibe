@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { 
   ArrowLeft, Search, FileDown, ArrowUpDown, Loader2, X, Filter, 
   AlertTriangle, Save, History, ChevronRight, Info, AlertCircle, Share2, TrendingUp, Clock,
-  Layers, Copy, ArrowLeftRight
+  Layers, Copy, ArrowLeftRight, Check, ListChecks
 } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -33,6 +33,16 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
 type AuditTrail = {
   id: string;
