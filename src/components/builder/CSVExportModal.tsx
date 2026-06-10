@@ -400,12 +400,30 @@ export default function CSVExportModal({ open, onOpenChange, logs, filterFallbac
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Download className="h-5 w-5" /> Exportar Log de Auditoria para CSV
-          </DialogTitle>
-          <DialogDescription>
-            Configure as colunas e o formato do arquivo antes de baixar.
-          </DialogDescription>
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-1">
+              <DialogTitle className="flex items-center gap-2">
+                <Download className="h-5 w-5" /> Exportar Auditoria Kubo
+              </DialogTitle>
+              <DialogDescription>
+                Configure as colunas e o formato do arquivo antes de baixar.
+              </DialogDescription>
+            </div>
+            <div className="flex items-center gap-2 px-4 py-2 bg-muted/30 rounded-lg border border-border/20">
+              <Label className="text-[10px] uppercase font-bold text-muted-foreground whitespace-nowrap">Filtrar por Execução:</Label>
+              <Select value={internalRunIdFilter} onValueChange={setInternalRunIdFilter}>
+                <SelectTrigger className="h-8 w-40 text-[10px] bg-background">
+                  <SelectValue placeholder="Todas as RunIDs" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Todas as Execuções</SelectItem>
+                  {availableRunIds.map(rid => (
+                    <SelectItem key={rid} value={rid}>{rid}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </DialogHeader>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1 overflow-hidden min-h-0">
