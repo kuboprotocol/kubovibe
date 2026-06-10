@@ -36,7 +36,7 @@ import { Badge } from "@/components/ui/badge";
 import { 
   Loader2, Sparkles, Send, Coins, Settings2, Info, AlertCircle, Wallet, RotateCw, Upload, X, 
   Image as ImageIcon, Download, Crop as CropIcon, Trash2, Sliders, History, FileText, FileCode, 
-  Play, Search, Filter, PlayCircle, Package, Brain, Rocket, Zap
+  Play, Search, Filter, PlayCircle, Package, Brain, Rocket, Zap, FileSpreadsheet
 } from "lucide-react";
 import { useSubscription } from "@/hooks/useSubscription";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
