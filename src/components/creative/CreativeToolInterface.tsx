@@ -161,7 +161,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
   const [traceInfo, setTraceInfo] = useState<{ correlationId?: string; traceId?: string } | null>(null);
   const [errorState, setErrorState] = useState<{ message: string; correlationId?: string; traceId?: string; stack?: string } | null>(null);
   const [showErrorModal, setShowErrorModal] = useState(false);
-  const [simulationMode, setSimulationMode] = useState(false);
+  const [simulationMode, setSimulationMode] = useState(() => localStorage.getItem("creative_simulation_mode") === "true");
   const [isUploading, setIsUploading] = useState(false);
   const [lastResult, setLastResult] = useState<any>(null);
   const [sessionHistory, setSessionHistory] = useState<{ id: string; timestamp: string; prompt: string; status: "success" | "error"; assetUrl?: string; output_text?: string; metadata?: any; logs?: AvatarStepState[] }[]>(() => {
@@ -224,12 +224,23 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                {autoDetectMode ? <Zap className="h-2.5 w-2.5" /> : <Settings2 className="h-2.5 w-2.5" />}
                {autoDetectMode ? "AUTO" : "MANUAL"}
              </span>
-             <button 
-               onClick={() => setAutoDetectMode(!autoDetectMode)}
-               className="text-[9px] underline hover:text-primary transition-colors"
-             >
-               MUDAR
-             </button>
+              <button 
+                onClick={() => setAutoDetectMode(!autoDetectMode)}
+                className="text-[9px] underline hover:text-primary transition-colors"
+              >
+                MUDAR
+              </button>
+              <div className="h-3 w-[1px] bg-border mx-1" />
+              <button 
+                onClick={() => setSimulationMode(!simulationMode)}
+                className={cn(
+                  "text-[9px] font-bold px-1.5 rounded transition-colors",
+                  simulationMode ? "bg-amber-500 text-white" : "text-muted-foreground hover:text-foreground"
+                )}
+                title="Simular falha na Kimi para testar fallback"
+              >
+                SIMULAR FALHA
+              </button>
           </div>
         </div>
         
@@ -347,7 +358,8 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     localStorage.setItem("creative_kimi_model", kimiModel);
     localStorage.setItem("creative_temperature", String(temperature));
     localStorage.setItem("creative_max_tokens", String(maxTokens));
-  }, [kimiModel, temperature, maxTokens]);
+    localStorage.setItem("creative_simulation_mode", String(simulationMode));
+  }, [kimiModel, temperature, maxTokens, simulationMode]);
 
   const logAuditAction = useCallback(async (step: string, action: string, params: any = {}, correlationId?: string, traceId?: string) => {
     // Audit logs for deployment and agent improvements
@@ -667,6 +679,10 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       try {
         // Log auditing initial attempt
         await logAuditAction("AI_Orchestration", "kimi_attempt", { model: kimiModel, temperature, maxTokens });
+
+        if (simulationMode) {
+          throw new Error("SISTEMA: Falha simulada para teste de fallback (DeepSeek)");
+        }
 
         const resp = await puter.ai.chat(prompt, { 
           model: kimiModel,
@@ -1313,6 +1329,11 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
               }}
             >
               <FileText className="h-3.5 w-3.5" /> Exportar Auditoria da Sessão (CSV)
+              {sessionHistory.length > 0 && (
+                <Badge variant="secondary" className="ml-auto text-[8px] h-4 bg-emerald-500/10 text-emerald-600 border-emerald-500/20">
+                  {sessionHistory.length} Registros
+                </Badge>
+              )}
             </Button>
 
             {sessionHistory.length > 0 && (
@@ -1370,6 +1391,38 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Painel de Verificação de Saúde (Health Check) */}
+        {toolKey === "chat" && sessionHistory.length > 0 && (
+          <div className="pt-4 border-t border-border/20 space-y-3">
+            <h4 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+              <Rocket className="h-3 w-3" /> Verificação de Saúde Kimi
+            </h4>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="bg-emerald-500/5 border border-emerald-500/10 p-2 rounded-lg flex flex-col items-center justify-center">
+                <span className="text-[9px] text-muted-foreground uppercase mb-0.5">Latência Média</span>
+                <span className="text-sm font-bold text-emerald-600">
+                  {(sessionHistory
+                    .filter(h => h.metadata?.model?.includes('kimi') && h.status === 'success')
+                    .reduce((acc, h) => acc + (parseFloat(h.metadata?.duration) || 0), 0) / 
+                    (sessionHistory.filter(h => h.metadata?.model?.includes('kimi') && h.status === 'success').length || 1)).toFixed(2)}s
+                </span>
+              </div>
+              <div className="bg-amber-500/5 border border-amber-500/10 p-2 rounded-lg flex flex-col items-center justify-center">
+                <span className="text-[9px] text-muted-foreground uppercase mb-0.5">Taxa de Fallback</span>
+                <span className="text-sm font-bold text-amber-600">
+                  {((sessionHistory.filter(h => h.metadata?.status === 'fallback_success').length / (sessionHistory.length || 1)) * 100).toFixed(0)}%
+                </span>
+              </div>
+              <div className="bg-red-500/5 border border-red-500/10 p-2 rounded-lg flex flex-col items-center justify-center">
+                <span className="text-[9px] text-muted-foreground uppercase mb-0.5">Taxa de Erro</span>
+                <span className="text-sm font-bold text-red-600">
+                  {((sessionHistory.filter(h => h.status === 'error').length / (sessionHistory.length || 1)) * 100).toFixed(0)}%
+                </span>
+              </div>
+            </div>
           </div>
         )}
 

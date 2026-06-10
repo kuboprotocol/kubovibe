@@ -27,7 +27,8 @@ import {
   useSortable
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Download, AlertTriangle, Check, X, ListFilter } from 'lucide-react';
+import { GripVertical, Download, AlertTriangle, Check, X, ListFilter, AlertCircle, ChevronUp, ChevronDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { 
   Select, 
@@ -77,6 +78,7 @@ const ALL_COLUMNS = [
   { id: 'url', label: 'URL' },
   { id: 'duration', label: 'Duração Total (ms)' },
   { id: 'stack', label: 'Stack Trace' },
+  { id: 'trail', label: 'Trilha de Decisão/Motivo' },
 ];
 
 const LS_KEY_COLS = 'kubo:audit:export:columns';
@@ -135,6 +137,14 @@ export default function CSVExportModal({ open, onOpenChange, logs, filterFallbac
   const [dateFormat, setDateFormat] = useState<'ISO' | 'DD/MM/AAAA'>('ISO');
   const [previewLimit, setPreviewLimit] = useState(5);
   const [internalFallbackFilter, setInternalFallbackFilter] = useState(filterFallbackOnly);
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+
+  const validationResult = useMemo(() => {
+    const required = ['model', 'credits', 'duration_msg', 'status_final'];
+    const missing = required.filter(r => !selectedColumns.has(r));
+    const isValid = missing.length === 0;
+    return { isValid, missing };
+  }, [selectedColumns]);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id || 'anonymous'));
@@ -195,14 +205,38 @@ export default function CSVExportModal({ open, onOpenChange, logs, filterFallbac
   };
 
   const filteredLogs = useMemo(() => {
-    if (!internalFallbackFilter) return logs;
-    return logs.filter(log => {
-      const metadata = (log as any).metadata;
-      const status = (log as any).status;
-      return (metadata?.decision_trail?.some((t: string) => t.toLowerCase().includes('fallback'))) || 
-             (status?.toLowerCase().includes('fallback'));
-    });
-  }, [logs, internalFallbackFilter]);
+    let result = [...logs];
+    
+    // Filtro de fallback
+    if (internalFallbackFilter) {
+      result = result.filter(log => {
+        const metadata = (log as any).metadata;
+        const status = (log as any).status;
+        return (metadata?.decision_trail?.some((t: string) => t.toLowerCase().includes('fallback'))) || 
+               (status?.toLowerCase().includes('fallback'));
+      });
+    }
+
+    // Ordenação
+    if (sortConfig) {
+      result.sort((a, b) => {
+        let valA: any = (a as any)[sortConfig.key];
+        let valB: any = (b as any)[sortConfig.key];
+
+        // Mapear campos de metadados se necessário
+        if (sortConfig.key === 'model') { valA = (a as any).metadata?.model; valB = (b as any).metadata?.model; }
+        if (sortConfig.key === 'credits') { valA = (a as any).metadata?.credits; valB = (b as any).metadata?.credits; }
+        if (sortConfig.key === 'duration_msg') { valA = parseFloat((a as any).metadata?.duration) || 0; valB = parseFloat((b as any).metadata?.duration) || 0; }
+        if (sortConfig.key === 'status_final') { valA = (a as any).status; valB = (b as any).status; }
+
+        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return result;
+  }, [logs, internalFallbackFilter, sortConfig]);
 
   const previewData = useMemo(() => {
     const activeCols = columnOrder.filter(id => selectedColumns.has(id));
@@ -215,6 +249,7 @@ export default function CSVExportModal({ open, onOpenChange, logs, filterFallbac
         if (colId === 'credits') return (log as any).metadata?.credits || 0;
         if (colId === 'duration_msg') return (log as any).metadata?.duration || '';
         if (colId === 'status_final') return (log as any).status || '';
+        if (colId === 'trail') return (log as any).metadata?.decision_trail?.join(' | ') || '';
         return (log as any)[colId] ?? '';
       });
     });
@@ -243,6 +278,7 @@ export default function CSVExportModal({ open, onOpenChange, logs, filterFallbac
         if (colId === 'credits') val = (log as any).metadata?.credits || 0;
         if (colId === 'duration_msg') val = (log as any).metadata?.duration || '';
         if (colId === 'status_final') val = (log as any).status || '';
+        if (colId === 'trail') val = (log as any).metadata?.decision_trail?.join(' | ') || '';
         return csvEscape(val);
       }).join(',');
     });
@@ -328,7 +364,7 @@ export default function CSVExportModal({ open, onOpenChange, logs, filterFallbac
               </div>
             </div>
 
-            <div className="flex items-center gap-4 p-2 bg-muted/30 rounded-md">
+            <div className="flex items-center justify-between gap-4 p-2 bg-muted/30 rounded-md">
               <div className="flex items-center gap-2">
                 <Checkbox 
                   id="filter-fallback" 
@@ -336,6 +372,17 @@ export default function CSVExportModal({ open, onOpenChange, logs, filterFallbac
                   onCheckedChange={(v) => setInternalFallbackFilter(!!v)}
                 />
                 <Label htmlFor="filter-fallback" className="text-[10px] font-medium cursor-pointer uppercase">Apenas Fallbacks</Label>
+              </div>
+
+              <div className={cn(
+                "flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase",
+                validationResult.isValid ? "bg-emerald-500/10 text-emerald-500" : "bg-red-500/10 text-red-500"
+              )}>
+                {validationResult.isValid ? (
+                  <><Check className="h-2.5 w-2.5" /> Auditoria Válida</>
+                ) : (
+                  <><AlertCircle className="h-2.5 w-2.5" /> Colunas Ausentes: {validationResult.missing.join(', ')}</>
+                )}
               </div>
             </div>
 
@@ -354,9 +401,29 @@ export default function CSVExportModal({ open, onOpenChange, logs, filterFallbac
                 <table className="w-full text-[10px] border-collapse">
                   <thead className="sticky top-0 bg-muted/80 backdrop-blur">
                     <tr>
-                      {previewData.header.map((h, i) => (
-                        <th key={i} className="px-2 py-1.5 text-left border-b font-bold whitespace-nowrap">{h}</th>
-                      ))}
+                      {previewData.header.map((h, i) => {
+                        const colId = columnOrder.filter(id => selectedColumns.has(id))[i];
+                        const isSorted = sortConfig?.key === colId;
+                        return (
+                          <th 
+                            key={i} 
+                            className="px-2 py-1.5 text-left border-b font-bold whitespace-nowrap cursor-pointer hover:bg-muted transition-colors select-none"
+                            onClick={() => {
+                              setSortConfig(current => ({
+                                key: colId,
+                                direction: current?.key === colId && current.direction === 'asc' ? 'desc' : 'asc'
+                              }));
+                            }}
+                          >
+                            <div className="flex items-center gap-1">
+                              {h}
+                              {isSorted && (
+                                sortConfig.direction === 'asc' ? <ChevronUp className="h-2 w-2" /> : <ChevronDown className="h-2 w-2" />
+                              )}
+                            </div>
+                          </th>
+                        );
+                      })}
                     </tr>
                   </thead>
                   <tbody>
