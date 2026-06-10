@@ -512,18 +512,62 @@ function AuditHistoryManager({
               )}
             </div>
 
-            <div className="p-3 rounded-lg bg-muted/50 border border-border/40 space-y-1.5">
-              <div className="flex justify-between text-[10px]">
-                <span className="text-muted-foreground">Registros:</span>
-                <span className="font-bold">
-                  {exportMode === "current_page" ? paginatedLogs.length : 
-                   exportMode === "range" ? Math.min(filteredLogs.length, (exportRange.end - exportRange.start + 1) * itemsPerPage) : 
-                   filteredLogs.length}
-                </span>
+            <div className="p-3 rounded-lg bg-muted/50 border border-border/40 space-y-2">
+              <div className="flex items-center gap-1.5 mb-1 border-b border-border/20 pb-1">
+                <Terminal className="h-3.5 w-3.5 text-primary" />
+                <span className="text-[10px] font-bold uppercase text-primary">Resumo da Exportação</span>
               </div>
-              <div className="flex justify-between text-[10px]">
-                <span className="text-muted-foreground">Colunas:</span>
-                <span className="font-bold">{logExportColumns.length}</span>
+              
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[10px]">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-muted-foreground uppercase text-[9px] font-medium">Registros:</span>
+                  <span className="font-bold text-foreground">
+                    {exportMode === "current_page" ? paginatedLogs.length : 
+                     exportMode === "range" ? Math.min(filteredLogs.length, (exportRange.end - exportRange.start + 1) * itemsPerPage) : 
+                     filteredLogs.length}
+                  </span>
+                </div>
+                
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-muted-foreground uppercase text-[9px] font-medium">Colunas:</span>
+                  <span className="font-bold text-foreground">{logExportColumns.length}</span>
+                </div>
+
+                <div className="flex flex-col gap-0.5 col-span-2">
+                  <span className="text-muted-foreground uppercase text-[9px] font-medium">Recorte Temporal:</span>
+                  <span className="font-bold text-foreground truncate">
+                    {(() => {
+                      const logsToExport = exportMode === "current_page" ? paginatedLogs : 
+                                         exportMode === "range" ? filteredLogs.slice((exportRange.start - 1) * itemsPerPage, exportRange.end * itemsPerPage) : 
+                                         filteredLogs;
+                      
+                      if (logsToExport.length === 0) return "Nenhum registro";
+                      
+                      const dates = logsToExport.map(l => new Date(l.timestamp).getTime());
+                      const minDate = new Date(Math.min(...dates));
+                      const maxDate = new Date(Math.max(...dates));
+                      
+                      return `${minDate.toLocaleDateString()} ${minDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} até ${maxDate.toLocaleDateString()} ${maxDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+                    })()}
+                  </span>
+                </div>
+
+                <div className="flex flex-col gap-0.5 col-span-2">
+                  <span className="text-muted-foreground uppercase text-[9px] font-medium">Colunas Selecionadas:</span>
+                  <div className="flex flex-wrap gap-1 mt-0.5">
+                    {logExportColumns.map(colId => {
+                      const labels: Record<string, string> = {
+                        timestamp: "Data/Hora", user: "Usuário", range: "Intervalo",
+                        filters: "Filtros", total: "Total", attachmentName: "Anexo", status: "Status"
+                      };
+                      return (
+                        <Badge key={colId} variant="outline" className="text-[8px] h-3.5 py-0 px-1 font-normal bg-background/50">
+                          {labels[colId] || colId}
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
