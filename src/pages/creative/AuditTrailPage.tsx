@@ -175,15 +175,11 @@ export default function CreativeAuditPage() {
 
   // Export CSV State
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-  const [exportDateFormat, setExportDateFormat] = useState<"DD/MM/AAAA" | "ISO">(() => {
-    return (localStorage.getItem("audit_export_date_format") as "DD/MM/AAAA" | "ISO") || "DD/MM/AAAA";
-  });
-  const [selectedColumns, setSelectedColumns] = useState<string[]>(() => {
-    const saved = localStorage.getItem("audit_export_columns");
-    return saved ? JSON.parse(saved) : ["created_at", "user", "step", "action", "correlation_id"];
-  });
+  const [previewRowsCount, setPreviewRowsCount] = useState(5);
+  const [exportDateFormat, setExportDateFormat] = useState<"DD/MM/AAAA" | "ISO">("DD/MM/AAAA");
+  const [selectedColumns, setSelectedColumns] = useState<string[]>([]);
 
-  const availableColumns = [
+  const availableColumns = useMemo(() => [
     { id: "id", label: "ID" },
     { id: "created_at", label: "Data/Hora" },
     { id: "user", label: "Usuário" },
@@ -192,7 +188,61 @@ export default function CreativeAuditPage() {
     { id: "correlation_id", label: "ID de Correlação" },
     { id: "trace_id", label: "ID de Trace" },
     { id: "params", label: "Parâmetros" },
-  ];
+  ], []);
+
+  // Load preferences from localStorage per user
+  useEffect(() => {
+    if (!user) return;
+    
+    const userId = user.id;
+    const columns = localStorage.getItem(`audit_export_columns_${userId}`);
+    if (columns) setSelectedColumns(JSON.parse(columns));
+    else setSelectedColumns(["created_at", "user", "step", "action", "correlation_id"]);
+
+    const format = localStorage.getItem(`audit_export_date_format_${userId}`);
+    if (format) setExportDateFormat(format as "DD/MM/AAAA" | "ISO");
+
+    // Load filter preferences
+    const filters = localStorage.getItem(`audit_filters_pref_${userId}`);
+    if (filters) {
+      const parsed = JSON.parse(filters);
+      if (parsed.search) setSearch(parsed.search);
+      if (parsed.step) setStep(parsed.step);
+      if (parsed.status) setStatus(parsed.status);
+      if (parsed.startDate) setStartDate(parsed.startDate);
+      if (parsed.endDate) setEndDate(parsed.endDate);
+      if (parsed.sortDir) setSortDir(parsed.sortDir);
+    }
+  }, [user]);
+
+  // Persistent Filter saving
+  useEffect(() => {
+    if (!user) return;
+    const userId = user.id;
+    const filterPrefs = { search, step, status, startDate, endDate, sortDir };
+    localStorage.setItem(`audit_filters_pref_${userId}`, JSON.stringify(filterPrefs));
+  }, [user, search, step, status, startDate, endDate, sortDir]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (active.id !== over?.id) {
+      setSelectedColumns((items) => {
+        const oldIndex = items.indexOf(active.id as string);
+        const newIndex = items.indexOf(over?.id as string);
+        const newOrder = arrayMove(items, oldIndex, newIndex);
+        if (user) localStorage.setItem(`audit_export_columns_${user.id}`, JSON.stringify(newOrder));
+        return newOrder;
+      });
+    }
+  };
 
   const toggleColumn = (colId: string) => {
     setSelectedColumns(prev => 
