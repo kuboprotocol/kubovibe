@@ -1258,9 +1258,28 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                       <Button variant="ghost" size="icon" className="h-7 w-7 text-primary hover:bg-primary/10" onClick={() => {
                         setPrompt(item.prompt);
                         setTimeout(() => handleExecute(), 100);
-                      }} title="Reexecutar">
+                      }} title="Reexecutar (Normal)">
                         <Play className="h-3.5 w-3.5" />
                       </Button>
+                      {toolKey === "chat" && (
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-7 w-7 text-amber-500 hover:bg-amber-500/10" 
+                          onClick={() => {
+                            setSimulationMode(true);
+                            setPrompt(item.prompt);
+                            setTimeout(() => {
+                              handleExecute();
+                              // Reset mode after a delay so next manual click isn't forced failure
+                              setTimeout(() => setSimulationMode(false), 2000);
+                            }, 100);
+                          }} 
+                          title="Reexecutar com Simulação de Falha"
+                        >
+                          <AlertCircle className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
                       <Popover>
                         <PopoverTrigger asChild>
                           <Button variant="ghost" size="icon" className="h-7 w-7">
