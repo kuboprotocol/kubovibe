@@ -1281,7 +1281,7 @@ export default function CreativeAuditPage() {
             {selectedColumns.length > 0 && entries.length > 0 && (
               <div className="space-y-3">
                 <h4 className="text-sm font-semibold flex items-center gap-2">
-                  <ListChecks className="h-4 w-4" /> Pré-visualização (Primeiras 3 linhas)
+                  <ListChecks className="h-4 w-4" /> Pré-visualização (Primeiras 10 linhas)
                 </h4>
                 <div className="border rounded-md overflow-x-auto">
                   <table className="w-full text-[10px] border-collapse">
@@ -1295,7 +1295,7 @@ export default function CreativeAuditPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {entries.slice(0, 3).map((e, idx) => (
+                      {entries.slice(0, 10).map((e, idx) => (
                         <tr key={idx}>
                           {selectedColumns.map(colId => {
                             let val = "";
