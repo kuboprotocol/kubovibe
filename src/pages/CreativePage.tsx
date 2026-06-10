@@ -1112,12 +1112,25 @@ export default function CreativePage() {
                         </Button>
                         <Button 
                           variant="secondary" 
-                          onClick={() => exportFullPanelReport("json")}
+                          onClick={() => {
+                             const auditLogs = sessionHistory.map(h => ({
+                               id: h.id,
+                               ts: new Date(h.timestamp).getTime(),
+                               kind: 'CHAT',
+                               message: h.prompt,
+                               model: h.metadata?.model,
+                               credits: h.metadata?.credits,
+                               duration: h.metadata?.duration,
+                               status: h.metadata?.status || h.status
+                             }));
+                             (window as any).__exportLogsToCSV = auditLogs;
+                             window.dispatchEvent(new CustomEvent('open-audit-export', { detail: { filterFallback: false } }));
+                          }}
                           disabled={isExporting || history.length === 0}
-                          title="Exportar tudo em JSON"
+                          title="Exportar tudo em CSV"
                         >
                           {isExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileDown className="h-4 w-4 mr-2" />}
-                          JSON Full
+                          Exportar Auditoria (CSV)
                         </Button>
                         <Button 
                           variant="outline" 
