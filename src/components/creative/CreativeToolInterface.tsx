@@ -173,7 +173,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     // Nível 3 (Ship) - Produção e Código Pesado -> DeepSeek
     const shipKeywords = ['app completo', 'sistema completo', 'ecommerce', 'marketplace', 'plataforma', 'clone', 'produção', 'saas'];
     if (shipKeywords.some(kw => lower.includes(kw)) || len > 500) {
-      setKimiModel("deepseek-chat"); // Usamos o slug que o roteador aceita
+      setKimiModel("deepseek-chat"); 
       return;
     }
 
@@ -182,6 +182,52 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       setKimiModel("moonshotai/kimi-k2.6");
     }
   }, [prompt, autoDetectMode, toolKey]);
+
+  const renderModelSelector = () => {
+    if (toolKey !== "chat") return null;
+    return (
+      <div className="flex flex-col gap-2 mb-4 p-3 bg-muted/20 rounded-xl border border-border/40">
+        <div className="flex items-center justify-between">
+          <Label className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-2">
+            <Brain className="h-3 w-3" /> Orquestrador de IA
+          </Label>
+          <div className="flex items-center gap-2">
+             <span className="text-[9px] font-bold text-primary flex items-center gap-1">
+               {autoDetectMode ? <Zap className="h-2.5 w-2.5" /> : <Settings2 className="h-2.5 w-2.5" />}
+               {autoDetectMode ? "AUTO" : "MANUAL"}
+             </span>
+             <button 
+               onClick={() => setAutoDetectMode(!autoDetectMode)}
+               className="text-[9px] underline hover:text-primary transition-colors"
+             >
+               MUDAR
+             </button>
+          </div>
+        </div>
+        
+        <Select 
+          value={kimiModel} 
+          onValueChange={(v) => {
+            setKimiModel(v);
+            if (autoDetectMode) setAutoDetectMode(false);
+          }}
+        >
+          <SelectTrigger className="h-8 text-xs bg-background/50">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="moonshotai/kimi-k2.6">Kimi K2.6 (Nível 1 - Rápido)</SelectItem>
+            <SelectItem value="moonshotai/kimi-k2.5">Kimi K2.5 (Estável)</SelectItem>
+            <SelectItem value="moonshotai/kimi-k2-thinking">Kimi Thinking (Nível 2 - Análise)</SelectItem>
+            <SelectItem value="deepseek-chat">DeepSeek V3 (Nível 3 - Produção)</SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-[9px] text-muted-foreground italic">
+          {kimiModel.includes('kimi') ? "Utilizando Puter.js para economia de créditos." : "Processamento avançado via OpenRouter (Custo: 1 crédito)."}
+        </p>
+      </div>
+    );
+  };
 
   const buildSteps = (needsConvert: boolean, initialDetails?: Record<string, any>, currentSteps?: AvatarStepState[]): AvatarStepState[] => {
     const now = new Date().toLocaleTimeString();
@@ -1236,6 +1282,22 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
           </div>
         )}
 
+        {/* Streaming Content Display */}
+        {streamingContent && (
+          <div className="mt-4 p-4 rounded-xl bg-primary/5 border border-primary/20 animate-in fade-in slide-in-from-bottom-2">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+              <span className="text-[10px] font-bold uppercase text-primary">Kimi Responde:</span>
+            </div>
+            <div className="text-sm prose prose-invert max-w-none prose-p:leading-relaxed">
+              {streamingContent}
+              <span className="inline-block w-1 h-4 ml-1 bg-primary animate-pulse align-middle" />
+            </div>
+          </div>
+        )}
+
+        {renderModelSelector()}
+        
         <div className="pt-4 flex items-center justify-between gap-4 border-t border-border/20">
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
