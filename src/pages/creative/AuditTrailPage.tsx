@@ -11,8 +11,26 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { 
   ArrowLeft, Search, FileDown, ArrowUpDown, Loader2, X, Filter, 
   AlertTriangle, Save, History, ChevronRight, Info, AlertCircle, Share2, TrendingUp, Clock,
-  Layers, Copy, ArrowLeftRight, Check, ListChecks
+  Layers, Copy, ArrowLeftRight, Check, ListChecks, GripVertical, AlertOctagon
 } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { restrictToVerticalAxis, restrictToFirstScrollableAncestor } from "@dnd-kit/modifiers";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -89,6 +107,42 @@ const TimelineViewer = ({ correlationId, currentId }: { correlationId: string, c
   );
 };
 
+const SortableItem = ({ id, label, isChecked, onToggle }: { id: string; label: string; isChecked: boolean; onToggle: () => void }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : "auto",
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div 
+      ref={setNodeRef} 
+      style={style} 
+      className={`flex items-center space-x-2 p-2 rounded-md border bg-card/50 hover:bg-accent/30 transition-colors ${isDragging ? "shadow-lg border-primary" : ""}`}
+    >
+      <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-muted-foreground p-1">
+        <GripVertical className="h-4 w-4" />
+      </div>
+      <Checkbox 
+        id={`col-${id}`} 
+        checked={isChecked} 
+        onCheckedChange={onToggle}
+      />
+      <Label htmlFor={`col-${id}`} className="text-xs cursor-pointer flex-1 py-1">{label}</Label>
+    </div>
+  );
+};
+
 const PAGE_SIZE = 25;
 
 export default function CreativeAuditPage() {
@@ -121,15 +175,11 @@ export default function CreativeAuditPage() {
 
   // Export CSV State
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-  const [exportDateFormat, setExportDateFormat] = useState<"DD/MM/AAAA" | "ISO">(() => {
-    return (localStorage.getItem("audit_export_date_format") as "DD/MM/AAAA" | "ISO") || "DD/MM/AAAA";
-  });
-  const [selectedColumns, setSelectedColumns] = useState<string[]>(() => {
-    const saved = localStorage.getItem("audit_export_columns");
-    return saved ? JSON.parse(saved) : ["created_at", "user", "step", "action", "correlation_id"];
-  });
+  const [previewRowsCount, setPreviewRowsCount] = useState(5);
+  const [exportDateFormat, setExportDateFormat] = useState<"DD/MM/AAAA" | "ISO">("DD/MM/AAAA");
+  const [selectedColumns, setSelectedColumns] = useState<string[]>([]);
 
-  const availableColumns = [
+  const availableColumns = useMemo(() => [
     { id: "id", label: "ID" },
     { id: "created_at", label: "Data/Hora" },
     { id: "user", label: "Usuário" },
@@ -138,7 +188,61 @@ export default function CreativeAuditPage() {
     { id: "correlation_id", label: "ID de Correlação" },
     { id: "trace_id", label: "ID de Trace" },
     { id: "params", label: "Parâmetros" },
-  ];
+  ], []);
+
+  // Load preferences from localStorage per user
+  useEffect(() => {
+    if (!user) return;
+    
+    const userId = user.id;
+    const columns = localStorage.getItem(`audit_export_columns_${userId}`);
+    if (columns) setSelectedColumns(JSON.parse(columns));
+    else setSelectedColumns(["created_at", "user", "step", "action", "correlation_id"]);
+
+    const format = localStorage.getItem(`audit_export_date_format_${userId}`);
+    if (format) setExportDateFormat(format as "DD/MM/AAAA" | "ISO");
+
+    // Load filter preferences
+    const filters = localStorage.getItem(`audit_filters_pref_${userId}`);
+    if (filters) {
+      const parsed = JSON.parse(filters);
+      if (parsed.search) setSearch(parsed.search);
+      if (parsed.step) setStep(parsed.step);
+      if (parsed.status) setStatus(parsed.status);
+      if (parsed.startDate) setStartDate(parsed.startDate);
+      if (parsed.endDate) setEndDate(parsed.endDate);
+      if (parsed.sortDir) setSortDir(parsed.sortDir);
+    }
+  }, [user]);
+
+  // Persistent Filter saving
+  useEffect(() => {
+    if (!user) return;
+    const userId = user.id;
+    const filterPrefs = { search, step, status, startDate, endDate, sortDir };
+    localStorage.setItem(`audit_filters_pref_${userId}`, JSON.stringify(filterPrefs));
+  }, [user, search, step, status, startDate, endDate, sortDir]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (active.id !== over?.id) {
+      setSelectedColumns((items) => {
+        const oldIndex = items.indexOf(active.id as string);
+        const newIndex = items.indexOf(over?.id as string);
+        const newOrder = arrayMove(items, oldIndex, newIndex);
+        if (user) localStorage.setItem(`audit_export_columns_${user.id}`, JSON.stringify(newOrder));
+        return newOrder;
+      });
+    }
+  };
 
   const toggleColumn = (colId: string) => {
     setSelectedColumns(prev => 
@@ -155,8 +259,10 @@ export default function CreativeAuditPage() {
   };
 
   const saveExportSettings = () => {
-    localStorage.setItem("audit_export_columns", JSON.stringify(selectedColumns));
-    localStorage.setItem("audit_export_date_format", exportDateFormat);
+    if (user) {
+      localStorage.setItem(`audit_export_columns_${user.id}`, JSON.stringify(selectedColumns));
+      localStorage.setItem(`audit_export_date_format_${user.id}`, exportDateFormat);
+    }
   };
 
   // Update URL params when filters change
@@ -1227,10 +1333,13 @@ export default function CreativeAuditPage() {
               </div>
             </div>
 
-            {/* Column Selection */}
+            {/* Column Selection with Drag and Drop */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h4 className="text-sm font-semibold">Selecione as Colunas</h4>
+                <div className="space-y-0.5">
+                  <h4 className="text-sm font-semibold">Selecione e Reordene as Colunas</h4>
+                  <p className="text-[10px] text-muted-foreground">Arraste para mudar a ordem no CSV</p>
+                </div>
                 <div className="flex gap-2">
                   <Button variant="ghost" size="sm" className="h-7 text-[10px]" onClick={selectAllColumns}>
                     <ListChecks className="h-3 w-3 mr-1" /> Selecionar Tudo
@@ -1240,15 +1349,45 @@ export default function CreativeAuditPage() {
                   </Button>
                 </div>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {availableColumns.map((col) => (
-                  <div key={col.id} className="flex items-center space-x-2">
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[200px] overflow-y-auto p-1">
+                <DndContext 
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
+                  modifiers={[restrictToVerticalAxis, restrictToFirstScrollableAncestor]}
+                >
+                  <SortableContext 
+                    items={selectedColumns}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    {/* Render selected/sorted columns first */}
+                    {selectedColumns.map((colId) => {
+                      const col = availableColumns.find(c => c.id === colId);
+                      if (!col) return null;
+                      return (
+                        <SortableItem 
+                          key={col.id} 
+                          id={col.id} 
+                          label={col.label} 
+                          isChecked={true} 
+                          onToggle={() => toggleColumn(col.id)} 
+                        />
+                      );
+                    })}
+                  </SortableContext>
+                </DndContext>
+
+                {/* Render unselected columns */}
+                {availableColumns.filter(c => !selectedColumns.includes(c.id)).map((col) => (
+                  <div key={col.id} className="flex items-center space-x-2 p-2 rounded-md border bg-muted/20">
+                    <div className="w-6" /> {/* Spacer for drag handle */}
                     <Checkbox 
                       id={`col-${col.id}`} 
-                      checked={selectedColumns.includes(col.id)} 
+                      checked={false} 
                       onCheckedChange={() => toggleColumn(col.id)}
                     />
-                    <Label htmlFor={`col-${col.id}`} className="text-xs cursor-pointer">{col.label}</Label>
+                    <Label htmlFor={`col-${col.id}`} className="text-xs cursor-pointer flex-1 py-1">{col.label}</Label>
                   </div>
                 ))}
               </div>
@@ -1280,22 +1419,34 @@ export default function CreativeAuditPage() {
             {/* Preview Section */}
             {selectedColumns.length > 0 && entries.length > 0 && (
               <div className="space-y-3">
-                <h4 className="text-sm font-semibold flex items-center gap-2">
-                  <ListChecks className="h-4 w-4" /> Pré-visualização (Primeiras 10 linhas)
-                </h4>
-                <div className="border rounded-md overflow-x-auto">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-semibold flex items-center gap-2">
+                    <ListChecks className="h-4 w-4" /> Pré-visualização (Primeiras {previewRowsCount} linhas)
+                  </h4>
+                  {entries.length > previewRowsCount && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-7 text-[10px]"
+                      onClick={() => setPreviewRowsCount(prev => Math.min(prev + 5, 20))}
+                    >
+                      <ChevronRight className="h-3 w-3 mr-1 rotate-90" /> Carregar mais linhas
+                    </Button>
+                  )}
+                </div>
+                <div className="border rounded-md overflow-x-auto max-h-[150px]">
                   <table className="w-full text-[10px] border-collapse">
-                    <thead className="bg-muted">
+                    <thead className="bg-muted sticky top-0 z-10">
                       <tr>
                         {selectedColumns.map(colId => (
-                          <th key={colId} className="p-2 border text-left whitespace-nowrap">
+                          <th key={colId} className="p-2 border text-left whitespace-nowrap bg-muted">
                             {availableColumns.find(c => c.id === colId)?.label}
                           </th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {entries.slice(0, 10).map((e, idx) => (
+                      {entries.slice(0, previewRowsCount).map((e, idx) => (
                         <tr key={idx}>
                           {selectedColumns.map(colId => {
                             let val = "";
@@ -1320,13 +1471,24 @@ export default function CreativeAuditPage() {
                 </div>
               </div>
             )}
+
+            {/* Warning for 0 records */}
+            {entries.length === 0 && (
+              <div className="p-3 border border-amber-500/50 bg-amber-500/10 rounded-md flex items-center gap-3">
+                <AlertOctagon className="h-5 w-5 text-amber-500 flex-shrink-0" />
+                <div>
+                  <p className="text-xs font-bold text-amber-600 uppercase">Aviso de Filtro</p>
+                  <p className="text-[11px] text-amber-700">A combinação de filtros atual resultou em 0 registros. Ajuste os filtros antes de exportar.</p>
+                </div>
+              </div>
+            )}
           </div>
 
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setIsExportModalOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleDownloadCSV} disabled={selectedColumns.length === 0}>
+            <Button onClick={handleDownloadCSV} disabled={selectedColumns.length === 0 || entries.length === 0}>
               Confirmar e Baixar CSV
             </Button>
           </DialogFooter>
