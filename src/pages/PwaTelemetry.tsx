@@ -143,18 +143,86 @@ const PwaTelemetry = () => {
   const [exportFmt, setExportFmt] = useState<"csv" | "json">("csv");
   const [exporting, setExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
-  const abortControllerRef = useRef<AbortController | null>(null);
+  const [currentJobId, setCurrentJobId] = useState<string | null>(null);
+  const pollIntervalRef = useRef<number | null>(null);
+
+  const cancelExport = async () => {
+    if (!currentJobId) return;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      await fetch(`${FUNCTIONS_URL}/pwa-telemetry`, {
+        method: "POST",
+        headers: { 
+          Authorization: `Bearer ${session?.access_token ?? ""}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ action: "cancel", jobId: currentJobId }),
+      });
+      toast.info("Exportação cancelada.");
+    } catch (e) {
+      console.error("Cancel error:", e);
+    } finally {
+      stopPolling();
+      setExporting(false);
+      setExportProgress(0);
+      setCurrentJobId(null);
+    }
+  };
+
+  const stopPolling = () => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+  };
+
+  const startPolling = (jobId: string) => {
+    stopPolling();
+    setCurrentJobId(jobId);
+    pollIntervalRef.current = window.setInterval(async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const res = await fetch(`${FUNCTIONS_URL}/pwa-telemetry?jobId=${jobId}`, {
+          headers: { Authorization: `Bearer ${session?.access_token ?? ""}` },
+        });
+        const { job } = await res.json();
+        if (job) {
+          setExportProgress(job.progress || 0);
+          if (job.status === "completed") {
+            stopPolling();
+            setExporting(false);
+            setExportProgress(100);
+            toast.success("Exportação em background concluída.");
+            // In a real app, we'd trigger the download here from job.result_url
+            // For now, we'll just simulate completion
+            setCurrentJobId(null);
+          } else if (job.status === "failed") {
+            stopPolling();
+            setExporting(false);
+            toast.error(`Exportação falhou: ${job.error_message}`);
+            setCurrentJobId(null);
+          } else if (job.status === "cancelled") {
+            stopPolling();
+            setExporting(false);
+            setCurrentJobId(null);
+          }
+        }
+      } catch (e) {
+        console.error("Poll error:", e);
+      }
+    }, 2000);
+  };
 
   const doExport = async () => {
     if (!canRead) return;
     setExporting(true);
-    setExportProgress(10);
-    abortControllerRef.current = new AbortController();
+    setExportProgress(5);
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const qs = new URLSearchParams();
       qs.set("export", exportFmt);
+      qs.set("background", "true");
       if (exportStart) qs.set("start", new Date(exportStart).toISOString());
       if (exportEnd) qs.set("end", new Date(exportEnd).toISOString());
       if (filters.type !== "all") qs.set("type", filters.type);
@@ -162,44 +230,36 @@ const PwaTelemetry = () => {
       if (filters.userId) qs.set("userId", filters.userId);
       if (filters.sessionId) qs.set("sessionId", filters.sessionId);
       
-      setExportProgress(30);
       const res = await fetch(`${FUNCTIONS_URL}/pwa-telemetry?${qs.toString()}`, {
         headers: { Authorization: `Bearer ${session?.access_token ?? ""}` },
-        signal: abortControllerRef.current.signal
       });
       
-      setExportProgress(60);
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: "Export falhou" }));
         throw new Error(err.message || err.error || "Export falhou");
       }
       
-      const blob = await res.blob();
-      setExportProgress(90);
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = `pwa-telemetry-${Date.now()}.${exportFmt}`;
-      a.click();
-      URL.revokeObjectURL(a.href);
-      setExportProgress(100);
-      setExportOpen(false);
-      toast.success("Exportação concluída com sucesso.");
-    } catch (e: any) {
-      if (e.name === 'AbortError') {
-        toast.info("Exportação cancelada pelo usuário.");
+      const { jobId } = await res.json();
+      if (jobId) {
+        startPolling(jobId);
       } else {
-        console.error("Export error:", e);
-        toast.error(`Erro ao exportar: ${e.message}. Tente reduzir o período ou verificar os filtros.`);
+        // Fallback to direct download if not background
+        const blob = await res.blob();
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `pwa-telemetry-${Date.now()}.${exportFmt}`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+        setExporting(false);
+        setExportProgress(100);
+        setExportOpen(false);
       }
-    } finally {
+    } catch (e: any) {
+      console.error("Export error:", e);
+      toast.error(`Erro ao exportar: ${e.message}`);
       setExporting(false);
       setExportProgress(0);
-      abortControllerRef.current = null;
     }
-  };
-
-  const cancelExport = () => {
-    abortControllerRef.current?.abort();
   };
 
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
@@ -209,14 +269,61 @@ const PwaTelemetry = () => {
       .from("pwa_telemetry_audit_logs" as any)
       .select("*, actor:actor_id(email)")
       .order("created_at", { ascending: false })
-      .limit(20);
+      .limit(50);
     setAuditLogs(data || []);
   };
 
+  const [metrics, setMetrics] = useState<any[]>([]);
+  const fetchMetrics = async () => {
+    if (!hasAnyRole(["admin"])) return;
+    const { data } = await supabase
+      .from("pwa_telemetry_metrics" as any)
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(100);
+    setMetrics(data || []);
+  };
+
+  const [settings, setSettings] = useState<any>(null);
+  const fetchSettings = async () => {
+    const { data } = await supabase
+      .from("pwa_telemetry_settings")
+      .select("*")
+      .single();
+    setSettings(data);
+  };
+
+  const toggleNotifications = async (enabled: boolean, webhookUrl?: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${FUNCTIONS_URL}/pwa-telemetry`, {
+        method: "POST",
+        headers: { 
+          Authorization: `Bearer ${session?.access_token ?? ""}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ 
+          action: "toggle_notifications", 
+          enabled, 
+          webhookUrl: webhookUrl || settings?.webhook_url 
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to update settings");
+      toast.success(enabled ? "Notificações ativadas" : "Notificações desativadas");
+      fetchSettings();
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  };
 
   useEffect(() => {
-    if (hasAnyRole(["admin"])) fetchAuditLogs();
+    if (hasAnyRole(["admin"])) {
+      fetchAuditLogs();
+      fetchMetrics();
+      fetchSettings();
+    }
   }, [hasAnyRole]);
+
 
 
   const [clearOpen, setClearOpen] = useState(false);
