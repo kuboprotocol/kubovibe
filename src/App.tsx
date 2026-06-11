@@ -160,8 +160,10 @@ const App = () => {
 
       </AuthProvider>
     </TooltipProvider>
-  </QueryClientProvider>
-);
+    </QueryClientProvider>
+  );
+};
+
 
 
 
