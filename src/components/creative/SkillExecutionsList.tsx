@@ -157,6 +157,12 @@ export function SkillExecutionsList() {
     if (page > 1) params.page = String(page);
     if (sortOrder !== "desc") params.sort = sortOrder;
     
+    // Suporte para o "Nano Banano" via URL (OpenHoster)
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get("provider") === "openhoster" && urlParams.get("tool") === "nano_banano") {
+      setSkillFilter("nano_banana");
+    }
+
     setSearchParams(params, { replace: true });
   }, [search, statusFilter, skillFilter, dateStart, dateEnd, page, sortOrder]);
 
