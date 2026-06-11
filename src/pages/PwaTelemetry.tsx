@@ -629,10 +629,12 @@ const PwaTelemetry = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Data</TableHead>
+                      <TableHead>Ação</TableHead>
                       <TableHead>Usuário</TableHead>
                       <TableHead>Filtros / Escopo</TableHead>
                       <TableHead className="text-right">Removidos</TableHead>
                     </TableRow>
+
                   </TableHeader>
                   <TableBody>
                     {auditLogs.length === 0 ? (
