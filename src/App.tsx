@@ -84,15 +84,22 @@ if (typeof window !== 'undefined') {
   }
 }
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <AuthProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <ErrorBoundary resourceName="App">
-            <Suspense fallback={<PageLoader />}>
+
+
+
+const App = () => {
+  return (
+
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <AuthProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <ErrorBoundary resourceName="App">
+              <Suspense fallback={<PageLoader />}>
+
+
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/terms" element={<TermsPage />} />
@@ -150,9 +157,14 @@ const App = () => (
             </Suspense>
           </ErrorBoundary>
         </BrowserRouter>
+
       </AuthProvider>
     </TooltipProvider>
-  </QueryClientProvider>
-);
+    </QueryClientProvider>
+  );
+};
+
+
+
 
 export default App;

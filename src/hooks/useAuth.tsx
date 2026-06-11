@@ -23,6 +23,8 @@ const AuthContext = createContext<AuthContextType>({
 })
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  
+
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
@@ -48,8 +50,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false)
     })
 
+
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
+
+
       setUser(session?.user ?? null)
       loadRoles(session?.user?.id)
       setLoading(false)
