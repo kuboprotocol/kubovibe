@@ -129,7 +129,10 @@ export function SkillExecutionsList() {
     details?: string;
     backend_status?: number;
     stack?: string;
+    endpoint?: string;
+    payload?: any;
   } | null>(null);
+
 
   // Export Configuration
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
