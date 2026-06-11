@@ -617,6 +617,10 @@ const PwaTelemetry = () => {
           </Card>
         </TabsContent>
 
+        <TabsContent value="jobs" className="pt-6">
+          <ExportJobsView />
+        </TabsContent>
+
         <TabsContent value="summary" className="pt-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {summary.map((s) => (
