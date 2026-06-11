@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { X, Search, ArrowRight, Star } from 'lucide-react'
+import { X, Search, ArrowRight, Star, Monitor } from 'lucide-react'
 import { templatePreviews } from './templatePreviews'
 import { categories, templates } from './templatesData'
 
@@ -147,6 +147,10 @@ function TemplateCard({ template, index, onSelect }: { template: Template; index
   const Icon = template.icon
   const previewHtml = templatePreviews[template.id]
 
+  // Logic for heavy components (editor/canvas) would typically involve lazy loading
+  // but for the gallery we show a placeholder/skeleton if it's considered heavy.
+  const isHeavy = template.category === 'canvas' || template.category === 'saas'
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -168,6 +172,14 @@ function TemplateCard({ template, index, onSelect }: { template: Template; index
               sandbox=""
               tabIndex={-1}
             />
+          ) : isHeavy ? (
+            <div className="h-full w-full flex flex-col items-center justify-center bg-secondary/30 p-4 gap-2">
+               <div className="w-12 h-12 rounded-lg bg-secondary animate-pulse flex items-center justify-center">
+                  <Icon className="h-6 w-6 text-muted-foreground" />
+               </div>
+               <div className="w-24 h-2 bg-secondary rounded animate-pulse" />
+               <div className="w-16 h-1.5 bg-secondary/60 rounded animate-pulse" />
+            </div>
           ) : (
             <div className={`h-full bg-gradient-to-br ${template.color} opacity-80 group-hover:opacity-100 transition-opacity flex items-center justify-center`}>
               <Icon className="h-10 w-10 text-white/90 drop-shadow-lg" />
