@@ -1201,8 +1201,22 @@ ${JSON.stringify(ex.output, null, 2)}
               <p className="text-sm font-medium">{openHosterError.message}</p>
               {openHosterError.details && <p className="text-xs opacity-80">{openHosterError.details}</p>}
               
-              {(openHosterError.backend_status || openHosterError.stack) && (
+              {(openHosterError.backend_status || openHosterError.stack || openHosterError.endpoint || openHosterError.payload) && (
                 <div className="mt-4 p-3 bg-black/20 rounded-lg space-y-2 border border-destructive/10">
+                  {openHosterError.endpoint && (
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold uppercase opacity-60">URL/Endpoint:</span>
+                      <p className="text-[10px] font-mono break-all opacity-80">{openHosterError.endpoint}</p>
+                    </div>
+                  )}
+                  {openHosterError.payload && (
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold uppercase opacity-60">Parâmetros Detectados:</span>
+                      <pre className="text-[9px] font-mono p-2 bg-black/40 rounded border border-white/5">
+                        {JSON.stringify(openHosterError.payload, null, 2)}
+                      </pre>
+                    </div>
+                  )}
                   {openHosterError.backend_status && (
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] font-bold uppercase opacity-60">Status Backend:</span>
@@ -1219,6 +1233,7 @@ ${JSON.stringify(ex.output, null, 2)}
                   )}
                 </div>
               )}
+
               
               <div className="flex gap-2 mt-4">
                 <Button 
