@@ -76,13 +76,17 @@ const queryClient = new QueryClient({
 if (typeof window !== 'undefined') {
   const host = window.location.hostname
   const previewHost = 'preview--kubo-secure-ai.lovable.app'
-  if (host === previewHost) {
+  const isLovableApp = /(^|\.)lovable\.app$/i.test(host)
+  const isCustomDomain = host === 'kubovibe.dev' || host === 'www.kubovibe.dev'
+  
+  if (host === previewHost || host.includes('lovableproject.com')) {
     // Already on the preview domain
-  } else if (/(^|\.)lovable\.app$/i.test(host) && !host.startsWith('id-preview--')) {
+  } else if (isLovableApp && !host.startsWith('id-preview--')) {
     const target = `https://kubovibe.dev${window.location.pathname}${window.location.search}${window.location.hash}`
     window.location.replace(target)
   }
 }
+
 
 
 
