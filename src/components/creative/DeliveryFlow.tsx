@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
 
 interface ValidationStep {
   id: string;
@@ -1020,7 +1021,10 @@ export function DeliveryFlow() {
   const itemsPerPage = 5;
   const [showQR, setShowQR] = useState(false);
   const [notifications, setNotifications] = useState({ email: true, webhook: false });
-  const [currentUserRole, setCurrentUserRole] = useState<string>("admin"); // Mock role: 'admin', 'developer', 'viewer'
+  // SECURITY: role is derived server-side from useAuth; never client-mutable.
+  const { isAdmin, hasAnyRole } = useAuth();
+  const currentUserRole: "admin" | "developer" | "viewer" =
+    isAdmin ? "admin" : hasAnyRole(["developer", "analyst"]) ? "developer" : "viewer";
   const [pendingApproval, setPendingApproval] = useState<boolean>(false);
   const [currentCommit, setCurrentCommit] = useState<string>(() => Math.random().toString(36).substring(7));
   const [approvalComment, setApprovalComment] = useState("");
@@ -1534,16 +1538,6 @@ export function DeliveryFlow() {
         <Badge variant="outline" className="text-[9px] gap-1 px-2 py-0.5">
           <UserCheck className="h-2.5 w-2.5" /> {currentUserRole.toUpperCase()}
         </Badge>
-        <Select value={currentUserRole} onValueChange={setCurrentUserRole}>
-          <SelectTrigger className="w-[100px] h-6 text-[9px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="admin">Admin</SelectItem>
-            <SelectItem value="developer">Dev</SelectItem>
-            <SelectItem value="viewer">Viewer</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
