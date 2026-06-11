@@ -2,9 +2,10 @@ import { existsSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 
 const distDir = join(process.cwd(), 'dist/assets');
-const MAX_CHUNK_SIZE_MB = 4.5; // Slightly above our largest vendor chunk
+const MAX_CHUNK_SIZE_MB = 4.0; 
+const TOTAL_BUNDLE_LIMIT_MB = 15.0;
 
-console.log('Validating bundle sizes...');
+console.log('--- Bundle Size Report ---');
 
 if (!existsSync(distDir)) {
   console.error('❌ dist/assets directory not found!');
@@ -14,6 +15,7 @@ if (!existsSync(distDir)) {
 const files = readdirSync(distDir);
 let totalSize = 0;
 let exceeded = false;
+const largeFiles: string[] = [];
 
 files.forEach(file => {
   const filePath = join(distDir, file);
@@ -21,15 +23,27 @@ files.forEach(file => {
   const sizeMB = stats.size / (1024 * 1024);
   totalSize += sizeMB;
 
+  console.log(`  ${file.padEnd(40)} | ${sizeMB.toFixed(2)} MB`);
+
   if (sizeMB > MAX_CHUNK_SIZE_MB) {
-    console.error(`❌ File ${file} exceeds maximum chunk size: ${sizeMB.toFixed(2)}MB > ${MAX_CHUNK_SIZE_MB}MB`);
+    largeFiles.push(`${file} (${sizeMB.toFixed(2)} MB)`);
     exceeded = true;
   }
 });
 
-console.log(`Total bundle size: ${totalSize.toFixed(2)}MB`);
+console.log('--------------------------');
+console.log(`Total Bundle Size: ${totalSize.toFixed(2)} MB`);
+console.log('--------------------------');
 
 if (exceeded) {
+  console.error('❌ FAIL: The following chunks exceed the ${MAX_CHUNK_SIZE_MB}MB limit:');
+  largeFiles.forEach(f => console.error(`   - ${f}`));
+  console.error('\nAction required: Implement further code splitting or optimize dependencies.');
+  process.exit(1);
+}
+
+if (totalSize > TOTAL_BUNDLE_LIMIT_MB) {
+  console.error(`❌ FAIL: Total bundle size (${totalSize.toFixed(2)}MB) exceeds the ${TOTAL_BUNDLE_LIMIT_MB}MB limit!`);
   process.exit(1);
 }
 
