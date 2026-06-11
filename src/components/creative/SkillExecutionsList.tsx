@@ -120,6 +120,14 @@ export function SkillExecutionsList() {
   const [importValidationResults, setImportValidationResults] = useState<{ valid: boolean, errors: string[], preview: any[] } | null>(null);
   const [mergeOption, setMergeOption] = useState<"create" | "merge">("create");
 
+  // OpenHoster/Nano Banano States
+  const [openHosterError, setOpenHosterError] = useState<{
+    message: string;
+    details?: string;
+    backend_status?: number;
+    stack?: string;
+  } | null>(null);
+
   // Export Configuration
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState<"csv" | "xlsx">("csv");
@@ -139,6 +147,7 @@ export function SkillExecutionsList() {
     { id: "input", label: "Entrada (JSON)" },
     { id: "output", label: "Saída (JSON)" },
   ];
+
 
 
   useEffect(() => {
