@@ -1866,6 +1866,45 @@ export type Database = {
         }
         Relationships: []
       }
+      pwa_telemetry_export_jobs: {
+        Row: {
+          created_at: string | null
+          error_message: string | null
+          filters: Json | null
+          format: string
+          id: string
+          progress: number | null
+          result_url: string | null
+          status: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          error_message?: string | null
+          filters?: Json | null
+          format: string
+          id?: string
+          progress?: number | null
+          result_url?: string | null
+          status?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          error_message?: string | null
+          filters?: Json | null
+          format?: string
+          id?: string
+          progress?: number | null
+          result_url?: string | null
+          status?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       pwa_telemetry_metrics: {
         Row: {
           created_at: string | null
@@ -1893,6 +1932,36 @@ export type Database = {
           operation?: string
           row_count?: number | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      pwa_telemetry_settings: {
+        Row: {
+          anomaly_threshold_sigma: number | null
+          created_at: string | null
+          id: string
+          is_notifications_enabled: boolean | null
+          updated_at: string | null
+          user_id: string | null
+          webhook_url: string | null
+        }
+        Insert: {
+          anomaly_threshold_sigma?: number | null
+          created_at?: string | null
+          id?: string
+          is_notifications_enabled?: boolean | null
+          updated_at?: string | null
+          user_id?: string | null
+          webhook_url?: string | null
+        }
+        Update: {
+          anomaly_threshold_sigma?: number | null
+          created_at?: string | null
+          id?: string
+          is_notifications_enabled?: boolean | null
+          updated_at?: string | null
+          user_id?: string | null
+          webhook_url?: string | null
         }
         Relationships: []
       }
