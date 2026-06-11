@@ -4,7 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Download, RefreshCw, AlertCircle, FileJson, FileSpreadsheet, Clock, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Download, RefreshCw, AlertCircle, FileJson, FileSpreadsheet, Clock, CheckCircle2, XCircle, Loader2, ShieldAlert, LogIn } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -20,22 +21,68 @@ interface ExportJob {
   updated_at: string;
 }
 
+type PermissionError = {
+  kind: "permission" | "auth" | "network";
+  message: string;
+  hint: string;
+};
+
 export const ExportJobsView = () => {
   const [jobs, setJobs] = useState<ExportJob[]>([]);
   const [loading, setLoading] = useState(true);
+  const [permError, setPermError] = useState<PermissionError | null>(null);
+  const [reloading, setReloading] = useState(false);
 
   const fetchJobs = useCallback(async () => {
     try {
+      const { data: sess } = await supabase.auth.getSession();
+      if (!sess.session) {
+        setPermError({
+          kind: "auth",
+          message: "Sua sessão expirou ou você não está autenticado.",
+          hint: "Faça login novamente para ver seus jobs de exportação.",
+        });
+        setJobs([]);
+        return;
+      }
+
       const { data, error } = await supabase
         .from("pwa_telemetry_export_jobs" as any)
         .select("*")
         .order("created_at", { ascending: false })
         .limit(20);
 
-      if (error) throw error;
+      if (error) {
+        const code = (error as any).code;
+        const msg = error.message || "";
+        if (code === "42501" || /permission denied/i.test(msg) || /row-level security/i.test(msg)) {
+          setPermError({
+            kind: "permission",
+            message: "Você não tem permissão para visualizar os jobs de exportação.",
+            hint: "Esta página requer a role admin, analyst ou viewer. Se sua role foi alterada recentemente, recarregue a sessão para aplicar as mudanças, ou peça acesso a um administrador.",
+          });
+          setJobs([]);
+          return;
+        }
+        throw error;
+      }
+
+      setPermError(null);
       setJobs((data as any) || []);
+
+      // Audit access to the jobs view (best-effort, ignore failures)
+      void supabase.from("pwa_telemetry_audit_logs" as any).insert({
+        actor_id: sess.session.user.id,
+        action_type: "view_jobs",
+        filters: { count: (data as any)?.length ?? 0, source: "ExportJobsView" },
+        deleted_count: 0,
+      });
     } catch (e: any) {
-      toast.error(`Erro ao carregar jobs: ${e.message}`);
+      setPermError({
+        kind: "network",
+        message: "Não foi possível carregar os jobs.",
+        hint: e.message || "Verifique sua conexão e tente novamente.",
+      });
     } finally {
       setLoading(false);
     }
@@ -46,6 +93,20 @@ export const ExportJobsView = () => {
     const interval = setInterval(fetchJobs, 5000);
     return () => clearInterval(interval);
   }, [fetchJobs]);
+
+  const handleReloadSession = async () => {
+    setReloading(true);
+    try {
+      const { error } = await supabase.auth.refreshSession();
+      if (error) throw error;
+      toast.success("Sessão recarregada. Tentando novamente...");
+      await fetchJobs();
+    } catch (e: any) {
+      toast.error(`Falha ao recarregar sessão: ${e.message}. Tente fazer login novamente.`);
+    } finally {
+      setReloading(false);
+    }
+  };
 
   const getStatusBadge = (status: ExportJob['status']) => {
     switch (status) {
@@ -79,14 +140,50 @@ export const ExportJobsView = () => {
           <CardTitle>Jobs de Exportação</CardTitle>
           <CardDescription>Acompanhe o status das exportações em segundo plano.</CardDescription>
         </div>
-        <Button variant="ghost" size="icon" onClick={fetchJobs} disabled={loading}>
+        <Button variant="ghost" size="icon" onClick={fetchJobs} disabled={loading} aria-label="Atualizar">
           <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
         </Button>
       </CardHeader>
       <CardContent>
-        {jobs.length === 0 ? (
+        {permError ? (
+          <Alert variant={permError.kind === "permission" ? "destructive" : "default"} role="alert">
+            <ShieldAlert className="h-4 w-4" />
+            <AlertTitle>
+              {permError.kind === "permission" && "Acesso negado"}
+              {permError.kind === "auth" && "Sessão expirada"}
+              {permError.kind === "network" && "Erro ao carregar"}
+            </AlertTitle>
+            <AlertDescription className="space-y-3">
+              <p>{permError.message}</p>
+              <p className="text-xs opacity-90">{permError.hint}</p>
+              <div className="flex flex-wrap gap-2 pt-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleReloadSession}
+                  disabled={reloading}
+                  className="gap-2"
+                >
+                  <RefreshCw className={`w-3 h-3 ${reloading ? 'animate-spin' : ''}`} />
+                  Recarregar sessão
+                </Button>
+                {permError.kind === "auth" && (
+                  <Button
+                    size="sm"
+                    variant="default"
+                    onClick={() => { window.location.href = "/auth"; }}
+                    className="gap-2"
+                  >
+                    <LogIn className="w-3 h-3" />
+                    Ir para login
+                  </Button>
+                )}
+              </div>
+            </AlertDescription>
+          </Alert>
+        ) : jobs.length === 0 ? (
           <div className="text-center py-10 text-muted-foreground">
-            Nenhum job de exportação encontrado.
+            {loading ? "Carregando jobs..." : "Nenhum job de exportação encontrado."}
           </div>
         ) : (
           <div className="overflow-x-auto">
