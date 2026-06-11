@@ -5,48 +5,56 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import ProtectedRoute from "@/components/ProtectedRoute";
-import Index from "./pages/Index";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
-import AuthPage from "./pages/AuthPage";
-import ResetPasswordPage from "./pages/ResetPasswordPage";
-import DashboardPage from "./pages/DashboardPage";
-import BuilderPage from "./pages/BuilderPage";
-import ProfilePage from "./pages/ProfilePage";
-import TermsPage from "./pages/TermsPage";
-import PrivacyPage from "./pages/PrivacyPage";
-import NotFound from "./pages/NotFound";
-import PricingPage from "./pages/PricingPage";
-import SupportPage from "./pages/SupportPage";
-import ConnectPage from "./pages/ConnectPage";
-import ConnectorsHubPage from "./pages/ConnectorsHubPage";
-import ConnectorDetailPage from "./pages/ConnectorDetailPage";
-import ConnectorAboutPage from "./pages/ConnectorAboutPage";
-import ConnectorSetupPage from "./pages/ConnectorSetupPage";
-import ConnectorWeb3Page from "./pages/ConnectorWeb3Page";
-import ConnectorWeb3HubPage from "./pages/ConnectorWeb3HubPage";
-import ConnectorGmailPage from "./pages/ConnectorGmailPage";
-import ConnectorSlackPage from "./pages/ConnectorSlackPage";
-import ConnectorRenderPage from "./pages/ConnectorRenderPage";
-import ShortlinksPage from "./pages/ShortlinksPage";
-import LeaderboardPage from "./pages/LeaderboardPage";
-import PublicAppPage from "./pages/PublicAppPage";
-import UnsubscribePage from "./pages/UnsubscribePage";
-import EmailDashboardPage from "./pages/EmailDashboardPage";
-import PlanPage from "./pages/PlanPage";
-import SharedAuditPage from "./pages/SharedAuditPage";
-import GamePage from "./pages/GamePage";
-import AdminSkillsPage from "./pages/AdminSkillsPage";
-import DomainsPage from "./pages/DomainsPage";
-import CreativePage from "./pages/CreativePage";
-import InvestigationPage from "./pages/creative/InvestigationPage";
-import AuditTrailPage from "./pages/creative/AuditTrailPage";
-import PresetsPage from "./pages/creative/PresetsPage";
-import NotificationPreferencesPage from "./pages/creative/NotificationPreferencesPage";
-import ExportDetailsPage from "./pages/creative/ExportDetailsPage";
-import AgentsHubPage from "./pages/AgentsHubPage";
-import AgentDetailPage from "./pages/AgentDetailPage";
-import AdminPage from "./pages/AdminPage";
-import OrchestratorPage from "./pages/OrchestratorPage";
+import { lazy, Suspense } from "react";
+
+const Index = lazy(() => import("./pages/Index"));
+const AuthPage = lazy(() => import("./pages/AuthPage"));
+const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
+const DashboardPage = lazy(() => import("./pages/DashboardPage"));
+const BuilderPage = lazy(() => import("./pages/BuilderPage"));
+const ProfilePage = lazy(() => import("./pages/ProfilePage"));
+const TermsPage = lazy(() => import("./pages/TermsPage"));
+const PrivacyPage = lazy(() => import("./pages/PrivacyPage"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const PricingPage = lazy(() => import("./pages/PricingPage"));
+const SupportPage = lazy(() => import("./pages/SupportPage"));
+const ConnectPage = lazy(() => import("./pages/ConnectPage"));
+const ConnectorsHubPage = lazy(() => import("./pages/ConnectorsHubPage"));
+const ConnectorDetailPage = lazy(() => import("./pages/ConnectorDetailPage"));
+const ConnectorAboutPage = lazy(() => import("./pages/ConnectorAboutPage"));
+const ConnectorSetupPage = lazy(() => import("./pages/ConnectorSetupPage"));
+const ConnectorWeb3Page = lazy(() => import("./pages/ConnectorWeb3Page"));
+const ConnectorWeb3HubPage = lazy(() => import("./pages/ConnectorWeb3HubPage"));
+const ConnectorGmailPage = lazy(() => import("./pages/ConnectorGmailPage"));
+const ConnectorSlackPage = lazy(() => import("./pages/ConnectorSlackPage"));
+const ConnectorRenderPage = lazy(() => import("./pages/ConnectorRenderPage"));
+const ShortlinksPage = lazy(() => import("./pages/ShortlinksPage"));
+const LeaderboardPage = lazy(() => import("./pages/LeaderboardPage"));
+const PublicAppPage = lazy(() => import("./pages/PublicAppPage"));
+const UnsubscribePage = lazy(() => import("./pages/UnsubscribePage"));
+const EmailDashboardPage = lazy(() => import("./pages/EmailDashboardPage"));
+const PlanPage = lazy(() => import("./pages/PlanPage"));
+const SharedAuditPage = lazy(() => import("./pages/SharedAuditPage"));
+const GamePage = lazy(() => import("./pages/GamePage"));
+const AdminSkillsPage = lazy(() => import("./pages/AdminSkillsPage"));
+const DomainsPage = lazy(() => import("./pages/DomainsPage"));
+const CreativePage = lazy(() => import("./pages/CreativePage"));
+const InvestigationPage = lazy(() => import("./pages/creative/InvestigationPage"));
+const AuditTrailPage = lazy(() => import("./pages/creative/AuditTrailPage"));
+const PresetsPage = lazy(() => import("./pages/creative/PresetsPage"));
+const NotificationPreferencesPage = lazy(() => import("./pages/creative/NotificationPreferencesPage"));
+const ExportDetailsPage = lazy(() => import("./pages/creative/ExportDetailsPage"));
+const AgentsHubPage = lazy(() => import("./pages/AgentsHubPage"));
+const AgentDetailPage = lazy(() => import("./pages/AgentDetailPage"));
+const AdminPage = lazy(() => import("./pages/AdminPage"));
+const OrchestratorPage = lazy(() => import("./pages/OrchestratorPage"));
+
+// Loading fallback component
+const PageLoader = () => (
+  <div className=\"flex items-center justify-center min-h-screen\">
+    <div className=\"animate-spin rounded-full h-12 w-12 border-b-2 border-primary\"></div>
+  </div>
+);
 
 const queryClient = new QueryClient();
 
