@@ -97,7 +97,7 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <ErrorBoundary resourceName="App">
-            <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-black text-white">Loading App...</div>}>
+            <Suspense fallback={<PageLoader />}>
 
               <Routes>
                 <Route path="/" element={<Index />} />
