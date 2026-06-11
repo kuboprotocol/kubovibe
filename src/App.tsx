@@ -98,6 +98,7 @@ const App = () => (
         <BrowserRouter>
           <ErrorBoundary resourceName="App">
             <Suspense fallback={<PageLoader />}>
+
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/terms" element={<TermsPage />} />
