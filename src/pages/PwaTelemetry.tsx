@@ -281,6 +281,8 @@ const PwaTelemetry = () => {
   if (filters.userId)         activeChips.push({ key: "userId", label: `User: ${filters.userId.slice(0, 8)}…` });
   if (filters.sessionId)      activeChips.push({ key: "sessionId", label: `Sessão: ${filters.sessionId.slice(0, 8)}…` });
   if (filters.q)              activeChips.push({ key: "q", label: `Busca: ${filters.q}` });
+  if (filters.sigma !== 2)    activeChips.push({ key: "sigma", label: `Nσ: ${filters.sigma}` });
+
 
   return (
     <div className="container mx-auto py-10 space-y-6 animate-fade-in">
