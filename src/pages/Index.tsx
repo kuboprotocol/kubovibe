@@ -11,6 +11,8 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 
 const Index = () => {
+  console.log("[Index] Rendering Index page");
+
   const navigate = useNavigate();
 
   return (

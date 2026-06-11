@@ -87,17 +87,18 @@ if (typeof window !== 'undefined') {
 
 
 
-const App = () => (
+const App = () => {
+  console.log("[App] Rendering root component");
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <AuthProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <ErrorBoundary resourceName="App">
+              <Suspense fallback={<PageLoader />}>
 
-
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <AuthProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <ErrorBoundary resourceName="App">
-            <Suspense fallback={<PageLoader />}>
 
               <Routes>
                 <Route path="/" element={<Index />} />
