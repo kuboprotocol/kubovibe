@@ -90,4 +90,11 @@ if (typeof window !== 'undefined') {
   }, true);
 }
 
-createRoot(document.getElementById("root")!).render(<App />);
+console.log("[main] Rendering root");
+const container = document.getElementById("root");
+if (!container) {
+  console.error("[main] Root container not found!");
+} else {
+  createRoot(container).render(<App />);
+}
+
