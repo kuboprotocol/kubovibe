@@ -497,9 +497,12 @@ const PwaTelemetry = () => {
       </div>
 
       <Tabs defaultValue="events" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 max-w-[600px]">
+        <TabsList className="grid w-full grid-cols-5 max-w-[700px]">
           <TabsTrigger value="events">Eventos</TabsTrigger>
           <TabsTrigger value="summary">Sessões</TabsTrigger>
+          <TabsTrigger value="jobs">
+            <Database className="w-4 h-4 mr-2" /> Jobs
+          </TabsTrigger>
           <TabsTrigger value="metrics" disabled={!hasAnyRole(['admin'])}>
             <BarChart3 className="w-4 h-4 mr-2" /> Métricas
           </TabsTrigger>
