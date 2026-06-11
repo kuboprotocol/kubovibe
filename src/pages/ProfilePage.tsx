@@ -88,11 +88,18 @@ export default function ProfilePage() {
       return
     }
 
-    const { data: { publicUrl } } = supabase.storage
+    // Use signed URL since avatars bucket is now private
+    const { data, error: signError } = await supabase.storage
       .from('avatars')
-      .getPublicUrl(filePath)
+      .createSignedUrl(filePath, 60 * 60 * 24 * 365) // 1 year expiry
 
-    const url = `${publicUrl}?t=${Date.now()}`
+    if (signError || !data?.signedUrl) {
+      toast.error('Erro ao gerar URL de acesso')
+      setUploading(false)
+      return
+    }
+
+    const url = data.signedUrl
 
     const { error: updateError } = await supabase
       .from('profiles')
