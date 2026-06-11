@@ -29,14 +29,14 @@ export default defineConfig(({ mode }) => ({
           'assets/index-*.css',
           'assets/index-*.js',
           'assets/vendor-react-*.js',
-          'assets/vendor-core-*.js'
+          'assets/vendor-core-*.js',
+          'assets/vendor-three-*.js'
         ],
         // Non-critical or large assets handled via runtime caching
         globIgnores: [
-          '**/vendor-three-*.js',
           '**/vendor-tldraw-*.js',
           '**/vendor-exports-*.js',
-          '**/vendor-*.js',
+          '**/vendor-BImbtvlH.js', // Specific large chunk
           '**/*.map'
         ],
         runtimeCaching: [
@@ -47,7 +47,7 @@ export default defineConfig(({ mode }) => ({
             options: {
               cacheName: 'static-resources-runtime',
               expiration: {
-                maxEntries: 50,
+                maxEntries: 60,
                 maxAgeSeconds: 30 * 24 * 60 * 60,
               },
             },
@@ -75,7 +75,7 @@ export default defineConfig(({ mode }) => ({
               cacheName: 'pages-cache',
               networkTimeoutSeconds: 3,
               expiration: {
-                maxEntries: 20,
+                maxEntries: 30,
               },
             },
           },
