@@ -88,8 +88,8 @@ if (typeof window !== 'undefined') {
 
 
 const App = () => {
-  console.log("[App] Rendering root component");
   return (
+
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AuthProvider>
