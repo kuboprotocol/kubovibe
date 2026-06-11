@@ -170,13 +170,21 @@ export function SkillExecutionsList() {
     } else if (provider === "openhoster" || tool === "nano_banano") {
       // Fallback: Se um dos dois estiver presente, tenta forçar o filtro mas avisa o erro
       setSkillFilter("nano_banana");
+      
+      const missing = [];
+      if (!provider) missing.push("provider=openhoster");
+      if (!tool) missing.push("tool=nano_banano");
+      
       setOpenHosterError({
         message: "Link incompleto para OpenHoster",
-        details: `Parâmetros detectados: provider=${provider || 'ausente'}, tool=${tool || 'ausente'}. O link ideal deve conter ambos.`
+        details: `Para funcionar corretamente, adicione os seguintes parâmetros à sua URL: ${missing.join(" e ")}.`,
+        endpoint: window.location.href,
+        payload: { detected_provider: provider, detected_tool: tool }
       });
-      toast.warning("Link incompleto detectado. Aplicando fallback para Nano Banano.");
+      toast.warning(`Link incompleto detectado. Faltando: ${missing.join(", ")}`);
     }
   }, []);
+
 
 
 
