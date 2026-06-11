@@ -58,11 +58,18 @@ Deno.serve(async (req) => {
 
     const url = new URL(req.url);
     const p = url.searchParams;
-    const sigma = parseFloat(p.get("sigma") ?? "2");
+    let sigma = parseFloat(p.get("sigma") ?? "2");
     
-    // Server-side validation for sigma if the user is not admin
+    // Server-side validation for sigma with safe bounds (0.1 to 10)
+    if (isNaN(sigma) || sigma < 0.1 || sigma > 10) {
+      return new Response(JSON.stringify({ error: "invalid_sigma", message: "Sigma must be between 0.1 and 10" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const isAdmin = roles.includes("admin");
-    const appliedSigma = isAdmin ? sigma : 2.0; // Enforce default for non-admins
+    const appliedSigma = isAdmin ? sigma : 2.0;
+
 
     const type = p.get("type");
     const canvasId = p.get("canvasId");
