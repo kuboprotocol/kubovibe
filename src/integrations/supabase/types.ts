@@ -1806,8 +1806,9 @@ export type Database = {
         }
         Relationships: []
       }
-      pwa_telemetry_clear_logs: {
+      pwa_telemetry_audit_logs: {
         Row: {
+          action_type: string
           actor_id: string | null
           created_at: string | null
           deleted_count: number
@@ -1815,6 +1816,7 @@ export type Database = {
           id: string
         }
         Insert: {
+          action_type?: string
           actor_id?: string | null
           created_at?: string | null
           deleted_count?: number
@@ -1822,6 +1824,7 @@ export type Database = {
           id?: string
         }
         Update: {
+          action_type?: string
           actor_id?: string | null
           created_at?: string | null
           deleted_count?: number
@@ -1860,6 +1863,60 @@ export type Database = {
           type?: string
           url?: string
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      pwa_telemetry_metrics: {
+        Row: {
+          created_at: string | null
+          duration_ms: number
+          filters: Json | null
+          id: string
+          operation: string
+          row_count: number | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          duration_ms: number
+          filters?: Json | null
+          id?: string
+          operation: string
+          row_count?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          duration_ms?: number
+          filters?: Json | null
+          id?: string
+          operation?: string
+          row_count?: number | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      pwa_telemetry_webhooks: {
+        Row: {
+          created_at: string | null
+          event_types: string[]
+          id: string
+          is_active: boolean | null
+          url: string
+        }
+        Insert: {
+          created_at?: string | null
+          event_types?: string[]
+          id?: string
+          is_active?: boolean | null
+          url: string
+        }
+        Update: {
+          created_at?: string | null
+          event_types?: string[]
+          id?: string
+          is_active?: boolean | null
+          url?: string
         }
         Relationships: []
       }
