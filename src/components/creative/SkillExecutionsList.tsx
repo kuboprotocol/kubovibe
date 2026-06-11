@@ -156,10 +156,22 @@ export function SkillExecutionsList() {
 
     // Suporte para o "Nano Banano" via URL (OpenHoster)
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get("provider") === "openhoster" && urlParams.get("tool") === "nano_banano") {
+    const provider = urlParams.get("provider");
+    const tool = urlParams.get("tool");
+
+    if (provider === "openhoster" && tool === "nano_banano") {
       setSkillFilter("nano_banana");
+    } else if (provider === "openhoster" || tool === "nano_banano") {
+      // Fallback: Se um dos dois estiver presente, tenta forçar o filtro mas avisa o erro
+      setSkillFilter("nano_banana");
+      setOpenHosterError({
+        message: "Link incompleto para OpenHoster",
+        details: `Parâmetros detectados: provider=${provider || 'ausente'}, tool=${tool || 'ausente'}. O link ideal deve conter ambos.`
+      });
+      toast.warning("Link incompleto detectado. Aplicando fallback para Nano Banano.");
     }
   }, []);
+
 
 
   // Update URL params when filters change
