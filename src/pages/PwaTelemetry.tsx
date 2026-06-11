@@ -611,7 +611,49 @@ const PwaTelemetry = () => {
             })}
           </div>
         </TabsContent>
+
+        <TabsContent value="audit">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Audit Trail (Últimas Limpezas)</CardTitle>
+              <CardDescription>Registro de quem limpou a telemetria e quais filtros foram usados.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-md border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Data</TableHead>
+                      <TableHead>Usuário</TableHead>
+                      <TableHead>Filtros / Escopo</TableHead>
+                      <TableHead className="text-right">Removidos</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {auditLogs.length === 0 ? (
+                      <TableRow><TableCell colSpan={4} className="text-center py-10 text-muted-foreground">Nenhum log encontrado.</TableCell></TableRow>
+                    ) : auditLogs.map((log) => (
+                      <TableRow key={log.id}>
+                        <TableCell className="text-xs whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</TableCell>
+                        <TableCell className="text-xs truncate max-w-[150px]">{log.actor?.email || "Desconhecido"}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {Object.entries(log.filters).map(([k, v]) => (
+                              <Badge key={k} variant="secondary" className="text-[10px] py-0">{k}: {String(v)}</Badge>
+                            ))}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right font-mono font-bold text-destructive">{log.deleted_count}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
+
     </div>
   );
 };
