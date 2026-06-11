@@ -2800,6 +2800,60 @@ export type Database = {
         }
         Relationships: []
       }
+      leaderboard_badges: {
+        Row: {
+          badge_type: string | null
+          user_id: string | null
+        }
+        Insert: {
+          badge_type?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          badge_type?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      leaderboard_profiles: {
+        Row: {
+          avatar_url: string | null
+          display_name: string | null
+          id: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          display_name?: string | null
+          id?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          display_name?: string | null
+          id?: string | null
+        }
+        Relationships: []
+      }
+      leaderboard_streaks: {
+        Row: {
+          current_streak: number | null
+          last_activity_date: string | null
+          longest_streak: number | null
+          user_id: string | null
+        }
+        Insert: {
+          current_streak?: number | null
+          last_activity_date?: string | null
+          longest_streak?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          current_streak?: number | null
+          last_activity_date?: string | null
+          longest_streak?: number | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       published_projects: {
         Row: {
           created_at: string | null
