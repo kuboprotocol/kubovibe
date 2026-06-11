@@ -110,7 +110,7 @@ export default function ProfilePage() {
     if (updateError) {
       toast.error('Erro ao atualizar perfil')
     } else {
-      setAvatarUrl(url)
+      await refreshAvatar()
       toast.success('Avatar atualizado!')
     }
     setUploading(false)
