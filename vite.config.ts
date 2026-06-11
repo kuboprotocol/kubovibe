@@ -22,10 +22,28 @@ export default defineConfig(({ mode }) => ({
       registerType: "autoUpdate",
       includeAssets: ["favicon.ico", "apple-touch-icon.png", "mask-icon.svg"],
       workbox: {
-        // Reduced back to a safer limit but using globPatterns to exclude heavy assets if needed
+        // We set a reasonable limit for precaching
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
-        // Fallback for larger assets
+        // Exclude large vendor chunks from precaching to avoid build errors
+        // They will be handled by runtimeCaching instead
+        globIgnores: ['**/vendor-*.js', '**/vendor-*.css'],
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}'],
+        // Fallback for larger assets and those excluded from precaching
         runtimeCaching: [
+          {
+            urlPattern: /assets\/vendor-.*\.js$/,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'vendor-chunks',
+              expiration: {
+                maxEntries: 10,
+                maxAgeSeconds: 60 * 24 * 60 * 60, // 60 days
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
           {
             urlPattern: /\.(?:js|css|html|json)$/,
             handler: 'StaleWhileRevalidate',
@@ -94,6 +112,12 @@ export default defineConfig(({ mode }) => ({
             }
             if (id.includes('framer-motion')) {
               return 'vendor-framer';
+            }
+            if (id.includes('jspdf') || id.includes('jszip') || id.includes('xlsx')) {
+              return 'vendor-exports';
+            }
+            if (id.includes('@supabase') || id.includes('@tanstack/react-query')) {
+              return 'vendor-core';
             }
             return 'vendor';
           }
