@@ -134,13 +134,36 @@ export const ExportJobsView = () => {
                       </div>
                     </TableCell>
                     <TableCell>
-                      {job.status === 'completed' && job.result_url && (
-                        <Button variant="outline" size="sm" asChild className="h-8 gap-2">
-                          <a href={job.result_url} download={`telemetry-${job.id}.${job.format}`}>
-                            <Download className="w-3 h-3" /> Baixar
-                          </a>
-                        </Button>
-                      )}
+                      <div className="flex gap-2">
+                        {job.status === 'completed' && job.result_url && (
+                          <Button variant="outline" size="sm" asChild className="h-8 gap-2">
+                            <a href={job.result_url} download={`telemetry-${job.id}.${job.format}`} target="_blank" rel="noreferrer">
+                              <Download className="w-3 h-3" /> Baixar
+                            </a>
+                          </Button>
+                        )}
+                        {job.status === 'failed' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 gap-2"
+                            onClick={async () => {
+                              try {
+                                const { error } = await supabase.functions.invoke("pwa-telemetry", {
+                                  body: { action: "retry", jobId: job.id },
+                                });
+                                if (error) throw error;
+                                toast.success("Job reenviado para processamento");
+                                fetchJobs();
+                              } catch (e: any) {
+                                toast.error(`Falha ao reexecutar: ${e.message}`);
+                              }
+                            }}
+                          >
+                            <RefreshCw className="w-3 h-3" /> Reexecutar
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
