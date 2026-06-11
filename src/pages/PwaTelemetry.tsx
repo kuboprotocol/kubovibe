@@ -20,11 +20,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import {
   Download, Trash2, Image as ImageIcon, FileCode, Type, Search, ChevronLeft, ChevronRight,
-  LayoutGrid, List, X, AlertTriangle, ShieldAlert, ShieldCheck, History, Ban, Settings, BarChart3
+  LayoutGrid, List, X, AlertTriangle, ShieldAlert, ShieldCheck, History, Ban, Settings, BarChart3, Database
 } from "lucide-react";
 import { toast } from "sonner";
 import { MetricsView } from "@/components/pwa-telemetry/MetricsView";
 import { AuditView } from "@/components/pwa-telemetry/AuditView";
+import { ExportJobsView } from "@/components/pwa-telemetry/ExportJobsView";
 
 type RemoteEvent = {
   id: string;
