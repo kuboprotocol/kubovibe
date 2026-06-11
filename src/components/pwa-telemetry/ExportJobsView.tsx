@@ -1,18 +1,23 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Link } from "react-router-dom";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Download, RefreshCw, AlertCircle, FileJson, FileSpreadsheet, Clock, CheckCircle2, XCircle, Loader2, ShieldAlert, LogIn } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Download, RefreshCw, AlertCircle, FileJson, FileSpreadsheet, Clock,
+  CheckCircle2, XCircle, Loader2, ShieldAlert, LogIn, FileDown, ExternalLink,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 interface ExportJob {
   id: string;
   status: 'pending' | 'processing' | 'completed' | 'cancelled' | 'failed';
-  filters: any;
+  filters: Record<string, unknown> | null;
   format: 'csv' | 'json';
   progress: number;
   result_url: string | null;
@@ -27,11 +32,33 @@ type PermissionError = {
   hint: string;
 };
 
+const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: "all", label: "Todos os status" },
+  { value: "pending", label: "Pendente" },
+  { value: "processing", label: "Processando" },
+  { value: "completed", label: "Concluído" },
+  { value: "failed", label: "Falhou" },
+  { value: "cancelled", label: "Cancelado" },
+];
+
+const RETRY_DELAY_SECONDS = 10;
+
 export const ExportJobsView = () => {
   const [jobs, setJobs] = useState<ExportJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [permError, setPermError] = useState<PermissionError | null>(null);
   const [reloading, setReloading] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [retryIn, setRetryIn] = useState<number | null>(null);
+  const retryTimer = useRef<number | null>(null);
+
+  const clearRetryTimer = useCallback(() => {
+    if (retryTimer.current) {
+      window.clearInterval(retryTimer.current);
+      retryTimer.current = null;
+    }
+    setRetryIn(null);
+  }, []);
 
   const fetchJobs = useCallback(async () => {
     try {
@@ -47,19 +74,19 @@ export const ExportJobsView = () => {
       }
 
       const { data, error } = await supabase
-        .from("pwa_telemetry_export_jobs" as any)
+        .from("pwa_telemetry_export_jobs" as never)
         .select("*")
         .order("created_at", { ascending: false })
-        .limit(20);
+        .limit(50);
 
       if (error) {
-        const code = (error as any).code;
+        const code = (error as { code?: string }).code;
         const msg = error.message || "";
         if (code === "42501" || /permission denied/i.test(msg) || /row-level security/i.test(msg)) {
           setPermError({
             kind: "permission",
             message: "Você não tem permissão para visualizar os jobs de exportação.",
-            hint: "Esta página requer a role admin, analyst ou viewer. Se sua role foi alterada recentemente, recarregue a sessão para aplicar as mudanças, ou peça acesso a um administrador.",
+            hint: "Esta página requer a role admin, analyst ou viewer. Se sua role foi alterada recentemente, recarregue a sessão para aplicar as mudanças.",
           });
           setJobs([]);
           return;
@@ -68,31 +95,53 @@ export const ExportJobsView = () => {
       }
 
       setPermError(null);
-      setJobs((data as any) || []);
+      clearRetryTimer();
+      setJobs((data ?? []) as unknown as ExportJob[]);
 
-      // Audit access to the jobs view (best-effort, ignore failures)
-      void supabase.from("pwa_telemetry_audit_logs" as any).insert({
+      void supabase.from("pwa_telemetry_audit_logs" as never).insert({
         actor_id: sess.session.user.id,
         action_type: "view_jobs",
-        filters: { count: (data as any)?.length ?? 0, source: "ExportJobsView" },
+        filters: { count: data?.length ?? 0, source: "ExportJobsView" },
         deleted_count: 0,
-      });
-    } catch (e: any) {
+      } as never);
+    } catch (e) {
       setPermError({
         kind: "network",
         message: "Não foi possível carregar os jobs.",
-        hint: e.message || "Verifique sua conexão e tente novamente.",
+        hint: (e as Error).message || "Verifique sua conexão e tente novamente.",
       });
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [clearRetryTimer]);
 
+  // Initial + light polling
   useEffect(() => {
     fetchJobs();
-    const interval = setInterval(fetchJobs, 5000);
-    return () => clearInterval(interval);
+    const interval = window.setInterval(fetchJobs, 5000);
+    return () => window.clearInterval(interval);
   }, [fetchJobs]);
+
+  // Auto-retry countdown when permission/network error
+  useEffect(() => {
+    if (!permError || permError.kind === "auth") {
+      clearRetryTimer();
+      return;
+    }
+    setRetryIn(RETRY_DELAY_SECONDS);
+    retryTimer.current = window.setInterval(() => {
+      setRetryIn((s) => {
+        if (s == null) return null;
+        if (s <= 1) {
+          clearRetryTimer();
+          fetchJobs();
+          return null;
+        }
+        return s - 1;
+      });
+    }, 1000);
+    return () => clearRetryTimer();
+  }, [permError, fetchJobs, clearRetryTimer]);
 
   const handleReloadSession = async () => {
     setReloading(true);
@@ -101,8 +150,8 @@ export const ExportJobsView = () => {
       if (error) throw error;
       toast.success("Sessão recarregada. Tentando novamente...");
       await fetchJobs();
-    } catch (e: any) {
-      toast.error(`Falha ao recarregar sessão: ${e.message}. Tente fazer login novamente.`);
+    } catch (e) {
+      toast.error(`Falha ao recarregar sessão: ${(e as Error).message}. Tente fazer login novamente.`);
     } finally {
       setReloading(false);
     }
@@ -125,7 +174,7 @@ export const ExportJobsView = () => {
     }
   };
 
-  const getFilterSummary = (filters: any) => {
+  const getFilterSummary = (filters: ExportJob['filters']) => {
     if (!filters || Object.keys(filters).length === 0) return "Sem filtros";
     return Object.entries(filters)
       .filter(([_, v]) => v !== null && v !== "" && v !== "all")
@@ -133,16 +182,59 @@ export const ExportJobsView = () => {
       .join(", ");
   };
 
+  const filteredJobs = statusFilter === "all" ? jobs : jobs.filter((j) => j.status === statusFilter);
+
+  const handleExportList = () => {
+    const headers = ["id", "status", "format", "progress", "created_at", "updated_at", "error_message", "filters", "result_url"];
+    const escape = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const rows = filteredJobs.map((j) =>
+      headers.map((h) => {
+        if (h === "filters") return escape(JSON.stringify(j.filters ?? {}));
+        return escape((j as unknown as Record<string, unknown>)[h]);
+      }).join(",")
+    );
+    const csv = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `export-jobs-${new Date().toISOString().slice(0, 19)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`${filteredJobs.length} job(s) exportado(s) como CSV`);
+  };
+
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <CardTitle>Jobs de Exportação</CardTitle>
           <CardDescription>Acompanhe o status das exportações em segundo plano.</CardDescription>
         </div>
-        <Button variant="ghost" size="icon" onClick={fetchJobs} disabled={loading} aria-label="Atualizar">
-          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="h-8 w-[160px]" aria-label="Filtrar por status">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              {STATUS_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-2"
+            onClick={handleExportList}
+            disabled={filteredJobs.length === 0}
+          >
+            <FileDown className="w-3 h-3" /> Exportar lista
+          </Button>
+          <Button variant="ghost" size="icon" onClick={fetchJobs} disabled={loading} aria-label="Atualizar">
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         {permError ? (
@@ -156,34 +248,37 @@ export const ExportJobsView = () => {
             <AlertDescription className="space-y-3">
               <p>{permError.message}</p>
               <p className="text-xs opacity-90">{permError.hint}</p>
+              {retryIn !== null && (
+                <p className="text-xs font-medium" aria-live="polite">
+                  Nova tentativa automática em <span className="font-mono">{retryIn}s</span>…
+                </p>
+              )}
               <div className="flex flex-wrap gap-2 pt-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleReloadSession}
-                  disabled={reloading}
-                  className="gap-2"
-                >
+                <Button size="sm" variant="outline" onClick={handleReloadSession} disabled={reloading} className="gap-2">
                   <RefreshCw className={`w-3 h-3 ${reloading ? 'animate-spin' : ''}`} />
                   Recarregar sessão
                 </Button>
+                <Button size="sm" variant="outline" onClick={() => { clearRetryTimer(); fetchJobs(); }} className="gap-2">
+                  Tentar agora
+                </Button>
+                {retryIn !== null && (
+                  <Button size="sm" variant="ghost" onClick={clearRetryTimer}>
+                    Cancelar nova tentativa
+                  </Button>
+                )}
                 {permError.kind === "auth" && (
-                  <Button
-                    size="sm"
-                    variant="default"
-                    onClick={() => { window.location.href = "/auth"; }}
-                    className="gap-2"
-                  >
-                    <LogIn className="w-3 h-3" />
-                    Ir para login
+                  <Button size="sm" variant="default" onClick={() => { window.location.href = "/auth"; }} className="gap-2">
+                    <LogIn className="w-3 h-3" /> Ir para login
                   </Button>
                 )}
               </div>
             </AlertDescription>
           </Alert>
-        ) : jobs.length === 0 ? (
+        ) : filteredJobs.length === 0 ? (
           <div className="text-center py-10 text-muted-foreground">
-            {loading ? "Carregando jobs..." : "Nenhum job de exportação encontrado."}
+            {loading ? "Carregando jobs…" : statusFilter === "all"
+              ? "Nenhum job de exportação encontrado."
+              : `Nenhum job com status "${STATUS_OPTIONS.find(o => o.value === statusFilter)?.label}".`}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -194,11 +289,11 @@ export const ExportJobsView = () => {
                   <TableHead>Formato</TableHead>
                   <TableHead>Filtros</TableHead>
                   <TableHead>Status / Progresso</TableHead>
-                  <TableHead>Ação</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {jobs.map((job) => (
+                {filteredJobs.map((job) => (
                   <TableRow key={job.id}>
                     <TableCell className="text-xs whitespace-nowrap">
                       {new Date(job.created_at).toLocaleString()}
@@ -231,7 +326,12 @@ export const ExportJobsView = () => {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 justify-end">
+                        <Button variant="ghost" size="sm" asChild className="h-8 gap-1" title="Ver detalhes">
+                          <Link to={`/pwa/telemetry/jobs/${job.id}`}>
+                            <ExternalLink className="w-3 h-3" /> Detalhes
+                          </Link>
+                        </Button>
                         {job.status === 'completed' && job.result_url && (
                           <Button variant="outline" size="sm" asChild className="h-8 gap-2">
                             <a href={job.result_url} download={`telemetry-${job.id}.${job.format}`} target="_blank" rel="noreferrer">
@@ -252,8 +352,8 @@ export const ExportJobsView = () => {
                                 if (error) throw error;
                                 toast.success("Job reenviado para processamento");
                                 fetchJobs();
-                              } catch (e: any) {
-                                toast.error(`Falha ao reexecutar: ${e.message}`);
+                              } catch (e) {
+                                toast.error(`Falha ao reexecutar: ${(e as Error).message}`);
                               }
                             }}
                           >
