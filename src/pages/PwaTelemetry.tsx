@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -15,9 +15,10 @@ import {
 } from "@/components/ui/dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
 import {
   Download, Trash2, Image as ImageIcon, FileCode, Type, Search, ChevronLeft, ChevronRight,
-  LayoutGrid, List, X, AlertTriangle, ShieldAlert, ShieldCheck,
+  LayoutGrid, List, X, AlertTriangle, ShieldAlert, ShieldCheck, History, Ban
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -139,10 +140,15 @@ const PwaTelemetry = () => {
   const [exportEnd, setExportEnd] = useState("");
   const [exportFmt, setExportFmt] = useState<"csv" | "json">("csv");
   const [exporting, setExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const doExport = async () => {
     if (!canRead) return;
     setExporting(true);
+    setExportProgress(10);
+    abortControllerRef.current = new AbortController();
+
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const qs = new URLSearchParams();
@@ -154,31 +160,61 @@ const PwaTelemetry = () => {
       if (filters.userId) qs.set("userId", filters.userId);
       if (filters.sessionId) qs.set("sessionId", filters.sessionId);
       
+      setExportProgress(30);
       const res = await fetch(`${FUNCTIONS_URL}/pwa-telemetry?${qs.toString()}`, {
         headers: { Authorization: `Bearer ${session?.access_token ?? ""}` },
+        signal: abortControllerRef.current.signal
       });
       
+      setExportProgress(60);
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: "Export falhou" }));
         throw new Error(err.message || err.error || "Export falhou");
       }
       
       const blob = await res.blob();
+      setExportProgress(90);
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       a.download = `pwa-telemetry-${Date.now()}.${exportFmt}`;
       a.click();
       URL.revokeObjectURL(a.href);
+      setExportProgress(100);
       setExportOpen(false);
       toast.success("Exportação concluída com sucesso.");
     } catch (e: any) {
-      console.error("Export error:", e);
-      // We keep the dialog open if there's an error so they can retry
-      toast.error(`Erro ao exportar: ${e.message}. Tente reduzir o período ou verificar os filtros.`);
+      if (e.name === 'AbortError') {
+        toast.info("Exportação cancelada pelo usuário.");
+      } else {
+        console.error("Export error:", e);
+        toast.error(`Erro ao exportar: ${e.message}. Tente reduzir o período ou verificar os filtros.`);
+      }
     } finally {
       setExporting(false);
+      setExportProgress(0);
+      abortControllerRef.current = null;
     }
   };
+
+  const cancelExport = () => {
+    abortControllerRef.current?.abort();
+  };
+
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const fetchAuditLogs = async () => {
+    if (!hasAnyRole(["admin"])) return;
+    const { data } = await supabase
+      .from("pwa_telemetry_clear_logs")
+      .select("*, actor:actor_id(email)")
+      .order("created_at", { ascending: false })
+      .limit(10);
+    setAuditLogs(data || []);
+  };
+
+  useEffect(() => {
+    if (hasAnyRole(["admin"])) fetchAuditLogs();
+  }, [hasAnyRole]);
+
 
   const [clearOpen, setClearOpen] = useState(false);
   const [clearScope, setClearScope] = useState<"filtered" | "all">("filtered");
@@ -271,10 +307,23 @@ const PwaTelemetry = () => {
                       {exportEnd && <li>Fim: {new Date(exportEnd).toLocaleString()}</li>}
                     </ul>
                     {total > 10000 && (
-                      <p className="text-destructive font-medium">
-                        ⚠️ Atenção: O total de eventos ({total.toLocaleString()}) excede o limite de 10k. 
-                        Apenas os 10.000 eventos mais recentes no período selecionado serão exportados.
-                      </p>
+                      <div className="text-destructive space-y-1">
+                        <p className="font-medium">
+                          ⚠️ Limite atingido: Total de {total.toLocaleString()} eventos disponíveis.
+                        </p>
+                        <p>
+                          Apenas os 10.000 mais recentes serão retornados. 
+                          Tente filtrar por <strong>canvasId</strong> ou <strong>userId</strong> para reduzir o volume.
+                        </p>
+                        <Button 
+                          variant="link" 
+                          size="sm" 
+                          className="h-auto p-0 text-xs text-destructive underline"
+                          onClick={() => setExportOpen(false)}
+                        >
+                          Ajustar filtros agora
+                        </Button>
+                      </div>
                     )}
                   </div>
                 </DialogDescription>
@@ -282,15 +331,15 @@ const PwaTelemetry = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label htmlFor="start">Início</Label>
-                  <Input id="start" type="datetime-local" value={exportStart} onChange={(e) => setExportStart(e.target.value)} />
+                  <Input id="start" type="datetime-local" value={exportStart} onChange={(e) => setExportStart(e.target.value)} disabled={exporting} />
                 </div>
                 <div>
                   <Label htmlFor="end">Fim</Label>
-                  <Input id="end" type="datetime-local" value={exportEnd} onChange={(e) => setExportEnd(e.target.value)} />
+                  <Input id="end" type="datetime-local" value={exportEnd} onChange={(e) => setExportEnd(e.target.value)} disabled={exporting} />
                 </div>
                 <div className="col-span-2">
                   <Label>Formato</Label>
-                  <Select value={exportFmt} onValueChange={(v: any) => setExportFmt(v)}>
+                  <Select value={exportFmt} onValueChange={(v: any) => setExportFmt(v)} disabled={exporting}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="csv">CSV</SelectItem>
@@ -299,11 +348,27 @@ const PwaTelemetry = () => {
                   </Select>
                 </div>
               </div>
-              <DialogFooter>
-                <Button onClick={doExport} disabled={exporting}>
-                  {exporting ? "Exportando..." : "Baixar"}
-                </Button>
+
+              {exporting && (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs font-medium">
+                    <span>Processando exportação...</span>
+                    <span>{exportProgress}%</span>
+                  </div>
+                  <Progress value={exportProgress} className="h-2" />
+                </div>
+              )}
+
+              <DialogFooter className="gap-2">
+                {exporting ? (
+                  <Button variant="outline" className="gap-2" onClick={cancelExport}>
+                    <Ban className="w-4 h-4" /> Cancelar
+                  </Button>
+                ) : (
+                  <Button onClick={doExport}>Baixar</Button>
+                )}
               </DialogFooter>
+
             </DialogContent>
           </Dialog>
 
@@ -442,7 +507,11 @@ const PwaTelemetry = () => {
         <TabsList>
           <TabsTrigger value="list" className="gap-2"><List className="w-4 h-4" /> Eventos ({total})</TabsTrigger>
           <TabsTrigger value="sessions" className="gap-2"><LayoutGrid className="w-4 h-4" /> Sessões ({summary.length})</TabsTrigger>
+          {hasAnyRole(["admin"]) && (
+            <TabsTrigger value="audit" className="gap-2"><History className="w-4 h-4" /> Auditoria</TabsTrigger>
+          )}
         </TabsList>
+
 
         <TabsContent value="list">
           <Card>
@@ -542,7 +611,49 @@ const PwaTelemetry = () => {
             })}
           </div>
         </TabsContent>
+
+        <TabsContent value="audit">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Audit Trail (Últimas Limpezas)</CardTitle>
+              <CardDescription>Registro de quem limpou a telemetria e quais filtros foram usados.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-md border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Data</TableHead>
+                      <TableHead>Usuário</TableHead>
+                      <TableHead>Filtros / Escopo</TableHead>
+                      <TableHead className="text-right">Removidos</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {auditLogs.length === 0 ? (
+                      <TableRow><TableCell colSpan={4} className="text-center py-10 text-muted-foreground">Nenhum log encontrado.</TableCell></TableRow>
+                    ) : auditLogs.map((log) => (
+                      <TableRow key={log.id}>
+                        <TableCell className="text-xs whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</TableCell>
+                        <TableCell className="text-xs truncate max-w-[150px]">{log.actor?.email || "Desconhecido"}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {Object.entries(log.filters).map(([k, v]) => (
+                              <Badge key={k} variant="secondary" className="text-[10px] py-0">{k}: {String(v)}</Badge>
+                            ))}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right font-mono font-bold text-destructive">{log.deleted_count}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
+
     </div>
   );
 };

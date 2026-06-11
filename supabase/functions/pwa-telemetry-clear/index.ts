@@ -96,7 +96,15 @@ Deno.serve(async (req) => {
     const { error, count } = await del;
     if (error) throw error;
 
+    // Audit Log
+    await admin.from("pwa_telemetry_clear_logs").insert({
+      actor_id: userData.user.id,
+      filters: scoped ? scope : { all: true },
+      deleted_count: count ?? 0
+    });
+
     return new Response(JSON.stringify({ ok: true, deleted: count ?? 0 }), {
+
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

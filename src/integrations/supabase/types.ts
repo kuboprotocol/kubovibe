@@ -1806,6 +1806,30 @@ export type Database = {
         }
         Relationships: []
       }
+      pwa_telemetry_clear_logs: {
+        Row: {
+          actor_id: string | null
+          created_at: string | null
+          deleted_count: number
+          filters: Json
+          id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string | null
+          deleted_count?: number
+          filters?: Json
+          id?: string
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string | null
+          deleted_count?: number
+          filters?: Json
+          id?: string
+        }
+        Relationships: []
+      }
       pwa_telemetry_events: {
         Row: {
           canvas_id: string | null

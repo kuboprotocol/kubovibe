@@ -125,4 +125,49 @@ test.describe('PWA Telemetry E2E', () => {
     
     await expect(page.locator('text=Removidos 5 eventos')).toBeVisible();
   });
+
+  test('should block unauthorized roles for clear and export', async ({ page }) => {
+    // Mock user with non-admin role
+    await page.route('**/pwa-telemetry*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          events: [], total: 0, isCapped: false, appliedSigma: 2.0, summary: [], roles: ['viewer']
+        }),
+      });
+    });
+
+    await page.reload();
+
+    // Export should still be visible (viewer can read), but clear button should be hidden for viewers
+    await expect(page.locator('button:has-text("Limpar")')).not.toBeVisible();
+    
+    // Now mock a totally unauthorized role
+    await page.route('**/pwa-telemetry*', async (route) => {
+      await route.fulfill({
+        status: 403,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'forbidden', message: 'Requires admin, analyst or viewer role' }),
+      });
+    });
+    
+    await page.reload();
+    await expect(page.locator('text=Acesso restrito')).toBeVisible();
+  });
+
+  test('should validate sigma bounds on server', async ({ page }) => {
+    await page.route('**/pwa-telemetry?*sigma=11*', async (route) => {
+      await route.fulfill({
+        status: 400,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'invalid_sigma', message: 'Sigma must be between 0.1 and 10' }),
+      });
+    });
+
+    // Manually trigger a high sigma via URL to bypass UI validation or test server response
+    await page.goto('/pwa-telemetry?sigma=11');
+    await expect(page.locator('text=Falha ao carregar: Sigma must be between 0.1 and 10')).toBeVisible();
+  });
 });
+
