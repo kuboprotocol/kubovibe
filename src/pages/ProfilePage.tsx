@@ -7,6 +7,7 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { ArrowLeft, Camera, Loader2, Mail, User, Shield, Gift, Users, Copy, Check } from 'lucide-react'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/hooks/useAuth'
+import { useAvatarUrl } from '@/hooks/useAvatarUrl'
 import { toast } from 'sonner'
 import { motion } from 'framer-motion'
 import logoImg from '@/assets/logo-kubovibe.png'
@@ -17,7 +18,7 @@ export default function ProfilePage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [displayName, setDisplayName] = useState('')
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const { url: avatarUrl, refresh: refreshAvatar } = useAvatarUrl(user?.id)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -40,7 +41,7 @@ export default function ProfilePage() {
 
     if (!profileRes.error && profileRes.data) {
       setDisplayName(profileRes.data.display_name || '')
-      setAvatarUrl(profileRes.data.avatar_url)
+      // avatarUrl is provided by useAvatarUrl hook
     }
     if (refCodeRes.data) setReferralCode(refCodeRes.data as string)
     if (!referralsRes.error && referralsRes.data) {
@@ -109,7 +110,7 @@ export default function ProfilePage() {
     if (updateError) {
       toast.error('Erro ao atualizar perfil')
     } else {
-      setAvatarUrl(url)
+      await refreshAvatar()
       toast.success('Avatar atualizado!')
     }
     setUploading(false)
