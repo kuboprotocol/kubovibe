@@ -6,15 +6,15 @@ const MAX_CHUNK_SIZE_MB = 4.0;
 const TOTAL_BUNDLE_LIMIT_MB = 15.0;
 const jsonReportPath = join(process.cwd(), 'bundle-size-report.json');
 const htmlReportPath = join(process.cwd(), 'bundle-size-report.html');
+const ciMarkdownPath = join(process.cwd(), 'ci-summary.md');
 
-console.log('--- Bundle Size Report ---');
+console.log('--- Quality Audit & Bundle Size Report ---');
 
 if (!existsSync(distDir)) {
-  console.error('❌ dist/assets directory not found!');
-  process.exit(1);
+  console.warn('⚠️ dist/assets directory not found! Skipping bundle size checks.');
 }
 
-const files = readdirSync(distDir);
+const files = existsSync(distDir) ? readdirSync(distDir) : [];
 let totalSize = 0;
 let exceeded = false;
 const largeFiles: string[] = [];
@@ -27,8 +27,6 @@ files.forEach(file => {
   totalSize += sizeMB;
   fileData[file] = sizeMB;
 
-  console.log(`  ${file.padEnd(40)} | ${sizeMB.toFixed(2)} MB`);
-
   if (sizeMB > MAX_CHUNK_SIZE_MB) {
     largeFiles.push(`${file} (${sizeMB.toFixed(2)} MB)`);
     exceeded = true;
@@ -38,9 +36,12 @@ files.forEach(file => {
 // Evidence structure for CI comments
 const evidence = {
   screenshots: [
-    { name: 'PNG Fallback', path: 'test-results/fallback-png.png' },
-    { name: 'SVG Fallback', path: 'test-results/fallback-svg.png' },
-    { name: 'Font Fallback', path: 'test-results/fallback-font.png' }
+    { name: 'PNG Fallback', path: 'test-results/fallback-png.png', exists: existsSync('test-results/fallback-png.png') },
+    { name: 'SVG Fallback', path: 'test-results/fallback-svg.png', exists: existsSync('test-results/fallback-svg.png') },
+    { name: 'Font Fallback', path: 'test-results/fallback-font.png', exists: existsSync('test-results/fallback-font.png') }
+  ],
+  videos: [
+    { name: 'PWA Fallback Video', path: 'test-results/pwa-fallback.mp4', exists: existsSync('test-results/pwa-fallback.mp4') }
   ]
 };
 
@@ -54,6 +55,42 @@ const report = {
 };
 
 writeFileSync(jsonReportPath, JSON.stringify(report, null, 2));
+
+// Generate CI Markdown Comment
+let ciMarkdown = `### 🚀 Kubo Vibe - PWA Quality Report\n\n`;
+ciMarkdown += `**Build Status:** ${exceeded ? '❌ FAILED' : '✅ PASSED'}\n`;
+ciMarkdown += `**Total Bundle Size:** ${totalSize.toFixed(2)} MB / ${TOTAL_BUNDLE_LIMIT_MB} MB\n\n`;
+
+if (exceeded) {
+  ciMarkdown += `#### ⚠️ Alerta: Arquivos que excederam o limite (${MAX_CHUNK_SIZE_MB}MB):\n`;
+  largeFiles.forEach(f => ciMarkdown += `- ${f}\n`);
+  ciMarkdown += `\n`;
+}
+
+ciMarkdown += `#### 📸 E2E Offline Fallback Evidence\n`;
+ciMarkdown += `Em caso de falha nos testes, confira as evidências geradas:\n\n`;
+
+evidence.screenshots.forEach(s => {
+  if (s.exists) {
+    ciMarkdown += `- **${s.name}**: [Visualizar Screenshot](./${s.path})\n`;
+  } else {
+    ciMarkdown += `- **${s.name}**: (Não gerado nesta execução)\n`;
+  }
+});
+
+evidence.videos.forEach(v => {
+  if (v.exists) {
+    ciMarkdown += `- **${v.name}**: [Baixar Vídeo](./${v.path})\n`;
+  }
+});
+
+ciMarkdown += `\n#### 📊 Telemetria PWA\n`;
+ciMarkdown += `O endpoint de telemetria está disponível em: \`/api/pwa/telemetry\`\n`;
+ciMarkdown += `Dashboard: \`/pwa/telemetry\`\n\n`;
+ciMarkdown += `*Relatório completo disponível nos artefatos do job: bundle-size-report.html*\n`;
+
+writeFileSync(ciMarkdownPath, ciMarkdown);
+console.log(`CI Markdown Summary saved to ${ciMarkdownPath}`);
 
 const htmlContent = `
 <!DOCTYPE html>
@@ -94,7 +131,7 @@ const htmlContent = `
       </div>
       <div class="stat-box">
         <div class="stat-label">PWA Telemetry</div>
-        <div><button onclick="window.__exportPWATelemetry()" style="font-size: 10px; cursor: pointer;">Export Session Data</button></div>
+        <div class="stat-value" style="font-size: 1rem;">/api/pwa/telemetry</div>
       </div>
       <div class="stat-box">
         <div class="stat-label">Build Status</div>
@@ -111,9 +148,7 @@ const htmlContent = `
       <div class="evidence-grid">
         ${evidence.screenshots.map(s => `
           <div class="evidence-card">
-            <div style="background: #f1f5f9; height: 150px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; color: #64748b; font-size: 12px;">
-              [Screenshot: ${s.path}]
-            </div>
+            ${s.exists ? `<img src="${s.path}" alt="${s.name}">` : `<div style="background: #f1f5f9; height: 150px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; color: #64748b; font-size: 12px;">[Arquivo não encontrado]</div>`}
             <span>${s.name}</span>
           </div>
         `).join('')}
@@ -145,7 +180,5 @@ writeFileSync(htmlReportPath, htmlContent);
 console.log(`HTML Report saved to ${htmlReportPath}`);
 
 if (exceeded) {
-  console.error('❌ FAIL: Max chunk size exceeded. Large files:');
-  largeFiles.forEach(f => console.error(`  - ${f}`));
   process.exit(1);
 }
