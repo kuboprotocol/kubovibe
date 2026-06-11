@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -15,9 +15,10 @@ import {
 } from "@/components/ui/dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
 import {
   Download, Trash2, Image as ImageIcon, FileCode, Type, Search, ChevronLeft, ChevronRight,
-  LayoutGrid, List, X, AlertTriangle, ShieldAlert, ShieldCheck,
+  LayoutGrid, List, X, AlertTriangle, ShieldAlert, ShieldCheck, History, Ban
 } from "lucide-react";
 import { toast } from "sonner";
 
