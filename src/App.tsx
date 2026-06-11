@@ -51,6 +51,7 @@ const AgentDetailPage = lazy(() => import("./pages/AgentDetailPage"));
 const AdminPage = lazy(() => import("./pages/AdminPage"));
 const OrchestratorPage = lazy(() => import("./pages/OrchestratorPage"));
 const PwaTelemetryPage = lazy(() => import("./pages/PwaTelemetry"));
+const PwaExportJobDetailsPage = lazy(() => import("./pages/PwaExportJobDetails"));
 
 // Loading fallback component
 const PageLoader = () => (
