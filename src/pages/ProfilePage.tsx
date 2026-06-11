@@ -17,7 +17,7 @@ export default function ProfilePage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [displayName, setDisplayName] = useState('')
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const { url: avatarUrl, refresh: refreshAvatar } = useAvatarUrl(user?.id)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
