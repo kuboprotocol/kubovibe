@@ -140,10 +140,15 @@ const PwaTelemetry = () => {
   const [exportEnd, setExportEnd] = useState("");
   const [exportFmt, setExportFmt] = useState<"csv" | "json">("csv");
   const [exporting, setExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const doExport = async () => {
     if (!canRead) return;
     setExporting(true);
+    setExportProgress(10);
+    abortControllerRef.current = new AbortController();
+
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const qs = new URLSearchParams();
@@ -155,31 +160,61 @@ const PwaTelemetry = () => {
       if (filters.userId) qs.set("userId", filters.userId);
       if (filters.sessionId) qs.set("sessionId", filters.sessionId);
       
+      setExportProgress(30);
       const res = await fetch(`${FUNCTIONS_URL}/pwa-telemetry?${qs.toString()}`, {
         headers: { Authorization: `Bearer ${session?.access_token ?? ""}` },
+        signal: abortControllerRef.current.signal
       });
       
+      setExportProgress(60);
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: "Export falhou" }));
         throw new Error(err.message || err.error || "Export falhou");
       }
       
       const blob = await res.blob();
+      setExportProgress(90);
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       a.download = `pwa-telemetry-${Date.now()}.${exportFmt}`;
       a.click();
       URL.revokeObjectURL(a.href);
+      setExportProgress(100);
       setExportOpen(false);
       toast.success("Exportação concluída com sucesso.");
     } catch (e: any) {
-      console.error("Export error:", e);
-      // We keep the dialog open if there's an error so they can retry
-      toast.error(`Erro ao exportar: ${e.message}. Tente reduzir o período ou verificar os filtros.`);
+      if (e.name === 'AbortError') {
+        toast.info("Exportação cancelada pelo usuário.");
+      } else {
+        console.error("Export error:", e);
+        toast.error(`Erro ao exportar: ${e.message}. Tente reduzir o período ou verificar os filtros.`);
+      }
     } finally {
       setExporting(false);
+      setExportProgress(0);
+      abortControllerRef.current = null;
     }
   };
+
+  const cancelExport = () => {
+    abortControllerRef.current?.abort();
+  };
+
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const fetchAuditLogs = async () => {
+    if (!hasAnyRole(["admin"])) return;
+    const { data } = await supabase
+      .from("pwa_telemetry_clear_logs")
+      .select("*, actor:actor_id(email)")
+      .order("created_at", { ascending: false })
+      .limit(10);
+    setAuditLogs(data || []);
+  };
+
+  useEffect(() => {
+    if (hasAnyRole(["admin"])) fetchAuditLogs();
+  }, [hasAnyRole]);
+
 
   const [clearOpen, setClearOpen] = useState(false);
   const [clearScope, setClearScope] = useState<"filtered" | "all">("filtered");
