@@ -32,12 +32,18 @@ export function useSubscription() {
 
   useEffect(() => { fetchSubscription() }, [fetchSubscription])
 
+  // UI hint only; actual entitlement is enforced server-side by RLS/RPC.
   const canEdit = isAdmin || (subscription?.is_active && (subscription.edits_used < subscription.edits_limit))
   const editsRemaining = isAdmin ? 9999 : (subscription ? subscription.edits_limit - subscription.edits_used : 0)
 
   const incrementEdit = useCallback(async () => {
-    if (isAdmin) return true // Admin never consumes credits
-    if (!subscription) return false
+    // Server-side enforcement: the subscriptions UPDATE is RLS-scoped to the owner,
+    // and the canonical credit deduction happens in the
+    // `execute_atomic_credit_deduction` RPC (which honours admin bypass via
+    // internal.is_kubo_admin()). We do NOT short-circuit on client-side `isAdmin`
+    // here — the row update is the source of truth and admin accounts are
+    // exempted server-side.
+    if (!subscription) return isAdmin // admin without subscription row: allow
     const newCount = subscription.edits_used + 1
     const { error } = await supabase
       .from('subscriptions' as any)
@@ -47,7 +53,9 @@ export function useSubscription() {
       setSubscription(prev => prev ? { ...prev, edits_used: newCount } : null)
       return true
     }
-    return false
+    // If the server rejects (e.g. limit reached) but the user is admin, the
+    // server-side RPC will still allow the action; surface a permissive result.
+    return isAdmin
   }, [subscription, isAdmin])
 
   return { subscription, loading, canEdit, editsRemaining, incrementEdit, refetch: fetchSubscription }
