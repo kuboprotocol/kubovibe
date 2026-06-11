@@ -58,6 +58,12 @@ Deno.serve(async (req) => {
 
     const url = new URL(req.url);
     const p = url.searchParams;
+    const sigma = parseFloat(p.get("sigma") ?? "2");
+    
+    // Server-side validation for sigma if the user is not admin
+    const isAdmin = roles.includes("admin");
+    const appliedSigma = isAdmin ? sigma : 2.0; // Enforce default for non-admins
+
     const type = p.get("type");
     const canvasId = p.get("canvasId");
     const filterUser = p.get("userId");
@@ -134,6 +140,7 @@ Deno.serve(async (req) => {
       events: rows ?? [],
       page, pageSize, total: count ?? 0,
       isCapped,
+      appliedSigma,
       summary, roles,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

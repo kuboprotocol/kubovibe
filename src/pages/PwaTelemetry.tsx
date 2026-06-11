@@ -88,6 +88,7 @@ const PwaTelemetry = () => {
       qs.set("page", String(filters.page));
       qs.set("pageSize", String(PAGE_SIZE));
       qs.set("sort", filters.sort);
+      qs.set("sigma", String(filters.sigma));
       if (filters.type !== "all") qs.set("type", filters.type);
       if (filters.q) qs.set("q", filters.q);
       if (filters.canvasId) qs.set("canvasId", filters.canvasId);
@@ -103,12 +104,17 @@ const PwaTelemetry = () => {
       setSummary(json.summary ?? []);
       setTotal(json.total ?? 0);
       setIsCapped(json.isCapped ?? false);
+      
+      // If server returned a different sigma (e.g. non-admin tried to set one), sync it back
+      if (json.appliedSigma !== undefined && json.appliedSigma !== filters.sigma) {
+        updateParam({ sigma: json.appliedSigma });
+      }
     } catch (e: any) {
       toast.error(`Falha ao carregar: ${e.message}`);
     } finally {
       setLoading(false);
     }
-  }, [canRead, filters.page, filters.sort, filters.type, filters.q, filters.canvasId, filters.userId, filters.sessionId]);
+  }, [canRead, filters.page, filters.sort, filters.type, filters.q, filters.canvasId, filters.userId, filters.sessionId, filters.sigma]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -147,13 +153,16 @@ const PwaTelemetry = () => {
       if (filters.canvasId) qs.set("canvasId", filters.canvasId);
       if (filters.userId) qs.set("userId", filters.userId);
       if (filters.sessionId) qs.set("sessionId", filters.sessionId);
+      
       const res = await fetch(`${FUNCTIONS_URL}/pwa-telemetry?${qs.toString()}`, {
         headers: { Authorization: `Bearer ${session?.access_token ?? ""}` },
       });
+      
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: "Export falhou" }));
         throw new Error(err.message || err.error || "Export falhou");
       }
+      
       const blob = await res.blob();
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
@@ -161,8 +170,10 @@ const PwaTelemetry = () => {
       a.click();
       URL.revokeObjectURL(a.href);
       setExportOpen(false);
-      toast.success("Exportação concluída");
+      toast.success("Exportação concluída com sucesso.");
     } catch (e: any) {
+      console.error("Export error:", e);
+      // We keep the dialog open if there's an error so they can retry
       toast.error(`Erro ao exportar: ${e.message}. Tente reduzir o período ou verificar os filtros.`);
     } finally {
       setExporting(false);
