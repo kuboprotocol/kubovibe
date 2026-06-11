@@ -27,6 +27,8 @@ interface Project {
 }
 
 export default function DashboardPage() {
+  console.log("[DashboardPage] Rendering");
+
   const navigate = useNavigate()
   const { user, signOut } = useAuth()
   const { subscription, loading: subLoading, editsRemaining } = useSubscription()

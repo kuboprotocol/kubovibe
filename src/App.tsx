@@ -84,7 +84,10 @@ if (typeof window !== 'undefined') {
   }
 }
 
-const App = () => (
+const App = () => {
+  console.log("[App] Rendering root component");
+  return (
+
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <AuthProvider>
@@ -153,6 +156,8 @@ const App = () => (
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
-);
+  );
+};
+
 
 export default App;
