@@ -14,15 +14,22 @@ window.fetch = async (...args) => {
   const url = typeof resource === 'string' ? resource : resource instanceof URL ? resource.href : resource.url;
 
   if (url.includes('/api/pwa/telemetry')) {
+    const { supabase } = await import("./integrations/supabase/client");
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
     const { getTelemetryEvents, clearTelemetry } = await import("./utils/pwaTelemetry");
     const events = getTelemetryEvents();
     
     if (config?.method === 'DELETE') {
       clearTelemetry();
-      return new Response(JSON.stringify({ success: true, message: 'Telemetry cleared' }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return new Response(JSON.stringify({ success: true }), { status: 200 });
     }
 
     return new Response(JSON.stringify(events), {
@@ -32,6 +39,7 @@ window.fetch = async (...args) => {
   }
   return originalFetch(...args);
 };
+
 
 
 const MUTE_LS_KEY = 'kubo:pwa:mute_toasts';
