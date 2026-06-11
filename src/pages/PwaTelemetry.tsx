@@ -1,6 +1,5 @@
 /** @type {any} */
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
-
 import { useSearchParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -12,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
@@ -20,9 +20,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import {
   Download, Trash2, Image as ImageIcon, FileCode, Type, Search, ChevronLeft, ChevronRight,
-  LayoutGrid, List, X, AlertTriangle, ShieldAlert, ShieldCheck, History, Ban
+  LayoutGrid, List, X, AlertTriangle, ShieldAlert, ShieldCheck, History, Ban, Settings, BarChart3
 } from "lucide-react";
 import { toast } from "sonner";
+import { MetricsView } from "@/components/pwa-telemetry/MetricsView";
+import { AuditView } from "@/components/pwa-telemetry/AuditView";
+
 
 type RemoteEvent = {
   id: string;
