@@ -22,13 +22,12 @@ export default defineConfig(({ mode }) => ({
       registerType: "autoUpdate",
       includeAssets: ["favicon.ico", "apple-touch-icon.png", "mask-icon.svg"],
       workbox: {
-        // We set a reasonable limit for precaching
-        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
-        // Exclude large vendor chunks from precaching to avoid build errors
-        // They will be handled by runtimeCaching instead
-        globIgnores: ['**/vendor-*.js', '**/vendor-*.css'],
+        // Increased limit to avoid build failure, but we use globIgnores to control what is actually precached
+        maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}'],
-        // Fallback for larger assets and those excluded from precaching
+        // Exclude potentially large vendor chunks from precaching
+        // They will be loaded on demand and cached via runtimeCaching
+        globIgnores: ['**/vendor-*.js', '**/vendor-*.css'],
         runtimeCaching: [
           {
             urlPattern: /assets\/vendor-.*\.js$/,
@@ -36,11 +35,8 @@ export default defineConfig(({ mode }) => ({
             options: {
               cacheName: 'vendor-chunks',
               expiration: {
-                maxEntries: 10,
-                maxAgeSeconds: 60 * 24 * 60 * 60, // 60 days
-              },
-              cacheableResponse: {
-                statuses: [0, 200],
+                maxEntries: 20,
+                maxAgeSeconds: 60 * 24 * 60 * 60,
               },
             },
           },
@@ -51,7 +47,7 @@ export default defineConfig(({ mode }) => ({
               cacheName: 'static-resources',
               expiration: {
                 maxEntries: 50,
-                maxAgeSeconds: 30 * 24 * 60 * 60, // 30 days
+                maxAgeSeconds: 30 * 24 * 60 * 60,
               },
             },
           },
@@ -62,7 +58,7 @@ export default defineConfig(({ mode }) => ({
               cacheName: 'images',
               expiration: {
                 maxEntries: 100,
-                maxAgeSeconds: 60 * 24 * 60 * 60, // 60 days
+                maxAgeSeconds: 60 * 24 * 60 * 60,
               },
             },
           },
@@ -70,7 +66,7 @@ export default defineConfig(({ mode }) => ({
       },
       manifest: {
         name: "Kubo Vibe",
-        short_name: "KuboVibe",
+        short_name: "KuboVibe", short_name: "KuboVibe",
         description: "Plataforma Criativa com IA",
         theme_color: "#ffffff",
         icons: [
@@ -94,31 +90,20 @@ export default defineConfig(({ mode }) => ({
     },
   },
   build: {
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {
-            if (id.includes('three') || id.includes('@types/three')) {
-              return 'vendor-three';
-            }
-            if (id.includes('tldraw')) {
-              return 'vendor-tldraw';
-            }
-            if (id.includes('lucide-react')) {
-              return 'vendor-lucide';
-            }
-            if (id.includes('@radix-ui')) {
-              return 'vendor-radix';
-            }
-            if (id.includes('framer-motion')) {
-              return 'vendor-framer';
-            }
-            if (id.includes('jspdf') || id.includes('jszip') || id.includes('xlsx')) {
-              return 'vendor-exports';
-            }
-            if (id.includes('@supabase') || id.includes('@tanstack/react-query')) {
-              return 'vendor-core';
-            }
+            if (id.includes('three')) return 'vendor-three';
+            if (id.includes('tldraw')) return 'vendor-tldraw';
+            if (id.includes('recharts')) return 'vendor-recharts';
+            if (id.includes('lucide-react')) return 'vendor-lucide';
+            if (id.includes('@radix-ui')) return 'vendor-radix';
+            if (id.includes('framer-motion')) return 'vendor-framer';
+            if (id.includes('jspdf') || id.includes('jszip') || id.includes('xlsx')) return 'vendor-exports';
+            if (id.includes('@supabase') || id.includes('@tanstack/react-query')) return 'vendor-core';
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) return 'vendor-react';
             return 'vendor';
           }
         }
