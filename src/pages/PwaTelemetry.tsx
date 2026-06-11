@@ -405,15 +405,24 @@ const PwaTelemetry = () => {
           </p>
         </div>
         <div className="flex gap-2">
+          {exporting && currentJobId && (
+            <div className="flex items-center gap-3 bg-muted px-4 py-2 rounded-lg border">
+              <div className="text-xs font-medium">Exportando em background ({exportProgress}%)</div>
+              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={cancelExport}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+
           <Dialog open={exportOpen} onOpenChange={setExportOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline"><Download className="w-4 h-4 mr-2" />Exportar</Button>
+              <Button variant="outline" disabled={exporting}><Download className="w-4 h-4 mr-2" />Exportar</Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Exportar telemetria</DialogTitle>
                 <DialogDescription className="space-y-2">
-                  <p>Defina um período para exportar (limite de 10.000 eventos por requisição). Os filtros ativos serão aplicados.</p>
+                  <p>Defina um período para exportar. Volumes grandes são processados em background (streaming).</p>
                   <div className="text-xs bg-muted p-2 rounded border space-y-1">
                     <p className="font-semibold">Filtros Ativos:</p>
                     <ul className="list-disc list-inside">
@@ -421,25 +430,6 @@ const PwaTelemetry = () => {
                       {exportStart && <li>Início: {new Date(exportStart).toLocaleString()}</li>}
                       {exportEnd && <li>Fim: {new Date(exportEnd).toLocaleString()}</li>}
                     </ul>
-                    {total > 10000 && (
-                      <div className="text-destructive space-y-1">
-                        <p className="font-medium">
-                          ⚠️ Limite atingido: Total de {total.toLocaleString()} eventos disponíveis.
-                        </p>
-                        <p>
-                          Apenas os 10.000 mais recentes serão retornados. 
-                          Tente filtrar por <strong>canvasId</strong> ou <strong>userId</strong> para reduzir o volume.
-                        </p>
-                        <Button 
-                          variant="link" 
-                          size="sm" 
-                          className="h-auto p-0 text-xs text-destructive underline"
-                          onClick={() => setExportOpen(false)}
-                        >
-                          Ajustar filtros agora
-                        </Button>
-                      </div>
-                    )}
                   </div>
                 </DialogDescription>
               </DialogHeader>
@@ -465,9 +455,9 @@ const PwaTelemetry = () => {
               </div>
 
               {exporting && (
-                <div className="space-y-2">
+                <div className="space-y-2 mt-4">
                   <div className="flex justify-between text-xs font-medium">
-                    <span>Processando exportação...</span>
+                    <span>{currentJobId ? 'Processando em background...' : 'Preparando download...'}</span>
                     <span>{exportProgress}%</span>
                   </div>
                   <Progress value={exportProgress} className="h-2" />
@@ -480,10 +470,9 @@ const PwaTelemetry = () => {
                     <Ban className="w-4 h-4" /> Cancelar
                   </Button>
                 ) : (
-                  <Button onClick={doExport}>Baixar</Button>
+                  <Button onClick={doExport}>Iniciar Exportação</Button>
                 )}
               </DialogFooter>
-
             </DialogContent>
           </Dialog>
 
@@ -515,6 +504,21 @@ const PwaTelemetry = () => {
           )}
         </div>
       </div>
+
+      <Tabs defaultValue="events" className="w-full">
+        <TabsList className="grid w-full grid-cols-4 max-w-[600px]">
+          <TabsTrigger value="events">Eventos</TabsTrigger>
+          <TabsTrigger value="summary">Resumo de Sessões</TabsTrigger>
+          <TabsTrigger value="metrics" disabled={!hasAnyRole(['admin'])}>
+            <BarChart3 className="w-4 h-4 mr-2" /> Métricas
+          </TabsTrigger>
+          <TabsTrigger value="settings" disabled={!hasAnyRole(['admin'])}>
+            <Settings className="w-4 h-4 mr-2" /> Ajustes
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="events" className="space-y-6 pt-6">
+
 
       {anomaly && (
         <Alert role="alert" aria-live="polite">
