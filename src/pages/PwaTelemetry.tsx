@@ -331,15 +331,15 @@ const PwaTelemetry = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label htmlFor="start">Início</Label>
-                  <Input id="start" type="datetime-local" value={exportStart} onChange={(e) => setExportStart(e.target.value)} />
+                  <Input id="start" type="datetime-local" value={exportStart} onChange={(e) => setExportStart(e.target.value)} disabled={exporting} />
                 </div>
                 <div>
                   <Label htmlFor="end">Fim</Label>
-                  <Input id="end" type="datetime-local" value={exportEnd} onChange={(e) => setExportEnd(e.target.value)} />
+                  <Input id="end" type="datetime-local" value={exportEnd} onChange={(e) => setExportEnd(e.target.value)} disabled={exporting} />
                 </div>
                 <div className="col-span-2">
                   <Label>Formato</Label>
-                  <Select value={exportFmt} onValueChange={(v: any) => setExportFmt(v)}>
+                  <Select value={exportFmt} onValueChange={(v: any) => setExportFmt(v)} disabled={exporting}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="csv">CSV</SelectItem>
@@ -348,11 +348,27 @@ const PwaTelemetry = () => {
                   </Select>
                 </div>
               </div>
-              <DialogFooter>
-                <Button onClick={doExport} disabled={exporting}>
-                  {exporting ? "Exportando..." : "Baixar"}
-                </Button>
+
+              {exporting && (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs font-medium">
+                    <span>Processando exportação...</span>
+                    <span>{exportProgress}%</span>
+                  </div>
+                  <Progress value={exportProgress} className="h-2" />
+                </div>
+              )}
+
+              <DialogFooter className="gap-2">
+                {exporting ? (
+                  <Button variant="outline" className="gap-2" onClick={cancelExport}>
+                    <Ban className="w-4 h-4" /> Cancelar
+                  </Button>
+                ) : (
+                  <Button onClick={doExport}>Baixar</Button>
+                )}
               </DialogFooter>
+
             </DialogContent>
           </Dialog>
 
