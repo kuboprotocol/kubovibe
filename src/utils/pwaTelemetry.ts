@@ -1,20 +1,24 @@
+import { supabase } from "@/integrations/supabase/client";
+
+export type TelemetryEventType = "image" | "svg" | "font" | "other";
 
 export type TelemetryEvent = {
   id: string;
   timestamp: string;
-  type: 'image' | 'svg' | 'font' | 'other';
+  type: TelemetryEventType;
   url: string;
   sessionId: string;
+  canvasId?: string | null;
+  userId?: string | null;
 };
 
-const TELEMETRY_KEY = 'kubo:pwa:telemetry_events';
+const TELEMETRY_KEY = "kubo:pwa:telemetry_events";
 
-// Persistent Session ID for the current browser session
 const getSessionId = () => {
-  let sid = sessionStorage.getItem('kubo:pwa:session_id');
+  let sid = sessionStorage.getItem("kubo:pwa:session_id");
   if (!sid) {
     sid = crypto.randomUUID();
-    sessionStorage.setItem('kubo:pwa:session_id', sid);
+    sessionStorage.setItem("kubo:pwa:session_id", sid);
   }
   return sid;
 };
@@ -28,7 +32,9 @@ export const getTelemetryEvents = (): TelemetryEvent[] => {
   }
 };
 
-export const saveTelemetryEvent = (event: Omit<TelemetryEvent, 'id' | 'timestamp' | 'sessionId'>) => {
+export const saveTelemetryEvent = (
+  event: Omit<TelemetryEvent, "id" | "timestamp" | "sessionId">,
+) => {
   const events = getTelemetryEvents();
   const newEvent: TelemetryEvent = {
     ...event,
@@ -37,33 +43,68 @@ export const saveTelemetryEvent = (event: Omit<TelemetryEvent, 'id' | 'timestamp
     sessionId: getSessionId(),
   };
   events.push(newEvent);
-  const trimmed = events.slice(-2000); // Increased limit for larger audits
-  localStorage.setItem(TELEMETRY_KEY, JSON.stringify(trimmed));
+  localStorage.setItem(TELEMETRY_KEY, JSON.stringify(events.slice(-2000)));
+
+  // Best-effort server ingest (auth required by RLS — silently skips when logged out)
+  void ingestRemote(newEvent);
   return newEvent;
 };
+
+async function ingestRemote(e: TelemetryEvent) {
+  try {
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth.user) return;
+    await supabase.from("pwa_telemetry_events").insert({
+      user_id: auth.user.id,
+      session_id: e.sessionId,
+      canvas_id: e.canvasId ?? null,
+      type: e.type,
+      url: e.url,
+    });
+  } catch {
+    /* swallow */
+  }
+}
 
 export const clearTelemetry = () => {
   localStorage.removeItem(TELEMETRY_KEY);
 };
 
-export const exportTelemetryAsJSON = (events: TelemetryEvent[]) => {
-  const blob = new Blob([JSON.stringify(events, null, 2)], { type: 'application/json' });
+const download = (blob: Blob, filename: string) => {
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
+  const a = document.createElement("a");
   a.href = url;
-  a.download = `pwa-telemetry-${new Date().toISOString()}.json`;
+  a.download = filename;
   a.click();
+  URL.revokeObjectURL(url);
 };
+
+export const exportTelemetryAsJSON = (events: TelemetryEvent[]) =>
+  download(
+    new Blob([JSON.stringify(events, null, 2)], { type: "application/json" }),
+    `pwa-telemetry-${new Date().toISOString()}.json`,
+  );
 
 export const exportTelemetryAsCSV = (events: TelemetryEvent[]) => {
   if (events.length === 0) return;
-  const headers = ['id', 'timestamp', 'type', 'url', 'sessionId'];
-  const rows = events.map(e => [e.id, e.timestamp, e.type, e.url, e.sessionId].map(v => `"${v}"`).join(','));
-  const csvContent = [headers.join(','), ...rows].join('\n');
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `pwa-telemetry-${new Date().toISOString()}.csv`;
-  a.click();
+  const headers = ["id", "timestamp", "type", "url", "sessionId", "canvasId", "userId"];
+  const rows = events.map((e) =>
+    [e.id, e.timestamp, e.type, e.url, e.sessionId, e.canvasId ?? "", e.userId ?? ""]
+      .map((v) => `"${String(v).replace(/"/g, '""')}"`)
+      .join(","),
+  );
+  download(
+    new Blob([[headers.join(","), ...rows].join("\n")], { type: "text/csv;charset=utf-8;" }),
+    `pwa-telemetry-${new Date().toISOString()}.csv`,
+  );
 };
+
+/** Single-tab CSRF token, regenerated on demand. */
+export function getCsrfToken() {
+  let t = sessionStorage.getItem("kubo:pwa:csrf");
+  if (!t) {
+    t = crypto.randomUUID() + "-" + crypto.randomUUID();
+    sessionStorage.setItem("kubo:pwa:csrf", t);
+  }
+  return t;
+}
