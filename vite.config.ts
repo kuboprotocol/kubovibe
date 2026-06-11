@@ -22,26 +22,22 @@ export default defineConfig(({ mode }) => ({
       registerType: "autoUpdate",
       includeAssets: ["favicon.ico", "apple-touch-icon.png", "mask-icon.svg"],
       workbox: {
-        // App Shell Critical Assets
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         globPatterns: [
           'index.html',
           'assets/index-*.css',
           'assets/index-*.js',
           'assets/vendor-react-*.js',
-          'assets/vendor-core-*.js',
-          'assets/vendor-three-*.js'
+          'assets/vendor-core-*.js'
         ],
-        // Non-critical or large assets handled via runtime caching
         globIgnores: [
           '**/vendor-tldraw-*.js',
           '**/vendor-exports-*.js',
-          '**/vendor-BImbtvlH.js', // Specific large chunk
+          '**/vendor-BImbtvlH.js',
           '**/*.map'
         ],
         runtimeCaching: [
           {
-            // Cache scripts and styles not precached
             urlPattern: /\.(?:js|css)$/,
             handler: 'StaleWhileRevalidate',
             options: {
@@ -53,7 +49,6 @@ export default defineConfig(({ mode }) => ({
             },
           },
           {
-            // Image caching with CacheFirst and fallback handling
             urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp)$/,
             handler: 'CacheFirst',
             options: {
@@ -64,11 +59,11 @@ export default defineConfig(({ mode }) => ({
               },
               cacheableResponse: {
                 statuses: [0, 200]
-              }
+              },
+              // We could add a background-sync or fallback here if needed via custom plugins
             },
           },
           {
-            // Navigation fallback (Single Page App)
             urlPattern: ({ request }) => request.mode === 'navigate',
             handler: 'NetworkFirst',
             options: {
@@ -80,7 +75,6 @@ export default defineConfig(({ mode }) => ({
             },
           },
           {
-            // Font caching
             urlPattern: /\.(?:woff|woff2|ttf|otf)$/,
             handler: 'CacheFirst',
             options: {
