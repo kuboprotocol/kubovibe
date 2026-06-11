@@ -144,7 +144,14 @@ export function SkillExecutionsList() {
   useEffect(() => {
     fetchAvailableSkills();
     loadPresets();
+
+    // Suporte para o "Nano Banano" via URL (OpenHoster)
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get("provider") === "openhoster" && urlParams.get("tool") === "nano_banano") {
+      setSkillFilter("nano_banana");
+    }
   }, []);
+
 
   // Update URL params when filters change
   useEffect(() => {
