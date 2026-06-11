@@ -1806,6 +1806,39 @@ export type Database = {
         }
         Relationships: []
       }
+      pwa_telemetry_events: {
+        Row: {
+          canvas_id: string | null
+          created_at: string
+          id: string
+          metadata: Json
+          session_id: string
+          type: string
+          url: string
+          user_id: string | null
+        }
+        Insert: {
+          canvas_id?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json
+          session_id: string
+          type: string
+          url: string
+          user_id?: string | null
+        }
+        Update: {
+          canvas_id?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json
+          session_id?: string
+          type?: string
+          url?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       rate_limit_counters: {
         Row: {
           bucket_key: string
@@ -2773,6 +2806,7 @@ export type Database = {
         Args: { p_amount: number; p_user_id: string }
         Returns: undefined
       }
+      has_any_role: { Args: { _roles: string[] }; Returns: boolean }
       has_role: { Args: { _role: string }; Returns: boolean }
       is_admin: { Args: { p_user_id: string }; Returns: boolean }
       log_connector_activity: {
