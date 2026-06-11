@@ -60,13 +60,14 @@ const PwaTelemetry = () => {
     sessionId: params.get("sessionId") ?? "",
     sort:      (params.get("sort") as "asc" | "desc") ?? "desc",
     page:      parseInt(params.get("page") ?? "1"),
+    sigma:     parseFloat(params.get("sigma") ?? "2"),
   };
 
-  const updateParam = (patch: Record<string, string | null>) => {
+  const updateParam = (patch: Record<string, string | number | null>) => {
     const next = new URLSearchParams(params);
     Object.entries(patch).forEach(([k, v]) => {
       if (v === null || v === "" || (k === "type" && v === "all")) next.delete(k);
-      else next.set(k, v);
+      else next.set(k, String(v));
     });
     if (!("page" in patch)) next.delete("page");
     setParams(next, { replace: true });
@@ -76,6 +77,7 @@ const PwaTelemetry = () => {
   const [summary, setSummary] = useState<SessionAgg[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [isCapped, setIsCapped] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!canRead) return;
@@ -100,6 +102,7 @@ const PwaTelemetry = () => {
       setEvents(json.events ?? []);
       setSummary(json.summary ?? []);
       setTotal(json.total ?? 0);
+      setIsCapped(json.isCapped ?? false);
     } catch (e: any) {
       toast.error(`Falha ao carregar: ${e.message}`);
     } finally {
@@ -111,7 +114,7 @@ const PwaTelemetry = () => {
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  // Anomaly: fallback rate > mean + 2σ across sessions with >= 5 events
+  // Anomaly: fallback rate > mean + Nσ across sessions with >= 5 events
   const anomaly = useMemo(() => {
     const eligible = summary.filter((s) => s.count >= 5);
     if (eligible.length < 3) return null;
@@ -119,19 +122,21 @@ const PwaTelemetry = () => {
     const mean = counts.reduce((a, b) => a + b, 0) / counts.length;
     const variance = counts.reduce((a, b) => a + (b - mean) ** 2, 0) / counts.length;
     const sd = Math.sqrt(variance);
-    const threshold = mean + 2 * sd;
+    const threshold = mean + filters.sigma * sd;
     const anomalous = eligible.filter((s) => s.count > threshold);
     return anomalous.length ? { anomalous, threshold: Math.round(threshold), mean: Math.round(mean) } : null;
-  }, [summary]);
+  }, [summary, filters.sigma]);
 
   // Export dialog state
   const [exportOpen, setExportOpen] = useState(false);
   const [exportStart, setExportStart] = useState("");
   const [exportEnd, setExportEnd] = useState("");
   const [exportFmt, setExportFmt] = useState<"csv" | "json">("csv");
+  const [exporting, setExporting] = useState(false);
 
   const doExport = async () => {
     if (!canRead) return;
+    setExporting(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const qs = new URLSearchParams();
@@ -145,7 +150,10 @@ const PwaTelemetry = () => {
       const res = await fetch(`${FUNCTIONS_URL}/pwa-telemetry?${qs.toString()}`, {
         headers: { Authorization: `Bearer ${session?.access_token ?? ""}` },
       });
-      if (!res.ok) throw new Error("Export falhou");
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Export falhou" }));
+        throw new Error(err.message || err.error || "Export falhou");
+      }
       const blob = await res.blob();
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
@@ -155,15 +163,19 @@ const PwaTelemetry = () => {
       setExportOpen(false);
       toast.success("Exportação concluída");
     } catch (e: any) {
-      toast.error(e.message);
+      toast.error(`Erro ao exportar: ${e.message}. Tente reduzir o período ou verificar os filtros.`);
+    } finally {
+      setExporting(false);
     }
   };
 
   const [clearOpen, setClearOpen] = useState(false);
   const [clearScope, setClearScope] = useState<"filtered" | "all">("filtered");
+  const [clearing, setClearing] = useState(false);
 
   const doClear = async () => {
     if (!canManage) return;
+    setClearing(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const csrf = getCsrfToken();
@@ -191,6 +203,8 @@ const PwaTelemetry = () => {
       fetchData();
     } catch (e: any) {
       toast.error(e.message);
+    } finally {
+      setClearing(false);
     }
   };
 
@@ -236,8 +250,22 @@ const PwaTelemetry = () => {
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Exportar telemetria</DialogTitle>
-                <DialogDescription>
-                  Defina um período para exportar (limite de 10.000 eventos por requisição). Os filtros ativos serão aplicados.
+                <DialogDescription className="space-y-2">
+                  <p>Defina um período para exportar (limite de 10.000 eventos por requisição). Os filtros ativos serão aplicados.</p>
+                  <div className="text-xs bg-muted p-2 rounded border space-y-1">
+                    <p className="font-semibold">Filtros Ativos:</p>
+                    <ul className="list-disc list-inside">
+                      {activeChips.length > 0 ? activeChips.map(c => <li key={c.key}>{c.label}</li>) : <li>Nenhum filtro aplicado</li>}
+                      {exportStart && <li>Início: {new Date(exportStart).toLocaleString()}</li>}
+                      {exportEnd && <li>Fim: {new Date(exportEnd).toLocaleString()}</li>}
+                    </ul>
+                    {total > 10000 && (
+                      <p className="text-destructive font-medium">
+                        ⚠️ Atenção: O total de eventos ({total.toLocaleString()}) excede o limite de 10k. 
+                        Apenas os 10.000 eventos mais recentes no período selecionado serão exportados.
+                      </p>
+                    )}
+                  </div>
                 </DialogDescription>
               </DialogHeader>
               <div className="grid grid-cols-2 gap-3">
@@ -261,7 +289,9 @@ const PwaTelemetry = () => {
                 </div>
               </div>
               <DialogFooter>
-                <Button onClick={doExport}>Baixar</Button>
+                <Button onClick={doExport} disabled={exporting}>
+                  {exporting ? "Exportando..." : "Baixar"}
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -284,8 +314,10 @@ const PwaTelemetry = () => {
                   </SelectContent>
                 </Select>
                 <DialogFooter>
-                  <Button variant="outline" onClick={() => setClearOpen(false)}>Cancelar</Button>
-                  <Button variant="destructive" onClick={doClear}>Confirmar</Button>
+                  <Button variant="outline" onClick={() => setClearOpen(false)} disabled={clearing}>Cancelar</Button>
+                  <Button variant="destructive" onClick={doClear} disabled={clearing}>
+                    {clearing ? "Limpando..." : "Confirmar"}
+                  </Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
@@ -314,7 +346,26 @@ const PwaTelemetry = () => {
       )}
 
       <Card>
-        <CardHeader className="space-y-3">
+        <CardHeader className="space-y-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <CardTitle>Filtros e Controles</CardTitle>
+            {hasAnyRole(["admin"]) && (
+              <div className="flex items-center gap-2 text-sm border rounded-md p-1 bg-muted/50">
+                <ShieldCheck className="w-3 h-3 text-primary" />
+                <Label htmlFor="sigma" className="text-xs font-medium">Anomaly Threshold (Nσ):</Label>
+                <Input
+                  id="sigma"
+                  type="number"
+                  step="0.1"
+                  min="0.1"
+                  className="h-7 w-16 text-xs"
+                  defaultValue={filters.sigma}
+                  onBlur={(e) => updateParam({ sigma: parseFloat(e.target.value) || 2 })}
+                  onKeyDown={(e) => { if (e.key === "Enter") updateParam({ sigma: parseFloat((e.target as HTMLInputElement).value) || 2 }); }}
+                />
+              </div>
+            )}
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
             <div className="relative md:col-span-2">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />

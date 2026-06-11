@@ -109,6 +109,7 @@ Deno.serve(async (req) => {
     const to = from + pageSize - 1;
     const { data: rows, count, error } = await query.range(from, to);
     if (error) throw error;
+    const isCapped = (count ?? 0) > 10000;
 
     // Aggregate session summary across the (filtered) full set up to 5k events
     const { data: aggRows } = await admin
@@ -132,6 +133,7 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({
       events: rows ?? [],
       page, pageSize, total: count ?? 0,
+      isCapped,
       summary, roles,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
