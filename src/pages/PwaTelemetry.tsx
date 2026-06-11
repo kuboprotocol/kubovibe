@@ -271,10 +271,23 @@ const PwaTelemetry = () => {
                       {exportEnd && <li>Fim: {new Date(exportEnd).toLocaleString()}</li>}
                     </ul>
                     {total > 10000 && (
-                      <p className="text-destructive font-medium">
-                        ⚠️ Atenção: O total de eventos ({total.toLocaleString()}) excede o limite de 10k. 
-                        Apenas os 10.000 eventos mais recentes no período selecionado serão exportados.
-                      </p>
+                      <div className="text-destructive space-y-1">
+                        <p className="font-medium">
+                          ⚠️ Limite atingido: Total de {total.toLocaleString()} eventos disponíveis.
+                        </p>
+                        <p>
+                          Apenas os 10.000 mais recentes serão retornados. 
+                          Tente filtrar por <strong>canvasId</strong> ou <strong>userId</strong> para reduzir o volume.
+                        </p>
+                        <Button 
+                          variant="link" 
+                          size="sm" 
+                          className="h-auto p-0 text-xs text-destructive underline"
+                          onClick={() => setExportOpen(false)}
+                        >
+                          Ajustar filtros agora
+                        </Button>
+                      </div>
                     )}
                   </div>
                 </DialogDescription>
