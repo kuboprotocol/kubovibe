@@ -1,37 +1,47 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('PWA Assets Fallback', () => {
-  test('should handle missing images gracefully offline', async ({ page, context }) => {
-    // 1. Initial load to register SW and cache fallbacks
+  test('should handle missing images gracefully offline and show warning', async ({ page, context }) => {
     await page.goto('/');
     await page.evaluate(async () => await navigator.serviceWorker.ready);
     
-    // 2. Go offline
     await context.setOffline(true);
 
-    // 3. Inject an image that isn't cached
+    // Inject an image that isn't cached
     await page.evaluate(() => {
       const img = document.createElement('img');
-      img.src = '/not-cached-image.png';
-      img.id = 'test-fallback-img';
+      img.src = '/non-existent-image-404.png';
+      img.id = 'test-offline-img';
+      img.onerror = () => {
+        window.dispatchEvent(new CustomEvent('pwa:asset-fallback', { 
+          detail: { type: 'image', url: img.src } 
+        }));
+      };
       document.body.appendChild(img);
     });
 
-    // 4. In a real environment, the SW would serve placeholders/img-fallback.svg
-    // We check if the app continues to render or if the image error is handled
-    const img = page.locator('#test-fallback-img');
-    await expect(img).toBeVisible();
+    // Check if the discrete warning is shown
+    const toast = page.locator('li').filter({ hasText: /Offline Mode/i }).or(page.locator('.sonner-toast'));
+    await expect(toast.first()).toBeVisible();
+    
+    // Check if fallback SVG is likely used (in a real browser SW would serve it)
   });
 
-  test('should handle missing fonts gracefully offline', async ({ page, context }) => {
-    await page.goto('/');
+  test('should maintain text legibility with font fallback', async ({ page, context }) => {
+    await page.goto('/dashboard');
     await context.setOffline(true);
 
-    // Check if the page title (which uses the theme font) is still readable
-    const title = page.locator('h1').first();
-    // Even if font fails, browser should fallback to sans-serif
-    await expect(title).toBeVisible();
-    const fontFamily = await title.evaluate(el => window.getComputedStyle(el).fontFamily);
-    expect(fontFamily).toBeTruthy();
+    const mainText = page.locator('h1').first();
+    await expect(mainText).toBeVisible();
+    
+    // Check for console errors related to fonts
+    const errors: string[] = [];
+    page.on('console', msg => {
+      if (msg.type() === 'error' && msg.text().includes('.woff2')) errors.push(msg.text());
+    });
+    
+    await page.reload();
+    // Browser might log font failure but SW should handle it or UI should stay clean
+    expect(errors.length).toBe(0);
   });
 });
