@@ -26,7 +26,6 @@ import { toast } from "sonner";
 import { MetricsView } from "@/components/pwa-telemetry/MetricsView";
 import { AuditView } from "@/components/pwa-telemetry/AuditView";
 
-
 type RemoteEvent = {
   id: string;
   user_id: string | null;
@@ -111,7 +110,6 @@ const PwaTelemetry = () => {
       setTotal(json.total ?? 0);
       setIsCapped(json.isCapped ?? false);
       
-      // If server returned a different sigma (e.g. non-admin tried to set one), sync it back
       if (json.appliedSigma !== undefined && json.appliedSigma !== filters.sigma) {
         updateParam({ sigma: json.appliedSigma });
       }
@@ -126,7 +124,6 @@ const PwaTelemetry = () => {
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  // Anomaly: fallback rate > mean + Nσ across sessions with >= 5 events
   const anomaly = useMemo(() => {
     const eligible = summary.filter((s) => s.count >= 5);
     if (eligible.length < 3) return null;
@@ -139,7 +136,6 @@ const PwaTelemetry = () => {
     return anomalous.length ? { anomalous, threshold: Math.round(threshold), mean: Math.round(mean) } : null;
   }, [summary, filters.sigma]);
 
-  // Export dialog state
   const [exportOpen, setExportOpen] = useState(false);
   const [exportStart, setExportStart] = useState("");
   const [exportEnd, setExportEnd] = useState("");
@@ -148,6 +144,13 @@ const PwaTelemetry = () => {
   const [exportProgress, setExportProgress] = useState(0);
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
   const pollIntervalRef = useRef<number | null>(null);
+
+  const stopPolling = useCallback(() => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+  }, []);
 
   const cancelExport = async () => {
     if (!currentJobId) return;
@@ -172,14 +175,7 @@ const PwaTelemetry = () => {
     }
   };
 
-  const stopPolling = () => {
-    if (pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current);
-      pollIntervalRef.current = null;
-    }
-  };
-
-  const startPolling = (jobId: string) => {
+  const startPolling = useCallback((jobId: string) => {
     stopPolling();
     setCurrentJobId(jobId);
     pollIntervalRef.current = window.setInterval(async () => {
@@ -196,8 +192,6 @@ const PwaTelemetry = () => {
             setExporting(false);
             setExportProgress(100);
             toast.success("Exportação em background concluída.");
-            // In a real app, we'd trigger the download here from job.result_url
-            // For now, we'll just simulate completion
             setCurrentJobId(null);
           } else if (job.status === "failed") {
             stopPolling();
@@ -214,7 +208,7 @@ const PwaTelemetry = () => {
         console.error("Poll error:", e);
       }
     }, 2000);
-  };
+  }, [stopPolling]);
 
   const doExport = async () => {
     if (!canRead) return;
@@ -246,7 +240,6 @@ const PwaTelemetry = () => {
       if (jobId) {
         startPolling(jobId);
       } else {
-        // Fallback to direct download if not background
         const blob = await res.blob();
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
@@ -292,7 +285,7 @@ const PwaTelemetry = () => {
     const { data } = await supabase
       .from("pwa_telemetry_settings")
       .select("*")
-      .single();
+      .maybeSingle();
     setSettings(data);
   };
 
@@ -326,8 +319,6 @@ const PwaTelemetry = () => {
       fetchSettings();
     }
   }, [hasAnyRole]);
-
-
 
   const [clearOpen, setClearOpen] = useState(false);
   const [clearScope, setClearScope] = useState<"filtered" | "all">("filtered");
@@ -392,7 +383,6 @@ const PwaTelemetry = () => {
   if (filters.sessionId)      activeChips.push({ key: "sessionId", label: `Sessão: ${filters.sessionId.slice(0, 8)}…` });
   if (filters.q)              activeChips.push({ key: "q", label: `Busca: ${filters.q}` });
   if (filters.sigma !== 2)    activeChips.push({ key: "sigma", label: `Nσ: ${filters.sigma}` });
-
 
   return (
     <div className="container mx-auto py-10 space-y-6 animate-fade-in">
@@ -508,7 +498,7 @@ const PwaTelemetry = () => {
       <Tabs defaultValue="events" className="w-full">
         <TabsList className="grid w-full grid-cols-4 max-w-[600px]">
           <TabsTrigger value="events">Eventos</TabsTrigger>
-          <TabsTrigger value="summary">Resumo de Sessões</TabsTrigger>
+          <TabsTrigger value="summary">Sessões</TabsTrigger>
           <TabsTrigger value="metrics" disabled={!hasAnyRole(['admin'])}>
             <BarChart3 className="w-4 h-4 mr-2" /> Métricas
           </TabsTrigger>
@@ -518,123 +508,58 @@ const PwaTelemetry = () => {
         </TabsList>
 
         <TabsContent value="events" className="space-y-6 pt-6">
-
-
-      {anomaly && (
-        <Alert role="alert" aria-live="polite">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Anomalia detectada na taxa de fallback</AlertTitle>
-          <AlertDescription>
-            {anomaly.anomalous.length} sessão(ões) acima do limite estatístico ({anomaly.threshold}, média {anomaly.mean}).{" "}
-            {anomaly.anomalous.slice(0, 5).map((s) => (
-              <Link
-                key={s.session_id}
-                to={`?sessionId=${s.session_id}`}
-                className="underline mr-2"
-                aria-label={`Ver sessão ${s.session_id} com ${s.count} eventos a partir de ${new Date(s.first).toLocaleString()}`}
-              >
-                {s.session_id.slice(0, 8)}… ({s.count})
-              </Link>
-            ))}
-          </AlertDescription>
-        </Alert>
-      )}
-
-      <Card>
-        <CardHeader className="space-y-4">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <CardTitle>Filtros e Controles</CardTitle>
-            {hasAnyRole(["admin"]) && (
-              <div className="flex items-center gap-2 text-sm border rounded-md p-1 bg-muted/50">
-                <ShieldCheck className="w-3 h-3 text-primary" />
-                <Label htmlFor="sigma" className="text-xs font-medium">Anomaly Threshold (Nσ):</Label>
-                <Input
-                  id="sigma"
-                  type="number"
-                  step="0.1"
-                  min="0.1"
-                  className="h-7 w-16 text-xs"
-                  defaultValue={filters.sigma}
-                  onBlur={(e) => updateParam({ sigma: parseFloat(e.target.value) || 2 })}
-                  onKeyDown={(e) => { if (e.key === "Enter") updateParam({ sigma: parseFloat((e.target as HTMLInputElement).value) || 2 }); }}
-                />
-              </div>
-            )}
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-            <div className="relative md:col-span-2">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Busca livre (URL / sessão / canvas)…"
-                className="pl-9"
-                defaultValue={filters.q}
-                onKeyDown={(e) => { if (e.key === "Enter") updateParam({ q: (e.target as HTMLInputElement).value }); }}
-              />
-            </div>
-            <Input
-              placeholder="canvasId"
-              defaultValue={filters.canvasId}
-              onKeyDown={(e) => { if (e.key === "Enter") updateParam({ canvasId: (e.target as HTMLInputElement).value }); }}
-            />
-            <Input
-              placeholder="userId (uuid)"
-              defaultValue={filters.userId}
-              onKeyDown={(e) => { if (e.key === "Enter") updateParam({ userId: (e.target as HTMLInputElement).value }); }}
-            />
-            <div className="flex gap-2">
-              <Select value={filters.type} onValueChange={(v) => updateParam({ type: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="image">PNG</SelectItem>
-                  <SelectItem value="svg">SVG</SelectItem>
-                  <SelectItem value="font">WOFF2</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={filters.sort} onValueChange={(v) => updateParam({ sort: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="desc">↓ Recentes</SelectItem>
-                  <SelectItem value="asc">↑ Antigos</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          {activeChips.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {activeChips.map((c) => (
-                <Badge key={c.key} variant="secondary" className="gap-1">
-                  {c.label}
-                  <button
-                    aria-label={`Remover filtro ${c.key}`}
-                    onClick={() => updateParam({ [c.key]: null })}
-                    className="ml-1 hover:text-destructive"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </Badge>
-              ))}
-              <Button variant="ghost" size="sm" onClick={() => setParams(new URLSearchParams(), { replace: true })}>
-                Limpar filtros
-              </Button>
-            </div>
+          {anomaly && (
+            <Alert role="alert" aria-live="polite">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Anomalia detectada</AlertTitle>
+              <AlertDescription>
+                {anomaly.anomalous.length} sessão(ões) acima do limite estatístico ({anomaly.threshold}, média {anomaly.mean}).{" "}
+                {anomaly.anomalous.slice(0, 5).map((s) => (
+                  <Link key={s.session_id} to={`?sessionId=${s.session_id}`} className="underline mr-2">
+                    {s.session_id.slice(0, 8)}… ({s.count})
+                  </Link>
+                ))}
+              </AlertDescription>
+            </Alert>
           )}
-        </CardHeader>
-      </Card>
 
-      <Tabs defaultValue="list">
-        <TabsList>
-          <TabsTrigger value="list" className="gap-2"><List className="w-4 h-4" /> Eventos ({total})</TabsTrigger>
-          <TabsTrigger value="sessions" className="gap-2"><LayoutGrid className="w-4 h-4" /> Sessões ({summary.length})</TabsTrigger>
-          {hasAnyRole(["admin"]) && (
-            <TabsTrigger value="audit" className="gap-2"><History className="w-4 h-4" /> Auditoria</TabsTrigger>
-          )}
-        </TabsList>
-
-
-        <TabsContent value="list">
           <Card>
-            <CardContent className="pt-6">
+            <CardHeader className="space-y-4">
+              <CardTitle>Filtros</CardTitle>
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                <div className="relative md:col-span-2">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Busca livre…"
+                    className="pl-9"
+                    defaultValue={filters.q}
+                    onKeyDown={(e) => { if (e.key === "Enter") updateParam({ q: (e.target as HTMLInputElement).value }); }}
+                  />
+                </div>
+                <Input
+                  placeholder="canvasId"
+                  defaultValue={filters.canvasId}
+                  onKeyDown={(e) => { if (e.key === "Enter") updateParam({ canvasId: (e.target as HTMLInputElement).value }); }}
+                />
+                <Input
+                  placeholder="userId"
+                  defaultValue={filters.userId}
+                  onKeyDown={(e) => { if (e.key === "Enter") updateParam({ userId: (e.target as HTMLInputElement).value }); }}
+                />
+                <div className="flex gap-2">
+                  <Select value={filters.type} onValueChange={(v) => updateParam({ type: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      <SelectItem value="image">PNG</SelectItem>
+                      <SelectItem value="svg">SVG</SelectItem>
+                      <SelectItem value="font">WOFF2</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
               <div className="rounded-md border">
                 <Table>
                   <TableHeader>
@@ -648,26 +573,26 @@ const PwaTelemetry = () => {
                   </TableHeader>
                   <TableBody>
                     {loading ? (
-                      <TableRow><TableCell colSpan={5} className="text-center py-10 text-muted-foreground">Carregando…</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={5} className="text-center py-10">Carregando…</TableCell></TableRow>
                     ) : events.length === 0 ? (
-                      <TableRow><TableCell colSpan={5} className="text-center py-10 text-muted-foreground">Nenhum evento.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={5} className="text-center py-10">Nenhum evento.</TableCell></TableRow>
                     ) : events.map((e) => (
                       <TableRow key={e.id}>
                         <TableCell className="text-xs font-mono">{new Date(e.created_at).toLocaleString()}</TableCell>
-                        <TableCell className="text-xs font-mono">
+                        <TableCell className="text-xs">
                           <button className="underline" onClick={() => updateParam({ sessionId: e.session_id })}>
                             {e.session_id.slice(0, 8)}…
                           </button>
                         </TableCell>
-                        <TableCell className="text-xs font-mono">
+                        <TableCell className="text-xs">
                           {e.canvas_id ? (
                             <button className="underline" onClick={() => updateParam({ canvasId: e.canvas_id! })}>
-                              {e.canvas_id.slice(0, 10)}
+                              {e.canvas_id.slice(0, 8)}
                             </button>
                           ) : "—"}
                         </TableCell>
                         <TableCell>{typeBadge(e.type)}</TableCell>
-                        <TableCell className="font-medium truncate max-w-[300px]" title={e.url}>
+                        <TableCell className="font-medium truncate max-w-[200px]" title={e.url}>
                           {e.url.split("/").pop()}
                         </TableCell>
                       </TableRow>
@@ -676,13 +601,11 @@ const PwaTelemetry = () => {
                 </Table>
               </div>
               <div className="flex items-center justify-end gap-2 py-4">
-                <Button variant="outline" size="sm" disabled={filters.page <= 1}
-                  onClick={() => updateParam({ page: String(filters.page - 1) })}>
+                <Button variant="outline" size="sm" disabled={filters.page <= 1} onClick={() => updateParam({ page: filters.page - 1 })}>
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
                 <div className="text-sm">Página {filters.page} de {totalPages}</div>
-                <Button variant="outline" size="sm" disabled={filters.page >= totalPages}
-                  onClick={() => updateParam({ page: String(filters.page + 1) })}>
+                <Button variant="outline" size="sm" disabled={filters.page >= totalPages} onClick={() => updateParam({ page: filters.page + 1 })}>
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
@@ -690,99 +613,75 @@ const PwaTelemetry = () => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="sessions">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {summary.map((s) => {
-              const totalCount = s.count;
-              const fallbackRate = (s.types.image ?? 0) + (s.types.svg ?? 0) + (s.types.font ?? 0);
-              const rate = totalCount > 0 ? Math.round((fallbackRate / totalCount) * 100) : 0;
-              const isAnom = anomaly?.anomalous.some((a) => a.session_id === s.session_id);
-              return (
-                <Card key={s.session_id} className={isAnom ? "border-destructive" : ""}>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-mono truncate flex items-center gap-2">
-                      {isAnom && <AlertTriangle className="w-3 h-3 text-destructive" aria-label="Sessão anômala" />}
-                      <button className="underline" onClick={() => updateParam({ sessionId: s.session_id })}>
-                        {s.session_id}
-                      </button>
-                    </CardTitle>
-                    <CardDescription>
-                      {new Date(s.first).toLocaleString()} → {new Date(s.last).toLocaleTimeString()}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="flex justify-between">
-                      <div>
-                        <div className="text-2xl font-bold">{s.count}</div>
-                        <div className="text-xs text-muted-foreground">Fallbacks ({rate}%)</div>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {Object.entries(s.types).map(([t, c]) => (
-                        <div key={t} className="flex items-center gap-1.5 text-xs bg-secondary px-2 py-1 rounded-md">
-                          {typeBadge(t)} <span className="font-bold">{c}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+        <TabsContent value="summary" className="pt-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {summary.map((s) => (
+              <Card key={s.session_id}>
+                <CardHeader>
+                  <CardTitle className="text-sm truncate">
+                    <button className="underline" onClick={() => updateParam({ sessionId: s.session_id })}>
+                      {s.session_id}
+                    </button>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{s.count}</div>
+                  <div className="text-xs text-muted-foreground">Fallbacks registrados</div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </TabsContent>
 
-        <TabsContent value="audit">
+        <TabsContent value="metrics" className="pt-6 space-y-6">
+          <MetricsView metrics={metrics} />
+          <AuditView logs={auditLogs} />
+        </TabsContent>
+
+        <TabsContent value="settings" className="pt-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Audit Trail (Últimas Limpezas)</CardTitle>
-              <CardDescription>Registro de quem limpou a telemetria e quais filtros foram usados.</CardDescription>
+              <CardTitle>Ajustes de Telemetria</CardTitle>
+              <CardDescription>Configurações de anomalias e notificações.</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="rounded-md border overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Data</TableHead>
-                      <TableHead>Ação</TableHead>
-                      <TableHead>Usuário</TableHead>
-                      <TableHead>Filtros / Escopo</TableHead>
-                      <TableHead className="text-right">Removidos</TableHead>
-                    </TableRow>
+            <CardContent className="space-y-6">
+              <div className="flex items-center justify-between space-x-2 border-b pb-4">
+                <div className="space-y-0.5">
+                  <Label>Notificações via Webhook</Label>
+                  <p className="text-sm text-muted-foreground">Receba alertas quando a taxa de fallback ultrapassar Nσ.</p>
+                </div>
+                <div className="flex items-center gap-4">
+                  <Input 
+                    placeholder="https://webhook.site/..." 
+                    className="w-[300px]" 
+                    defaultValue={settings?.webhook_url}
+                    onBlur={(e) => toggleNotifications(settings?.is_notifications_enabled, e.target.value)}
+                  />
+                  <Switch 
+                    checked={settings?.is_notifications_enabled} 
+                    onCheckedChange={(v) => toggleNotifications(v)}
+                  />
+                </div>
+              </div>
 
-                  </TableHeader>
-                  <TableBody>
-                    {auditLogs.length === 0 ? (
-                      <TableRow><TableCell colSpan={5} className="text-center py-10 text-muted-foreground">Nenhum log encontrado.</TableCell></TableRow>
-                    ) : auditLogs.map((log) => (
-                      <TableRow key={log.id}>
-                        <TableCell className="text-xs whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</TableCell>
-                        <TableCell>
-                          <Badge variant={log.action_type === 'clear' ? 'destructive' : 'default'} className="text-[10px] uppercase">
-                            {log.action_type}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-xs truncate max-w-[150px]">{log.actor?.email || "Desconhecido"}</TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-1">
-                            {Object.entries(log.filters || {}).map(([k, v]) => (
-                              v ? <Badge key={k} variant="secondary" className="text-[10px] py-0">{k}: {String(v)}</Badge> : null
-                            ))}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right font-mono font-bold text-destructive">
-                          {log.action_type === 'clear' ? log.deleted_count : '—'}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-
-                  </TableBody>
-                </Table>
+              <div className="space-y-2">
+                <Label htmlFor="sigma-settings">Anomaly Threshold (Nσ)</Label>
+                <Input
+                  id="sigma-settings"
+                  type="number"
+                  step="0.1"
+                  min="0.1"
+                  max="10"
+                  defaultValue={filters.sigma}
+                  className="w-24"
+                  onBlur={(e) => updateParam({ sigma: parseFloat(e.target.value) || 2 })}
+                />
+                <p className="text-xs text-muted-foreground">Valores recomendados entre 1.5 e 3.0.</p>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
-
     </div>
   );
 };
