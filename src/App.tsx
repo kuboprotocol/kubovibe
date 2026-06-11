@@ -8,6 +8,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import { lazy, Suspense } from "react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
+// Lazy loading all pages
 const Index = lazy(() => import("./pages/Index"));
 const AuthPage = lazy(() => import("./pages/AuthPage"));
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
