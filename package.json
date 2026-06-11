@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && bun scripts/validate-pwa.ts",
+    "build": "vite build && bun scripts/validate-pwa.ts && bun scripts/check-bundle-size.ts",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "typecheck": "rm -rf node_modules/.cache && bunx tsc --noEmit",
