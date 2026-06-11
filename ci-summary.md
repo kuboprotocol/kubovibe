@@ -1,7 +1,7 @@
 ### 🚀 Kubo Vibe - PWA Quality Report
 
 **Build Status:** ✅ PASSED
-**Total Bundle Size:** 6.41 MB / 15 MB
+**Total Bundle Size:** 6.44 MB / 15 MB
 
 #### 📸 E2E Offline Fallback Evidence
 Em caso de falha nos testes, confira as evidências geradas:
