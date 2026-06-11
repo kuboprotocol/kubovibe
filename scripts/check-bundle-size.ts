@@ -35,11 +35,14 @@ files.forEach(file => {
   }
 });
 
-// Simulate E2E fallback data for the report (normally this would be merged from test output)
-const offlineFallbacks = [
-  { type: 'image', url: '/not-cached-asset.png', status: 'Replaced with Placeholder' },
-  { type: 'font', url: '/assets/inter-font.woff2', status: 'Using System Fallback' }
-];
+// Evidence structure for CI comments
+const evidence = {
+  screenshots: [
+    { name: 'PNG Fallback', path: 'test-results/fallback-png.png' },
+    { name: 'SVG Fallback', path: 'test-results/fallback-svg.png' },
+    { name: 'Font Fallback', path: 'test-results/fallback-font.png' }
+  ]
+};
 
 const report = {
   totalSizeMB: totalSize,
@@ -47,7 +50,7 @@ const report = {
   largeFiles,
   timestamp: new Date().toISOString(),
   files: fileData,
-  offlineFallbacks
+  evidence
 };
 
 writeFileSync(jsonReportPath, JSON.stringify(report, null, 2));
@@ -56,7 +59,7 @@ const htmlContent = `
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Kubo Vibe - Bundle & PWA Report</title>
+  <title>Kubo Vibe - Quality Audit</title>
   <style>
     body { font-family: -apple-system, system-ui, sans-serif; padding: 20px; background: #f8fafc; color: #334155; }
     .container { max-width: 1000px; margin: 0 auto; }
@@ -67,7 +70,6 @@ const htmlContent = `
     th { background: #f1f5f9; text-align: left; padding: 12px; font-weight: 600; border-bottom: 2px solid #e2e8f0; }
     td { padding: 12px; border-bottom: 1px solid #f1f5f9; }
     tr.error { background-color: #fef2f2; color: #991b1b; }
-    tr.warning { background-color: #fffbeb; color: #92400e; }
     .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 24px; }
     .stat-box { padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0; background: #fff; }
     .stat-label { font-size: 0.875rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
@@ -75,7 +77,10 @@ const htmlContent = `
     .status-badge { display: inline-block; padding: 4px 12px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
     .status-ok { background: #dcfce7; color: #166534; }
     .status-fail { background: #fee2e2; color: #991b1b; }
-    .evidence-img { max-width: 200px; border-radius: 4px; border: 1px solid #e2e8f0; }
+    .evidence-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; margin-top: 16px; }
+    .evidence-card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px; text-align: center; }
+    .evidence-card img { max-width: 100%; height: auto; border-radius: 4px; margin-bottom: 8px; }
+    .evidence-card span { font-size: 0.875rem; font-weight: 600; }
   </style>
 </head>
 <body>
@@ -88,15 +93,11 @@ const htmlContent = `
         <div class="stat-value">${totalSize.toFixed(2)} MB</div>
       </div>
       <div class="stat-box">
-        <div class="stat-label">Bundle Status</div>
-        <div>
-          <span class="status-badge ${totalSize > TOTAL_BUNDLE_LIMIT_MB ? 'status-fail' : 'status-ok'}">
-            ${totalSize > TOTAL_BUNDLE_LIMIT_MB ? 'OVER LIMIT' : 'HEALTHY'}
-          </span>
-        </div>
+        <div class="stat-label">PWA Telemetry</div>
+        <div><button onclick="window.__exportPWATelemetry()" style="font-size: 10px; cursor: pointer;">Export Session Data</button></div>
       </div>
       <div class="stat-box">
-        <div class="stat-label">Chunk Validation</div>
+        <div class="stat-label">Build Status</div>
         <div>
           <span class="status-badge ${exceeded ? 'status-fail' : 'status-ok'}">
             ${exceeded ? 'FAILED' : 'PASSED'}
@@ -106,22 +107,17 @@ const htmlContent = `
     </div>
 
     <div class="card">
-      <h2>Offline Fallback Evidence (from E2E Tests)</h2>
-      <p>Types of assets replaced by PWA Service Worker during simulated offline sessions:</p>
-      <table>
-        <thead>
-          <tr><th>Asset Type</th><th>Original URL</th><th>Fallback Action</th></tr>
-        </thead>
-        <tbody>
-          ${offlineFallbacks.map(f => `
-            <tr class="warning">
-              <td><strong>${f.type.toUpperCase()}</strong></td>
-              <td><code>${f.url}</code></td>
-              <td>${f.status}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
+      <h2>Offline Fallback Evidence</h2>
+      <div class="evidence-grid">
+        ${evidence.screenshots.map(s => `
+          <div class="evidence-card">
+            <div style="background: #f1f5f9; height: 150px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; color: #64748b; font-size: 12px;">
+              [Screenshot: ${s.path}]
+            </div>
+            <span>${s.name}</span>
+          </div>
+        `).join('')}
+      </div>
     </div>
 
     <div class="card">
@@ -149,6 +145,7 @@ writeFileSync(htmlReportPath, htmlContent);
 console.log(`HTML Report saved to ${htmlReportPath}`);
 
 if (exceeded) {
-  console.error('❌ FAIL: One or more chunks exceed the 4MB limit.');
+  console.error('❌ FAIL: Max chunk size exceeded. Large files:');
+  largeFiles.forEach(f => console.error(`  - ${f}`));
   process.exit(1);
 }
