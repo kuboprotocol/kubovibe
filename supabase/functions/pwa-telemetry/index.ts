@@ -2,6 +2,7 @@
 // POST /pwa-telemetry { action: 'cancel', jobId: '...' }
 // Returns paginated telemetry events, aggregated session summary, and supports filtered export.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { validatePublicUrl } from "../_shared/security.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -26,7 +27,9 @@ async function notifyAnomaly(supabase: any, anomalyData: any, userId: string) {
 
   if (settings?.is_notifications_enabled && settings?.webhook_url) {
     try {
-      await fetch(settings.webhook_url, {
+      // SSRF protection: re-validate at fetch time in case row was tampered
+      const safeUrl = validatePublicUrl(settings.webhook_url);
+      await fetch(safeUrl.toString(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -179,12 +182,23 @@ Deno.serve(async (req) => {
       
       // Toggle notifications
       if (body.action === "toggle_notifications") {
+        // SSRF protection: validate webhook URL before storing
+        let safeWebhookUrl: string | null = null;
+        if (body.webhookUrl) {
+          try {
+            safeWebhookUrl = validatePublicUrl(String(body.webhookUrl)).toString();
+          } catch (e) {
+            return new Response(JSON.stringify({ error: "invalid_webhook_url", message: (e as Error).message }), {
+              status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+        }
         const { error } = await admin
           .from("pwa_telemetry_settings")
           .upsert({
             user_id: userId,
             is_notifications_enabled: body.enabled,
-            webhook_url: body.webhookUrl,
+            webhook_url: safeWebhookUrl,
           }, { onConflict: 'user_id' });
         if (error) throw error;
         return new Response(JSON.stringify({ success: true }), {

@@ -250,8 +250,8 @@ serve(async (req) => {
       }
     }
 
-    const details = failures.length ? ` (${failures.join(" | ")})` : "";
-    return jsonResponse(503, `Nenhum serviço de IA disponível no momento. Tente novamente mais tarde.${details}`);
+    if (failures.length) console.warn("[generate-code] all providers failed:", failures.join(" | "));
+    return jsonResponse(503, "Serviço temporariamente indisponível. Tente novamente mais tarde.");
   } catch (e) {
     console.error("generate-code error:", e);
     return jsonResponse(500, "Something went wrong. Please try again.");
