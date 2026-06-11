@@ -33,7 +33,7 @@ export const ExportJobsView = () => {
         .limit(20);
 
       if (error) throw error;
-      setJobs(data || []);
+      setJobs((data as any) || []);
     } catch (e: any) {
       toast.error(`Erro ao carregar jobs: ${e.message}`);
     } finally {
