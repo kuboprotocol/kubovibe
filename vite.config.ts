@@ -22,7 +22,33 @@ export default defineConfig(({ mode }) => ({
       registerType: "autoUpdate",
       includeAssets: ["favicon.ico", "apple-touch-icon.png", "mask-icon.svg"],
       workbox: {
-        maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
+        // Reduced back to a safer limit but using globPatterns to exclude heavy assets if needed
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
+        // Fallback for larger assets
+        runtimeCaching: [
+          {
+            urlPattern: /\.(?:js|css|html|json)$/,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'static-resources',
+              expiration: {
+                maxEntries: 50,
+                maxAgeSeconds: 30 * 24 * 60 * 60, // 30 days
+              },
+            },
+          },
+          {
+            urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp)$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'images',
+              expiration: {
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 24 * 60 * 60, // 60 days
+              },
+            },
+          },
+        ],
       },
       manifest: {
         name: "Kubo Vibe",
@@ -49,4 +75,30 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('three') || id.includes('@types/three')) {
+              return 'vendor-three';
+            }
+            if (id.includes('tldraw')) {
+              return 'vendor-tldraw';
+            }
+            if (id.includes('lucide-react')) {
+              return 'vendor-lucide';
+            }
+            if (id.includes('@radix-ui')) {
+              return 'vendor-radix';
+            }
+            if (id.includes('framer-motion')) {
+              return 'vendor-framer';
+            }
+            return 'vendor';
+          }
+        }
+      }
+    }
+  }
 }));
