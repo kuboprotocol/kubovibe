@@ -41,6 +41,88 @@ async function notifyAnomaly(supabase: any, anomalyData: any, userId: string) {
   }
 }
 
+async function sendJobFailureEmail(admin: any, userId: string, jobId: string, errorMessage: string) {
+  try {
+    const { data: u } = await admin.auth.admin.getUserById(userId);
+    const email = u?.user?.email;
+    if (!email) return;
+    await admin.rpc("enqueue_email", {
+      queue_name: "transactional_emails",
+      payload: {
+        to: email,
+        from: "Kubo Vibe <noreply@kubovibe.dev>",
+        subject: "Falha na exportação de telemetria PWA",
+        purpose: "transactional",
+        html: `<div style="font-family:sans-serif;padding:20px"><h2>Sua exportação falhou</h2><p>O job <code>${jobId}</code> falhou ao processar.</p><p><strong>Erro:</strong> ${String(errorMessage).slice(0, 500)}</p><p>Você pode reexecutar pela aba <strong>Jobs</strong> em PWA Telemetry.</p></div>`,
+      },
+    });
+  } catch (e) {
+    console.error("Failed to send failure email:", e);
+  }
+}
+
+function buildEventsQuery(admin: any, f: any) {
+  let q = admin.from("pwa_telemetry_events").select("*");
+  if (f.type && f.type !== "all") q = q.eq("type", f.type);
+  if (f.canvasId) q = q.eq("canvas_id", f.canvasId);
+  if (f.filterUser) q = q.eq("user_id", f.filterUser);
+  if (f.sessionId) q = q.eq("session_id", f.sessionId);
+  if (f.start) q = q.gte("created_at", f.start);
+  if (f.end) q = q.lte("created_at", f.end);
+  if (f.q) q = q.or(`url.ilike.%${f.q}%,session_id.ilike.%${f.q}%,canvas_id.ilike.%${f.q}%`);
+  return q.order("created_at", { ascending: false });
+}
+
+async function runBackgroundExport(admin: any, userId: string, job: any) {
+  try {
+    const exportFmt = job.format;
+    const headers = ["id", "created_at", "type", "url", "session_id", "canvas_id", "user_id"];
+    let content = exportFmt === "csv" ? headers.join(",") + "\n" : "[\n";
+    let exportedCount = 0;
+    const CHUNK_SIZE = 1000;
+    const MAX_EXPORT = 50000;
+
+    for (let offset = 0; offset < MAX_EXPORT; offset += CHUNK_SIZE) {
+      const { data: currentJob } = await admin
+        .from("pwa_telemetry_export_jobs").select("status").eq("id", job.id).single();
+      if (currentJob?.status === "cancelled") return;
+
+      const { data: chunk, error: chunkErr } = await buildEventsQuery(admin, job.filters || {}).range(offset, offset + CHUNK_SIZE - 1);
+      if (chunkErr) throw chunkErr;
+      if (!chunk || chunk.length === 0) break;
+
+      exportedCount += chunk.length;
+      const progress = Math.min(95, Math.round((exportedCount / MAX_EXPORT) * 100));
+      await admin.from("pwa_telemetry_export_jobs").update({ progress }).eq("id", job.id);
+
+      if (exportFmt === "csv") {
+        content += chunk.map((r: any) => headers.map((h) => csvEscape(r[h])).join(",")).join("\n") + "\n";
+      } else {
+        content += chunk.map((r: any) => JSON.stringify(r)).join(",\n") + ",\n";
+      }
+      if (chunk.length < CHUNK_SIZE) break;
+    }
+    if (exportFmt === "json") content = content.replace(/,\n$/, "") + "\n]";
+
+    const path = `pwa-telemetry/${userId}/${job.id}.${exportFmt}`;
+    const contentType = exportFmt === "csv" ? "text/csv" : "application/json";
+    const { error: upErr } = await admin.storage.from("uploads").upload(path, new Blob([content], { type: contentType }), { upsert: true, contentType });
+    if (upErr) throw upErr;
+    const { data: signed, error: signErr } = await admin.storage.from("uploads").createSignedUrl(path, 60 * 60 * 24 * 7);
+    if (signErr) throw signErr;
+
+    await admin.from("pwa_telemetry_export_jobs")
+      .update({ status: "completed", progress: 100, result_url: signed.signedUrl })
+      .eq("id", job.id);
+  } catch (e) {
+    console.error("Background export failed:", e);
+    const msg = String((e as Error).message ?? e);
+    await admin.from("pwa_telemetry_export_jobs")
+      .update({ status: "failed", error_message: msg }).eq("id", job.id);
+    await sendJobFailureEmail(admin, userId, job.id, msg);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
