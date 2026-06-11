@@ -51,6 +51,7 @@ const AgentDetailPage = lazy(() => import("./pages/AgentDetailPage"));
 const AdminPage = lazy(() => import("./pages/AdminPage"));
 const OrchestratorPage = lazy(() => import("./pages/OrchestratorPage"));
 const PwaTelemetryPage = lazy(() => import("./pages/PwaTelemetry"));
+const PwaExportJobDetailsPage = lazy(() => import("./pages/PwaExportJobDetails"));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -141,6 +142,7 @@ const App = () => (
                 <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
                 <Route path="/orchestrator" element={<ProtectedRoute><OrchestratorPage /></ProtectedRoute>} />
                 <Route path="/pwa/telemetry" element={<ProtectedRoute><PwaTelemetryPage /></ProtectedRoute>} />
+                <Route path="/pwa/telemetry/jobs/:jobId" element={<ProtectedRoute><PwaExportJobDetailsPage /></ProtectedRoute>} />
 
                 
                 <Route path="*" element={<NotFound />} />
