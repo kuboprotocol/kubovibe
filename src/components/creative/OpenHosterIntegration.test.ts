@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 
 // Simulação simplificada da lógica de URL e filtro no SkillExecutionsList
 function getSkillFilterFromURL(urlStr: string) {
@@ -9,9 +9,14 @@ function getSkillFilterFromURL(urlStr: string) {
   if (provider === "openhoster" && tool === "nano_banano") {
     return { filter: "nano_banana", error: null };
   } else if (provider === "openhoster" || tool === "nano_banano") {
+    const missing = [];
+    if (!provider) missing.push("provider=openhoster");
+    if (!tool) missing.push("tool=nano_banano");
+    
     return { 
       filter: "nano_banana", 
-      error: "Link incompleto para OpenHoster" 
+      error: `Link incompleto para OpenHoster. Faltando: ${missing.join(" e ")}`,
+      missing
     };
   }
   return { filter: "all", error: null };
@@ -26,39 +31,47 @@ describe('SkillExecutionsList - Integração OpenHoster/Nano Banano', () => {
     expect(result.error).toBeNull();
   });
 
-  it('deve aplicar o fallback nano_banana e retornar erro quando apenas provider=openhoster está presente', () => {
-    const url = "https://app.lovable.ai/creative/history?provider=openhoster";
-    const result = getSkillFilterFromURL(url);
-    
-    expect(result.filter).toBe("nano_banana");
-    expect(result.error).toBe("Link incompleto para OpenHoster");
-  });
-
-  it('deve aplicar o fallback nano_banana e retornar erro quando apenas tool=nano_banano está presente', () => {
+  it('deve aplicar o fallback nano_banana e informar provider ausente', () => {
     const url = "https://app.lovable.ai/creative/history?tool=nano_banano";
     const result = getSkillFilterFromURL(url);
     
     expect(result.filter).toBe("nano_banana");
-    expect(result.error).toBe("Link incompleto para OpenHoster");
+    expect(result.error).toContain("provider=openhoster");
   });
 
-  it('não deve aplicar o filtro nano_banana se os parâmetros forem diferentes', () => {
-    const url = "https://app.lovable.ai/creative/history?provider=other&tool=other";
+  it('deve aplicar o fallback nano_banana e informar tool ausente', () => {
+    const url = "https://app.lovable.ai/creative/history?provider=openhoster";
+    const result = getSkillFilterFromURL(url);
+    
+    expect(result.filter).toBe("nano_banana");
+    expect(result.error).toContain("tool=nano_banano");
+  });
+
+  it('não deve aplicar o filtro nano_banana se ambos estiverem ausentes', () => {
+    const url = "https://app.lovable.ai/creative/history";
     const result = getSkillFilterFromURL(url);
     
     expect(result.filter).toBe("all");
     expect(result.error).toBeNull();
   });
 
-  it('deve validar o schema de erro detalhado para falhas no carregamento', () => {
+  it('não deve aplicar o filtro nano_banana com valores errados', () => {
+    const url = "https://app.lovable.ai/creative/history?provider=wrong&tool=wrong";
+    const result = getSkillFilterFromURL(url);
+    
+    expect(result.filter).toBe("all");
+    expect(result.error).toBeNull();
+  });
+
+  it('deve detalhar endpoint e payload no schema de erro', () => {
     const mockError = {
-      message: "Falha ao carregar Nano Banano",
-      backend_status: 500,
-      stack: "Error: Failed to fetch at Object.load..."
+      message: "Erro de teste",
+      endpoint: "https://api.test/v1/call",
+      payload: { provider: "openhoster", tool: null }
     };
     
-    expect(mockError).toHaveProperty("message");
-    expect(mockError).toHaveProperty("backend_status");
-    expect(mockError.backend_status).toBe(500);
+    expect(mockError).toHaveProperty("endpoint");
+    expect(mockError.payload).toHaveProperty("provider");
   });
 });
+
