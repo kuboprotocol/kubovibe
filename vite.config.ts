@@ -22,29 +22,30 @@ export default defineConfig(({ mode }) => ({
       registerType: "autoUpdate",
       includeAssets: ["favicon.ico", "apple-touch-icon.png", "mask-icon.svg"],
       workbox: {
-        // Increased limit to avoid build failure, but we use globIgnores to control what is actually precached
-        maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}'],
-        // Exclude potentially large vendor chunks from precaching
-        // They will be loaded on demand and cached via runtimeCaching
-        globIgnores: ['**/vendor-*.js', '**/vendor-*.css'],
+        // App Shell Critical Assets
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
+        globPatterns: [
+          'index.html',
+          'assets/index-*.css',
+          'assets/index-*.js',
+          'assets/vendor-react-*.js',
+          'assets/vendor-core-*.js'
+        ],
+        // Non-critical or large assets handled via runtime caching
+        globIgnores: [
+          '**/vendor-three-*.js',
+          '**/vendor-tldraw-*.js',
+          '**/vendor-exports-*.js',
+          '**/vendor-*.js',
+          '**/*.map'
+        ],
         runtimeCaching: [
           {
-            urlPattern: /assets\/vendor-.*\.js$/,
+            // Cache scripts and styles not precached
+            urlPattern: /\.(?:js|css)$/,
             handler: 'StaleWhileRevalidate',
             options: {
-              cacheName: 'vendor-chunks',
-              expiration: {
-                maxEntries: 20,
-                maxAgeSeconds: 60 * 24 * 60 * 60,
-              },
-            },
-          },
-          {
-            urlPattern: /\.(?:js|css|html|json)$/,
-            handler: 'StaleWhileRevalidate',
-            options: {
-              cacheName: 'static-resources',
+              cacheName: 'static-resources-runtime',
               expiration: {
                 maxEntries: 50,
                 maxAgeSeconds: 30 * 24 * 60 * 60,
@@ -52,16 +53,44 @@ export default defineConfig(({ mode }) => ({
             },
           },
           {
+            // Image caching with CacheFirst and fallback handling
             urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp)$/,
             handler: 'CacheFirst',
             options: {
-              cacheName: 'images',
+              cacheName: 'images-cache',
               expiration: {
                 maxEntries: 100,
                 maxAgeSeconds: 60 * 24 * 60 * 60,
               },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
             },
           },
+          {
+            // Navigation fallback (Single Page App)
+            urlPattern: ({ request }) => request.mode === 'navigate',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'pages-cache',
+              networkTimeoutSeconds: 3,
+              expiration: {
+                maxEntries: 20,
+              },
+            },
+          },
+          {
+            // Font caching
+            urlPattern: /\.(?:woff|woff2|ttf|otf)$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'fonts-cache',
+              expiration: {
+                maxEntries: 10,
+                maxAgeSeconds: 365 * 24 * 60 * 60,
+              },
+            },
+          }
         ],
       },
       manifest: {
@@ -90,7 +119,7 @@ export default defineConfig(({ mode }) => ({
     },
   },
   build: {
-    chunkSizeWarningLimit: 1000,
+    chunkSizeWarningLimit: 1200,
     rollupOptions: {
       output: {
         manualChunks(id) {
