@@ -94,29 +94,61 @@ Deno.serve(async (req) => {
     query = query.order("created_at", { ascending: sort === "asc" });
 
     if (exportFmt) {
-      // Hard cap export to 10k rows per request to avoid runaway
-      const { data: rows, error } = await query.range(0, 9999);
-      if (error) throw error;
-      if (exportFmt === "csv") {
-        const headers = ["id","created_at","type","url","session_id","canvas_id","user_id"];
-        const lines = [headers.join(",")];
-        for (const r of rows ?? []) lines.push(headers.map((h) => csvEscape((r as any)[h])).join(","));
-        return new Response(lines.join("\n"), {
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "text/csv; charset=utf-8",
-            "Content-Disposition": `attachment; filename="pwa-telemetry-${Date.now()}.csv"`,
-          },
-        });
+      const startTime = Date.now();
+      const headers = ["id", "created_at", "type", "url", "session_id", "canvas_id", "user_id"];
+      let csvContent = exportFmt === "csv" ? headers.join(",") + "\n" : "[\n";
+      
+      let exportedCount = 0;
+      const CHUNK_SIZE = 1000;
+      const MAX_EXPORT = 50000; // Increased limit for streaming-style approach
+      
+      for (let offset = 0; offset < MAX_EXPORT; offset += CHUNK_SIZE) {
+        const { data: chunk, error: chunkErr } = await query.range(offset, offset + CHUNK_SIZE - 1);
+        if (chunkErr) throw chunkErr;
+        if (!chunk || chunk.length === 0) break;
+        
+        exportedCount += chunk.length;
+        
+        if (exportFmt === "csv") {
+          csvContent += chunk.map((r: any) => headers.map((h) => csvEscape(r[h])).join(",")).join("\n") + "\n";
+        } else {
+          csvContent += chunk.map((r: any) => JSON.stringify(r)).join(",\n") + (exportedCount < MAX_EXPORT ? ",\n" : "");
+        }
+        
+        if (chunk.length < CHUNK_SIZE) break;
       }
-      return new Response(JSON.stringify(rows ?? []), {
+      
+      if (exportFmt === "json") {
+        csvContent = csvContent.replace(/,\n$/, "") + "\n]";
+      }
+
+      const duration = Date.now() - startTime;
+      
+      // Metrics and Audit
+      await admin.from("pwa_telemetry_metrics").insert({
+        operation: "export",
+        duration_ms: duration,
+        row_count: exportedCount,
+        filters: { type, canvasId, filterUser, sessionId, q, start, end },
+        user_id: userId
+      });
+
+      await admin.from("pwa_telemetry_audit_logs").insert({
+        actor_id: userId,
+        action_type: "export",
+        filters: { type, canvasId, filterUser, sessionId, q, start, end, format: exportFmt },
+        deleted_count: 0
+      });
+
+      return new Response(csvContent, {
         headers: {
           ...corsHeaders,
-          "Content-Type": "application/json",
-          "Content-Disposition": `attachment; filename="pwa-telemetry-${Date.now()}.json"`,
+          "Content-Type": exportFmt === "csv" ? "text/csv" : "application/json",
+          "Content-Disposition": `attachment; filename="pwa-telemetry-${Date.now()}.${exportFmt}"`,
         },
       });
     }
+
 
     const from = (page - 1) * pageSize;
     const to = from + pageSize - 1;
