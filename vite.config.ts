@@ -66,7 +66,7 @@ export default defineConfig(({ mode }) => ({
       },
       manifest: {
         name: "Kubo Vibe",
-        short_name: "KuboVibe", short_name: "KuboVibe",
+        short_name: "KuboVibe",
         description: "Plataforma Criativa com IA",
         theme_color: "#ffffff",
         icons: [
