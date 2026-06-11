@@ -507,7 +507,11 @@ const PwaTelemetry = () => {
         <TabsList>
           <TabsTrigger value="list" className="gap-2"><List className="w-4 h-4" /> Eventos ({total})</TabsTrigger>
           <TabsTrigger value="sessions" className="gap-2"><LayoutGrid className="w-4 h-4" /> Sessões ({summary.length})</TabsTrigger>
+          {hasAnyRole(["admin"]) && (
+            <TabsTrigger value="audit" className="gap-2"><History className="w-4 h-4" /> Auditoria</TabsTrigger>
+          )}
         </TabsList>
+
 
         <TabsContent value="list">
           <Card>
