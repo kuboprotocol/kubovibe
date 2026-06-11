@@ -174,6 +174,13 @@ Deno.serve(async (req) => {
           .select()
           .single();
         if (jobErr) throw jobErr;
+        
+        // Audit background export
+        await admin.from("pwa_telemetry_audit_logs").insert({
+          actor_id: userId,
+          action_type: "export",
+          filters: { ...job.filters, format: job.format, mode: "background", jobId: job.id }
+        });
 
         // Start processing in "background" (Deno will keep this running for a bit)
         (async () => {
