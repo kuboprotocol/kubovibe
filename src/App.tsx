@@ -77,7 +77,6 @@ if (typeof window !== 'undefined') {
   const host = window.location.hostname
   const previewHost = 'preview--kubo-secure-ai.lovable.app'
   const isLovableApp = /(^|\.)lovable\.app$/i.test(host)
-  const isCustomDomain = host === 'kubovibe.dev' || host === 'www.kubovibe.dev'
   
   if (host === previewHost || host.includes('lovableproject.com') || host === 'localhost' || host === '127.0.0.1') {
     // Already on the preview domain or local
@@ -86,6 +85,7 @@ if (typeof window !== 'undefined') {
     window.location.replace(target)
   }
 }
+
 
 
 
