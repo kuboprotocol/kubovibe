@@ -79,13 +79,14 @@ if (typeof window !== 'undefined') {
   const isLovableApp = /(^|\.)lovable\.app$/i.test(host)
   const isCustomDomain = host === 'kubovibe.dev' || host === 'www.kubovibe.dev'
   
-  if (host === previewHost || host.includes('lovableproject.com')) {
-    // Already on the preview domain
+  if (host === previewHost || host.includes('lovableproject.com') || host === 'localhost' || host === '127.0.0.1') {
+    // Already on the preview domain or local
   } else if (isLovableApp && !host.startsWith('id-preview--')) {
     const target = `https://kubovibe.dev${window.location.pathname}${window.location.search}${window.location.hash}`
     window.location.replace(target)
   }
 }
+
 
 
 
