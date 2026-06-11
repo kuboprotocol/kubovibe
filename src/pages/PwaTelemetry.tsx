@@ -204,12 +204,13 @@ const PwaTelemetry = () => {
   const fetchAuditLogs = async () => {
     if (!hasAnyRole(["admin"])) return;
     const { data } = await supabase
-      .from("pwa_telemetry_clear_logs")
+      .from("pwa_telemetry_audit_logs" as any)
       .select("*, actor:actor_id(email)")
       .order("created_at", { ascending: false })
-      .limit(10);
+      .limit(20);
     setAuditLogs(data || []);
   };
+
 
   useEffect(() => {
     if (hasAnyRole(["admin"])) fetchAuditLogs();
