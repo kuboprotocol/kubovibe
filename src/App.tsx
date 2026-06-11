@@ -76,21 +76,19 @@ const queryClient = new QueryClient({
 if (typeof window !== 'undefined') {
   const host = window.location.hostname
   const previewHost = 'preview--kubo-secure-ai.lovable.app'
-  console.log("[App] Host check:", host, "isLovable:", /(^|\.)lovable\.app$/i.test(host));
   if (host === previewHost) {
     // Already on the preview domain
   } else if (/(^|\.)lovable\.app$/i.test(host) && !host.startsWith('id-preview--')) {
     const target = `https://kubovibe.dev${window.location.pathname}${window.location.search}${window.location.hash}`
-    console.log("[App] Redirect logic triggered. Host:", host, "Target:", target);
-    // window.location.replace(target)
+    window.location.replace(target)
   }
 }
 
 
 
-const App = () => {
-  console.log("[App] Rendering root component");
-  return (
+
+const App = () => (
+
 
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -160,8 +158,8 @@ const App = () => {
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
-  );
-};
+);
+
 
 
 export default App;
