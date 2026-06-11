@@ -1,9 +1,10 @@
-import { existsSync, readdirSync, statSync } from 'fs';
+import { existsSync, readdirSync, statSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
 const distDir = join(process.cwd(), 'dist/assets');
 const MAX_CHUNK_SIZE_MB = 4.0; 
 const TOTAL_BUNDLE_LIMIT_MB = 15.0;
+const reportPath = join(process.cwd(), 'bundle-size-report.json');
 
 console.log('--- Bundle Size Report ---');
 
@@ -16,12 +17,14 @@ const files = readdirSync(distDir);
 let totalSize = 0;
 let exceeded = false;
 const largeFiles: string[] = [];
+const fileData: Record<string, number> = {};
 
 files.forEach(file => {
   const filePath = join(distDir, file);
   const stats = statSync(filePath);
   const sizeMB = stats.size / (1024 * 1024);
   totalSize += sizeMB;
+  fileData[file] = sizeMB;
 
   console.log(`  ${file.padEnd(40)} | ${sizeMB.toFixed(2)} MB`);
 
@@ -30,6 +33,17 @@ files.forEach(file => {
     exceeded = true;
   }
 });
+
+const report = {
+  totalSizeMB: totalSize,
+  exceeded,
+  largeFiles,
+  timestamp: new Date().toISOString(),
+  files: fileData
+};
+
+writeFileSync(reportPath, JSON.stringify(report, null, 2));
+console.log(`Report saved to ${reportPath}`);
 
 console.log('--------------------------');
 console.log(`Total Bundle Size: ${totalSize.toFixed(2)} MB`);
