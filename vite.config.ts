@@ -20,7 +20,7 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.ico", "apple-touch-icon.png", "mask-icon.svg"],
+      includeAssets: ["favicon.ico", "apple-touch-icon.png", "mask-icon.svg", "placeholders/*"],
       workbox: {
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         globPatterns: [
@@ -28,7 +28,8 @@ export default defineConfig(({ mode }) => ({
           'assets/index-*.css',
           'assets/index-*.js',
           'assets/vendor-react-*.js',
-          'assets/vendor-core-*.js'
+          'assets/vendor-core-*.js',
+          'placeholders/*.svg'
         ],
         globIgnores: [
           '**/vendor-tldraw-*.js',
@@ -59,19 +60,7 @@ export default defineConfig(({ mode }) => ({
               },
               cacheableResponse: {
                 statuses: [0, 200]
-              },
-              // We could add a background-sync or fallback here if needed via custom plugins
-            },
-          },
-          {
-            urlPattern: ({ request }) => request.mode === 'navigate',
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'pages-cache',
-              networkTimeoutSeconds: 3,
-              expiration: {
-                maxEntries: 30,
-              },
+              }
             },
           },
           {
@@ -84,8 +73,21 @@ export default defineConfig(({ mode }) => ({
                 maxAgeSeconds: 365 * 24 * 60 * 60,
               },
             },
+          },
+          {
+            urlPattern: ({ request }) => request.mode === 'navigate',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'pages-cache',
+              networkTimeoutSeconds: 3,
+              expiration: {
+                maxEntries: 30,
+              },
+            },
           }
         ],
+        // Manual offline fallback for images
+        offlineGoogleAnalytics: true,
       },
       manifest: {
         name: "Kubo Vibe",
