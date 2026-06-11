@@ -142,6 +142,7 @@ const App = () => (
                 <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
                 <Route path="/orchestrator" element={<ProtectedRoute><OrchestratorPage /></ProtectedRoute>} />
                 <Route path="/pwa/telemetry" element={<ProtectedRoute><PwaTelemetryPage /></ProtectedRoute>} />
+                <Route path="/pwa/telemetry/jobs/:jobId" element={<ProtectedRoute><PwaExportJobDetailsPage /></ProtectedRoute>} />
 
                 
                 <Route path="*" element={<NotFound />} />
