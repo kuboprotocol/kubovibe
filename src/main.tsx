@@ -3,36 +3,39 @@ import App from "./App.tsx";
 import "./index.css";
 import { assertFrontendEnv } from "./lib/envCheck";
 import { toast } from "sonner";
-import { Button } from "./components/ui/button";
+import { saveTelemetryEvent } from "./utils/pwaTelemetry";
 
 assertFrontendEnv();
 
-const TELEMETRY_LS_KEY = 'kubo:pwa:telemetry';
-const MUTE_LS_KEY = 'kubo:pwa:mute_toasts';
+// Intercept fetch calls to mock the telemetry API endpoint
+const originalFetch = window.fetch;
+window.fetch = async (...args) => {
+  const [resource, config] = args;
+  const url = typeof resource === 'string' ? resource : resource instanceof URL ? resource.href : resource.url;
 
-const loadTelemetry = (): Record<string, number> => {
-  try {
-    const saved = localStorage.getItem(TELEMETRY_LS_KEY);
-    return saved ? JSON.parse(saved) : { image: 0, svg: 0, font: 0, other: 0 };
-  } catch {
-    return { image: 0, svg: 0, font: 0, other: 0 };
+  if (url.includes('/api/pwa/telemetry')) {
+    const { getTelemetryEvents, clearTelemetry } = await import("./utils/pwaTelemetry");
+    const events = getTelemetryEvents();
+    
+    if (config?.method === 'DELETE') {
+      clearTelemetry();
+      return new Response(JSON.stringify({ success: true, message: 'Telemetry cleared' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    return new Response(JSON.stringify(events), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
+  return originalFetch(...args);
 };
 
-const pwaTelemetry = loadTelemetry();
+
+const MUTE_LS_KEY = 'kubo:pwa:mute_toasts';
 let ignorePwaToasts = localStorage.getItem(MUTE_LS_KEY) === 'true';
-
-// Helper to expose telemetry globally for export
-(window as any).__exportPWATelemetry = () => {
-  const data = JSON.stringify(pwaTelemetry, null, 2);
-  const blob = new Blob([data], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `pwa-telemetry-\${new Date().toISOString()}.json`;
-  a.click();
-  console.log('Telemetry exported:', pwaTelemetry);
-};
 
 // Listen for PWA asset fallback events
 if (typeof window !== 'undefined') {
@@ -41,24 +44,23 @@ if (typeof window !== 'undefined') {
     
     // Telemetry update
     const category = type === 'image' ? (url?.endsWith('.svg') ? 'svg' : 'image') : (type === 'font' ? 'font' : 'other');
-    pwaTelemetry[category]++;
-    localStorage.setItem(TELEMETRY_LS_KEY, JSON.stringify(pwaTelemetry));
+    saveTelemetryEvent({ type: category, url: url || 'unknown' });
     
-    console.log(`[PWA Telemetry] Fallback triggered: \${category}. Total for category: \${pwaTelemetry[category]}`, { url });
+    console.log(`[PWA Telemetry] Fallback triggered: ${category}`, { url });
 
     if (ignorePwaToasts) return;
 
-    toast.info(`Offline Mode: Asset (\${type}) replaced`, {
-      description: `Usando placeholder para: \${url?.split('/').pop()}`,
+    toast.info(`Offline Mode: Asset (${type}) replaced`, {
+      description: `Usando placeholder para: ${url?.split('/').pop()}`,
       duration: 5000,
-      id: `pwa-fallback-\${type}`, 
+      id: `pwa-fallback-${type}`, 
       action: {
         label: "Silenciar",
         onClick: () => {
           ignorePwaToasts = true;
           localStorage.setItem(MUTE_LS_KEY, 'true');
           toast.dismiss();
-          toast.success("Avisos offline silenciados para esta sessão.");
+          toast.success("Avisos offline silenciados.");
         }
       },
     });
@@ -73,7 +75,6 @@ if (typeof window !== 'undefined') {
         detail: { type: 'image', url }
       }));
     } else if (target instanceof HTMLLinkElement && target.rel === 'stylesheet') {
-      // Potentially font/css related
       window.dispatchEvent(new CustomEvent('pwa:asset-fallback', {
         detail: { type: 'font', url }
       }));
