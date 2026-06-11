@@ -179,15 +179,46 @@ Deno.serve(async (req) => {
       
       // Toggle notifications
       if (body.action === "toggle_notifications") {
-        const { data, error } = await admin
+        const { error } = await admin
           .from("pwa_telemetry_settings")
-          .upsert({ 
-            user_id: userId, 
+          .upsert({
+            user_id: userId,
             is_notifications_enabled: body.enabled,
-            webhook_url: body.webhookUrl 
+            webhook_url: body.webhookUrl,
           }, { onConflict: 'user_id' });
         if (error) throw error;
         return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Retry a failed job
+      if (body.action === "retry" && body.jobId) {
+        const { data: orig, error: orErr } = await admin
+          .from("pwa_telemetry_export_jobs")
+          .select("*").eq("id", body.jobId).eq("user_id", userId).single();
+        if (orErr || !orig) {
+          return new Response(JSON.stringify({ error: "job_not_found" }), {
+            status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const { data: newJob, error: njErr } = await admin
+          .from("pwa_telemetry_export_jobs")
+          .insert({
+            user_id: userId,
+            status: "processing",
+            format: orig.format,
+            filters: orig.filters,
+            progress: 0,
+          }).select().single();
+        if (njErr) throw njErr;
+        await admin.from("pwa_telemetry_audit_logs").insert({
+          actor_id: userId,
+          action_type: "export",
+          filters: { ...newJob.filters, format: newJob.format, mode: "retry", originalJobId: orig.id, jobId: newJob.id },
+        });
+        (async () => { await runBackgroundExport(admin, userId, newJob); })();
+        return new Response(JSON.stringify({ jobId: newJob.id }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
