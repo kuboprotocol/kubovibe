@@ -174,6 +174,13 @@ Deno.serve(async (req) => {
           .select()
           .single();
         if (jobErr) throw jobErr;
+        
+        // Audit background export
+        await admin.from("pwa_telemetry_audit_logs").insert({
+          actor_id: userId,
+          action_type: "export",
+          filters: { ...job.filters, format: job.format, mode: "background", jobId: job.id }
+        });
 
         // Start processing in "background" (Deno will keep this running for a bit)
         (async () => {
@@ -286,10 +293,20 @@ Deno.serve(async (req) => {
       });
     }
 
+    const listStartTime = Date.now();
     const from = (page - 1) * pageSize;
     const to = from + pageSize - 1;
     const { data: rows, count, error } = await query.range(from, to);
     if (error) throw error;
+
+    // Log list metrics
+    await admin.from("pwa_telemetry_metrics").insert({
+      operation: "list",
+      duration_ms: Date.now() - listStartTime,
+      row_count: rows?.length ?? 0,
+      filters: { type, canvasId, filterUser, sessionId, q, start, end, page },
+      user_id: userId
+    });
     
     // Aggregation and Anomaly Detection
     const { data: aggRows } = await admin

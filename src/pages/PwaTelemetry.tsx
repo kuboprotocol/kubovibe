@@ -20,11 +20,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import {
   Download, Trash2, Image as ImageIcon, FileCode, Type, Search, ChevronLeft, ChevronRight,
-  LayoutGrid, List, X, AlertTriangle, ShieldAlert, ShieldCheck, History, Ban, Settings, BarChart3
+  LayoutGrid, List, X, AlertTriangle, ShieldAlert, ShieldCheck, History, Ban, Settings, BarChart3, Database
 } from "lucide-react";
 import { toast } from "sonner";
 import { MetricsView } from "@/components/pwa-telemetry/MetricsView";
 import { AuditView } from "@/components/pwa-telemetry/AuditView";
+import { ExportJobsView } from "@/components/pwa-telemetry/ExportJobsView";
 
 type RemoteEvent = {
   id: string;
@@ -496,9 +497,12 @@ const PwaTelemetry = () => {
       </div>
 
       <Tabs defaultValue="events" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 max-w-[600px]">
+        <TabsList className="grid w-full grid-cols-5 max-w-[700px]">
           <TabsTrigger value="events">Eventos</TabsTrigger>
           <TabsTrigger value="summary">Sessões</TabsTrigger>
+          <TabsTrigger value="jobs">
+            <Database className="w-4 h-4 mr-2" /> Jobs
+          </TabsTrigger>
           <TabsTrigger value="metrics" disabled={!hasAnyRole(['admin'])}>
             <BarChart3 className="w-4 h-4 mr-2" /> Métricas
           </TabsTrigger>
@@ -611,6 +615,10 @@ const PwaTelemetry = () => {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="jobs" className="pt-6">
+          <ExportJobsView />
         </TabsContent>
 
         <TabsContent value="summary" className="pt-6">

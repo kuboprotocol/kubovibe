@@ -97,10 +97,21 @@ Deno.serve(async (req) => {
     if (error) throw error;
 
     // Audit Log
-    await admin.from("pwa_telemetry_clear_logs").insert({
+    const startTime = Date.now();
+    await admin.from("pwa_telemetry_audit_logs").insert({
       actor_id: userData.user.id,
+      action_type: "clear",
       filters: scoped ? scope : { all: true },
       deleted_count: count ?? 0
+    });
+
+    // Performance Metrics
+    await admin.from("pwa_telemetry_metrics").insert({
+      operation: "clear",
+      duration_ms: Date.now() - startTime,
+      row_count: count ?? 0,
+      filters: scoped ? scope : { all: true },
+      user_id: userData.user.id
     });
 
     return new Response(JSON.stringify({ ok: true, deleted: count ?? 0 }), {
