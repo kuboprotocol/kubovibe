@@ -1,4 +1,6 @@
+/** @type {any} */
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+
 import { useSearchParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -204,12 +206,13 @@ const PwaTelemetry = () => {
   const fetchAuditLogs = async () => {
     if (!hasAnyRole(["admin"])) return;
     const { data } = await supabase
-      .from("pwa_telemetry_clear_logs")
+      .from("pwa_telemetry_audit_logs" as any)
       .select("*, actor:actor_id(email)")
       .order("created_at", { ascending: false })
-      .limit(10);
+      .limit(20);
     setAuditLogs(data || []);
   };
+
 
   useEffect(() => {
     if (hasAnyRole(["admin"])) fetchAuditLogs();
@@ -278,6 +281,8 @@ const PwaTelemetry = () => {
   if (filters.userId)         activeChips.push({ key: "userId", label: `User: ${filters.userId.slice(0, 8)}…` });
   if (filters.sessionId)      activeChips.push({ key: "sessionId", label: `Sessão: ${filters.sessionId.slice(0, 8)}…` });
   if (filters.q)              activeChips.push({ key: "q", label: `Busca: ${filters.q}` });
+  if (filters.sigma !== 2)    activeChips.push({ key: "sigma", label: `Nσ: ${filters.sigma}` });
+
 
   return (
     <div className="container mx-auto py-10 space-y-6 animate-fade-in">
@@ -624,28 +629,38 @@ const PwaTelemetry = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Data</TableHead>
+                      <TableHead>Ação</TableHead>
                       <TableHead>Usuário</TableHead>
                       <TableHead>Filtros / Escopo</TableHead>
                       <TableHead className="text-right">Removidos</TableHead>
                     </TableRow>
+
                   </TableHeader>
                   <TableBody>
                     {auditLogs.length === 0 ? (
-                      <TableRow><TableCell colSpan={4} className="text-center py-10 text-muted-foreground">Nenhum log encontrado.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={5} className="text-center py-10 text-muted-foreground">Nenhum log encontrado.</TableCell></TableRow>
                     ) : auditLogs.map((log) => (
                       <TableRow key={log.id}>
                         <TableCell className="text-xs whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</TableCell>
+                        <TableCell>
+                          <Badge variant={log.action_type === 'clear' ? 'destructive' : 'default'} className="text-[10px] uppercase">
+                            {log.action_type}
+                          </Badge>
+                        </TableCell>
                         <TableCell className="text-xs truncate max-w-[150px]">{log.actor?.email || "Desconhecido"}</TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
-                            {Object.entries(log.filters).map(([k, v]) => (
-                              <Badge key={k} variant="secondary" className="text-[10px] py-0">{k}: {String(v)}</Badge>
+                            {Object.entries(log.filters || {}).map(([k, v]) => (
+                              v ? <Badge key={k} variant="secondary" className="text-[10px] py-0">{k}: {String(v)}</Badge> : null
                             ))}
                           </div>
                         </TableCell>
-                        <TableCell className="text-right font-mono font-bold text-destructive">{log.deleted_count}</TableCell>
+                        <TableCell className="text-right font-mono font-bold text-destructive">
+                          {log.action_type === 'clear' ? log.deleted_count : '—'}
+                        </TableCell>
                       </TableRow>
                     ))}
+
                   </TableBody>
                 </Table>
               </div>
