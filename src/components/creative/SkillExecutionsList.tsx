@@ -38,6 +38,9 @@ import {
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
+
 import {
   Select,
   SelectContent,
@@ -120,6 +123,14 @@ export function SkillExecutionsList() {
   const [importValidationResults, setImportValidationResults] = useState<{ valid: boolean, errors: string[], preview: any[] } | null>(null);
   const [mergeOption, setMergeOption] = useState<"create" | "merge">("create");
 
+  // OpenHoster/Nano Banano States
+  const [openHosterError, setOpenHosterError] = useState<{
+    message: string;
+    details?: string;
+    backend_status?: number;
+    stack?: string;
+  } | null>(null);
+
   // Export Configuration
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState<"csv" | "xlsx">("csv");
@@ -141,16 +152,29 @@ export function SkillExecutionsList() {
   ];
 
 
+
   useEffect(() => {
     fetchAvailableSkills();
     loadPresets();
 
     // Suporte para o "Nano Banano" via URL (OpenHoster)
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get("provider") === "openhoster" && urlParams.get("tool") === "nano_banano") {
+    const provider = urlParams.get("provider");
+    const tool = urlParams.get("tool");
+
+    if (provider === "openhoster" && tool === "nano_banano") {
       setSkillFilter("nano_banana");
+    } else if (provider === "openhoster" || tool === "nano_banano") {
+      // Fallback: Se um dos dois estiver presente, tenta forçar o filtro mas avisa o erro
+      setSkillFilter("nano_banana");
+      setOpenHosterError({
+        message: "Link incompleto para OpenHoster",
+        details: `Parâmetros detectados: provider=${provider || 'ausente'}, tool=${tool || 'ausente'}. O link ideal deve conter ambos.`
+      });
+      toast.warning("Link incompleto detectado. Aplicando fallback para Nano Banano.");
     }
   }, []);
+
 
 
   // Update URL params when filters change
@@ -1158,6 +1182,55 @@ ${JSON.stringify(ex.output, null, 2)}
       </Dialog>
 
       <div className="space-y-4">
+        {openHosterError && (
+          <Alert variant="destructive" className="bg-destructive/10 border-destructive/20 animate-in fade-in slide-in-from-top-4 duration-300">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle className="font-bold">Erro de Integração (OpenHoster)</AlertTitle>
+            <AlertDescription className="space-y-3">
+              <p className="text-sm font-medium">{openHosterError.message}</p>
+              {openHosterError.details && <p className="text-xs opacity-80">{openHosterError.details}</p>}
+              
+              {(openHosterError.backend_status || openHosterError.stack) && (
+                <div className="mt-4 p-3 bg-black/20 rounded-lg space-y-2 border border-destructive/10">
+                  {openHosterError.backend_status && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold uppercase opacity-60">Status Backend:</span>
+                      <Badge variant="outline" className="text-[10px] h-4 py-0 border-destructive/30 text-destructive">{openHosterError.backend_status}</Badge>
+                    </div>
+                  )}
+                  {openHosterError.stack && (
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold uppercase opacity-60">Stack Trace:</span>
+                      <pre className="text-[9px] font-mono overflow-x-auto p-2 bg-black/40 rounded border border-white/5 whitespace-pre-wrap max-h-32">
+                        {openHosterError.stack}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              <div className="flex gap-2 mt-4">
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="h-7 text-[10px] bg-background/50"
+                  onClick={() => setOpenHosterError(null)}
+                >
+                  Fechar Aviso
+                </Button>
+                <Button 
+                  size="sm" 
+                  className="h-7 text-[10px]"
+                  onClick={() => window.location.href = window.location.pathname}
+                >
+                  Limpar URL
+                </Button>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+
+
         {loading ? (
           <div className="text-center py-20">
             <Clock className="w-8 h-8 animate-spin mx-auto text-primary/40 mb-2" />
