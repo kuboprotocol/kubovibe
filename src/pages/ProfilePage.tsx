@@ -41,7 +41,7 @@ export default function ProfilePage() {
 
     if (!profileRes.error && profileRes.data) {
       setDisplayName(profileRes.data.display_name || '')
-      setAvatarUrl(profileRes.data.avatar_url)
+      // avatarUrl is provided by useAvatarUrl hook
     }
     if (refCodeRes.data) setReferralCode(refCodeRes.data as string)
     if (!referralsRes.error && referralsRes.data) {
