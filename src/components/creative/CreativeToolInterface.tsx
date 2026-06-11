@@ -395,8 +395,17 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     const filePath = `${user.id}/creative/${crypto.randomUUID()}.${extension}`;
     const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, blob);
     if (uploadError) throw uploadError;
-    const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath);
-    return publicUrl;
+    
+    // Use signed URL since avatars bucket is now private
+    const { data, error: signError } = await supabase.storage
+      .from('avatars')
+      .createSignedUrl(filePath, 60 * 60 * 24 * 365); // 1 year expiry
+    
+    if (signError || !data?.signedUrl) {
+      throw new Error("Falha ao gerar URL de acesso ao arquivo");
+    }
+    
+    return data.signedUrl;
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
