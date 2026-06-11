@@ -13,6 +13,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e": "playwright test",
+    "e2e:redirect": "playwright test e2e/redirect-loop.spec.ts",
     "e2e:ui": "playwright test --ui",
     "e2e:report": "playwright show-report",
     "preflight:rerun": "deno run --allow-net --allow-env scripts/preflight-rerun.ts",
