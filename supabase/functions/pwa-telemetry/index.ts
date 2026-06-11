@@ -295,72 +295,8 @@ Deno.serve(async (req) => {
           filters: { ...job.filters, format: job.format, mode: "background", jobId: job.id }
         });
 
-        // Start processing in "background" (Deno will keep this running for a bit)
-        (async () => {
-          try {
-            const headers = ["id", "created_at", "type", "url", "session_id", "canvas_id", "user_id"];
-            let content = exportFmt === "csv" ? headers.join(",") + "\n" : "[\n";
-            let exportedCount = 0;
-            const CHUNK_SIZE = 1000;
-            const MAX_EXPORT = 50000;
-            
-            for (let offset = 0; offset < MAX_EXPORT; offset += CHUNK_SIZE) {
-              // Check for cancellation
-              const { data: currentJob } = await admin
-                .from("pwa_telemetry_export_jobs")
-                .select("status")
-                .eq("id", job.id)
-                .single();
-              
-              if (currentJob?.status === "cancelled") {
-                console.log(`Job ${job.id} cancelled.`);
-                return;
-              }
-
-              const { data: chunk, error: chunkErr } = await query.range(offset, offset + CHUNK_SIZE - 1);
-              if (chunkErr) throw chunkErr;
-              if (!chunk || chunk.length === 0) break;
-              
-              exportedCount += chunk.length;
-              const progress = Math.min(95, Math.round((exportedCount / MAX_EXPORT) * 100));
-              
-              await admin
-                .from("pwa_telemetry_export_jobs")
-                .update({ progress })
-                .eq("id", job.id);
-
-              if (exportFmt === "csv") {
-                content += chunk.map((r: any) => headers.map((h) => csvEscape(r[h])).join(",")).join("\n") + "\n";
-              } else {
-                content += chunk.map((r: any) => JSON.stringify(r)).join(",\n") + (exportedCount < MAX_EXPORT ? ",\n" : "");
-              }
-              
-              if (chunk.length < CHUNK_SIZE) break;
-            }
-
-            if (exportFmt === "json") {
-              content = content.replace(/,\n$/, "") + "\n]";
-            }
-
-            // In a real app, we'd upload to storage. Here we'll just store the content in a result_url mock or similar
-            // For simplicity, we'll mark as completed and the UI will have to handle the data if it was smaller, 
-            // but the prompt asked for streaming/background. Let's assume we store it in a bucket.
-            // Since we don't have a bucket ready, we'll just mock it or use a simplified approach.
-            // Actually, I can just update the job with the final content if it's not too large, or just mark it.
-            
-            await admin
-              .from("pwa_telemetry_export_jobs")
-              .update({ status: "completed", progress: 100 })
-              .eq("id", job.id);
-
-          } catch (e) {
-            console.error("Background export failed:", e);
-            await admin
-              .from("pwa_telemetry_export_jobs")
-              .update({ status: "failed", error_message: String(e) })
-              .eq("id", job.id);
-          }
-        })();
+        // Start processing in background using shared helper (uploads to storage + emails on failure)
+        (async () => { await runBackgroundExport(admin, userId, job); })();
 
         return new Response(JSON.stringify({ jobId: job.id }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
