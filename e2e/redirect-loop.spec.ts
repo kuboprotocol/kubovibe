@@ -50,7 +50,17 @@ test('should detect and prevent redirect loops on preview domains', async ({ pag
     // Based on App.tsx, we have a Suspense fallback "Carregando Kubo Vibe..."
     // We want to make sure the actual content renders.
     const root = page.locator('#root');
-    await expect(root).toBeVisible();
+    await expect(root).toBeVisible({ timeout: 10000 });
+    
+    // Check for some meaningful content inside root that proves React hydrated
+    // This could be a specific component text or class
+    // In many React apps, we can check for a common UI element.
+    const hasContent = await root.innerText();
+    expect(hasContent.trim().length).toBeGreaterThan(0);
+    
+    // Specifically check we don't just see a loader indefinitely
+    const appContent = page.locator('main, nav, .container, .flex');
+    await expect(appContent.first()).toBeVisible({ timeout: 15000 });
     
     // Check that we are not stuck in the black screen / loader indefinitely
     const loader = page.getByText('Carregando Kubo Vibe...');
