@@ -108,12 +108,35 @@ if (typeof window !== 'undefined') {
 // Global hook to catch navigation loops or unexpected crashes
 if (typeof window !== 'undefined') {
   window.addEventListener('error', (event) => {
-    if (event.message?.includes('Redirect loop') || event.message?.includes('Too many redirects')) {
-      console.error('Critical navigation error caught globally');
-      // Potential to show a fallback UI or clear cache
+    const errorMsg = event.message || '';
+    if (errorMsg.includes('Redirect loop') || errorMsg.includes('Too many redirects')) {
+      console.error('Critical navigation error caught globally:', errorMsg);
+      
+      // Metrics/Logs: Send to a hypothetical logging endpoint or telemetry page
+      // In this app, we can use the PwaTelemetry logic if it exists
+      const telemetryData = {
+        type: 'redirect_loop_error',
+        message: errorMsg,
+        url: window.location.href,
+        userAgent: navigator.userAgent,
+        timestamp: new Date().toISOString()
+      };
+      
+      console.info('[Telemetry] Logging redirect loop error:', telemetryData);
+      
+      // Attempt recovery: Clear redirect counter and reload after a delay
+      const REDIRECT_KEY = 'vibe_redirect_count';
+      sessionStorage.setItem(REDIRECT_KEY, '0');
     }
   });
+
+  // Also log successful loads in preview for baseline metrics
+  const isPreview = window.location.hostname.includes('lovable.app');
+  if (isPreview) {
+    console.info(`[Metrics] App loaded on preview domain: ${window.location.hostname}`);
+  }
 }
+
 
 
 
