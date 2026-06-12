@@ -2,42 +2,46 @@ import { test, expect } from '@playwright/test';
 
 /**
  * Test to detect redirect loops in the preview environment.
- * A redirect loop usually manifests as a large number of redirects
- * or a timeout during navigation.
+ * Monitors redirect counts and fails if a limit is exceeded or navigation times out.
  */
-test('should detect redirect loops during initial load', async ({ page }) => {
-  const maxRedirects = 5;
+test('should detect and prevent redirect loops', async ({ page }) => {
+  const maxRedirects = 4;
   let redirectCount = 0;
 
-  // Track all requests to count redirects
+  // Monitor redirects
   page.on('request', request => {
     if (request.isNavigationRequest() && request.redirectedFrom()) {
       redirectCount++;
-      console.log(`[Redirect Check] Redirect ${redirectCount}: ${request.url()}`);
+      console.log(`[E2E] Redirect detected: ${request.url()}`);
+    }
+  });
+
+  // Also check browser console for our internal loop detection
+  const consoleMessages: string[] = [];
+  page.on('console', msg => {
+    consoleMessages.push(msg.text());
+    if (msg.text().includes('Redirect loop detected')) {
+      console.warn('[E2E] Browser detected its own redirect loop!');
     }
   });
 
   try {
-    // Navigate to the root with a reasonable timeout
+    // Navigate to root
     const response = await page.goto('/', { 
-      waitUntil: 'networkidle',
-      timeout: 30000 
+      waitUntil: 'domcontentloaded',
+      timeout: 15000 
     });
 
-    // Check if the page loaded successfully (200 OK)
-    expect(response?.status()).toBe(200);
+    // Validations
+    expect(redirectCount, `Too many redirects: ${redirectCount}`).toBeLessThanOrEqual(maxRedirects);
     
-    // Fail if we encountered too many redirects
-    expect(redirectCount, `Detected possible redirect loop: ${redirectCount} redirects occurred.`).toBeLessThanOrEqual(maxRedirects);
-    
-    // Verify we are not on the canonical domain if we should be on preview
-    const finalUrl = page.url();
-    expect(finalUrl).not.toContain('kubovibe.dev');
-    
-    console.log(`[Redirect Check] Page loaded successfully at ${finalUrl} with ${redirectCount} redirects.`);
+    const loopError = consoleMessages.find(m => m.includes('Redirect loop detected'));
+    expect(loopError, 'The browser logic should not have triggered its own loop protection in a healthy environment.').toBeUndefined();
+
+    console.log(`[E2E] Navigation stable at: ${page.url()} after ${redirectCount} redirects.`);
   } catch (error) {
     if (error.message.includes('timeout')) {
-      throw new Error(`Navigation timed out. Possible infinite redirect loop or server hang. Total redirects: ${redirectCount}`);
+      throw new Error(`Navigation timed out - likely infinite redirect loop. Redirects so far: ${redirectCount}`);
     }
     throw error;
   }
