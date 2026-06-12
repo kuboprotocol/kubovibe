@@ -73,16 +73,28 @@ const queryClient = new QueryClient({
 });
 
 // Canonical-domain redirect
+// Redirect logic moved to a separate safety check to prevent loops
 if (typeof window !== 'undefined') {
   const host = window.location.hostname
-  const previewHost = 'preview--kubo-secure-ai.lovable.app'
+  const searchParams = new URLSearchParams(window.location.search)
   const isLovableApp = /(^|\.)lovable\.app$/i.test(host)
   
-  if (host === previewHost || host.includes('lovableproject.com') || host === 'localhost' || host === '127.0.0.1') {
-    // Already on the preview domain or local
-  } else if (isLovableApp && !host.startsWith('id-preview--')) {
+  // Track redirect history in sessionStorage to catch client-side loops
+  const REDIRECT_KEY = 'vibe_redirect_count'
+  const redirectCount = parseInt(sessionStorage.getItem(REDIRECT_KEY) || '0', 10)
+  
+  if (redirectCount > 3) {
+    console.error('Redirect loop detected. Stopping redirects.')
+    sessionStorage.removeItem(REDIRECT_KEY)
+  } else if (host === 'localhost' || host === '127.0.0.1' || host.includes('lovableproject.com')) {
+    // Development or internal domains - no redirect
+  } else if (isLovableApp && !host.startsWith('id-preview--') && !host.startsWith('preview--')) {
+    sessionStorage.setItem(REDIRECT_KEY, (redirectCount + 1).toString())
     const target = `https://kubovibe.dev${window.location.pathname}${window.location.search}${window.location.hash}`
     window.location.replace(target)
+  } else {
+    // If we've landed safely, clear the redirect counter
+    sessionStorage.removeItem(REDIRECT_KEY)
   }
 }
 
