@@ -91,17 +91,15 @@ if (typeof window !== 'undefined') {
     host === '127.0.0.1' || 
     host.includes('lovableproject.com') ||
     host.includes('lovable.app') ||
-    host === 'kubovibe.dev'
+    host === 'kubovibe.dev' ||
+    host === 'www.kubovibe.dev'
   ) {
-    // Development, internal domains, or canonical domain - no redirect
+    // Development, internal domains, or canonical domains - no redirect
     sessionStorage.removeItem(REDIRECT_KEY)
-  } else if (isLovableApp && !host.startsWith('id-preview--') && !host.startsWith('preview--')) {
+  } else {
     sessionStorage.setItem(REDIRECT_KEY, (redirectCount + 1).toString())
     const target = `https://kubovibe.dev${window.location.pathname}${window.location.search}${window.location.hash}`
     window.location.replace(target)
-  } else {
-    // If we've landed safely, clear the redirect counter
-    sessionStorage.removeItem(REDIRECT_KEY)
   }
 }
 
