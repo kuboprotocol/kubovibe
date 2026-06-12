@@ -34,6 +34,12 @@ test('should detect and prevent redirect loops on preview domains', async ({ pag
       timeout: 30000 
     });
 
+    // Check if we hit a known error page or blank page
+    const title = await page.title();
+    console.log(`[E2E] Page title: "${title}" at URL: ${page.url()}`);
+    
+    expect(response?.status(), `Page returned status ${response?.status()}`).toBeLessThan(400);
+
     // Validations
     expect(redirectCount, `Too many redirects: ${redirectCount}`).toBeLessThanOrEqual(maxRedirects);
     
