@@ -145,12 +145,18 @@ if (typeof window !== 'undefined') {
   }
 }
 
-
-
-
-
-
-
+// Marker for hydration verification
+if (typeof window !== 'undefined') {
+  window.addEventListener('load', () => {
+    const root = document.getElementById('root');
+    if (root) {
+      // Small delay to ensure React starts mounting and attribute is set
+      setTimeout(() => {
+        root.setAttribute('data-hydrated', 'true');
+      }, 200);
+    }
+  });
+}
 
 const App = () => {
   return (

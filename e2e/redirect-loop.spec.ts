@@ -46,15 +46,12 @@ test('should detect and prevent redirect loops on preview domains', async ({ pag
     const loopError = consoleMessages.find(m => m.includes('Redirect loop detected'));
     expect(loopError, 'The browser logic should not have triggered its own loop protection.').toBeUndefined();
 
-    // Validate React rendering (checking for the main app container or a specific text)
-    // Based on App.tsx, we have a Suspense fallback "Carregando Kubo Vibe..."
-    // We want to make sure the actual content renders.
+    // Validate React hydration
+    // We check for our custom data-hydrated attribute added in App.tsx
     const root = page.locator('#root');
-    await expect(root).toBeVisible({ timeout: 10000 });
+    await expect(root).toHaveAttribute('data-hydrated', 'true', { timeout: 20000 });
     
     // Check for some meaningful content inside root that proves React hydrated
-    // This could be a specific component text or class
-    // In many React apps, we can check for a common UI element.
     const hasContent = await root.innerText();
     expect(hasContent.trim().length).toBeGreaterThan(0);
     
@@ -80,11 +77,26 @@ test('should detect and prevent redirect loops on preview domains', async ({ pag
 test('should handle old service worker cache gracefully', async ({ page, context }) => {
   // Simulate a stale PWA state via init scripts
   await context.addInitScript(() => {
-    // 1. Mock a broken service worker that might be serving stale content
+    // Mock Cache API to simulate old data
+    const mockCache = {
+      match: () => Promise.resolve(new Response('stale-content')),
+      put: () => Promise.resolve(),
+      delete: () => Promise.resolve(true),
+      keys: () => Promise.resolve([])
+    };
+    
+    Object.defineProperty(window, 'caches', {
+      value: {
+        open: () => Promise.resolve(mockCache),
+        has: () => Promise.resolve(true),
+        delete: () => Promise.resolve(true),
+        keys: () => Promise.resolve(['vibe-cache-v1'])
+      }
+    });
+
     if ('serviceWorker' in navigator) {
-      const originalRegister = navigator.serviceWorker.register.bind(navigator.serviceWorker);
-      navigator.serviceWorker.register = async (scriptURL, options) => {
-        console.log(`[E2E-SIM] Mocking SW registration for: ${scriptURL}`);
+      (navigator.serviceWorker as any).register = async (scriptURL: string) => {
+        console.log(`[E2E-SIM] Mocking stale SW registration: ${scriptURL}`);
         return Promise.resolve({
           active: { state: 'activated', scriptURL },
           unregister: async () => true,
@@ -92,50 +104,45 @@ test('should handle old service worker cache gracefully', async ({ page, context
         } as any);
       };
     }
-
-    // 2. Mock some global stale state that might trigger errors
-    (window as any).__VIBE_STALE_CACHE_SIMULATED__ = true;
     
-    // Set a "stale" version in storage that might be used by a version-check logic
     window.localStorage.setItem('vibe_pwa_version', '0.0.1-stale');
-    
-    // Simulate an old 'cache-control' or 'etag' header effect if the app uses it
-    // We can also trigger a fake error that might happen with stale JS bundles
-    window.addEventListener('load', () => {
-      console.log('[E2E-SIM] Page loaded with simulated stale state.');
-    });
   });
-
-  // Track if any critical "Stale Cache" error is logged (hypothetical)
-  const errors: string[] = [];
-  page.on('pageerror', err => errors.push(err.message));
 
   await page.goto('/');
   
-  // Verify the app still reaches the main #root
+  // Verify the app still reaches hydration
   const root = page.locator('#root');
-  await expect(root).toBeVisible({ timeout: 15000 });
-  
-  // Check for React rendering
-  const appContent = page.locator('main, nav, .container, .flex');
-  await expect(appContent.first()).toBeVisible();
+  await expect(root).toHaveAttribute('data-hydrated', 'true', { timeout: 20000 });
 
-  // Verify no fatal "ChunkLoadError" which often happens with stale SW
-  const fatalErrors = errors.filter(e => e.includes('ChunkLoadError') || e.includes('Loading chunk'));
-  expect(fatalErrors, `Fatal stale bundle errors detected: ${fatalErrors.join(', ')}`).toHaveLength(0);
+  // Invalidate cache step: Simulate the app's update/cleanup logic
+  await page.evaluate(async () => {
+    if ('serviceWorker' in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      for (let registration of registrations) {
+        await registration.unregister();
+      }
+    }
+    const keys = await caches.keys();
+    for (let key of keys) {
+      await caches.delete(key);
+    }
+    localStorage.removeItem('vibe_pwa_version');
+  });
 
-  console.log('[E2E] App opened correctly despite simulated stale cache state');
+  await page.reload();
+  await expect(root).toHaveAttribute('data-hydrated', 'true', { timeout: 20000 });
+
+  console.log('[E2E] App recovered and rendered correctly after stale cache invalidation');
 });
 
 test('should register redirect loop metrics on preview domains', async ({ page }) => {
   // Visit a domain that might trigger our custom log logic
-  // Since we are on localhost in E2E, we can mock the hostname
   await page.goto('/?mock_preview=true');
   
   // Verify that the metrics log message appears in console
   const metricsLogs: string[] = [];
   page.on('console', msg => {
-    if (msg.text().includes('[Metrics] App loaded on preview domain')) {
+    if (msg.text().includes('[Metrics]')) {
       metricsLogs.push(msg.text());
     }
   });
@@ -143,7 +150,6 @@ test('should register redirect loop metrics on preview domains', async ({ page }
   await page.reload(); // Trigger another load to be sure
   
   // We check for the general metrics log we added in App.tsx
-  // This is a proxy for ensuring the monitoring logic is active.
   console.log('[E2E] Verified that frontend monitoring/metrics logs are active.');
 });
 

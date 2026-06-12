@@ -37,10 +37,12 @@ jobs:
           echo "Testing URL: $BASE_URL on ${{ matrix.browser }}"
           PLAYWRIGHT_TEST_BASE_URL=$BASE_URL bun run e2e:redirect --project=${{ matrix.browser }}
 
-      - name: Upload Test Results
+      - name: Upload Test Artifacts (Screenshots/Videos/Traces)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report-${{ matrix.browser }}
-          path: playwright-report/
-          retention-days: 30
+          name: e2e-artifacts-${{ matrix.browser }}-${{ github.run_id }}
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 7
