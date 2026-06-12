@@ -13,6 +13,9 @@ jobs:
   redirect-check:
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'deployment_status' && github.event.deployment_status.state == 'success')
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        browser: [chromium, firefox]
     steps:
       - uses: actions/checkout@v4
       
@@ -25,16 +28,19 @@ jobs:
         run: bun install
 
       - name: Install Playwright Browsers
-        run: bunx playwright install --with-deps chromium
+        run: bunx playwright install --with-deps ${{ matrix.browser }}
 
       - name: Run Redirect Loop E2E Test
         env:
-          # Set the target URL for the test
-          # If triggered by deployment_status, use the deployment URL
-          # If triggered manually, use the input URL
-          # Fallback to kubovibe-main.lovable.app
           BASE_URL: ${{ github.event.deployment_status.target_url || github.event.inputs.target_url || 'https://kubovibe-main.lovable.app' }}
         run: |
-          echo "Testing URL: $BASE_URL"
-          # We use a custom base URL for the E2E test
-          PLAYWRIGHT_TEST_BASE_URL=$BASE_URL bun run e2e:redirect
+          echo "Testing URL: $BASE_URL on ${{ matrix.browser }}"
+          PLAYWRIGHT_TEST_BASE_URL=$BASE_URL bun run e2e:redirect --project=${{ matrix.browser }}
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ matrix.browser }}
+          path: playwright-report/
+          retention-days: 30
