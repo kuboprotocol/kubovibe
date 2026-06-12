@@ -98,6 +98,16 @@ if (typeof window !== 'undefined') {
   }
 }
 
+// Global hook to catch navigation loops or unexpected crashes
+if (typeof window !== 'undefined') {
+  window.addEventListener('error', (event) => {
+    if (event.message?.includes('Redirect loop') || event.message?.includes('Too many redirects')) {
+      console.error('Critical navigation error caught globally');
+      // Potential to show a fallback UI or clear cache
+    }
+  });
+}
+
 
 
 
