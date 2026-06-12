@@ -1,4 +1,6 @@
 import { test, expect, describe, vi, beforeEach, afterEach } from 'vitest';
+import { setupEnv } from './test-setup'; // Hypothetical setup if needed, but let's try direct fix
+
 
 // Helper to mock window.location
 const mockLocation = (hostname: string) => {
