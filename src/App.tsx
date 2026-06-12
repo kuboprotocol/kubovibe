@@ -131,9 +131,17 @@ if (typeof window !== 'undefined') {
   });
 
   // Also log successful loads in preview for baseline metrics
-  const isPreview = window.location.hostname.includes('lovable.app');
+  const isPreview = window.location.hostname.includes('lovable.app') || window.location.search.includes('mock_preview=true');
   if (isPreview) {
     console.info(`[Metrics] App loaded on preview domain: ${window.location.hostname}`);
+    
+    // Check if we recovered from a loop recently
+    const REDIRECT_KEY = 'vibe_redirect_count';
+    const lastCount = sessionStorage.getItem(REDIRECT_KEY);
+    if (lastCount && parseInt(lastCount, 10) > 0) {
+      console.warn(`[Metrics] App recovered after ${lastCount} redirect attempts.`);
+      sessionStorage.removeItem(REDIRECT_KEY);
+    }
   }
 }
 
