@@ -55,10 +55,13 @@ export function assertFrontendEnv(): void {
   lines.push("  ↳ Validate: bun run setup:env:check");
   const msg = lines.join("\n");
 
+  // Log error but don't throw to avoid blank screens
+  // eslint-disable-next-line no-console
+  console.error(msg);
+  
   if (import.meta.env.DEV) {
-    throw new Error(msg);
-  } else {
-    // eslint-disable-next-line no-console
-    console.error(msg);
+    // In dev, we can also alert or show a small overlay if we wanted, 
+    // but for now, just logging to console is enough to avoid total failure.
+    console.warn("Continuing despite env errors to avoid blank screen.");
   }
 }

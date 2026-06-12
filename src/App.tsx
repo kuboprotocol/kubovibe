@@ -86,8 +86,15 @@ if (typeof window !== 'undefined') {
   if (redirectCount > 3) {
     console.error('Redirect loop detected. Stopping redirects.')
     sessionStorage.removeItem(REDIRECT_KEY)
-  } else if (host === 'localhost' || host === '127.0.0.1' || host.includes('lovableproject.com')) {
-    // Development or internal domains - no redirect
+  } else if (
+    host === 'localhost' || 
+    host === '127.0.0.1' || 
+    host.includes('lovableproject.com') ||
+    host.includes('lovable.app') ||
+    host === 'kubovibe.dev'
+  ) {
+    // Development, internal domains, or canonical domain - no redirect
+    sessionStorage.removeItem(REDIRECT_KEY)
   } else if (isLovableApp && !host.startsWith('id-preview--') && !host.startsWith('preview--')) {
     sessionStorage.setItem(REDIRECT_KEY, (redirectCount + 1).toString())
     const target = `https://kubovibe.dev${window.location.pathname}${window.location.search}${window.location.hash}`
