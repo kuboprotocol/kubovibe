@@ -1,138 +1,209 @@
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react-swc";
-import path from "path";
-import { componentTagger } from "lovable-tagger";
-import { envCheckPlugin } from "./vite-plugins/env-check";
-import { VitePWA } from "vite-plugin-pwa";
+import { defineConfig, loadEnv } from 'vite';
+import react from '@vitejs/plugin-react-swc';
+import { VitePWA } from 'vite-plugin-pwa';
+import compression from 'vite-plugin-compression';
+import { visualizer } from 'rollup-plugin-visualizer';
+import { componentTagger } from 'lovable-tagger';
+import { envCheckPlugin } from './vite-plugins/env-check';
+import path from 'path';
 
-// https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
-  server: {
-    host: "::",
-    port: 8080,
-    hmr: {
-      overlay: false,
-    },
-  },
-  plugins: [
-    envCheckPlugin(),
-    react(),
-    mode === "development" && componentTagger(),
-    VitePWA({
-      registerType: "autoUpdate",
-      includeAssets: ["favicon.ico", "apple-touch-icon.png", "mask-icon.svg", "placeholders/*"],
-      workbox: {
-        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
-        globPatterns: [
-          'index.html',
-          'assets/index-*.css',
-          'assets/index-*.js',
-          'assets/vendor-react-*.js',
-          'assets/vendor-core-*.js',
-          'placeholders/*.svg'
-        ],
-        globIgnores: [
-          '**/vendor-tldraw-*.js',
-          '**/vendor-exports-*.js',
-          '**/vendor-BImbtvlH.js',
-          '**/*.map'
-        ],
-        runtimeCaching: [
-          {
-            urlPattern: /\.(?:js|css)$/,
-            handler: 'StaleWhileRevalidate',
-            options: {
-              cacheName: 'static-resources-runtime',
-              expiration: {
-                maxEntries: 60,
-                maxAgeSeconds: 30 * 24 * 60 * 60,
-              },
-            },
-          },
-          {
-            urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp)$/,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'images-cache',
-              expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 24 * 60 * 60,
-              },
-              cacheableResponse: {
-                statuses: [0, 200]
-              }
-            },
-          },
-          {
-            urlPattern: /\.(?:woff|woff2|ttf|otf)$/,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'fonts-cache',
-              expiration: {
-                maxEntries: 10,
-                maxAgeSeconds: 365 * 24 * 60 * 60,
-              },
-            },
-          },
-          {
-            urlPattern: ({ request }) => request.mode === 'navigate',
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'pages-cache',
-              networkTimeoutSeconds: 3,
-              expiration: {
-                maxEntries: 30,
-              },
-            },
-          }
-        ],
-        // Manual offline fallback for images
-        offlineGoogleAnalytics: true,
+export default defineConfig(({ command, mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+  const isDev = command === 'serve';
+  const isProd = !isDev && mode === 'production';
+
+  return {
+    server: {
+      host: '::',
+      port: 8080,
+      strictPort: false,
+      cors: { origin: '*' },
+      hmr: { overlay: true },
+      proxy: {
+        '/api': {
+          target: env.VITE_API_URL || 'http://localhost:3000',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api/, ''),
+          ws: true,
+        },
       },
-      manifest: {
-        name: "Kubo Vibe",
-        short_name: "KuboVibe",
-        description: "Plataforma Criativa com IA",
-        theme_color: "#ffffff",
-        icons: [
-          {
-            src: "pwa-192x192.png",
-            sizes: "192x192",
-            type: "image/png",
-          },
-          {
-            src: "pwa-512x512.png",
-            sizes: "512x512",
-            type: "image/png",
-          },
-        ],
-      },
-    }),
-  ].filter(Boolean),
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
     },
-  },
-  build: {
-    chunkSizeWarningLimit: 1200,
-    rollupOptions: {
-      output: {
-        manualChunks(id) {
-          if (id.includes('node_modules')) {
-            if (id.includes('three')) return 'vendor-three';
-            if (id.includes('tldraw')) return 'vendor-tldraw';
-            if (id.includes('recharts')) return 'vendor-recharts';
-            if (id.includes('lucide-react')) return 'vendor-lucide';
-            if (id.includes('@radix-ui')) return 'vendor-radix';
-            if (id.includes('framer-motion')) return 'vendor-framer';
-            if (id.includes('jspdf') || id.includes('jszip') || id.includes('xlsx')) return 'vendor-exports';
-            if (id.includes('@supabase') || id.includes('@tanstack/react-query')) return 'vendor-core';
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) return 'vendor-react';
-            return 'vendor';
-          }
-        }
-      }
-    }
-  }
-}));
+    preview: {
+      port: 4173,
+      strictPort: false,
+    },
+    plugins: [
+      envCheckPlugin(),
+      react({ devTarget: 'es2020', productionTarget: 'es2020' }),
+      isDev && componentTagger(),
+      compression({ algorithm: 'brotli', threshold: 1024 * 10 }),
+      compression({ algorithm: 'gzip', threshold: 1024 * 10 }),
+      VitePWA({
+        registerType: 'autoUpdate',
+        includeAssets: [
+          'favicon.ico',
+          'apple-touch-icon.png',
+          'mask-icon.svg',
+          'placeholders/*',
+          'fonts/**/*.woff2',
+          'game/**/*.webp',
+        ],
+        workbox: {
+          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+          globPatterns: [
+            'index.html',
+            'assets/index-*.css',
+            'assets/index-*.js',
+            'assets/vendor-*.js',
+            'placeholders/*.svg',
+            'game/**/*.{json,webp}',
+          ],
+          globIgnores: ['**/*.map', '**/vendor-tldraw-*.js'],
+          runtimeCaching: [
+            {
+              urlPattern: /^https:\/\/(api\.kubovibe\.dev|cdn\.jsdelivr\.net)\/.*/i,
+              handler: 'NetworkFirst',
+              options: {
+                cacheName: 'api-runtime',
+                networkTimeoutSeconds: 5,
+                expiration: { maxEntries: 50, maxAgeSeconds: 86400 },
+              },
+            },
+            {
+              urlPattern: /\.(?:js|css)$/,
+              handler: 'StaleWhileRevalidate',
+              options: {
+                cacheName: 'static-resources',
+                expiration: { maxEntries: 60, maxAgeSeconds: 30 * 24 * 60 * 60 },
+              },
+            },
+            {
+              urlPattern: /\.(?:glb|gltf|webp|png|jpg|webm)$/,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'game-assets',
+                expiration: { maxEntries: 200, maxAgeSeconds: 365 * 24 * 60 * 60 },
+              },
+            },
+            {
+              urlPattern: /\.(?:woff|woff2|ttf|otf)$/,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'fonts-cache',
+                expiration: { maxEntries: 10, maxAgeSeconds: 365 * 24 * 60 * 60 },
+              },
+            },
+            {
+              urlPattern: ({ request }) => request.mode === 'navigate',
+              handler: 'NetworkFirst',
+              options: {
+                cacheName: 'pages-cache',
+                networkTimeoutSeconds: 3,
+                expiration: { maxEntries: 30 },
+              },
+            },
+          ],
+        },
+        manifest: {
+          name: 'Kubo Vibe - AI-Powered Digital Creation',
+          short_name: 'KuboVibe',
+          description: 'Create SaaS, dApps, Games & Metaverses with AI',
+          theme_color: '#000000',
+          background_color: '#ffffff',
+          display: 'standalone',
+          orientation: 'portrait-primary',
+          start_url: '/',
+          scope: '/',
+          categories: ['productivity', 'games'],
+          icons: [
+            {
+              src: 'pwa-192x192.png',
+              sizes: '192x192',
+              type: 'image/png',
+              purpose: 'any',
+            },
+            {
+              src: 'pwa-512x512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'any maskable',
+            },
+          ],
+        },
+      }),
+      isProd &&
+        visualizer({
+          open: false,
+          file: 'dist/stats.html',
+          template: 'treemap',
+          gzipSize: true,
+          brotliSize: true,
+        }),
+    ].filter(Boolean),
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, './src'),
+        '@components': path.resolve(__dirname, './src/components'),
+        '@hooks': path.resolve(__dirname, './src/hooks'),
+        '@types': path.resolve(__dirname, './src/types'),
+        '@game': path.resolve(__dirname, './src/game'),
+        '@game/engines': path.resolve(__dirname, './src/game/engines'),
+        '@game/physics': path.resolve(__dirname, './src/game/physics'),
+        '@game/rendering': path.resolve(__dirname, './src/game/rendering'),
+      },
+    },
+    build: {
+      target: 'es2020',
+      outDir: 'dist',
+      assetsDir: 'assets',
+      assetsInlineLimit: 4096,
+      cssCodeSplit: true,
+      cssMinify: 'lightningcss',
+      sourcemap: !isProd,
+      minify: 'terser',
+      terserOptions: {
+        compress: { drop_console: isProd, drop_debugger: isProd, passes: 3 },
+        mangle: { properties: { regex: /^_/ } },
+      },
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+            'vendor-ui': [
+              '@radix-ui/react-dialog',
+              '@radix-ui/react-dropdown-menu',
+              '@radix-ui/react-popover',
+              '@radix-ui/react-tabs',
+              '@radix-ui/react-tooltip',
+            ],
+            'vendor-three': ['three'],
+            'vendor-babylon': ['babylon.js'],
+            'vendor-physics': ['cannon-es', 'p2', 'oimo'],
+            'vendor-graphics': ['pixi.js', 'three-mesh-ui', 'gsap'],
+            'vendor-web3': ['@supabase/supabase-js', '@tanstack/react-query'],
+            'vendor-exports': ['jspdf', 'jszip', 'xlsx'],
+            'vendor-framer': ['framer-motion'],
+            'vendor-charts': ['recharts'],
+            'vendor-icons': ['lucide-react'],
+          },
+          entryFileNames: 'js/[name]-[hash].js',
+          chunkFileNames: 'js/[name]-[hash].js',
+          assetFileNames: 'assets/[name]-[hash].[ext]',
+        },
+      },
+      chunkSizeWarningLimit: 1000,
+      emptyOutDir: true,
+      reportCompressedSize: true,
+    },
+    optimizeDeps: {
+      include: [
+        'react',
+        'react-dom',
+        'react-router-dom',
+        '@supabase/supabase-js',
+        'framer-motion',
+      ],
+      exclude: ['@capacitor/core'],
+    },
+  };
+});
