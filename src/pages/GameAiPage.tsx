@@ -10,6 +10,8 @@ import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import * as THREE from 'three';
+import { EDITOR_STORAGE_KEY, type SerializedScene, type SerializedEntity } from '@/game/editor/sceneIO';
+
 
 interface Entity {
   kind: 'player' | 'npc' | 'enemy' | 'prop' | 'portal';
