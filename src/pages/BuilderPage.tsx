@@ -227,7 +227,7 @@ export default function BuilderPage() {
             finalMessages = updated; return updated
           })
           const html = extractHtml(assistantSoFar)
-          if (html.includes('<') && !showLoading) setGeneratedCode(html)
+          queuePreviewHtml(html)
         }
 
         const detectedMode = autoDetectMode(initialPrompt)
@@ -237,7 +237,7 @@ export default function BuilderPage() {
           messages: [userMsg],
           mode: detectedMode,
           onDelta: (chunk) => upsertAssistant(chunk),
-          onDone: () => { setIsLoading(false); const html = extractHtml(assistantSoFar); if (html.includes('<')) saveProject(html, finalMessages) },
+          onDone: () => { const html = extractHtml(assistantSoFar); queuePreviewHtml(html); setIsLoading(false); if (html.includes('<')) saveProject(html, finalMessages) },
           onError: (error) => { toast.error(error); setIsLoading(false) },
         }).catch((e) => { console.error(e); toast.error('Failed to generate'); setIsLoading(false) })
 
@@ -328,7 +328,7 @@ export default function BuilderPage() {
         finalMessages = updated; return updated
       })
       const html = extractHtml(assistantSoFar)
-      if (html.includes('<') && !showLoading) setGeneratedCode(html)
+      queuePreviewHtml(html)
     }
 
     try {
@@ -336,7 +336,7 @@ export default function BuilderPage() {
         messages: newMessages,
         mode: flowMode,
         onDelta: (chunk) => upsertAssistant(chunk),
-        onDone: () => { setIsLoading(false); const html = extractHtml(assistantSoFar); if (html.includes('<')) saveProject(html, finalMessages) },
+        onDone: () => { const html = extractHtml(assistantSoFar); queuePreviewHtml(html); setIsLoading(false); if (html.includes('<')) saveProject(html, finalMessages) },
         onError: (error) => { toast.error(error); setIsLoading(false) },
       })
     } catch (e) { console.error(e); toast.error('Failed to generate'); setIsLoading(false) }
@@ -389,7 +389,7 @@ export default function BuilderPage() {
         finalMessages = updated; return updated
       })
       const html = extractHtml(assistantSoFar)
-      if (html.includes('<') && !showLoading) setGeneratedCode(html)
+      queuePreviewHtml(html)
     }
 
     try {
@@ -397,9 +397,10 @@ export default function BuilderPage() {
         url,
         onDelta: (chunk) => upsertAssistant(chunk),
         onDone: () => {
+          const html = extractHtml(assistantSoFar)
+          queuePreviewHtml(html)
           setIsLoading(false)
           setIsCloning(false)
-          const html = extractHtml(assistantSoFar)
           if (html.includes('<')) saveProject(html, finalMessages)
           toast.success('Site cloned successfully! 🎉')
         },
