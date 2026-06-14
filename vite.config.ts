@@ -163,7 +163,7 @@ export default defineConfig(({ command, mode }) => {
               '@radix-ui/react-tooltip',
             ],
             'vendor-three': ['three'],
-            'vendor-babylon': ['babylon.js'],
+            'vendor-babylon': ['@babylonjs/core'],
             'vendor-physics': ['cannon-es', 'p2', 'oimo'],
             'vendor-graphics': ['pixi.js', 'three-mesh-ui', 'gsap'],
             'vendor-web3': ['@supabase/supabase-js', '@tanstack/react-query'],
