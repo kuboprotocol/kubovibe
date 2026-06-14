@@ -67,6 +67,7 @@ export default function BuilderPage() {
   }, [deviceFrame, landscape])
   const [previewLogs, setPreviewLogs] = useState<PreviewLogEntry[]>([])
   const [previewKey, setPreviewKey] = useState(0)
+  const previewId = `builder:${currentProjectId ?? 'draft'}`
   // Subscribe to runtime errors / console messages from the iframe
   useEffect(() => {
     return subscribePreviewLogs((entry) => {
@@ -74,10 +75,10 @@ export default function BuilderPage() {
         const next = [...prev, entry]
         return next.length > 500 ? next.slice(-500) : next
       })
-    })
-  }, [])
+    }, { previewId })
+  }, [previewId])
   // Reset logs whenever the preview is reloaded or the code changes
-  useEffect(() => { setPreviewLogs([]) }, [previewKey, generatedCode])
+  useEffect(() => { setPreviewLogs([]) }, [previewKey, currentProjectId])
   const [attachedFiles, setAttachedFiles] = useState<UploadedFile[]>([])
   const [uploadProgress, setUploadProgress] = useState<number | null>(null)
   const [isPublished, setIsPublished] = useState(false)
@@ -211,7 +212,7 @@ export default function BuilderPage() {
             finalMessages = updated; return updated
           })
           const html = extractHtml(assistantSoFar)
-          if (html.includes('<')) setGeneratedCode(html)
+          if (html.includes('<') && !showLoading) setGeneratedCode(html)
         }
 
         const detectedMode = autoDetectMode(initialPrompt)
@@ -312,7 +313,7 @@ export default function BuilderPage() {
         finalMessages = updated; return updated
       })
       const html = extractHtml(assistantSoFar)
-      if (html.includes('<')) setGeneratedCode(html)
+      if (html.includes('<') && !showLoading) setGeneratedCode(html)
     }
 
     try {
@@ -373,7 +374,7 @@ export default function BuilderPage() {
         finalMessages = updated; return updated
       })
       const html = extractHtml(assistantSoFar)
-      if (html.includes('<')) setGeneratedCode(html)
+      if (html.includes('<') && !showLoading) setGeneratedCode(html)
     }
 
     try {
@@ -626,6 +627,7 @@ export default function BuilderPage() {
                     deviceFrame={deviceFrame}
                     landscape={landscape}
                     previewKey={previewKey}
+                    previewId={previewId}
                     onRefresh={() => setPreviewKey(k => k + 1)}
                     publishedUrl={publishedUrl}
                     projectTitle={projectTitle}
