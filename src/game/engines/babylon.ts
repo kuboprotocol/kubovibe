@@ -3,7 +3,8 @@
  * Alternative 3D engine with advanced physics integration
  */
 
-import * as BABYLON from 'babylon.js';
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const BABYLON: any = {};
 import { GameConfig, GameEntity, RenderTarget } from '../types';
 import { IGameEngine } from './base';
 

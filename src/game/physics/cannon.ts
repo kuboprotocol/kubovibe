@@ -67,8 +67,7 @@ export class CannonPhysicsEngine implements IPhysicsEngine {
     const cannonBody = new CANNON.Body({
       mass: body.mass,
       shape,
-      friction: body.friction,
-      restitution: body.restitution,
+      material: new CANNON.Material({ friction: body.friction, restitution: body.restitution }),
     });
 
     if (body.linearVelocity) {
