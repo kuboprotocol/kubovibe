@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Sparkles, Send, Edit3, Gamepad2, Swords, Globe, Package } from 'lucide-react';
+import { ArrowLeft, Sparkles, Send, Edit3, Gamepad2, Swords, Globe, Package, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -173,6 +173,7 @@ export default function GamePage() {
             <Link to="/game/rpg"><Button size="sm" variant="ghost" className="gap-1"><Swords className="w-3.5 h-3.5" />RPG</Button></Link>
             <Link to="/game/metaverse"><Button size="sm" variant="ghost" className="gap-1"><Globe className="w-3.5 h-3.5" />Metaverse</Button></Link>
             <Link to="/game/sdk"><Button size="sm" variant="ghost" className="gap-1"><Package className="w-3.5 h-3.5" />SDK</Button></Link>
+            <Link to="/game/vr"><Button size="sm" variant="default" className="gap-1"><Eye className="w-3.5 h-3.5" />VR</Button></Link>
             <Badge className="neon-ring">SEED {seed}</Badge>
             <Button size="sm" variant="outline" onClick={() => setSeed(Math.floor(Math.random() * 10000))}>
               New world

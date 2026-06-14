@@ -25,8 +25,9 @@
 import * as retro from '@/game/retro';
 import * as rpg from '@/game/rpg';
 import * as metaverse from '@/game/metaverse';
+import * as vr from '@/game/vr';
 
-export { retro, rpg, metaverse };
+export { retro, rpg, metaverse, vr };
 
 export const VERSION = '1.0.0';
 
