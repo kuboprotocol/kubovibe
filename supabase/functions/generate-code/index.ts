@@ -180,6 +180,25 @@ serve(async (req) => {
 
     console.log("User authenticated:", data.user.id);
 
+    // Rate limiting: 30 requests / minute / user to prevent AI quota abuse
+    try {
+      const admin = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      );
+      const { data: rl } = await admin.rpc("bump_rate_limit", {
+        _bucket: "generate_code",
+        _user: data.user.id,
+        _window_seconds: 60,
+      });
+      if (typeof rl === "number" && rl > 30) {
+        return jsonResponse(429, "Rate limit exceeded. Try again shortly.");
+      }
+    } catch (rlErr) {
+      console.warn("rate-limit check failed:", rlErr);
+    }
+
+
     const body = await req.json();
     const rawMessages = body?.messages;
     const mode = body?.mode || "flow";
