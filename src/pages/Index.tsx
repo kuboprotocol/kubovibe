@@ -125,6 +125,14 @@ const Index = () => {
               >
                 GitHub
               </a>
+              <a
+                href="https://open.spotify.com/intl-pt/track/4T0fiAFOJU8d7fGC0DcMH0?si=ac6a7ed6a30a4c90"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-foreground transition-colors"
+              >
+                Spotify
+              </a>
             </div>
           </div>
           <div className="border-t border-border pt-6">
