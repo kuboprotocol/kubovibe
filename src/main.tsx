@@ -3,7 +3,7 @@ import App from "./App.tsx";
 import "./index.css";
 import { assertFrontendEnv } from "./lib/envCheck";
 import { toast } from "sonner";
-import { saveTelemetryEvent } from "./utils/pwaTelemetry";
+import { clearTelemetry, getTelemetryEvents, saveTelemetryEvent } from "./utils/pwaTelemetry";
 
 assertFrontendEnv();
 
@@ -24,7 +24,6 @@ window.fetch = async (...args) => {
       });
     }
 
-    const { getTelemetryEvents, clearTelemetry } = await import("./utils/pwaTelemetry");
     const events = getTelemetryEvents();
     
     if (config?.method === 'DELETE') {
