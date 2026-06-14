@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowLeft, Sparkles, Wand2, Loader2, Gamepad2, Send } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ArrowLeft, Sparkles, Wand2, Loader2, Gamepad2, Send, Rocket, Download } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
