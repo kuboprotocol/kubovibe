@@ -85,6 +85,9 @@ export default function DashboardPage() {
             <img src={logoImg} alt="KUBO VIBE" className="h-7" />
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={() => navigate('/docs')} className="rounded-xl gap-2 text-muted-foreground hover:text-foreground">
+              <BookOpen className="h-4 w-4" /> Docs
+            </Button>
             <Button variant="ghost" size="sm" onClick={() => navigate('/pwa/telemetry')} className="rounded-xl gap-2 text-muted-foreground hover:text-foreground">
               <BarChart3 className="h-4 w-4" /> PWA Audit
             </Button>
