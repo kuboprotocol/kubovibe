@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Sparkles, Send } from 'lucide-react';
+import { ArrowLeft, Sparkles, Send, Edit3, Gamepad2, Swords, Globe, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -167,10 +167,15 @@ export default function GamePage() {
               </h1>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <Link to="/game/editor"><Button size="sm" variant="ghost" className="gap-1"><Edit3 className="w-3.5 h-3.5" />Editor</Button></Link>
+            <Link to="/game/retro"><Button size="sm" variant="ghost" className="gap-1"><Gamepad2 className="w-3.5 h-3.5" />Retro</Button></Link>
+            <Link to="/game/rpg"><Button size="sm" variant="ghost" className="gap-1"><Swords className="w-3.5 h-3.5" />RPG</Button></Link>
+            <Link to="/game/metaverse"><Button size="sm" variant="ghost" className="gap-1"><Globe className="w-3.5 h-3.5" />Metaverse</Button></Link>
+            <Link to="/game/sdk"><Button size="sm" variant="ghost" className="gap-1"><Package className="w-3.5 h-3.5" />SDK</Button></Link>
             <Badge className="neon-ring">SEED {seed}</Badge>
             <Button size="sm" variant="outline" onClick={() => setSeed(Math.floor(Math.random() * 10000))}>
-              Novo mundo
+              New world
             </Button>
           </div>
         </div>
@@ -180,7 +185,7 @@ export default function GamePage() {
         <Card className="glass-premium overflow-hidden p-0 h-[calc(100vh-160px)] min-h-[480px] relative">
           <div ref={containerRef} className="w-full h-full" />
           <div className="absolute top-3 left-3 flex flex-col gap-1 text-xs text-muted-foreground">
-            <span>Clique em um NPC dourado para conversar</span>
+            <span>Click a gold NPC to chat</span>
             <span>Procedural · ECS · Three.js · AI NPCs</span>
           </div>
           {playerHP && (
@@ -222,7 +227,7 @@ export default function GamePage() {
               </div>
               <div className="flex-1 overflow-y-auto space-y-3 mb-3">
                 {dialogue.length === 0 && (
-                  <p className="text-sm text-muted-foreground text-center mt-8">Inicie a conversa…</p>
+                  <p className="text-sm text-muted-foreground text-center mt-8">Start the conversation…</p>
                 )}
                 {dialogue.map((d, i) => (
                   <div key={i} className={`text-sm p-3 rounded-lg ${
@@ -233,14 +238,14 @@ export default function GamePage() {
                     {d.content}
                   </div>
                 ))}
-                {loading && <div className="text-xs text-muted-foreground animate-pulse">NPC pensando…</div>}
+                {loading && <div className="text-xs text-muted-foreground animate-pulse">NPC thinking…</div>}
               </div>
               <div className="flex gap-2">
                 <Input
                   value={input}
                   onChange={e => setInput(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && send()}
-                  placeholder="Diga algo ao NPC…"
+                  placeholder="Say something to the NPC…"
                   disabled={loading}
                 />
                 <Button onClick={send} disabled={loading || !input.trim()} size="icon">
@@ -250,7 +255,7 @@ export default function GamePage() {
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center text-center text-muted-foreground text-sm">
-              Selecione um NPC dourado no mundo para iniciar uma conversa com IA.
+              Select a gold NPC in the world to start an AI conversation.
             </div>
           )}
         </Card>
