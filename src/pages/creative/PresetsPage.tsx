@@ -34,7 +34,7 @@ export default function PresetsPage() {
   const { data: presets = [], isLoading: loading, error: queryError, refetch: load, failureCount } = useQuery({
     queryKey: ["filter-presets", user?.id, sortDir],
     queryFn: async () => {
-      if (!user) throw new Error("Não autenticado");
+      if (!user) throw new Error("Not authenticated");
       const { data, error: err } = await supabase
         .from("creative_filter_presets")
         .select("*")
@@ -57,16 +57,16 @@ export default function PresetsPage() {
       .update({ name: editName.trim() })
       .eq("id", id);
     if (error) return toast.error(error.message);
-    toast.success("Preset renomeado");
+    toast.success("Preset renamed");
     setEditingId(null);
     load();
   }
 
   async function remove(id: string) {
-    if (!confirm("Excluir este preset?")) return;
+    if (!confirm("Delete this preset?")) return;
     const { error } = await supabase.from("creative_filter_presets").delete().eq("id", id);
     if (error) return toast.error(error.message);
-    toast.success("Preset removido");
+    toast.success("Preset removed");
     load();
   }
 
@@ -78,7 +78,7 @@ export default function PresetsPage() {
         <Button variant="ghost" size="icon" onClick={() => navigate("/creative")}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h1 className="text-xl font-bold flex-1">Presets de Filtros</h1>
+        <h1 className="text-xl font-bold flex-1">Filter Presets</h1>
       </header>
 
       <div className="px-4 pt-4 max-w-4xl mx-auto">
@@ -92,7 +92,7 @@ export default function PresetsPage() {
 
       <div className="p-4 max-w-4xl mx-auto space-y-3">
         <div className="flex gap-2">
-          <Input placeholder="Buscar presets..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Input placeholder="Search presets..." value={search} onChange={(e) => setSearch(e.target.value)} />
           <Button variant="outline" onClick={() => setSortDir((d) => d === "asc" ? "desc" : "asc")}>
             Data {sortDir === "asc" ? "↑" : "↓"}
           </Button>
@@ -102,10 +102,10 @@ export default function PresetsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>Filtros</TableHead>
-                <TableHead>Atualizado</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Filters</TableHead>
+                <TableHead>Updated</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -125,13 +125,13 @@ export default function PresetsPage() {
                     <div className="flex flex-col items-center gap-2 text-destructive">
                       <AlertTriangle className="h-8 w-8" />
                       <p>{error}</p>
-                      <Button variant="outline" size="sm" onClick={() => load()}>Tentar novamente</Button>
+                      <Button variant="outline" size="sm" onClick={() => load()}>Try again</Button>
                     </div>
                   </TableCell>
                 </TableRow>
               )}
               {!loading && !error && filtered.length === 0 && (
-                <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">Nenhum preset encontrado</TableCell></TableRow>
+                <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">No presets found</TableCell></TableRow>
               )}
               {filtered.map((p) => (
                 <TableRow key={p.id} data-testid="preset-row">
@@ -157,7 +157,7 @@ export default function PresetsPage() {
                         const qs = new URLSearchParams(p.filters).toString();
                         navigate(`/creative/investigation?${qs}`);
                       }}
-                      title="Aplicar filtros"
+                      title="Apply filters"
                     >
                       <ExternalLink className="h-4 w-4" />
                     </Button>

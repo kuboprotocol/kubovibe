@@ -21,12 +21,12 @@ interface JobRow {
 
 const EXTRA_FIELDS: Record<string, Array<{ key: string; label: string; type?: "number" | "text"; default?: string | number }>> = {
   slides: [{ key: "slideCount", label: "Slides", type: "number", default: 8 }],
-  "short-video": [{ key: "duration", label: "Duração (s)", type: "number", default: 30 }],
-  opusclip: [{ key: "videoTitle", label: "Título do vídeo" }, { key: "count", label: "Nº de clipes", type: "number", default: 5 }],
-  "avatar-speaker": [{ key: "persona", label: "Persona", default: "host profissional" }, { key: "duration", label: "Duração (s)", type: "number", default: 60 }],
-  "doc-converter": [{ key: "from", label: "De", default: "markdown" }, { key: "to", label: "Para", default: "html" }],
-  "video-downloader": [{ key: "url", label: "URL do vídeo" }],
-  "nano-banana": [{ key: "format", label: "Formato", default: "post" }, { key: "count", label: "Variações", type: "number", default: 5 }],
+  "short-video": [{ key: "duration", label: "Duration (s)", type: "number", default: 30 }],
+  opusclip: [{ key: "videoTitle", label: "Video title" }, { key: "count", label: "# of clips", type: "number", default: 5 }],
+  "avatar-speaker": [{ key: "persona", label: "Persona", default: "professional host" }, { key: "duration", label: "Duration (s)", type: "number", default: 60 }],
+  "doc-converter": [{ key: "from", label: "From", default: "markdown" }, { key: "to", label: "To", default: "html" }],
+  "video-downloader": [{ key: "url", label: "Video URL" }],
+  "nano-banana": [{ key: "format", label: "Format", default: "post" }, { key: "count", label: "Variations", type: "number", default: 5 }],
 };
 
 const PROMPT_KEY: Record<string, string> = {
@@ -97,7 +97,7 @@ export default function AgentDetailPage() {
 
       console.log(`[AgentDetailPage] Resposta recebida (${agent.slug}):`, data);
       setResult(data);
-      toast({ title: `${agent.name} ok`, description: `${agent.credit_cost} créditos.` });
+      toast({ title: `${agent.name} ok`, description: `${agent.credit_cost} credits.` });
       void refreshJobs();
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -105,7 +105,7 @@ export default function AgentDetailPage() {
       toast({ 
         title: "Erro de Conexão", 
         description: msg === "Failed to fetch" 
-          ? "Não foi possível conectar ao servidor. Verifique sua internet ou tente novamente." 
+          ? "Could not connect to the server. Check your internet connection or try again." 
           : msg, 
         variant: "destructive" 
       });
@@ -121,7 +121,7 @@ export default function AgentDetailPage() {
     <div className="min-h-screen bg-background text-foreground">
       <div className="container mx-auto px-4 py-8 max-w-5xl">
         <Link to="/agents" className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-2 mb-4">
-          <ArrowLeft className="w-4 h-4" /> Todos os agentes
+          <ArrowLeft className="w-4 h-4" /> All agents
         </Link>
 
         <div className="flex items-start justify-between mb-8 flex-wrap gap-4">
@@ -130,7 +130,7 @@ export default function AgentDetailPage() {
             <p className="text-muted-foreground mt-1 max-w-2xl">{agent.description}</p>
             <div className="flex items-center gap-2 mt-3">
               <Badge variant={agent.status === "active" ? "default" : "outline"}>{agent.status}</Badge>
-              <Badge variant="secondary"><Zap className="w-3 h-3 mr-1" />{agent.credit_cost} créditos</Badge>
+              <Badge variant="secondary"><Zap className="w-3 h-3 mr-1" />{agent.credit_cost} credits</Badge>
               <Badge variant="outline" className="font-mono text-xs">{agent.edge_function}</Badge>
             </div>
           </div>
@@ -139,11 +139,11 @@ export default function AgentDetailPage() {
         <div className="grid md:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Executar</CardTitle>
-              <CardDescription>Entrada principal + parâmetros opcionais.</CardDescription>
+              <CardTitle className="text-base">Run</CardTitle>
+              <CardDescription>Main input + optional parameters.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Textarea rows={8} placeholder="Prompt / conteúdo / tarefa…" value={prompt} onChange={e => setPrompt(e.target.value)} disabled={running} />
+              <Textarea rows={8} placeholder="Prompt / content / task…" value={prompt} onChange={e => setPrompt(e.target.value)} disabled={running} />
               {fields.map(f => (
                 <div key={f.key} className="space-y-1">
                   <label className="text-xs text-muted-foreground">{f.label}</label>
@@ -167,11 +167,11 @@ export default function AgentDetailPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Histórico ({jobs.length})</CardTitle>
-              <CardDescription>Últimos 20 jobs deste agente.</CardDescription>
+              <CardTitle className="text-base">History ({jobs.length})</CardTitle>
+              <CardDescription>Last 20 jobs for this agent.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2 max-h-[600px] overflow-auto">
-              {jobs.length === 0 && <p className="text-xs text-muted-foreground">Nenhum job ainda.</p>}
+              {jobs.length === 0 && <p className="text-xs text-muted-foreground">No jobs yet.</p>}
               {jobs.map(j => (
                 <div key={j.id} className="text-xs border rounded p-2 space-y-1">
                   <div className="flex items-center gap-2">

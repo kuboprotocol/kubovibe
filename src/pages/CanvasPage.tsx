@@ -15,7 +15,7 @@ export default function CanvasPage() {
   const { canvasId } = useParams()
   const navigate = useNavigate()
   const [currentCanvasId] = useState(canvasId || crypto.randomUUID())
-  const [canvasName, setCanvasName] = useState('Canvas sem nome')
+  const [canvasName, setCanvasName] = useState('Unnamed Canvas')
   const [saving, setSaving] = useState(false)
   const [showTemplates, setShowTemplates] = useState(!canvasId)
   const [showInfo, setShowInfo] = useState(true)
@@ -32,7 +32,7 @@ export default function CanvasPage() {
       const stored = localStorage.getItem(`canvas-${id}`)
       if (stored) {
         const data = JSON.parse(stored)
-        setCanvasName(data.name || 'Canvas sem nome')
+        setCanvasName(data.name || 'Unnamed Canvas')
       }
     } catch (err) {
       console.error('[LoadCanvas] Error:', err)
@@ -61,9 +61,9 @@ export default function CanvasPage() {
       }
       localStorage.setItem('canvas-list', JSON.stringify(list))
 
-      toast.success('Canvas salvo com sucesso!')
+      toast.success('Canvas saved successfully!')
     } catch (err) {
-      toast.error('Erro ao salvar canvas')
+      toast.error('Error saving canvas')
     } finally {
       setSaving(false)
     }
@@ -77,18 +77,18 @@ export default function CanvasPage() {
   }
 
   const handleExport = (format: 'png' | 'svg' | 'json') => {
-    toast.info(`Export ${format.toUpperCase()} — funcionalidade em desenvolvimento`)
+    toast.info(`Export ${format.toUpperCase()} — feature in development`)
   }
 
   const handleShare = () => {
     const url = `${window.location.origin}/canvas/${currentCanvasId}`
     navigator.clipboard.writeText(url)
-    toast.success('Link copiado para a área de transferência!')
+    toast.success('Link copied to clipboard!')
   }
 
   const handleTemplateSelect = (templateId: string) => {
     setShowTemplates(false)
-    toast.info(`Template "${templateId}" selecionado`)
+    toast.info(`Template "${templateId}" selected`)
   }
 
   return (
@@ -113,7 +113,7 @@ export default function CanvasPage() {
             value={canvasName}
             onChange={(e) => setCanvasName(e.target.value)}
             className="text-base font-semibold bg-transparent border-none shadow-none focus-visible:ring-1 focus-visible:ring-primary rounded-md px-2 w-56"
-            placeholder="Nome do canvas..."
+            placeholder="Canvas name..."
           />
         </div>
 
@@ -140,7 +140,7 @@ export default function CanvasPage() {
             size="sm"
             onClick={() => setShowRunway(true)}
             className="text-primary hover:text-primary"
-            title="RunwayML — Gerar vídeo/imagem (28 créditos)"
+            title="RunwayML — Generate video/image (28 credits)"
           >
             <Film className="h-4 w-4 mr-1.5" />
             <span className="hidden sm:inline">Runway</span>
@@ -152,7 +152,7 @@ export default function CanvasPage() {
             className="text-muted-foreground"
           >
             <Share2 className="h-4 w-4 mr-1.5" />
-            <span className="hidden sm:inline">Compartilhar</span>
+            <span className="hidden sm:inline">Share</span>
           </Button>
           <Button
             variant="hero"
@@ -165,7 +165,7 @@ export default function CanvasPage() {
             ) : (
               <Save className="h-4 w-4 mr-1.5" />
             )}
-            {saving ? 'Salvando...' : 'Salvar'}
+            {saving ? 'Saving...' : 'Save'}
           </Button>
         </div>
       </motion.header>
@@ -195,7 +195,7 @@ export default function CanvasPage() {
       <RunwayDialog
         open={showRunway}
         onOpenChange={setShowRunway}
-        onResult={(url) => toast.success(`Runway pronto — ${url}`)}
+        onResult={(url) => toast.success(`Runway ready — ${url}`)}
       />
     </div>
   )

@@ -50,18 +50,18 @@ export class ErrorBoundary extends Component<Props, State> {
             </div>
             <div className="space-y-2">
               <h1 className="text-2xl font-bold tracking-tight">
-                {isInvestigation ? "Erro na Investigação" : isExport ? "Erro na Exportação" : isPresets ? "Erro nos Presets" : `Falha em: ${this.props.resourceName || "Recurso"}`}
+                {isInvestigation ? "Investigation Error" : isExport ? "Export Error" : isPresets ? "Presets Error" : `Failure in: ${this.props.resourceName || "Resource"}`}
               </h1>
               <p className="text-muted-foreground text-sm">
                 {isInvestigation 
-                  ? "Não foi possível carregar o painel de investigação de falhas. Verifique seus filtros ou tente recarregar." 
+                  ? "Could not load the failure investigation panel. Check your filters or try reloading." 
                   : isExport 
-                    ? "Houve um problema ao carregar os detalhes desta exportação. O contexto da exportação foi preservado." 
-                    : "Ocorreu um erro ao carregar os dados. Você pode tentar recarregar a página."}
+                    ? "There was a problem loading the export details. Export context has been preserved." 
+                    : "An error occurred while loading data. You can try reloading the page."}
               </p>
               {this.state.error && (
                 <div className="mt-4 p-3 bg-muted rounded text-[10px] font-mono text-left overflow-auto max-h-24 opacity-70">
-                  <div className="font-semibold mb-1 opacity-50 uppercase tracking-wider">Contexto do Erro:</div>
+                  <div className="font-semibold mb-1 opacity-50 uppercase tracking-wider">Error Context:</div>
                   {this.state.error.message}
                 </div>
               )}
@@ -69,18 +69,18 @@ export class ErrorBoundary extends Component<Props, State> {
             <div className="flex flex-col gap-2">
               <div className="flex justify-center gap-3">
                 <Button variant="outline" onClick={() => window.location.href = "/creative"}>
-                  Voltar ao Painel
+                  Back to Dashboard
                 </Button>
                 <Button onClick={this.handleReset}>
                   <RotateCcw className="mr-2 h-4 w-4" />
-                  Tentar Novamente
+                  Try Again
                 </Button>
               </div>
               {isInvestigation && (
                 <Button variant="link" size="sm" onClick={() => {
                   window.location.search = "";
                 }}>
-                  Limpar Filtros e Tentar
+                  Clear Filters and Retry
                 </Button>
               )}
             </div>

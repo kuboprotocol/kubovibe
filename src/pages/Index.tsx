@@ -84,6 +84,12 @@ const Index = () => {
             </div>
             <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
               <a
+                href="/docs"
+                className="hover:text-foreground transition-colors"
+              >
+                Documentation
+              </a>
+              <a
                 href="/privacy"
                 className="hover:text-foreground transition-colors"
               >

@@ -12,11 +12,11 @@ import { useAuth } from '@/hooks/useAuth'
 // Sugestões em linguagem natural — sem jargão técnico (Web2 ou Web3).
 // O orquestrador detecta a stack por trás. O usuário só descreve a ideia.
 const suggestions = [
-  'Um app estilo Nubank com login e carteira digital',
-  'Marketplace de NFTs com pagamento em cripto',
-  'Loja online com fidelidade em tokens',
-  'Dashboard SaaS com analytics em tempo real',
-  'Rede social com recompensas para criadores',
+  'A Nubank-style app with login and digital wallet',
+  'NFT marketplace with crypto payment',
+  'Online store with token loyalty rewards',
+  'SaaS dashboard with real-time analytics',
+  'Social network with creator rewards',
 ]
 
 export default function HeroSection() {
@@ -29,7 +29,7 @@ export default function HeroSection() {
 
   const handleAttachFile = (file: File) => {
     setAttachedFile(file)
-    toast.success(`Arquivo anexado: ${file.name}`)
+    toast.success(`File attached: ${file.name}`)
   }
 
   const handleScreenshot = async () => {
@@ -47,17 +47,17 @@ export default function HeroSection() {
         if (blob) {
           const file = new File([blob], `screenshot-${Date.now()}.png`, { type: 'image/png' })
           setAttachedFile(file)
-          toast.success('Screenshot capturado!')
+          toast.success('Screenshot captured!')
         }
       }, 'image/png')
     } catch (err) {
-      toast.error('Não foi possível capturar a tela')
+      toast.error('Could not capture the screen')
     }
   }
 
   const handleAddReference = (url: string) => {
     setReferences(prev => [...prev, url])
-    toast.success('Referência adicionada!')
+    toast.success('Reference added!')
   }
 
   // Restaura prompt pendente após login (vindo do /auth).
@@ -89,12 +89,12 @@ export default function HeroSection() {
         body: { prompt: text },
       })
       if (error) throw error
-      if (!data?.plan_id) throw new Error('Plano sem ID')
-      toast.success('Plano gerado!')
+      if (!data?.plan_id) throw new Error('Plan has no ID')
+      toast.success('Plan generated!')
       navigate(`/plan/${data.plan_id}`)
     } catch (e) {
       console.error(e)
-      const msg = e instanceof Error ? e.message : 'Falha ao gerar plano'
+      const msg = e instanceof Error ? e.message : 'Failed to generate plan'
       toast.error(msg)
     } finally {
       setGenerating(false)
@@ -118,7 +118,7 @@ export default function HeroSection() {
           className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent glass-border text-accent-foreground text-xs font-medium mb-8"
         >
           <Zap className="h-3 w-3" />
-          Builder com IA — Web2 e Web3 sem complicação
+          AI Builder — Web2 and Web3 made simple
         </motion.div>
 
         {/* Logo */}
@@ -137,9 +137,9 @@ export default function HeroSection() {
           transition={{ duration: 0.5, delay: 0.1 }}
           className="text-4xl md:text-6xl font-display font-bold text-foreground leading-[1.1] tracking-tight"
         >
-          Transforme ideias em
+          Transform ideas into
           <br />
-          <span className="hero-highlight">produtos reais</span>
+          <span className="hero-highlight">real products</span>
         </motion.h1>
 
         <motion.p
@@ -148,7 +148,7 @@ export default function HeroSection() {
           transition={{ duration: 0.5, delay: 0.2 }}
           className="mt-6 text-lg text-muted-foreground max-w-lg mx-auto leading-relaxed"
         >
-          Descreva sua ideia em português comum. Nós cuidamos do resto — Web2, Web3, carteira, contratos. Você não precisa saber nada disso.
+          Describe your idea in plain language. We handle the rest — Web2, Web3, wallets, contracts. You don't need to know any of that.
         </motion.p>
 
         {/* Prompt input */}
@@ -162,7 +162,7 @@ export default function HeroSection() {
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Descreva o app que você quer. Exemplo: 'Quero um app estilo Nubank com login e carteira'"
+              placeholder="Describe the app you want. Example: 'I want a Nubank-style app with login and wallet'"
               className="w-full resize-none bg-transparent px-5 pt-5 pb-16 text-foreground placeholder:text-muted-foreground focus:outline-none text-base min-h-[130px] font-sans"
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -197,7 +197,7 @@ export default function HeroSection() {
                 className="rounded-xl px-6 gap-2"
               >
                 {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                {generating ? 'Gerando...' : 'Gerar'}
+                {generating ? 'Generating...' : 'Generate'}
                 {!generating && <ArrowRight className="h-4 w-4" />}
               </Button>
             </div>

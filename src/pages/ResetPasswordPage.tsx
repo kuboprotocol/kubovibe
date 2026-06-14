@@ -33,11 +33,11 @@ export default function ResetPasswordPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (password !== confirmPassword) {
-      toast.error('As senhas não coincidem.')
+      toast.error('Passwords do not match.')
       return
     }
     if (password.length < 6) {
-      toast.error('A senha deve ter pelo menos 6 caracteres.')
+      toast.error('Password must be at least 6 characters.')
       return
     }
 
@@ -45,10 +45,10 @@ export default function ResetPasswordPage() {
     try {
       const { error } = await supabase.auth.updateUser({ password })
       if (error) throw error
-      toast.success('Senha atualizada com sucesso!')
+      toast.success('Password updated successfully!')
       navigate('/dashboard')
     } catch (err: any) {
-      toast.error(err.message || 'Erro ao atualizar senha')
+      toast.error(err.message || 'Error updating password')
     } finally {
       setSubmitting(false)
     }
@@ -61,8 +61,8 @@ export default function ResetPasswordPage() {
           <div className="h-12 w-12 rounded-2xl gradient-primary flex items-center justify-center mx-auto mb-4 shadow-glow">
             <Sparkles className="h-6 w-6 text-primary-foreground" />
           </div>
-          <h1 className="text-2xl font-display font-bold text-foreground mb-2">Recuperação de senha</h1>
-          <p className="text-sm text-muted-foreground">Verificando link de recuperação...</p>
+          <h1 className="text-2xl font-display font-bold text-foreground mb-2">Password recovery</h1>
+          <p className="text-sm text-muted-foreground">Verifying recovery link...</p>
           <Loader2 className="h-6 w-6 animate-spin text-primary mx-auto mt-4" />
         </div>
       </div>
@@ -76,14 +76,14 @@ export default function ResetPasswordPage() {
           <div className="h-12 w-12 rounded-2xl gradient-primary flex items-center justify-center mx-auto mb-4 shadow-glow">
             <Sparkles className="h-6 w-6 text-primary-foreground" />
           </div>
-          <h1 className="text-2xl font-display font-bold text-foreground">Nova senha</h1>
-          <p className="text-sm text-muted-foreground mt-1">Digite sua nova senha</p>
+          <h1 className="text-2xl font-display font-bold text-foreground">New password</h1>
+          <p className="text-sm text-muted-foreground mt-1">Enter your new password</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
             type="password"
-            placeholder="Nova senha"
+            placeholder="New password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
@@ -91,7 +91,7 @@ export default function ResetPasswordPage() {
           />
           <Input
             type="password"
-            placeholder="Confirmar nova senha"
+            placeholder="Confirm new password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             required
@@ -99,7 +99,7 @@ export default function ResetPasswordPage() {
           />
           <Button type="submit" variant="hero" className="w-full" disabled={submitting}>
             {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-            Atualizar senha
+            Update password
           </Button>
         </form>
       </div>

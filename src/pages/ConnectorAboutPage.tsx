@@ -22,10 +22,10 @@ const DEFAULT_NAV_LOCK_MS = 600
 type NavTarget = 'hub' | 'panel' | 'setup' | 'docs'
 
 const NAV_LABELS: Record<NavTarget, string> = {
-  hub: 'lista de conectores',
-  panel: 'painel do conector',
-  setup: 'setup do conector',
-  docs: 'documentação oficial',
+  hub: 'connector list',
+  panel: 'connector panel',
+  setup: 'connector setup',
+  docs: 'official docs',
 }
 
 interface ConnectorAboutPageProps {
@@ -41,8 +41,8 @@ export default function ConnectorAboutPage({ navLockMs = DEFAULT_NAV_LOCK_MS }: 
     return (
       <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
         <div className="text-center space-y-3">
-          <p className="text-lg">Conector não encontrado</p>
-          <Button onClick={() => navigate('/connectors')}>Voltar aos conectores</Button>
+          <p className="text-lg">Connector not found</p>
+          <Button onClick={() => navigate('/connectors')}>Back to connectors</Button>
         </div>
       </div>
     )
@@ -180,7 +180,7 @@ export default function ConnectorAboutPage({ navLockMs = DEFAULT_NAV_LOCK_MS }: 
       {/* Header */}
       <div className="border-b border-border bg-card/50 backdrop-blur-xl sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={goToHub} aria-label="Voltar para conectores" disabled={isNavigating} className="min-h-11 min-w-11">
+          <Button variant="ghost" size="icon" onClick={goToHub} aria-label="Back to connectors" disabled={isNavigating} className="min-h-11 min-w-11">
             {navTarget === 'hub' ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowLeft className="h-5 w-5" />}
           </Button>
           <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -193,18 +193,18 @@ export default function ConnectorAboutPage({ navLockMs = DEFAULT_NAV_LOCK_MS }: 
             <div className="min-w-0">
               <h1 className="text-xl font-bold font-display truncate">{connector.name}</h1>
               <p className="text-xs text-muted-foreground truncate">
-                Detalhes do conector · KUBO Vibe Dev
+                Connector details · KUBO Vibe Dev
               </p>
             </div>
           </div>
           <div className="hidden sm:flex items-center gap-2">
             <Button variant="outline" onClick={goToPanel} disabled={isNavigating}>
               {navTarget === 'panel' ? <Loader2 className="h-4 w-4 animate-spin" /> : <LayoutDashboard className="h-4 w-4" />}
-              {navTarget === 'panel' ? 'Abrindo…' : 'Painel do conector'}
+              {navTarget === 'panel' ? 'Opening…' : 'Connector panel'}
             </Button>
             <Button onClick={handleStartSetup} disabled={isComingSoon || isNavigating}>
               {navTarget === 'setup' ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
-              {isComingSoon ? 'Em breve' : navTarget === 'setup' ? 'Abrindo…' : 'Iniciar setup'}
+              {isComingSoon ? 'Coming soon' : navTarget === 'setup' ? 'Opening…' : 'Start setup'}
               {!isComingSoon && navTarget !== 'setup' && <ArrowRight className="h-4 w-4" />}
             </Button>
           </div>
@@ -228,7 +228,7 @@ export default function ConnectorAboutPage({ navLockMs = DEFAULT_NAV_LOCK_MS }: 
                   data-testid="breadcrumb-hub"
                 >
                   {navTarget === 'hub' && <Loader2 className="h-3 w-3 animate-spin" />}
-                  Conectores
+                  Connectors
                 </Link>
               </BreadcrumbLink>
             </BreadcrumbItem>
@@ -246,13 +246,13 @@ export default function ConnectorAboutPage({ navLockMs = DEFAULT_NAV_LOCK_MS }: 
                   data-testid="breadcrumb-panel"
                 >
                   {navTarget === 'panel' && <Loader2 className="h-3 w-3 animate-spin" />}
-                  Painel do conector
+                  Connector panel
                 </Link>
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <BreadcrumbPage aria-current="page" data-testid="breadcrumb-current">Sobre</BreadcrumbPage>
+              <BreadcrumbPage aria-current="page" data-testid="breadcrumb-current">About</BreadcrumbPage>
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
@@ -281,11 +281,11 @@ export default function ConnectorAboutPage({ navLockMs = DEFAULT_NAV_LOCK_MS }: 
                 {connector.authType.replace('_', ' ')}
               </Badge>
               {isComingSoon && (
-                <Badge variant="secondary" className="text-[10px]">Em breve</Badge>
+                <Badge variant="secondary" className="text-[10px]">Coming soon</Badge>
               )}
             </div>
             <h2 className="text-2xl sm:text-3xl font-bold font-display">
-              Conecte {connector.name} ao seu workspace
+              Connect {connector.name} to your workspace
             </h2>
             <p className="text-muted-foreground text-base leading-relaxed max-w-2xl">
               {connector.longDescription}
@@ -293,7 +293,7 @@ export default function ConnectorAboutPage({ navLockMs = DEFAULT_NAV_LOCK_MS }: 
             <div className="flex gap-3 flex-wrap pt-2">
               <Button onClick={handleStartSetup} disabled={isComingSoon || isNavigating} size="lg">
                 {navTarget === 'setup' ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
-                {isComingSoon ? 'Em breve' : navTarget === 'setup' ? 'Abrindo…' : 'Iniciar setup'}
+                {isComingSoon ? 'Coming soon' : navTarget === 'setup' ? 'Opening…' : 'Start setup'}
                 {!isComingSoon && navTarget !== 'setup' && <ArrowRight className="h-4 w-4" />}
               </Button>
               <Button
@@ -303,7 +303,7 @@ export default function ConnectorAboutPage({ navLockMs = DEFAULT_NAV_LOCK_MS }: 
                 disabled={isNavigating}
               >
                 {navTarget === 'panel' ? <Loader2 className="h-4 w-4 animate-spin" /> : <LayoutDashboard className="h-4 w-4" />}
-                {navTarget === 'panel' ? 'Abrindo…' : 'Painel do conector'}
+                {navTarget === 'panel' ? 'Opening…' : 'Connector panel'}
               </Button>
               {connector.docsUrl && (
                 <Button
@@ -322,7 +322,7 @@ export default function ConnectorAboutPage({ navLockMs = DEFAULT_NAV_LOCK_MS }: 
                     aria-disabled={isNavigating && navTarget !== 'docs'}
                   >
                     {navTarget === 'docs' ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
-                    {navTarget === 'docs' ? 'Abrindo docs…' : 'Documentação oficial'}
+                    {navTarget === 'docs' ? 'Opening docs…' : 'Official docs'}
                   </a>
                 </Button>
               )}
@@ -334,7 +334,7 @@ export default function ConnectorAboutPage({ navLockMs = DEFAULT_NAV_LOCK_MS }: 
         <Card className="p-6 space-y-4">
           <div className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
-            <h3 className="font-semibold">Recursos disponíveis</h3>
+            <h3 className="font-semibold">Available features</h3>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {connector.features.map((feature) => (
@@ -353,7 +353,7 @@ export default function ConnectorAboutPage({ navLockMs = DEFAULT_NAV_LOCK_MS }: 
         <Card className="p-6 space-y-4">
           <div className="flex items-center gap-2">
             <Zap className="h-5 w-5 text-primary" />
-            <h3 className="font-semibold">Como funciona o setup</h3>
+            <h3 className="font-semibold">How setup works</h3>
           </div>
           <ol className="space-y-3">
             {connector.setupSteps.map((step, i) => (
@@ -375,9 +375,9 @@ export default function ConnectorAboutPage({ navLockMs = DEFAULT_NAV_LOCK_MS }: 
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
             >
-              Abrir página de credenciais do {connector.name}
+              Open credentials page for {connector.name}
               <ExternalLink className="h-3 w-3" />
-              <span className="text-muted-foreground">(site externo)</span>
+              <span className="text-muted-foreground">(external site)</span>
             </a>
           )}
         </Card>
@@ -386,17 +386,17 @@ export default function ConnectorAboutPage({ navLockMs = DEFAULT_NAV_LOCK_MS }: 
         <Card className="p-6 space-y-3 border-emerald-500/20 bg-emerald-500/5">
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-emerald-500" />
-            <h3 className="font-semibold">Segurança</h3>
+            <h3 className="font-semibold">Security</h3>
           </div>
           <p className="text-sm text-muted-foreground leading-relaxed">
-            Sua chave é cifrada com <strong>AES-256-GCM</strong> antes de ser persistida e nunca é
-            devolvida em claro ao navegador. Apenas as edge functions da KUBO podem descifrar para
-            executar ações em seu nome.
+            Your key is encrypted with <strong>AES-256-GCM</strong> before being stored and is never
+            returned in plaintext to the browser. Only KUBO's edge functions can decrypt it to
+            perform actions on your behalf.
           </p>
         </Card>
 
         {/* Footer shortcuts */}
-        <nav aria-label="Navegação relacionada" className="pt-2 pb-4 border-t border-border/50 mt-4">
+        <nav aria-label="Related navigation" className="pt-2 pb-4 border-t border-border/50 mt-4">
           <div className="flex flex-wrap items-center justify-between gap-3 pt-4 text-sm">
             <button
               type="button"
@@ -406,7 +406,7 @@ export default function ConnectorAboutPage({ navLockMs = DEFAULT_NAV_LOCK_MS }: 
               className="text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1.5 min-h-11 disabled:opacity-60"
             >
               {navTarget === 'hub' ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowLeft className="h-4 w-4" />}
-              {navTarget === 'hub' ? 'Abrindo…' : 'Todos os conectores'}
+              {navTarget === 'hub' ? 'Opening…' : 'All connectors'}
             </button>
             <button
               type="button"
@@ -416,7 +416,7 @@ export default function ConnectorAboutPage({ navLockMs = DEFAULT_NAV_LOCK_MS }: 
               className="text-primary hover:underline inline-flex items-center gap-1.5 font-medium min-h-11 disabled:opacity-60"
             >
               {navTarget === 'panel' ? <Loader2 className="h-4 w-4 animate-spin" /> : <LayoutDashboard className="h-4 w-4" />}
-              {navTarget === 'panel' ? 'Abrindo painel…' : 'Ir para o painel do conector'}
+              {navTarget === 'panel' ? 'Abrindo painel…' : 'Ir para o connector panel'}
               {navTarget !== 'panel' && <ArrowRight className="h-4 w-4" />}
             </button>
           </div>
@@ -430,22 +430,22 @@ export default function ConnectorAboutPage({ navLockMs = DEFAULT_NAV_LOCK_MS }: 
             className="flex-1 min-h-11"
             onClick={goToPanel}
             disabled={isNavigating}
-            aria-label="Abrir painel do conector"
+            aria-label="Abrir connector panel"
             aria-busy={navTarget === 'panel'}
           >
             {navTarget === 'panel' ? <Loader2 className="h-4 w-4 animate-spin" /> : <LayoutDashboard className="h-4 w-4" />}
-            {navTarget === 'panel' ? 'Abrindo…' : 'Painel'}
+            {navTarget === 'panel' ? 'Opening…' : 'Painel'}
           </Button>
           <Button
             onClick={handleStartSetup}
             disabled={isComingSoon || isNavigating}
             size="lg"
             className="flex-1 shadow-glow min-h-11"
-            aria-label={isComingSoon ? 'Em breve' : 'Iniciar setup do conector'}
+            aria-label={isComingSoon ? 'Coming soon' : 'Iniciar connector setup'}
             aria-busy={navTarget === 'setup'}
           >
             {navTarget === 'setup' ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
-            {isComingSoon ? 'Em breve' : navTarget === 'setup' ? 'Abrindo…' : 'Setup'}
+            {isComingSoon ? 'Coming soon' : navTarget === 'setup' ? 'Opening…' : 'Setup'}
             {!isComingSoon && navTarget !== 'setup' && <ArrowRight className="h-4 w-4" />}
           </Button>
         </div>
