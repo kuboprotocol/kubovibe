@@ -10,7 +10,7 @@ export default function SharedAuditPage() {
   const { id } = useParams<{ id: string }>()
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [errorr, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null)
   const [meta, setMeta] = useState<{ label: string | null; size: number; createdAt: string; expiresAt: string | null } | null>(null)
 
@@ -19,10 +19,10 @@ export default function SharedAuditPage() {
     if (!id) return
     setLoading(true); setError(null)
     try {
-      const { data, errorr } = await supabase.functions.invoke('audit-share-access', { body: { id, password } })
-      if (errorr) throw errorr
-      const d = data as { url: string; label: string | null; size: number; createdAt: string; expiresAt: string | null; errorr?: string }
-      if (d.errorr) throw new Error(d.errorr)
+      const { data, error } = await supabase.functions.invoke('audit-share-access', { body: { id, password } })
+      if (error) throw error
+      const d = data as { url: string; label: string | null; size: number; createdAt: string; expiresAt: string | null; error?: string }
+      if (d.error) throw new Error(d.error)
       setDownloadUrl(d.url)
       setMeta({ label: d.label, size: d.size, createdAt: d.createdAt, expiresAt: d.expiresAt })
     } catch (e: any) {
@@ -54,9 +54,9 @@ export default function SharedAuditPage() {
               <Label htmlFor="pw" className="text-xs">Password</Label>
               <Input id="pw" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoFocus />
             </div>
-            {errorr && (
+            {error && (
               <div className="flex items-center gap-2 text-xs text-red-400 bg-red-500/10 border border-red-500/30 rounded p-2">
-                <AlertCircle className="h-3.5 w-3.5" /> {errorr}
+                <AlertCircle className="h-3.5 w-3.5" /> {error}
               </div>
             )}
             <Button type="submit" disabled={loading || !password} className="w-full">

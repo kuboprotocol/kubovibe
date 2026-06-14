@@ -40,10 +40,10 @@ export default function ExportDetailsPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  const { data, isLoading: loading, error: queryErrorr, refetch: load, failureCount } = useQuery({
+  const { data, isLoading: loading, error: queryError, refetch: load, failureCount } = useQuery({
     queryKey: ["export-detail", id, user?.id],
     queryFn: async () => {
-      if (!user || !id) throw new Errorr("Invalid parameters");
+      if (!user || !id) throw new Error("Invalid parameters");
       
       const { data: exp, error: expErr } = await supabase
         .from("creative_export_history")
@@ -53,7 +53,7 @@ export default function ExportDetailsPage() {
         .maybeSingle();
       
       if (expErr) throw expErr;
-      if (!exp) throw new Errorr("Export not found");
+      if (!exp) throw new Error("Export not found");
 
       let executions = [];
       if (exp.item_ids && exp.item_ids.length > 0) {
@@ -74,7 +74,7 @@ export default function ExportDetailsPage() {
 
   const exportRow = data?.exportRow || null;
   const executions = data?.executions || [];
-  const error = queryErrorr ? (queryErrorr as Errorr).message : null;
+  const error = queryError ? (queryError as Error).message : null;
 
 
 
@@ -203,7 +203,7 @@ export default function ExportDetailsPage() {
       <div className="px-4 pt-4 max-w-5xl mx-auto">
         <RetryIndicator 
           failureCount={failureCount} 
-          error={queryErrorr as Errorr} 
+          error={queryError as Error} 
           onRetry={() => load()} 
           isLoading={loading} 
         />
