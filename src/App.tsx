@@ -44,6 +44,7 @@ const GameRpgPage = lazy(() => import("./pages/GameRpgPage"));
 const GameMetaversePage = lazy(() => import("./pages/GameMetaversePage"));
 const GameSdkPage = lazy(() => import("./pages/GameSdkPage"));
 const GameVrPage = lazy(() => import("./pages/GameVrPage"));
+const GameAiPage = lazy(() => import("./pages/GameAiPage"));
 const AdminSkillsPage = lazy(() => import("./pages/AdminSkillsPage"));
 const DomainsPage = lazy(() => import("./pages/DomainsPage"));
 const CreativePage = lazy(() => import("./pages/CreativePage"));
@@ -216,6 +217,7 @@ const App = () => {
                 <Route path="/game/metaverse" element={<ProtectedRoute><GameMetaversePage /></ProtectedRoute>} />
                 <Route path="/game/sdk" element={<ProtectedRoute><GameSdkPage /></ProtectedRoute>} />
                 <Route path="/game/vr" element={<ProtectedRoute><GameVrPage /></ProtectedRoute>} />
+                <Route path="/game/ai" element={<ProtectedRoute><GameAiPage /></ProtectedRoute>} />
                 <Route path="/admin/skills" element={<ProtectedRoute><AdminSkillsPage /></ProtectedRoute>} />
                 <Route path="/domains" element={<ProtectedRoute><DomainsPage /></ProtectedRoute>} />
                 
