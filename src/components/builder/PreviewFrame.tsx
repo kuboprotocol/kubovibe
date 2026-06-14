@@ -37,6 +37,7 @@ interface PreviewFrameProps {
   deviceFrame: DeviceFrame
   landscape: boolean
   previewKey: number
+  previewId?: string
   onRefresh: () => void
   publishedUrl?: string | null
   projectTitle?: string
@@ -44,6 +45,7 @@ interface PreviewFrameProps {
 
 export default function PreviewFrame({
   generatedCode, deviceFrame, landscape, previewKey, onRefresh,
+  previewId,
   publishedUrl, projectTitle,
 }: PreviewFrameProps) {
   const initial = loadSettings()
@@ -153,7 +155,9 @@ export default function PreviewFrame({
     return () => { try { delete (window as any).__kuboCapturePreview } catch {} }
   }, [captureDataUrl, w, h, deviceFrame])
 
-  const displayUrl = publishedUrl || (typeof window !== 'undefined' ? `${window.location.origin}/preview` : '/preview')
+  const displayUrl = publishedUrl || (typeof window !== 'undefined'
+    ? `${window.location.origin}/builder-preview`
+    : '/builder-preview')
 
   return (
     <div ref={containerRef} className="absolute inset-0 flex flex-col bg-muted overflow-hidden">
@@ -245,7 +249,7 @@ export default function PreviewFrame({
             <iframe
               ref={iframeRef}
               key={previewKey}
-              srcDoc={wrapPreviewHtml(generatedCode || '')}
+              srcDoc={wrapPreviewHtml(generatedCode || '', { previewId })}
               className="w-full h-full border-0 block"
               sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
               title="App Preview"

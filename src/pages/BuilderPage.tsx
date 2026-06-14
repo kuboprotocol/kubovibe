@@ -67,6 +67,7 @@ export default function BuilderPage() {
   }, [deviceFrame, landscape])
   const [previewLogs, setPreviewLogs] = useState<PreviewLogEntry[]>([])
   const [previewKey, setPreviewKey] = useState(0)
+  const previewId = `builder:${currentProjectId ?? 'draft'}`
   // Subscribe to runtime errors / console messages from the iframe
   useEffect(() => {
     return subscribePreviewLogs((entry) => {
@@ -74,10 +75,10 @@ export default function BuilderPage() {
         const next = [...prev, entry]
         return next.length > 500 ? next.slice(-500) : next
       })
-    })
-  }, [])
+    }, { previewId })
+  }, [previewId])
   // Reset logs whenever the preview is reloaded or the code changes
-  useEffect(() => { setPreviewLogs([]) }, [previewKey, generatedCode])
+  useEffect(() => { setPreviewLogs([]) }, [previewKey, currentProjectId])
   const [attachedFiles, setAttachedFiles] = useState<UploadedFile[]>([])
   const [uploadProgress, setUploadProgress] = useState<number | null>(null)
   const [isPublished, setIsPublished] = useState(false)
@@ -145,6 +146,18 @@ export default function BuilderPage() {
   const [showLoading, setShowLoading] = useState(false)
   const generationDoneRef = useRef(false)
   const pendingSaveRef = useRef<(() => void) | null>(null)
+  const pendingPreviewHtmlRef = useRef('')
+
+  const queuePreviewHtml = useCallback((html: string) => {
+    if (!html.includes('<')) return
+    pendingPreviewHtmlRef.current = html
+  }, [])
+
+  const flushPreviewHtml = useCallback(() => {
+    const nextHtml = pendingPreviewHtmlRef.current
+    if (!nextHtml || nextHtml === generatedCode) return
+    setGeneratedCode(nextHtml)
+  }, [generatedCode])
 
   // Detect chat language from user messages
   const chatLanguage = useMemo(() => {
@@ -160,6 +173,7 @@ export default function BuilderPage() {
       loadingStartRef.current = Date.now()
       generationDoneRef.current = false
       pendingSaveRef.current = null
+      pendingPreviewHtmlRef.current = ''
       setShowLoading(true)
     }
     if (!isLoading && showLoading) {
@@ -168,18 +182,20 @@ export default function BuilderPage() {
       const remaining = MIN_LOADING_MS - elapsed
       if (remaining > 0) {
         const timeout = setTimeout(() => {
+          flushPreviewHtml()
           setShowLoading(false)
           pendingSaveRef.current?.()
           pendingSaveRef.current = null
         }, remaining)
         return () => clearTimeout(timeout)
       } else {
+        flushPreviewHtml()
         setShowLoading(false)
         pendingSaveRef.current?.()
         pendingSaveRef.current = null
       }
     }
-  }, [isLoading])
+  }, [flushPreviewHtml, isLoading, showLoading])
 
   const chatEndRef = useRef<HTMLDivElement>(null)
 
@@ -211,7 +227,7 @@ export default function BuilderPage() {
             finalMessages = updated; return updated
           })
           const html = extractHtml(assistantSoFar)
-          if (html.includes('<')) setGeneratedCode(html)
+          queuePreviewHtml(html)
         }
 
         const detectedMode = autoDetectMode(initialPrompt)
@@ -221,7 +237,7 @@ export default function BuilderPage() {
           messages: [userMsg],
           mode: detectedMode,
           onDelta: (chunk) => upsertAssistant(chunk),
-          onDone: () => { setIsLoading(false); const html = extractHtml(assistantSoFar); if (html.includes('<')) saveProject(html, finalMessages) },
+          onDone: () => { const html = extractHtml(assistantSoFar); queuePreviewHtml(html); setIsLoading(false); if (html.includes('<')) saveProject(html, finalMessages) },
           onError: (error) => { toast.error(error); setIsLoading(false) },
         }).catch((e) => { console.error(e); toast.error('Failed to generate'); setIsLoading(false) })
 
@@ -312,7 +328,7 @@ export default function BuilderPage() {
         finalMessages = updated; return updated
       })
       const html = extractHtml(assistantSoFar)
-      if (html.includes('<')) setGeneratedCode(html)
+      queuePreviewHtml(html)
     }
 
     try {
@@ -320,7 +336,7 @@ export default function BuilderPage() {
         messages: newMessages,
         mode: flowMode,
         onDelta: (chunk) => upsertAssistant(chunk),
-        onDone: () => { setIsLoading(false); const html = extractHtml(assistantSoFar); if (html.includes('<')) saveProject(html, finalMessages) },
+        onDone: () => { const html = extractHtml(assistantSoFar); queuePreviewHtml(html); setIsLoading(false); if (html.includes('<')) saveProject(html, finalMessages) },
         onError: (error) => { toast.error(error); setIsLoading(false) },
       })
     } catch (e) { console.error(e); toast.error('Failed to generate'); setIsLoading(false) }
@@ -373,7 +389,7 @@ export default function BuilderPage() {
         finalMessages = updated; return updated
       })
       const html = extractHtml(assistantSoFar)
-      if (html.includes('<')) setGeneratedCode(html)
+      queuePreviewHtml(html)
     }
 
     try {
@@ -381,9 +397,10 @@ export default function BuilderPage() {
         url,
         onDelta: (chunk) => upsertAssistant(chunk),
         onDone: () => {
+          const html = extractHtml(assistantSoFar)
+          queuePreviewHtml(html)
           setIsLoading(false)
           setIsCloning(false)
-          const html = extractHtml(assistantSoFar)
           if (html.includes('<')) saveProject(html, finalMessages)
           toast.success('Site cloned successfully! 🎉')
         },
@@ -626,6 +643,7 @@ export default function BuilderPage() {
                     deviceFrame={deviceFrame}
                     landscape={landscape}
                     previewKey={previewKey}
+                    previewId={previewId}
                     onRefresh={() => setPreviewKey(k => k + 1)}
                     publishedUrl={publishedUrl}
                     projectTitle={projectTitle}

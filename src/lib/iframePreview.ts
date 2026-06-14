@@ -4,7 +4,7 @@
  * runtime errors / console messages to the parent window via postMessage.
  *
  * Parent listens for messages of shape:
- *   { source: 'kubo-preview', kind: 'log'|'error'|'warn'|'info'|'debug'|'exception'|'rejection'|'resource'|'ready', ... }
+ *   { __kuboPreview: true, previewId?: string, kind: 'log'|'error'|'warn'|'info'|'debug'|'exception'|'rejection'|'resource'|'ready', ... }
  */
 
 export type PreviewLogKind =
@@ -26,12 +26,15 @@ export interface PreviewLogEntry {
   duration?: number
 }
 
-const INSTRUMENTATION = `
+function buildInstrumentation(previewId?: string): string {
+  const encodedPreviewId = JSON.stringify(previewId ?? null)
+
+  return `
 <script>
 (function(){
   try {
     var send = function(payload){
-      try { parent.postMessage(Object.assign({source:'kubo-preview'}, payload), '*'); } catch(e){}
+      try { parent.postMessage(Object.assign({__kuboPreview:true, previewId:${encodedPreviewId}}, payload), '*'); } catch(e){}
     };
     var stringify = function(args){
       try {
@@ -108,18 +111,19 @@ const INSTRUMENTATION = `
   } catch(e){}
 })();
 </script>`
+}
 
 /**
  * Wraps user code so it always renders full-screen with a white background
  * and instrumented error capture. Detects whether code is a fragment or a
  * full HTML document and injects the instrumentation in the right place.
  */
-export function wrapPreviewHtml(code: string, opts: { instrument?: boolean } = {}): string {
+export function wrapPreviewHtml(code: string, opts: { instrument?: boolean; previewId?: string } = {}): string {
   const instrument = opts.instrument !== false
   const src = code || ''
   const hasDoctype = /<!doctype\s+html/i.test(src)
   const hasHtmlTag = /<html[\s>]/i.test(src)
-  const inject = instrument ? INSTRUMENTATION : ''
+  const inject = instrument ? buildInstrumentation(opts.previewId) : ''
 
   if (hasDoctype || hasHtmlTag) {
     if (!instrument) return src
@@ -135,10 +139,14 @@ export function wrapPreviewHtml(code: string, opts: { instrument?: boolean } = {
 /**
  * Subscribe to preview messages. Returns an unsubscribe function.
  */
-export function subscribePreviewLogs(handler: (entry: PreviewLogEntry) => void): () => void {
+export function subscribePreviewLogs(
+  handler: (entry: PreviewLogEntry) => void,
+  opts: { previewId?: string } = {},
+): () => void {
   const listener = (ev: MessageEvent) => {
     const data = ev.data
-    if (!data || typeof data !== 'object' || data.source !== 'kubo-preview') return
+    if (!data || typeof data !== 'object' || (data.__kuboPreview !== true && data.source !== 'kubo-preview')) return
+    if (opts.previewId && data.previewId !== opts.previewId) return
     handler({
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       ts: Date.now(),

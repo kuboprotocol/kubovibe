@@ -9,6 +9,7 @@ export default function PublicAppPage() {
   const { projectId } = useParams<{ projectId: string }>()
   const [searchParams] = useSearchParams()
   const debug = searchParams.get('debug') === '1'
+  const previewId = `public-app:${projectId ?? 'unknown'}`
   const [html, setHtml] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -48,8 +49,8 @@ export default function PublicAppPage() {
         const next = [...prev, entry]
         return next.length > 500 ? next.slice(-500) : next
       })
-    })
-  }, [])
+    }, { previewId })
+  }, [previewId])
 
   if (loading) {
     return (
@@ -73,7 +74,7 @@ export default function PublicAppPage() {
   return (
     <div className="relative w-full h-screen">
       <iframe
-        srcDoc={wrapPreviewHtml(html || '')}
+        srcDoc={wrapPreviewHtml(html || '', { previewId })}
         title="Published App"
         className="w-full h-full border-0"
         sandbox="allow-scripts allow-forms allow-popups allow-same-origin allow-modals"
