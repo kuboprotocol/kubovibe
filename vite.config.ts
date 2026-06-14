@@ -1,8 +1,6 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react-swc';
 import { VitePWA } from 'vite-plugin-pwa';
-import compression from 'vite-plugin-compression';
-import { visualizer } from 'rollup-plugin-visualizer';
 import { componentTagger } from 'lovable-tagger';
 import { envCheckPlugin } from './vite-plugins/env-check';
 import path from 'path';
@@ -34,10 +32,8 @@ export default defineConfig(({ command, mode }) => {
     },
     plugins: [
       envCheckPlugin(),
-      react({ devTarget: 'es2020', productionTarget: 'es2020' }),
+      react({ devTarget: 'es2020' }),
       isDev && componentTagger(),
-      compression({ algorithm: 'brotli', threshold: 1024 * 10 }),
-      compression({ algorithm: 'gzip', threshold: 1024 * 10 }),
       VitePWA({
         registerType: 'autoUpdate',
         includeAssets: [
@@ -131,14 +127,6 @@ export default defineConfig(({ command, mode }) => {
           ],
         },
       }),
-      isProd &&
-        visualizer({
-          open: false,
-          file: 'dist/stats.html',
-          template: 'treemap',
-          gzipSize: true,
-          brotliSize: true,
-        }),
     ].filter(Boolean),
     resolve: {
       alias: {
