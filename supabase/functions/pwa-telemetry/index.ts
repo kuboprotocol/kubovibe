@@ -285,7 +285,11 @@ Deno.serve(async (req) => {
     if (sessionId) query = query.eq("session_id", sessionId);
     if (start) query = query.gte("created_at", start);
     if (end) query = query.lte("created_at", end);
-    if (q) query = query.or(`url.ilike.%${q}%,session_id.ilike.%${q}%,canvas_id.ilike.%${q}%`);
+    if (q) {
+      // Strict allowlist to prevent PostgREST filter injection
+      const safeQ = String(q).replace(/[^\w\s\-./:]/g, "").slice(0, 100);
+      if (safeQ) query = query.or(`url.ilike.%${safeQ}%,session_id.ilike.%${safeQ}%,canvas_id.ilike.%${safeQ}%`);
+    }
     query = query.order("created_at", { ascending: sort === "asc" });
 
     if (exportFmt) {
