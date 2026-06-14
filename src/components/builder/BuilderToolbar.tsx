@@ -14,7 +14,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
 import { toast } from 'sonner'
-import logoImg from '@/assets/logo-kubovibe.png'
+import logoImg from '@/assets/logo-kubovibe-3d.png'
 
 export type DeviceFrame = 'desktop' | 'tablet' | 'mobile'
 

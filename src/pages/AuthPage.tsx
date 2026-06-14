@@ -8,7 +8,7 @@ import { Loader2, Mail, Lock, User, ArrowRight, KeyRound, ShieldAlert } from 'lu
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/useAuth'
 import { motion, AnimatePresence } from 'framer-motion'
-import logoImg from '@/assets/logo-kubovibe.png'
+import logoImg from '@/assets/logo-kubovibe-3d.png'
 
 export default function AuthPage() {
   const navigate = useNavigate()

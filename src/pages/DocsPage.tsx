@@ -22,7 +22,7 @@ import {
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import logoImg from '@/assets/logo-kubovibe.png'
+import logoImg from '@/assets/logo-kubovibe-3d.png'
 
 interface DocSection {
   id: string
