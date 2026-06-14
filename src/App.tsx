@@ -52,13 +52,14 @@ const AdminPage = lazy(() => import("./pages/AdminPage"));
 const OrchestratorPage = lazy(() => import("./pages/OrchestratorPage"));
 const PwaTelemetryPage = lazy(() => import("./pages/PwaTelemetry"));
 const PwaExportJobDetailsPage = lazy(() => import("./pages/PwaExportJobDetails"));
+const DocsPage = lazy(() => import("./pages/DocsPage"));
 
 // Loading fallback component
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-screen bg-background">
     <div className="flex flex-col items-center gap-4">
       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      <p className="text-sm text-muted-foreground animate-pulse">Carregando Kubo Vibe...</p>
+      <p className="text-sm text-muted-foreground animate-pulse">Loading Kubo Vibe...</p>
     </div>
   </div>
 );
