@@ -48,11 +48,9 @@ export default defineConfig(({ command, mode }) => {
           maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
           globPatterns: [
             'index.html',
-            'assets/index-*.css',
-            'assets/index-*.js',
-            'assets/vendor-*.js',
+            'assets/*.css',
+            'js/*.js',
             'placeholders/*.svg',
-            'game/**/*.{json,webp}',
           ],
           globIgnores: ['**/*.map', '**/vendor-tldraw-*.js'],
           runtimeCaching: [
