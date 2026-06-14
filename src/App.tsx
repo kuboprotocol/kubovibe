@@ -38,6 +38,7 @@ const EmailDashboardPage = lazy(() => import("./pages/EmailDashboardPage"));
 const PlanPage = lazy(() => import("./pages/PlanPage"));
 const SharedAuditPage = lazy(() => import("./pages/SharedAuditPage"));
 const GamePage = lazy(() => import("./pages/GamePage"));
+const GameEditorPage = lazy(() => import("./pages/GameEditorPage"));
 const AdminSkillsPage = lazy(() => import("./pages/AdminSkillsPage"));
 const DomainsPage = lazy(() => import("./pages/DomainsPage"));
 const CreativePage = lazy(() => import("./pages/CreativePage"));
@@ -204,6 +205,7 @@ const App = () => {
                 <Route path="/app/:projectId/:slug" element={<PublicAppPage />} />
                 <Route path="/unsubscribe" element={<UnsubscribePage />} />
                 <Route path="/game" element={<ProtectedRoute><GamePage /></ProtectedRoute>} />
+                <Route path="/game/editor" element={<ProtectedRoute><GameEditorPage /></ProtectedRoute>} />
                 <Route path="/admin/skills" element={<ProtectedRoute><AdminSkillsPage /></ProtectedRoute>} />
                 <Route path="/domains" element={<ProtectedRoute><DomainsPage /></ProtectedRoute>} />
                 
