@@ -48,11 +48,9 @@ export default defineConfig(({ command, mode }) => {
           maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
           globPatterns: [
             'index.html',
-            'assets/index-*.css',
-            'assets/index-*.js',
-            'assets/vendor-*.js',
+            'assets/*.css',
+            'js/*.js',
             'placeholders/*.svg',
-            'game/**/*.{json,webp}',
           ],
           globIgnores: ['**/*.map', '**/vendor-tldraw-*.js'],
           runtimeCaching: [
@@ -165,7 +163,7 @@ export default defineConfig(({ command, mode }) => {
               '@radix-ui/react-tooltip',
             ],
             'vendor-three': ['three'],
-            'vendor-babylon': ['babylon.js'],
+            'vendor-babylon': ['@babylonjs/core'],
             'vendor-physics': ['cannon-es', 'p2', 'oimo'],
             'vendor-graphics': ['pixi.js', 'three-mesh-ui', 'gsap'],
             'vendor-web3': ['@supabase/supabase-js', '@tanstack/react-query'],
