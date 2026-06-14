@@ -13,7 +13,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Progress } from '@/components/ui/progress'
 import { PromoCards } from '@/components/dashboard/PromoCards'
-import logoImg from '@/assets/logo-kubovibe.png'
+import logoImg from '@/assets/logo-kubovibe-3d.png'
 import CreditLedger from '@/components/CreditLedger'
 import { Gamepad2, Sparkles, Palette } from 'lucide-react'
 

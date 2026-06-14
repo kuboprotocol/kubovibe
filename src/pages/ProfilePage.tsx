@@ -10,7 +10,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useAvatarUrl } from '@/hooks/useAvatarUrl'
 import { toast } from 'sonner'
 import { motion } from 'framer-motion'
-import logoImg from '@/assets/logo-kubovibe.png'
+import logoImg from '@/assets/logo-kubovibe-3d.png'
 
 export default function ProfilePage() {
   const navigate = useNavigate()

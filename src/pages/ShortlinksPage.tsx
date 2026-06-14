@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
 import { toast } from 'sonner'
-import logoImg from '@/assets/logo-kubovibe.png'
+import logoImg from '@/assets/logo-kubovibe-3d.png'
 import StreakCard from '@/components/shortlinks/StreakCard'
 import BadgesCard from '@/components/shortlinks/BadgesCard'
 import {

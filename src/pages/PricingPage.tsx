@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
 import { toast } from 'sonner'
 import { useState, useEffect } from 'react'
-import logoImg from '@/assets/logo-kubovibe.png'
+import logoImg from '@/assets/logo-kubovibe-3d.png'
 
 const allPackages = [
   { id: 'free', name: 'Free', price: '$0', priceNum: 0, credits: 5, description: 'Comece grátis com 5 créditos', icon: Gift, badge: '🎁', color: 'from-muted to-secondary', borderColor: 'border-border', isFree: true, visible: true },

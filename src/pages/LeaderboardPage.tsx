@@ -5,7 +5,7 @@ import { ArrowLeft, Trophy, Flame, Crown, Medal } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
-import logoImg from '@/assets/logo-kubovibe.png'
+import logoImg from '@/assets/logo-kubovibe-3d.png'
 
 interface LeaderboardEntry {
   user_id: string
