@@ -10,7 +10,7 @@ import { IGameEngine } from './base';
 export class PixiJSEngine implements IGameEngine {
   private app: PIXI.Application | null = null;
   private entities = new Map<string, GameEntity>();
-  private entitySprites = new Map<string, PIXI.DisplayObject>();
+  private entitySprites = new Map<string, PIXI.Container>();
   private stats = { fps: 0, meshes: 0, triangles: 0 };
 
   async initialize(config: GameConfig): Promise<void> {
@@ -19,7 +19,7 @@ export class PixiJSEngine implements IGameEngine {
       width: config.width,
       height: config.height,
       antialias: config.antialias,
-      transparent: config.alpha,
+      backgroundAlpha: config.alpha ? 0 : 1,
       resolution: window.devicePixelRatio,
       powerPreference: 'high-performance',
     });

@@ -44,7 +44,7 @@ export class ThreeJSEngine implements IGameEngine {
     this.renderer.setSize(config.width, config.height);
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFShadowShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
 
     // Default lighting
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
