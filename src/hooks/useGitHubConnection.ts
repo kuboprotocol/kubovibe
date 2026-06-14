@@ -31,25 +31,25 @@ export function useGitHubConnection() {
 
   useEffect(() => { fetchConnection() }, [fetchConnection])
 
-  // Handle OAuth callback params on mount (token agora persiste no servidor)
+  // Handle OAuth callback params on mount (token now persists on the server)
   useEffect(() => {
     if (!user) return
     const params = new URLSearchParams(window.location.search)
     if (params.get('success') === 'true') {
-      toast.success('GitHub conectado com sucesso!')
+      toast.success('GitHub connected successfully!')
       fetchConnection()
       window.history.replaceState({}, '', window.location.pathname)
     }
     if (params.get('error')) {
-      toast.error(`Erro ao conectar: ${params.get('error')}`)
+      toast.error(`Connection error: ${params.get('error')}`)
       window.history.replaceState({}, '', window.location.pathname)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user])
 
   const connect = async () => {
-    // GitHub agora conecta via PAT na própria KUBO (sem OAuth externo).
-    // Direciona o usuário para a subpágina de setup interno.
+    // GitHub now connects via PAT inside KUBO (no external OAuth).
+    // Redirects the user to the internal setup subpage.
     setConnecting(true)
     window.location.href = '/connectors/github/setup'
   }
@@ -61,14 +61,14 @@ export function useGitHubConnection() {
       supabase.from('api_credentials').delete().eq('user_id', user.id).eq('connector_slug', 'github'),
     ])
     if (error) {
-      toast.error('Erro ao desconectar')
+      toast.error('Disconnection error')
     } else {
       setConnection(null)
-      toast.info('GitHub desconectado.')
+      toast.info('GitHub disconnected.')
       logConnectorEvent({
         connectorSlug: 'github',
         eventType: 'disconnected',
-        message: 'GitHub desconectado',
+        message: 'GitHub disconnected',
         status: 'info',
       })
     }

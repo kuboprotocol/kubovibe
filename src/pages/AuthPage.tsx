@@ -35,7 +35,7 @@ export default function AuthPage() {
     const { error } = await lovable.auth.signInWithOAuth('google', {
       redirect_uri: `${window.location.origin}${safeRedirect}`,
     })
-    if (error) toast.error('Erro ao entrar com Google')
+    if (error) toast.error('Error signing in with Google')
   }
 
   const handleForgotPassword = async (e: React.FormEvent) => {
@@ -46,10 +46,10 @@ export default function AuthPage() {
         redirectTo: `${window.location.origin}/reset-password`,
       })
       if (error) throw error
-      toast.success('Email de recuperação enviado! Verifique sua caixa de entrada.')
+      toast.success('Recovery email sent! Check your inbox.')
       setForgotPassword(false)
     } catch (err: any) {
-      toast.error(err.message || 'Erro ao enviar email de recuperação')
+      toast.error(err.message || 'Error sending recovery email')
     } finally {
       setSubmitting(false)
     }
@@ -74,7 +74,7 @@ export default function AuthPage() {
           },
         })
         if (error) throw error
-        toast.success('Conta criada com sucesso!')
+        toast.success('Account created successfully!')
 
         // Send welcome email (fire-and-forget)
         supabase.functions.invoke('send-transactional-email', {
@@ -89,13 +89,13 @@ export default function AuthPage() {
         navigate(safeRedirect, { replace: true })
       }
     } catch (err: any) {
-      const msg = err.message || 'Erro na autenticação'
+      const msg = err.message || 'Authentication error'
       if (msg.includes('Invalid login credentials')) {
-        toast.error('Email ou senha incorretos. Verifique seus dados ou crie uma conta.')
+        toast.error('Incorrect email or password. Check your details or create an account.')
       } else if (msg.includes('User already registered')) {
-        toast.error('Este email já está cadastrado. Tente fazer login.')
+        toast.error('This email is already registered. Try logging in.')
       } else if (msg.includes('security purposes')) {
-        toast.error('Aguarde alguns segundos antes de tentar novamente.')
+        toast.error('Please wait a few seconds before trying again.')
       } else {
         toast.error(msg)
       }
@@ -129,15 +129,15 @@ export default function AuthPage() {
                 <div className="h-14 w-14 rounded-2xl gradient-primary flex items-center justify-center mx-auto mb-5 shadow-glow">
                   <KeyRound className="h-7 w-7 text-primary-foreground" />
                 </div>
-                <h1 className="text-2xl font-display font-bold text-foreground">Recuperar senha</h1>
-                <p className="text-sm text-muted-foreground mt-2">Enviaremos um link para redefinir sua senha</p>
+                <h1 className="text-2xl font-display font-bold text-foreground">Recover password</h1>
+                <p className="text-sm text-muted-foreground mt-2">We will send a link to reset your password</p>
               </div>
               <form onSubmit={handleForgotPassword} className="space-y-5">
                 <div className="relative">
                   <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     type="email"
-                    placeholder="Seu email"
+                    placeholder="Your email"
                     value={resetEmail}
                     onChange={(e) => setResetEmail(e.target.value)}
                     required
@@ -146,12 +146,12 @@ export default function AuthPage() {
                 </div>
                 <Button type="submit" data-testid="auth-recover-submit" variant="hero" className="w-full h-12 rounded-xl text-sm font-semibold gap-2" disabled={submitting}>
                   {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
-                  Enviar link de recuperação
+                  Send recovery link
                 </Button>
               </form>
               <p className="text-center text-sm text-muted-foreground mt-6">
                 <button onClick={() => setForgotPassword(false)} className="text-primary hover:text-primary/80 font-semibold transition-colors">
-                  ← Voltar ao login
+                  ← Back to login
                 </button>
               </p>
             </div>
@@ -171,10 +171,10 @@ export default function AuthPage() {
                   <img src={logoImg} alt="KUBO VIBE" className="h-12" />
                 </div>
                 <h1 className="text-2xl font-display font-bold text-foreground">
-                  {isLogin ? 'Bem-vindo de volta' : 'Criar sua conta'}
+                  {isLogin ? 'Welcome back' : 'Create your account'}
                 </h1>
                 <p className="text-sm text-muted-foreground mt-2">
-                  {isLogin ? 'Acesse seus projetos no KUBO VIBE' : 'Comece a criar apps incríveis'}
+                  {isLogin ? 'Access your projects on KUBO VIBE' : 'Start building amazing apps'}
                 </p>
               </div>
 
@@ -190,15 +190,15 @@ export default function AuthPage() {
                   <div className="text-xs text-foreground/90 leading-relaxed">
                     {safeRedirect.startsWith('/connectors') ? (
                       <>
-                        A área de <span className="font-semibold text-primary">Conectores</span> é protegida.
-                        Faça login para continuar e voltaremos automaticamente para{' '}
+                        The <span className="font-semibold text-primary">Connectors</span> area is protected.
+                        Log in to continue and we'll redirect you back to{' '}
                         <code className="px-1 py-0.5 rounded bg-secondary/70 text-[11px] font-mono text-foreground">
                           {safeRedirect}
                         </code>.
                       </>
                     ) : (
                       <>
-                        Esta página é protegida. Faça login para continuar e voltaremos automaticamente para{' '}
+                        This page is protected. Log in to continue and we'll redirect you back to{' '}
                         <code className="px-1 py-0.5 rounded bg-secondary/70 text-[11px] font-mono text-foreground">
                           {safeRedirect}
                         </code>.
@@ -219,12 +219,12 @@ export default function AuthPage() {
                   <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
                   <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
                 </svg>
-                Entrar com Google
+                Sign In com Google
               </Button>
 
               <div className="flex items-center gap-3 mb-4">
                 <div className="h-px flex-1 bg-border/50" />
-                <span className="text-xs text-muted-foreground">ou use email</span>
+                <span className="text-xs text-muted-foreground">or use email</span>
                 <div className="h-px flex-1 bg-border/50" />
               </div>
 
@@ -236,7 +236,7 @@ export default function AuthPage() {
                     isLogin ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  Entrar
+                  Sign In
                 </button>
                 <button
                   onClick={() => setIsLogin(false)}
@@ -244,7 +244,7 @@ export default function AuthPage() {
                     !isLogin ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  Criar conta
+                  Sign Up
                 </button>
               </div>
 
@@ -262,7 +262,7 @@ export default function AuthPage() {
                       <div className="relative pb-1">
                         <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
-                          placeholder="Seu nome"
+                          placeholder="Your name"
                           value={displayName}
                           onChange={(e) => setDisplayName(e.target.value)}
                           required
@@ -303,7 +303,7 @@ export default function AuthPage() {
                       onClick={() => setForgotPassword(true)}
                       className="text-xs text-primary hover:text-primary/80 font-medium transition-colors"
                     >
-                      Esqueci minha senha
+                      Forgot my password
                     </button>
                   </div>
                 )}
@@ -314,17 +314,17 @@ export default function AuthPage() {
                   ) : (
                     <ArrowRight className="h-4 w-4" />
                   )}
-                  {isLogin ? 'Entrar na conta' : 'Criar minha conta'}
+                  {isLogin ? 'Sign In na conta' : 'Create my account'}
                 </Button>
               </form>
 
               <p className="text-center text-sm text-muted-foreground mt-6">
-                {isLogin ? 'Novo por aqui?' : 'Já tem conta?'}{' '}
+                {isLogin ? 'New here?' : 'Already have an account?'}{' '}
                 <button
                   onClick={() => setIsLogin(!isLogin)}
                   className="text-primary hover:text-primary/80 font-semibold transition-colors"
                 >
-                  {isLogin ? 'Crie sua conta grátis' : 'Faça login'}
+                  {isLogin ? 'Create your free account' : 'Sign in'}
                 </button>
               </p>
             </div>

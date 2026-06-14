@@ -55,13 +55,13 @@ export default function CreditLedger({ userId }: { userId: string }) {
           <h3 className="font-display tracking-wider">CREDIT LEDGER</h3>
         </div>
         {balance !== null && (
-          <Badge className="neon-ring-gold">{balance} créditos</Badge>
+          <Badge className="neon-ring-gold">{balance} credits</Badge>
         )}
       </div>
 
       {txs.length === 0 ? (
         <p className="text-sm text-muted-foreground py-6 text-center">
-          Nenhuma transação ainda. Atualizações aparecerão em tempo real.
+          No transactions yet. Updates will appear in real time.
         </p>
       ) : (
         <div className="space-y-2 max-h-80 overflow-y-auto">
