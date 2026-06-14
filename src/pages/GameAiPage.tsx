@@ -44,6 +44,49 @@ export default function GameAiPage() {
   const [blueprint, setBlueprint] = useState<Blueprint | null>(null);
   const [designDoc, setDesignDoc] = useState('');
   const previewRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+
+  const blueprintToScene = (bp: Blueprint): SerializedScene => {
+    const entities: SerializedEntity[] = (bp.scene?.entities ?? []).map((e, i) => {
+      const mesh: 'cube' | 'sphere' | 'npc' =
+        e.kind === 'npc' || e.kind === 'enemy' || e.kind === 'player' ? 'npc'
+        : e.kind === 'portal' ? 'sphere' : 'cube';
+      const color = parseInt((e.color ?? '#C9941A').replace('#', ''), 16);
+      return {
+        id: i + 1,
+        name: e.name || `${e.kind}-${i}`,
+        transform: { x: e.position.x, y: e.position.y, z: e.position.z, rot: 0 },
+        renderable: { mesh, color: isNaN(color) ? 0xc9941a : color, scale: 1 },
+        npc: mesh === 'npc' ? { npcId: e.name || `npc-${i}`, persona: e.persona ?? e.kind } : undefined,
+      };
+    });
+    return {
+      version: 1,
+      name: bp.title ?? 'AI Blueprint',
+      createdAt: new Date().toISOString(),
+      entities,
+    };
+  };
+
+  const sendToEditor = () => {
+    if (!blueprint) return;
+    const scene = blueprintToScene(blueprint);
+    localStorage.setItem(EDITOR_STORAGE_KEY, JSON.stringify(scene));
+    toast.success('Blueprint loaded into the editor');
+    navigate('/game/editor');
+  };
+
+  const downloadBlueprint = () => {
+    if (!blueprint) return;
+    const blob = new Blob([JSON.stringify({ blueprint, designDoc }, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${(blueprint.title ?? 'kubo-blueprint').toLowerCase().replace(/\s+/g, '-')}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
 
   // Live preview of generated scene
   useEffect(() => {
