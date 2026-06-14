@@ -9,6 +9,10 @@
 import * as THREE from 'three';
 import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
 import { XRControllerModelFactory } from 'three/examples/jsm/webxr/XRControllerModelFactory.js';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { buildCinematicEnvironment } from './environment';
 import {
   VR_QUALITY,
@@ -35,6 +39,8 @@ export class VrScene {
   private frameCount = 0;
   private lastFpsAt = performance.now();
   private objects = new Map<string, THREE.Object3D>();
+  private composer: EffectComposer | null = null;
+  private bloomPass: UnrealBloomPass | null = null;
 
   constructor(opts: VrSceneOptions) {
     this.quality =
@@ -69,10 +75,24 @@ export class VrScene {
     this.playerRig.add(this.camera);
     this.scene.add(this.playerRig);
 
-    buildCinematicEnvironment(this.scene, this.quality);
+    buildCinematicEnvironment(this.scene, this.quality, this.renderer);
     this.setupControllers();
+    this.setupPostProcessing(opts.canvas);
     this.bindResize(opts.canvas);
     this.bindXrEvents();
+  }
+
+  private setupPostProcessing(canvas: HTMLCanvasElement): void {
+    if (this.quality.bloom <= 0) return;
+    const w = canvas.clientWidth || window.innerWidth;
+    const h = canvas.clientHeight || window.innerHeight;
+    this.composer = new EffectComposer(this.renderer);
+    this.composer.setPixelRatio(this.renderer.getPixelRatio());
+    this.composer.setSize(w, h);
+    this.composer.addPass(new RenderPass(this.scene, this.camera));
+    this.bloomPass = new UnrealBloomPass(new THREE.Vector2(w, h), this.quality.bloom, 0.9, 0.82);
+    this.composer.addPass(this.bloomPass);
+    this.composer.addPass(new OutputPass());
   }
 
   /** Append a "Enter VR" button into the parent element. */
@@ -187,7 +207,12 @@ export class VrScene {
   private tick(): void {
     const dt = this.clock.getDelta();
     for (const fn of this.updates) fn(dt, { scene: this.scene, camera: this.camera, xrActive: this.xrActive });
-    this.renderer.render(this.scene, this.camera);
+    // Post-processing is disabled while in XR (WebXR drives its own framebuffer).
+    if (this.composer && !this.xrActive) {
+      this.composer.render();
+    } else {
+      this.renderer.render(this.scene, this.camera);
+    }
 
     this.frameCount++;
     const now = performance.now();
@@ -224,6 +249,8 @@ export class VrScene {
       this.renderer.setSize(w, h, false);
       this.camera.aspect = w / h;
       this.camera.updateProjectionMatrix();
+      this.composer?.setSize(w, h);
+      this.bloomPass?.setSize(w, h);
     };
     window.addEventListener('resize', handler);
     handler();
