@@ -57,7 +57,7 @@ export default function LeaderboardPage() {
           user_id: s.user_id,
           current_streak: s.current_streak,
           longest_streak: s.longest_streak,
-          display_name: profile?.display_name || 'Anônimo',
+          display_name: profile?.display_name || 'Anonymous',
           avatar_url: profile?.avatar_url || null,
         }
       })
@@ -102,11 +102,11 @@ export default function LeaderboardPage() {
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-yellow-500/20 flex items-center justify-center mx-auto mb-4">
             <Trophy className="h-8 w-8 text-primary" />
           </div>
-          <h1 className="font-display font-bold text-2xl text-foreground">🏆 Ranking de Streaks</h1>
-          <p className="text-muted-foreground text-sm mt-1">Os maiores streaks da comunidade Kubo Vibe</p>
+          <h1 className="font-display font-bold text-2xl text-foreground">🏆 Streak Leaderboard</h1>
+          <p className="text-muted-foreground text-sm mt-1">The longest streaks in the Kubo Vibe community</p>
           {userRank && (
             <p className="text-primary text-sm font-bold mt-2">
-              Sua posição: #{userRank}
+              Your rank: #{userRank}
             </p>
           )}
         </motion.div>
@@ -114,13 +114,13 @@ export default function LeaderboardPage() {
         {loading ? (
           <div className="text-center py-12">
             <Flame className="h-8 w-8 text-primary mx-auto animate-pulse mb-3" />
-            <p className="text-muted-foreground">Carregando ranking...</p>
+            <p className="text-muted-foreground">Loading leaderboard...</p>
           </div>
         ) : entries.length === 0 ? (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-12">
-            <p className="text-muted-foreground">Nenhum streak registrado ainda.</p>
+            <p className="text-muted-foreground">No streaks registered yet.</p>
             <Button variant="hero" className="mt-4" onClick={() => navigate('/shortlinks')}>
-              🔥 Começar meu streak
+              🔥 Start my streak
             </Button>
           </motion.div>
         ) : (
@@ -161,11 +161,11 @@ export default function LeaderboardPage() {
                   {/* Name & streak */}
                   <div className="flex-1 min-w-0">
                     <p className={`font-bold truncate ${isCurrentUser ? 'text-primary' : 'text-foreground'}`}>
-                      {entry.display_name || 'Anônimo'}
-                      {isCurrentUser && <span className="text-xs ml-1 opacity-70">(você)</span>}
+                      {entry.display_name || 'Anonymous'}
+                      {isCurrentUser && <span className="text-xs ml-1 opacity-70">(you)</span>}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Streak atual: {entry.current_streak} dias
+                      Current streak: {entry.current_streak} days
                     </p>
                   </div>
 
@@ -174,7 +174,7 @@ export default function LeaderboardPage() {
                     <div className={`text-xl font-display font-bold ${rankStyle ? rankStyle.color : 'text-primary'}`}>
                       {entry.longest_streak}
                     </div>
-                    <span className="text-xs text-muted-foreground">recorde</span>
+                    <span className="text-xs text-muted-foreground">record</span>
                   </div>
                 </motion.div>
               )
@@ -190,7 +190,7 @@ export default function LeaderboardPage() {
             onClick={() => navigate('/shortlinks')}
           >
             <Flame className="h-4 w-4" />
-            🔥 Voltar para ganhar créditos
+            🔥 Back to earn credits
           </Button>
         </motion.div>
       </main>

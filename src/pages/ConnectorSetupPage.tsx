@@ -65,8 +65,8 @@ export default function ConnectorSetupPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
         <div className="text-center space-y-3">
-          <p className="text-lg">Conector não encontrado</p>
-          <Button onClick={() => navigate('/connectors')}>Voltar aos conectores</Button>
+          <p className="text-lg">Connector not found</p>
+          <Button onClick={() => navigate('/connectors')}>Back to connectors</Button>
         </div>
       </div>
     )
@@ -74,11 +74,11 @@ export default function ConnectorSetupPage() {
 
   const handleSave = async () => {
     if (!accepted) {
-      toast.error('Você precisa aceitar os termos antes de continuar.')
+      toast.error('You must accept the terms before continuing.')
       return
     }
     if (apiKey.trim().length < 8) {
-      toast.error('A API Key parece inválida (mínimo 8 caracteres).')
+      toast.error('The API Key appears invalid (minimum 8 characters).')
       return
     }
     setSaving(true)
@@ -99,13 +99,13 @@ export default function ConnectorSetupPage() {
           .eq('connector_slug', slug)
           .maybeSingle()
         setExisting(cred ?? null)
-        toast.success(`GitHub vinculado: @${gh.login}`)
+        toast.success(`GitHub linked: @${gh.login}`)
       } else {
-        toast.success(`${connector.name} conectado com sucesso!`)
+        toast.success(`${connector.name} connected successfully!`)
         navigate(`/connectors/${slug}`)
       }
     } catch (e: any) {
-      toast.error(`Falha ao salvar: ${e.message ?? 'erro desconhecido'}`)
+      toast.error(`Failed to save: ${e.message ?? 'unknown error'}`)
     } finally {
       setSaving(false)
     }
@@ -122,11 +122,11 @@ export default function ConnectorSetupPage() {
       const r = data as any
       setTestResult({ ok: !!r?.ok, status: r?.status ?? 0, account: r?.account, detail: r?.detail })
       if (r?.ok) toast.success(`Conexão validada${r.account ? ` · ${r.account}` : ''}`)
-      else toast.error(`Falha no teste: ${r?.detail ?? `HTTP ${r?.status}`}`)
+      else toast.error(`Test failed: ${r?.detail ?? `HTTP ${r?.status}`}`)
     } catch (e: any) {
-      const msg = e?.message ?? 'erro desconhecido'
+      const msg = e?.message ?? 'unknown error'
       setTestResult({ ok: false, status: 0, detail: msg })
-      toast.error(`Erro ao testar: ${msg}`)
+      toast.error(`Error testing: ${msg}`)
     } finally {
       setTesting(false)
     }
@@ -150,8 +150,8 @@ export default function ConnectorSetupPage() {
               <Icon className="h-5 w-5" style={{ color: connector.color }} />
             </div>
             <div>
-              <h1 className="text-xl font-bold font-display">Conectar {connector.name}</h1>
-              <p className="text-xs text-muted-foreground">Setup interno · KUBO Vibe Dev</p>
+              <h1 className="text-xl font-bold font-display">Connect {connector.name}</h1>
+              <p className="text-xs text-muted-foreground">Internal setup · KUBO Vibe Dev</p>
             </div>
           </div>
         </div>
@@ -163,16 +163,16 @@ export default function ConnectorSetupPage() {
         transition={{ duration: 0.35 }}
         className="max-w-3xl mx-auto px-4 py-8 space-y-6"
       >
-        {/* Aviso responsabilidade */}
+        {/* Responsibility notice */}
         <Card className="p-5 border-amber-500/30 bg-amber-500/5">
           <div className="flex gap-3">
             <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
             <div className="space-y-2 text-sm">
-              <p className="font-semibold text-foreground">Serviço de terceiros</p>
+              <p className="font-semibold text-foreground">Third-party service</p>
               <p className="text-muted-foreground">
-                <strong>{connector.name}</strong> é um serviço externo, independente da KUBO. Cobranças,
-                limites de uso, política de API e segurança da conta são de responsabilidade exclusiva
-                do provedor. A KUBO apenas integra e automatiza chamadas usando a sua chave.
+                <strong>{connector.name}</strong> is an external service, independent of KUBO. Charges,
+                usage limits, API policies, and account security are solely the responsibility
+                of the provider. KUBO only integrates and automates calls using your key.
               </p>
             </div>
           </div>
@@ -182,7 +182,7 @@ export default function ConnectorSetupPage() {
           <Card className="p-4 border-primary/40 bg-primary/5 flex gap-3 items-start">
             <KeyRound className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
             <div className="text-sm space-y-1">
-              <p className="font-semibold text-foreground">Login GitHub via PAT</p>
+              <p className="font-semibold text-foreground">GitHub Login via PAT</p>
               <p className="text-muted-foreground text-xs">
                 Sem OAuth externo. A KUBO valida seu Personal Access Token na API do GitHub e
                 vincula sua conta automaticamente — só então você é levado ao painel do conector.
@@ -204,7 +204,7 @@ export default function ConnectorSetupPage() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <p className="font-semibold text-foreground">@{githubProfile.login}</p>
                   <Badge variant="outline" className="border-emerald-500/40 text-emerald-400 text-[10px]">
-                    <CheckCircle2 className="h-3 w-3 mr-1" /> Vinculado via PAT
+                    <CheckCircle2 className="h-3 w-3 mr-1" /> Linked via PAT
                   </Badge>
                 </div>
                 <a
@@ -217,7 +217,7 @@ export default function ConnectorSetupPage() {
                 </a>
               </div>
               <Button size="sm" onClick={() => navigate('/connectors/github')}>
-                Abrir painel
+                Open panel
               </Button>
             </div>
           </Card>
@@ -229,9 +229,9 @@ export default function ConnectorSetupPage() {
             <div className="flex items-center gap-3">
               <CheckCircle2 className="h-5 w-5 text-emerald-500 flex-shrink-0" />
               <div className="flex-1 text-sm">
-                <p className="font-medium">Chave configurada</p>
+                <p className="font-medium">Key configured</p>
                 <p className="text-muted-foreground text-xs">
-                  {existing.masked_hint ?? '••••'} · atualizada {new Date(existing.updated_at).toLocaleDateString()}
+                  {existing.masked_hint ?? '••••'} · updated {new Date(existing.updated_at).toLocaleDateString()}
                 </p>
               </div>
               <Button
@@ -241,7 +241,7 @@ export default function ConnectorSetupPage() {
                 disabled={testing}
               >
                 {testing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plug className="h-4 w-4 mr-2" />}
-                Testar conexão
+                Test connection
               </Button>
             </div>
 
@@ -259,10 +259,10 @@ export default function ConnectorSetupPage() {
                   : <XCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />}
                 <div className="flex-1 space-y-0.5">
                   <p className="font-medium">
-                    {testResult.ok ? 'Conexão OK' : 'Falha na conexão'}
+                    {testResult.ok ? 'Connection OK' : 'Connection failed'}
                     {testResult.status ? ` · HTTP ${testResult.status}` : ''}
                   </p>
-                  {testResult.account && <p className="text-xs opacity-90">Conta: {testResult.account}</p>}
+                  {testResult.account && <p className="text-xs opacity-90">Account: {testResult.account}</p>}
                   {testResult.detail && <p className="text-xs opacity-80 break-words">{testResult.detail}</p>}
                 </div>
               </div>
@@ -273,7 +273,7 @@ export default function ConnectorSetupPage() {
         {/* Steps */}
         <div className="space-y-3">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-            Como obter sua {connector.apiKeyLabel}
+            How to get your {connector.apiKeyLabel}
           </h2>
           {connector.setupSteps.map((step, i) => (
             <Card key={i} className="p-4 flex gap-4">
@@ -293,7 +293,7 @@ export default function ConnectorSetupPage() {
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
             >
-              Abrir página oficial do {connector.name}
+              Open official page for {connector.name}
               <ExternalLink className="h-3 w-3" />
               <span className="text-muted-foreground">(site externo)</span>
             </a>
@@ -305,11 +305,11 @@ export default function ConnectorSetupPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <KeyRound className="h-5 w-5 text-primary" />
-              <h2 className="font-semibold">Conectar à KUBO</h2>
+              <h2 className="font-semibold">Connect à KUBO</h2>
             </div>
             {connector.slug === 'github' && (
               <Badge variant="outline" className="text-[10px] uppercase font-bold text-primary border-primary/40">
-                Token PAT Requerido
+                PAT Token Required
               </Badge>
             )}
           </div>
@@ -331,7 +331,7 @@ export default function ConnectorSetupPage() {
           <div className="flex items-start gap-3 rounded-lg border border-border p-3 bg-muted/30">
             <ShieldCheck className="h-5 w-5 text-emerald-500 flex-shrink-0 mt-0.5" />
             <p className="text-xs text-muted-foreground">
-              Sua chave é cifrada com <strong>AES-256-GCM</strong> antes de ser persistida e nunca é
+              Your key is encrypted with <strong>AES-256-GCM</strong> antes de ser persistida e nunca é
               devolvida em claro ao navegador. Apenas as edge functions da KUBO podem descifrar para
               executar ações em seu nome.
             </p>
@@ -345,8 +345,8 @@ export default function ConnectorSetupPage() {
               className="mt-0.5"
             />
             <span className="text-sm text-muted-foreground">
-              Li e aceito que <strong>{connector.name}</strong> é um serviço de terceiros e que a KUBO
-              apenas integra/automatiza chamadas usando minha chave.
+              I have read and accept that <strong>{connector.name}</strong> is a third-party service and that KUBO
+              only integrates/automates calls using my key.
             </span>
           </label>
 
@@ -357,7 +357,7 @@ export default function ConnectorSetupPage() {
               disabled={saving}
               className="flex-1"
             >
-              Cancelar
+              Cancel
             </Button>
             <Button
               onClick={handleSave}
@@ -365,7 +365,7 @@ export default function ConnectorSetupPage() {
               className={cn('flex-1')}
             >
               {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {existing ? 'Atualizar chave' : 'Salvar e ativar'}
+              {existing ? 'Update key' : 'Save and activate'}
             </Button>
           </div>
         </Card>

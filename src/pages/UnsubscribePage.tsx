@@ -66,18 +66,18 @@ const UnsubscribePage = () => {
         {status === "loading" && (
           <>
             <Loader2 className="w-12 h-12 text-primary mx-auto animate-spin" />
-            <p className="text-muted-foreground">Verificando...</p>
+            <p className="text-muted-foreground">Verifying...</p>
           </>
         )}
 
         {status === "valid" && (
           <>
-            <h1 className="text-2xl font-bold text-foreground font-orbitron">Cancelar inscrição</h1>
+            <h1 className="text-2xl font-bold text-foreground font-orbitron">Unsubscribe</h1>
             <p className="text-muted-foreground">
-              Tem certeza que deseja cancelar o recebimento de emails do KUBO VIBE?
+              Are you sure you want to stop receiving emails from KUBO VIBE?
             </p>
             <Button onClick={handleUnsubscribe} className="w-full" variant="destructive">
-              Confirmar cancelamento
+              Confirm unsubscribe
             </Button>
           </>
         )}
@@ -85,9 +85,9 @@ const UnsubscribePage = () => {
         {status === "success" && (
           <>
             <CheckCircle className="w-12 h-12 text-green-500 mx-auto" />
-            <h1 className="text-2xl font-bold text-foreground font-orbitron">Inscrição cancelada</h1>
+            <h1 className="text-2xl font-bold text-foreground font-orbitron">Unsubscribed</h1>
             <p className="text-muted-foreground">
-              Você não receberá mais emails do KUBO VIBE.
+              You will no longer receive emails from KUBO VIBE.
             </p>
           </>
         )}
@@ -95,9 +95,9 @@ const UnsubscribePage = () => {
         {status === "already" && (
           <>
             <CheckCircle className="w-12 h-12 text-muted-foreground mx-auto" />
-            <h1 className="text-2xl font-bold text-foreground font-orbitron">Já cancelado</h1>
+            <h1 className="text-2xl font-bold text-foreground font-orbitron">Already unsubscribed</h1>
             <p className="text-muted-foreground">
-              Você já cancelou a inscrição anteriormente.
+              You have already unsubscribed previously.
             </p>
           </>
         )}
@@ -105,9 +105,9 @@ const UnsubscribePage = () => {
         {status === "invalid" && (
           <>
             <XCircle className="w-12 h-12 text-destructive mx-auto" />
-            <h1 className="text-2xl font-bold text-foreground font-orbitron">Link inválido</h1>
+            <h1 className="text-2xl font-bold text-foreground font-orbitron">Invalid link</h1>
             <p className="text-muted-foreground">
-              Este link de cancelamento é inválido ou expirou.
+              This unsubscribe link is invalid or has expired.
             </p>
           </>
         )}
@@ -117,17 +117,17 @@ const UnsubscribePage = () => {
             <XCircle className="w-12 h-12 text-destructive mx-auto" />
             <h1 className="text-2xl font-bold text-foreground font-orbitron">Erro</h1>
             <p className="text-muted-foreground">
-              Ocorreu um erro ao processar seu pedido. Tente novamente.
+              An error occurred processing your request. Please try again.
             </p>
             <Button onClick={handleUnsubscribe} variant="outline">
-              Tentar novamente
+              Try again
             </Button>
           </>
         )}
 
         <Button variant="ghost" onClick={() => navigate("/")} className="mt-4">
           <ArrowLeft className="w-4 h-4 mr-2" />
-          Voltar ao início
+          Back to home
         </Button>
       </div>
     </div>

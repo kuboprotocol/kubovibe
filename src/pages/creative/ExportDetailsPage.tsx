@@ -40,10 +40,10 @@ export default function ExportDetailsPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  const { data, isLoading: loading, error: queryError, refetch: load, failureCount } = useQuery({
+  const { data, isLoading: loading, error: queryErrorr, refetch: load, failureCount } = useQuery({
     queryKey: ["export-detail", id, user?.id],
     queryFn: async () => {
-      if (!user || !id) throw new Error("Parâmetros inválidos");
+      if (!user || !id) throw new Errorr("Invalid parameters");
       
       const { data: exp, error: expErr } = await supabase
         .from("creative_export_history")
@@ -53,7 +53,7 @@ export default function ExportDetailsPage() {
         .maybeSingle();
       
       if (expErr) throw expErr;
-      if (!exp) throw new Error("Exportação não encontrada");
+      if (!exp) throw new Errorr("Export not found");
 
       let executions = [];
       if (exp.item_ids && exp.item_ids.length > 0) {
@@ -74,7 +74,7 @@ export default function ExportDetailsPage() {
 
   const exportRow = data?.exportRow || null;
   const executions = data?.executions || [];
-  const error = queryError ? (queryError as Error).message : null;
+  const error = queryErrorr ? (queryErrorr as Errorr).message : null;
 
 
 
@@ -93,7 +93,7 @@ export default function ExportDetailsPage() {
 
   async function cancel() {
     if (!exportRow || !user) return;
-    if (!confirm("Cancelar esta exportação?")) return;
+    if (!confirm("Cancel this export?")) return;
     const { error } = await supabase
       .from("creative_export_history")
       .update({ status: "cancelled", cancelled_at: new Date().toISOString(), cancelled_by: user.id })
@@ -103,7 +103,7 @@ export default function ExportDetailsPage() {
       export_id: exportRow.id, user_id: user.id, action: "cancel",
       details: { actor_email: user.email, at: new Date().toISOString() },
     });
-    toast.success("Exportação cancelada");
+    toast.success("Export cancelled");
     load();
   }
 
@@ -123,7 +123,7 @@ export default function ExportDetailsPage() {
       export_id: exportRow.id, user_id: user.id, action: "retry",
       details: { actor_email: user.email, at: new Date().toISOString(), previous_status: exportRow.status },
     });
-    toast.success("Reenfileirado");
+    toast.success("Re-queued");
     load();
   }
 
@@ -171,14 +171,14 @@ export default function ExportDetailsPage() {
           }}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <h1 className="text-xl font-bold flex-1">Erro</h1>
+          <h1 className="text-xl font-bold flex-1">Error</h1>
         </header>
         <div className="p-8 flex flex-col items-center justify-center text-center gap-4">
           <AlertTriangle className="h-12 w-12 text-destructive" />
-          <h2 className="text-lg font-semibold">{error || "Exportação não encontrada"}</h2>
+          <h2 className="text-lg font-semibold">{error || "Export not found"}</h2>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => navigate("/creative")}>Voltar para Creative</Button>
-            <Button onClick={() => load()}>Tentar novamente</Button>
+            <Button variant="outline" onClick={() => navigate("/creative")}>Back to Creative</Button>
+            <Button onClick={() => load()}>Try again</Button>
           </div>
         </div>
       </div>
@@ -197,13 +197,13 @@ export default function ExportDetailsPage() {
         }}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h1 className="text-xl font-bold flex-1">Detalhes da Exportação</h1>
+        <h1 className="text-xl font-bold flex-1">Export Details</h1>
       </header>
 
       <div className="px-4 pt-4 max-w-5xl mx-auto">
         <RetryIndicator 
           failureCount={failureCount} 
-          error={queryError as Error} 
+          error={queryErrorr as Errorr} 
           onRetry={() => load()} 
           isLoading={loading} 
         />
@@ -220,51 +220,51 @@ export default function ExportDetailsPage() {
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Stat icon={Package} label="Execuções incluídas" value={`${exportRow.included_count ?? exportRow.item_ids?.length ?? 0}`} />
-            <Stat icon={Clock} label="Tempo total" value={totalSeconds > 0 ? `${totalSeconds}s` : "—"} />
+            <Stat icon={Package} label="Included executions" value={`${exportRow.included_count ?? exportRow.item_ids?.length ?? 0}`} />
+            <Stat icon={Clock} label="Total time" value={totalSeconds > 0 ? `${totalSeconds}s` : "—"} />
             <Stat icon={Download} label="Formato" value={exportRow.format.toUpperCase()} />
-            <Stat icon={RotateCw} label="Tentativas" value={String(exportRow.retry_count ?? 0)} />
+            <Stat icon={RotateCw} label="Attempts" value={String(exportRow.retry_count ?? 0)} />
           </div>
 
           {exportRow.error_message && (
             <div className="mt-4 p-3 rounded bg-destructive/10 border border-destructive/30 text-destructive text-sm">
-              <strong>Erro:</strong> {exportRow.error_message}
+              <strong>Error:</strong> {exportRow.error_message}
             </div>
           )}
 
           <div className="mt-4 flex gap-2 flex-wrap">
             {exportRow.file_url && (
               <a href={exportRow.file_url} target="_blank" rel="noreferrer">
-                <Button data-testid="download-file"><Download className="h-4 w-4 mr-2"/>Baixar arquivo</Button>
+                <Button data-testid="download-file"><Download className="h-4 w-4 mr-2"/>Download file</Button>
               </a>
             )}
             {exportRow.status === "processing" && (
-              <Button data-testid="cancel-export" variant="destructive" onClick={cancel}><Ban className="h-4 w-4 mr-2"/>Cancelar</Button>
+              <Button data-testid="cancel-export" variant="destructive" onClick={cancel}><Ban className="h-4 w-4 mr-2"/>Cancel</Button>
             )}
             {(exportRow.status === "failed" || exportRow.status === "cancelled" || error) && (
               <Button data-testid="requeue-export" onClick={() => error ? load() : requeue()} variant={error ? "default" : "secondary"}>
                 <RotateCw className="h-4 w-4 mr-2"/>
-                {error ? "Tentar novamente" : "Reenfileirar"}
+                {error ? "Try again" : "Re-queue"}
               </Button>
             )}
           </div>
         </Card>
 
         <Card>
-          <div className="p-3 border-b border-border font-semibold">Execuções incluídas ({executions.length})</div>
+          <div className="p-3 border-b border-border font-semibold">Included executions ({executions.length})</div>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Ferramenta</TableHead>
-                <TableHead>Execução</TableHead>
+                <TableHead>Tool</TableHead>
+                <TableHead>Execution</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Quando</TableHead>
+                <TableHead>When</TableHead>
                 <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {executions.length === 0 && (
-                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">Nenhuma execução listada</TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No executions listed</TableCell></TableRow>
               )}
               {executions.map((e) => (
                 <TableRow key={e.id}>
@@ -293,7 +293,7 @@ export default function ExportDetailsPage() {
                       params.set("investigate", e.id);
                       navigate(`/creative/investigation?${params.toString()}`);
                     }}>
-                      <ExternalLink className="h-3 w-3 mr-1"/>Investigar
+                      <ExternalLink className="h-3 w-3 mr-1"/>Investigate
                     </Button>
                   </TableCell>
                 </TableRow>

@@ -19,8 +19,8 @@ export default function ConnectorWeb3Page() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
         <div className="text-center space-y-3">
-          <p className="text-lg">Provider Web3 não encontrado</p>
-          <Button onClick={() => navigate('/connectors')}>Voltar aos conectores</Button>
+          <p className="text-lg">Web3 provider not found</p>
+          <Button onClick={() => navigate('/connectors')}>Back to connectors</Button>
         </div>
       </div>
     )
@@ -30,7 +30,7 @@ export default function ConnectorWeb3Page() {
     <div className="min-h-screen bg-background text-foreground">
       <div className="border-b border-border bg-card/50 backdrop-blur-xl sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-4 py-4 flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/connectors/web3')} aria-label="Voltar">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/connectors/web3')} aria-label="Back">
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <button
@@ -61,10 +61,10 @@ export default function ConnectorWeb3Page() {
         <Card className="p-4 border-amber-500/30 bg-amber-500/5 flex gap-3">
           <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
           <div className="text-sm space-y-1">
-            <p className="font-semibold">Serviço de terceiros</p>
+            <p className="font-semibold">Third-party service</p>
             <p className="text-muted-foreground text-xs">
-              {provider.label} é um provedor externo. Limites, cobranças e SLAs são de responsabilidade
-              do provedor. A KUBO apenas integra a RPC usando sua chave (criptografada AES-256-GCM).
+              {provider.label} is an external provider. Limits, charges, and SLAs are the provider's
+              responsibility. KUBO only integrates the RPC using your key (AES-256-GCM encrypted).
             </p>
           </div>
         </Card>
@@ -72,8 +72,8 @@ export default function ConnectorWeb3Page() {
         <Card className="p-4 border-primary/30 bg-primary/5 flex gap-3">
           <ShieldCheck className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
           <p className="text-xs text-muted-foreground">
-            Sua API Key e RPC URL são cifradas antes de serem persistidas. Apenas as edge functions
-            da KUBO podem descifrar para executar testes de conexão em seu nome.
+            Your API Key and RPC URL are encrypted before being stored. Only KUBO's edge functions can decrypt
+            them to run connection tests on your behalf.
           </p>
         </Card>
 
@@ -85,7 +85,7 @@ export default function ConnectorWeb3Page() {
               ? document.querySelector('[data-testid="web3-connection-form"]')
               : null
             const isDirty = formEl?.getAttribute('data-dirty') === 'true'
-            if (isDirty && !window.confirm('Você tem alterações não salvas. Trocar de conexão e descartá-las?')) return
+            if (isDirty && !window.confirm('You have unsaved changes. Switch connections and discard them?')) return
             setEditing(row)
             if (typeof window !== 'undefined') window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
           }}

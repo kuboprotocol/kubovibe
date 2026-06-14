@@ -40,7 +40,7 @@ export default function NotificationPreferencesPage() {
       });
     } catch (err: any) {
       setError(err.message);
-      toast.error("Erro ao carregar preferências: " + err.message);
+      toast.error("Error loading preferences: " + err.message);
     } finally {
       setLoading(false);
     }
@@ -56,7 +56,7 @@ export default function NotificationPreferencesPage() {
       .from("creative_notification_preferences")
       .upsert({ user_id: user.id, ...prefs }, { onConflict: "user_id" });
     if (error) toast.error(error.message);
-    else toast.success("Preferências salvas");
+    else toast.success("Preferences saved");
   }
 
   return (
@@ -65,7 +65,7 @@ export default function NotificationPreferencesPage() {
         <Button variant="ghost" size="icon" onClick={() => navigate("/creative")}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h1 className="text-xl font-bold flex-1">Notificações por E-mail</h1>
+        <h1 className="text-xl font-bold flex-1">Email Notifications</h1>
       </header>
 
       <div className="p-4 max-w-2xl mx-auto">
@@ -81,32 +81,32 @@ export default function NotificationPreferencesPage() {
             <div className="flex flex-col items-center justify-center py-8 text-center gap-4">
               <AlertTriangle className="h-10 w-10 text-destructive" />
               <p className="text-sm text-destructive font-medium">{error}</p>
-              <Button variant="outline" size="sm" onClick={() => fetchPrefs()}>Tentar novamente</Button>
+              <Button variant="outline" size="sm" onClick={() => fetchPrefs()}>Try again</Button>
             </div>
           ) : (
             <>
               <PrefRow
                 id="notify_cancel"
-                label="Cancelamento de execução"
-                description="Receba um e-mail sempre que uma execução for cancelada (incluindo motivo)."
+                label="Execution cancellation"
+                description="Receive an email whenever an execution is cancelled (including reason)."
                 checked={prefs.notify_cancel}
                 onChange={(v) => setPrefs((p) => ({ ...p, notify_cancel: v }))}
               />
               <PrefRow
                 id="notify_retry"
-                label="Reenfileiramento / retentativa"
-                description="Receba um e-mail quando uma execução for reenfileirada para nova tentativa."
+                label="Re-queuing / retry"
+                description="Receive an email when an execution is re-queued for a new attempt."
                 checked={prefs.notify_retry}
                 onChange={(v) => setPrefs((p) => ({ ...p, notify_retry: v }))}
               />
               <PrefRow
                 id="include_investigation_link"
-                label="Incluir link de investigação"
-                description="Adicionar o botão 'Investigar' nos e-mails, levando direto para a execução."
+                label="Include investigation link"
+                description="Add the 'Investigate' button in emails, linking directly to the execution."
                 checked={prefs.include_investigation_link}
                 onChange={(v) => setPrefs((p) => ({ ...p, include_investigation_link: v }))}
               />
-              <Button onClick={save} data-testid="save-prefs">Salvar preferências</Button>
+              <Button onClick={save} data-testid="save-prefs">Save preferences</Button>
             </>
           )}
         </Card>

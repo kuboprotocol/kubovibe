@@ -45,24 +45,24 @@ export default function DashboardPage() {
       .from('projects')
       .select('id, title, description, generated_code, updated_at, is_published')
       .order('updated_at', { ascending: false })
-    if (error) { toast.error('Erro ao carregar projetos'); console.error(error) }
+    if (error) { toast.error('Error loading projects'); console.error(error) }
     else setProjects(data || [])
     setLoading(false)
   }
 
   const handleDelete = async (id: string) => {
     const { error } = await supabase.from('projects').delete().eq('id', id)
-    if (error) toast.error('Erro ao deletar projeto')
+    if (error) toast.error('Error deleting project')
     else setProjects(prev => prev.filter(p => p.id !== id))
   }
 
   const handleRename = async () => {
     if (!renameProject || !newTitle.trim()) return
     const { error } = await supabase.from('projects').update({ title: newTitle.trim() }).eq('id', renameProject.id)
-    if (error) toast.error('Erro ao renomear projeto')
+    if (error) toast.error('Error renaming project')
     else {
       setProjects(prev => prev.map(p => p.id === renameProject.id ? { ...p, title: newTitle.trim() } : p))
-      toast.success('Projeto renomeado!')
+      toast.success('Project renamed!')
     }
     setRenameProject(null)
   }
@@ -96,18 +96,18 @@ export default function DashboardPage() {
             </Button>
 
             <Button variant="outline" size="sm" onClick={() => navigate('/creative')} className="rounded-xl gap-2 border-primary/30 text-primary hover:bg-primary/10">
-              <Palette className="h-4 w-4" /> Economia Criativa
+              <Palette className="h-4 w-4" /> Creative Economy
             </Button>
             <Button variant="outline" size="sm" onClick={() => navigate('/shortlinks')} className="rounded-xl gap-2 border-primary/20 text-primary hover:bg-primary/10">
-              <Gift className="h-4 w-4" /> Ganhar Créditos
+              <Gift className="h-4 w-4" /> Earn Credits
             </Button>
             <Button variant="hero" size="sm" onClick={() => navigate('/builder')} className="rounded-xl gap-2">
-              <Plus className="h-4 w-4" /> Novo Projeto
+              <Plus className="h-4 w-4" /> New Project
             </Button>
             <Button variant="ghost" size="icon" onClick={() => navigate('/profile')} title="Perfil" className="rounded-xl text-muted-foreground hover:text-foreground">
               <UserCircle className="h-5 w-5" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={handleSignOut} title="Sair" className="rounded-xl text-muted-foreground hover:text-foreground">
+            <Button variant="ghost" size="icon" onClick={handleSignOut} title="Sign Out" className="rounded-xl text-muted-foreground hover:text-foreground">
               <LogOut className="h-5 w-5" />
             </Button>
           </div>
@@ -179,13 +179,13 @@ export default function DashboardPage() {
                   <span className="text-xs tracking-[0.3em] text-muted-foreground">KUBO CREATIVE STUDIO</span>
                 </div>
                 <h3 className="text-2xl font-display font-bold mb-2">
-                  Painel de <span className="neon-text">Economia Criativa</span>
+                  Dashboard of <span className="neon-text">Creative Economy</span>
                 </h3>
                 <p className="text-sm text-muted-foreground max-w-md mb-4">
-                  Chat IA · Imagens (Nano Banana) · Downloader · Clips · Avatar · Shorts · Música (Suno) · Ebooks · EMO Animate
+                  Chat IA · Imagens (Nano Banana) · Downloader · Clips · Avatar · Shorts · Music (Suno) · Ebooks · EMO Animate
                 </p>
                 <div className="flex flex-wrap gap-1.5">
-                  {['Chat', 'Imagem', 'Vídeo', 'Música', 'Ebook', '+4'].map((t) => (
+                  {['Chat', 'Image', 'Video', 'Music', 'Ebook', '+4'].map((t) => (
                     <span key={t} className="text-[10px] px-2 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20 font-mono">{t}</span>
                   ))}
                 </div>
@@ -204,7 +204,7 @@ export default function DashboardPage() {
                   <span className="text-xs tracking-[0.3em] text-muted-foreground">KUBO QUANTUM ENGINE</span>
                 </div>
                 <h3 className="text-2xl font-display font-bold mb-2">
-                  Crie <span className="neon-text">mundos vivos</span> com IA
+                  Crie <span className="neon-text">living worlds</span> com IA
                 </h3>
                 <p className="text-sm text-muted-foreground max-w-md">
                   Mundo procedural · NPCs com memória · ECS · WebGL/Three.js · Sandbox WGSL seguro
@@ -219,13 +219,13 @@ export default function DashboardPage() {
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="mb-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-display font-bold text-foreground mb-1">Seus projetos</h1>
-              <p className="text-muted-foreground text-sm">Gerencie e continue trabalhando nos seus apps</p>
+              <h1 className="text-2xl font-display font-bold text-foreground mb-1">Your projects</h1>
+              <p className="text-muted-foreground text-sm">Manage and continue working on your apps</p>
             </div>
             {projects.length > 0 && (
               <div className="relative w-64">
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Buscar projetos..." value={search} onChange={e => setSearch(e.target.value)}
+                <Input placeholder="Search projects..." value={search} onChange={e => setSearch(e.target.value)}
                   className="pl-10 h-10 rounded-xl bg-secondary/50 border-border/50 focus-visible:ring-primary/30" />
               </div>
             )}
@@ -233,17 +233,17 @@ export default function DashboardPage() {
         </motion.div>
 
         {loading ? (
-          <div className="text-center py-20 text-muted-foreground">Carregando...</div>
+          <div className="text-center py-20 text-muted-foreground">Loading...</div>
         ) : projects.length === 0 ? (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center py-24">
             <div className="glass glass-border rounded-3xl p-12 max-w-md mx-auto shadow-gold">
               <div className="h-16 w-16 rounded-2xl gradient-primary flex items-center justify-center mx-auto mb-6 shadow-glow">
                 <FileText className="h-8 w-8 text-primary-foreground" />
               </div>
-              <h2 className="text-xl font-display font-bold text-foreground mb-2">Nenhum projeto ainda</h2>
-              <p className="text-muted-foreground text-sm mb-8">Crie seu primeiro projeto e comece a construir</p>
+              <h2 className="text-xl font-display font-bold text-foreground mb-2">No projects yet</h2>
+              <p className="text-muted-foreground text-sm mb-8">Create your first project and start building</p>
               <Button variant="hero" size="lg" onClick={() => navigate('/builder')} className="rounded-xl gap-2">
-                <Plus className="h-4 w-4" /> Criar primeiro projeto
+                <Plus className="h-4 w-4" /> Create first project
               </Button>
             </div>
           </motion.div>
@@ -269,7 +269,7 @@ export default function DashboardPage() {
                           </span>
                         )}
                         <span className="text-[10px] text-muted-foreground">
-                          {new Date(project.updated_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          {new Date(project.updated_at).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })}
                         </span>
                       </div>
                     </div>
@@ -282,23 +282,23 @@ export default function DashboardPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
                         <DropdownMenuItem onClick={e => { e.stopPropagation(); setRenameProject(project); setNewTitle(project.title) }}>
-                          <Pencil className="h-3.5 w-3.5 mr-2" /> Renomear
+                          <Pencil className="h-3.5 w-3.5 mr-2" /> Rename
                         </DropdownMenuItem>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <DropdownMenuItem onSelect={e => e.preventDefault()} className="text-destructive focus:text-destructive">
-                              <Trash2 className="h-3.5 w-3.5 mr-2" /> Deletar
+                              <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
                             </DropdownMenuItem>
                           </AlertDialogTrigger>
                           <AlertDialogContent onClick={e => e.stopPropagation()}>
                             <AlertDialogHeader>
-                              <AlertDialogTitle>Deletar projeto?</AlertDialogTitle>
-                              <AlertDialogDescription>Essa ação não pode ser desfeita. O projeto "{project.title}" será permanentemente removido.</AlertDialogDescription>
+                              <AlertDialogTitle>Delete projeto?</AlertDialogTitle>
+                              <AlertDialogDescription>This action cannot be undone. The project "{project.title}" will be permanently removed.</AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
-                              <AlertDialogCancel className="rounded-xl">Cancelar</AlertDialogCancel>
+                              <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
                               <AlertDialogAction onClick={e => { e.stopPropagation(); handleDelete(project.id) }}
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-xl">Deletar</AlertDialogAction>
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-xl">Delete</AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
@@ -314,11 +314,11 @@ export default function DashboardPage() {
 
       <Dialog open={!!renameProject} onOpenChange={open => !open && setRenameProject(null)}>
         <DialogContent className="glass rounded-2xl" onClick={e => e.stopPropagation()}>
-          <DialogHeader><DialogTitle className="font-display">Renomear projeto</DialogTitle></DialogHeader>
-          <Input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Novo nome do projeto"
+          <DialogHeader><DialogTitle className="font-display">Rename projeto</DialogTitle></DialogHeader>
+          <Input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="New project name"
             onKeyDown={e => e.key === 'Enter' && handleRename()} className="h-11 rounded-xl" />
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setRenameProject(null)} className="rounded-xl">Cancelar</Button>
+            <Button variant="ghost" onClick={() => setRenameProject(null)} className="rounded-xl">Cancel</Button>
             <Button variant="hero" onClick={handleRename} disabled={!newTitle.trim()} className="rounded-xl">Salvar</Button>
           </DialogFooter>
         </DialogContent>
