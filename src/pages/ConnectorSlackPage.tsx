@@ -39,7 +39,7 @@ export default function ConnectorSlackPage() {
       if (error) throw error
       setChannels(data?.channels ?? [])
     } catch (e: any) {
-      toast.error('Falha ao carregar canais', { description: e.message })
+      toast.error('Failed to load channels', { description: e.message })
     } finally { setLoadingChannels(false) }
   }, [])
 
@@ -51,7 +51,7 @@ export default function ConnectorSlackPage() {
       setMembers(data?.members ?? [])
       setTeam(data?.team ?? null)
     } catch (e: any) {
-      toast.error('Falha ao carregar usuários', { description: e.message })
+      toast.error('Failed to load users', { description: e.message })
     } finally { setLoadingUsers(false) }
   }, [])
 
@@ -67,14 +67,14 @@ export default function ConnectorSlackPage() {
       if (!res.ok) throw new Error(json.error ?? 'erro')
       setMessages(json.messages ?? [])
     } catch (e: any) {
-      toast.error('Falha ao carregar mensagens', { description: e.message })
+      toast.error('Failed to load messages', { description: e.message })
       setMessages([])
     } finally { setLoadingMessages(false) }
   }, [])
 
   const send = async () => {
     if (!composeChannel || !composeText.trim()) {
-      toast.error('Selecione um canal e digite a mensagem')
+      toast.error('Select a channel and type a message')
       return
     }
     setSending(true)
@@ -88,10 +88,10 @@ export default function ConnectorSlackPage() {
         },
       })
       if (error) throw error
-      toast.success('Mensagem enviada')
+      toast.success('Message sent')
       setComposeText('')
     } catch (e: any) {
-      toast.error('Falha ao enviar', { description: e.message })
+      toast.error('Failed to send', { description: e.message })
     } finally { setSending(false) }
   }
 
@@ -120,7 +120,7 @@ export default function ConnectorSlackPage() {
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="sm" onClick={() => navigate('/connectors')}>
-              <ArrowLeft className="w-4 h-4 mr-1" /> Voltar
+              <ArrowLeft className="w-4 h-4 mr-1" /> Back
             </Button>
             <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: '#4A154B' }}>
               <MessageSquare className="w-5 h-5 text-white" />
@@ -128,14 +128,14 @@ export default function ConnectorSlackPage() {
             <div>
               <h1 className="text-lg font-bold font-orbitron">Slack Connector</h1>
               <p className="text-xs text-muted-foreground">
-                {team ? `${team.name} · ${team.domain}.slack.com` : 'Workspace conectado via Lovable Gateway'}
+                {team ? `${team.name} · ${team.domain}.slack.com` : 'Workspace connected via Lovable Gateway'}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <Badge variant="outline" className="border-[#C9941A]/40 text-[#C9941A]">Bot OAuth</Badge>
             <Button size="sm" variant="outline" onClick={() => { loadChannels(); loadUsers(); if (selected) loadMessages(selected) }}>
-              <RefreshCw className="w-4 h-4 mr-1" /> Sincronizar
+              <RefreshCw className="w-4 h-4 mr-1" /> Sync
             </Button>
           </div>
         </div>
@@ -145,7 +145,7 @@ export default function ConnectorSlackPage() {
               {t === 'channels' && <Hash className="w-3 h-3 mr-1" />}
               {t === 'users' && <Users className="w-3 h-3 mr-1" />}
               {t === 'compose' && <Send className="w-3 h-3 mr-1" />}
-              {t === 'channels' ? 'Canais' : t === 'users' ? 'Usuários' : 'Enviar'}
+              {t === 'channels' ? 'Channels' : t === 'users' ? 'Users' : 'Send'}
             </Button>
           ))}
         </div>
@@ -158,12 +158,12 @@ export default function ConnectorSlackPage() {
               <div className="p-3 border-b border-border">
                 <div className="relative">
                   <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar canal..." className="pl-9" />
+                  <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Search channel..." className="pl-9" />
                 </div>
               </div>
               <div className="max-h-[70vh] overflow-y-auto">
-                {loadingChannels && <p className="p-4 text-sm text-muted-foreground">Carregando...</p>}
-                {!loadingChannels && filteredChannels.length === 0 && <p className="p-4 text-sm text-muted-foreground">Nenhum canal.</p>}
+                {loadingChannels && <p className="p-4 text-sm text-muted-foreground">Loading...</p>}
+                {!loadingChannels && filteredChannels.length === 0 && <p className="p-4 text-sm text-muted-foreground">No channels.</p>}
                 {filteredChannels.map(c => (
                   <button
                     key={c.id}
@@ -183,7 +183,7 @@ export default function ConnectorSlackPage() {
                 <div>
                   <h3 className="font-semibold flex items-center gap-2">
                     {selected ? (selected.is_private ? <Lock className="w-4 h-4" /> : <Hash className="w-4 h-4" />) : null}
-                    {selected?.name ?? 'Selecione um canal'}
+                    {selected?.name ?? 'Select a channel'}
                   </h3>
                   {selected?.topic && <p className="text-xs text-muted-foreground">{selected.topic}</p>}
                 </div>
@@ -191,7 +191,7 @@ export default function ConnectorSlackPage() {
                   {selected && (
                     <>
                       <Button size="sm" variant="outline" onClick={() => { setComposeChannel(selected.id); setTab('compose') }}>
-                        <Send className="w-3 h-3 mr-1" /> Responder
+                        <Send className="w-3 h-3 mr-1" /> Reply
                       </Button>
                       <Button size="sm" variant="outline" onClick={exportMessages} disabled={!messages.length}>
                         <Download className="w-3 h-3 mr-1" /> CSV
@@ -201,9 +201,9 @@ export default function ConnectorSlackPage() {
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                {loadingMessages && <p className="text-sm text-muted-foreground">Carregando mensagens...</p>}
+                {loadingMessages && <p className="text-sm text-muted-foreground">Loading messages...</p>}
                 {!loadingMessages && selected && messages.length === 0 && (
-                  <p className="text-sm text-muted-foreground">Sem mensagens neste canal.</p>
+                  <p className="text-sm text-muted-foreground">No messages in this channel.</p>
                 )}
                 {messages.map(m => (
                   <motion.div key={m.ts} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3">
@@ -214,7 +214,7 @@ export default function ConnectorSlackPage() {
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <span className="font-semibold text-foreground">{m.author}</span>
                         <span>{new Date(Number(m.ts.split('.')[0]) * 1000).toLocaleString('pt-BR')}</span>
-                        {m.reply_count > 0 && <Badge variant="secondary" className="text-[10px]">{m.reply_count} respostas</Badge>}
+                        {m.reply_count > 0 && <Badge variant="secondary" className="text-[10px]">{m.reply_count} replies</Badge>}
                       </div>
                       <p className="text-sm whitespace-pre-wrap break-words">{m.text}</p>
                       {m.reactions.length > 0 && (
@@ -235,7 +235,7 @@ export default function ConnectorSlackPage() {
         {tab === 'users' && (
           <div className="border border-border rounded-xl bg-card/30 overflow-hidden">
             <div className="p-3 border-b border-border flex items-center justify-between">
-              <h3 className="font-semibold">Usuários do workspace ({members.length})</h3>
+              <h3 className="font-semibold">Workspace users ({members.length})</h3>
               {team && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   {team.icon && <img src={team.icon} alt="" className="w-5 h-5 rounded" />}
@@ -244,7 +244,7 @@ export default function ConnectorSlackPage() {
               )}
             </div>
             <div className="max-h-[70vh] overflow-y-auto divide-y divide-border">
-              {loadingUsers && <p className="p-4 text-sm text-muted-foreground">Carregando...</p>}
+              {loadingUsers && <p className="p-4 text-sm text-muted-foreground">Loading...</p>}
               {members.map(m => (
                 <div key={m.id} className="px-4 py-2 flex items-center gap-3">
                   {m.avatar
@@ -263,15 +263,15 @@ export default function ConnectorSlackPage() {
 
         {tab === 'compose' && (
           <div className="max-w-2xl border border-border rounded-xl bg-card/30 p-6 space-y-4">
-            <h3 className="font-semibold text-lg">Enviar mensagem</h3>
+            <h3 className="font-semibold text-lg">Send message</h3>
             <div className="space-y-2">
-              <label className="text-xs text-muted-foreground">Canal</label>
+              <label className="text-xs text-muted-foreground">Channel</label>
               <select
                 value={composeChannel}
                 onChange={e => setComposeChannel(e.target.value)}
                 className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm"
               >
-                <option value="">-- selecione --</option>
+                <option value="">-- select --</option>
                 {channels.map(c => (
                   <option key={c.id} value={c.id}>{c.is_private ? '🔒' : '#'} {c.name}</option>
                 ))}
@@ -279,22 +279,22 @@ export default function ConnectorSlackPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <label className="text-xs text-muted-foreground">Username (opcional)</label>
+                <label className="text-xs text-muted-foreground">Username (optional)</label>
                 <Input value={composeUsername} onChange={e => setComposeUsername(e.target.value)} placeholder="KUBO Bot" />
               </div>
               <div className="space-y-2">
-                <label className="text-xs text-muted-foreground">Emoji (opcional)</label>
+                <label className="text-xs text-muted-foreground">Emoji (optional)</label>
                 <Input value={composeEmoji} onChange={e => setComposeEmoji(e.target.value)} placeholder=":robot_face:" />
               </div>
             </div>
             <div className="space-y-2">
-              <label className="text-xs text-muted-foreground">Mensagem (markdown Slack)</label>
-              <Textarea rows={6} value={composeText} onChange={e => setComposeText(e.target.value)} placeholder="Olá equipe! :wave:" />
+              <label className="text-xs text-muted-foreground">Message (Slack markdown)</label>
+              <Textarea rows={6} value={composeText} onChange={e => setComposeText(e.target.value)} placeholder="Hello team! :wave:" />
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="ghost" onClick={() => { setComposeText(''); setComposeChannel('') }}>Limpar</Button>
+              <Button variant="ghost" onClick={() => { setComposeText(''); setComposeChannel('') }}>Clear</Button>
               <Button onClick={send} disabled={sending}>
-                <Send className="w-4 h-4 mr-1" /> {sending ? 'Enviando...' : 'Enviar'}
+                <Send className="w-4 h-4 mr-1" /> {sending ? 'Sending...' : 'Send'}
               </Button>
             </div>
           </div>

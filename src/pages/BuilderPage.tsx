@@ -115,7 +115,7 @@ export default function BuilderPage() {
   const handleFileUpload = useCallback(async (file: File) => {
     const validationError = validateFile(file)
     if (validationError) { toast.error(validationError); return }
-    if (!user) { toast.error('Faça login primeiro'); return }
+    if (!user) { toast.error('Please log in first'); return }
     try {
       setUploadProgress(0)
       const uploaded = await uploadFile(file, user.id, setUploadProgress)
@@ -123,14 +123,14 @@ export default function BuilderPage() {
       const fmt = (bytes: number) => bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(0)} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`
       if (uploaded.originalSize > uploaded.size) {
         const saved = Math.round((1 - uploaded.size / uploaded.originalSize) * 100)
-        toast.success(`"${file.name}" enviado!`, {
-          description: `${fmt(uploaded.originalSize)} → ${fmt(uploaded.size)} (${saved}% menor)`,
+        toast.success(`"${file.name}" uploaded!`, {
+          description: `${fmt(uploaded.originalSize)} → ${fmt(uploaded.size)} (${saved}% smaller)`,
         })
       } else {
-        toast.success(`"${file.name}" enviado!`)
+        toast.success(`"${file.name}" uploaded!`)
       }
     } catch (err: any) {
-      toast.error(err.message || 'Erro no upload')
+      toast.error(err.message || 'Upload error')
     } finally {
       setUploadProgress(null)
     }
@@ -232,7 +232,7 @@ export default function BuilderPage() {
 
   const loadProject = async (id: string) => {
     const { data, error } = await supabase.from('projects').select('*').eq('id', id).single()
-    if (error || !data) { toast.error('Projeto não encontrado'); navigate('/dashboard'); return }
+    if (error || !data) { toast.error('Project not found'); navigate('/dashboard'); return }
     setProjectTitle(data.title)
     setGeneratedCode(data.generated_code || '')
     setMessages((data.messages as Msg[]) || [])
@@ -267,23 +267,23 @@ export default function BuilderPage() {
         window.history.replaceState(null, '', `/builder/${data.id}`)
       }
       setProjectTitle(title)
-      toast.success('Projeto salvo!')
-    } catch (err: any) { toast.error('Erro ao salvar: ' + (err.message || 'desconhecido')) }
+      toast.success('Project saved!')
+    } catch (err: any) { toast.error('Error saving: ' + (err.message || 'unknown')) }
     finally { setSaving(false) }
   }
 
   const send = async () => {
     if (!input.trim() || isLoading) return
     if (!subscription?.is_active) {
-      toast.error('Você precisa de um plano ativo para editar.', {
-        action: { label: 'Ver planos', onClick: () => navigate('/pricing') },
+      toast.error('You need an active plan to edit.', {
+        action: { label: 'View plans', onClick: () => navigate('/pricing') },
       })
       return
     }
     if (!canEdit) {
-      toast('Suas 20 edições acabaram! 🔄', {
-        description: 'Recarregue quando quiser para continuar criando.',
-        action: { label: 'Recarregar', onClick: () => navigate('/pricing') },
+      toast('Your 20 edits are used up! 🔄', {
+        description: 'Reload whenever you want to keep creating.',
+        action: { label: 'Reload', onClick: () => navigate('/pricing') },
       })
       return
     }
@@ -292,7 +292,7 @@ export default function BuilderPage() {
     let content = input
     if (attachedFiles.length > 0) {
       const fileRefs = attachedFiles.map(f => `[${f.category}: ${f.name}](${f.url})`).join('\n')
-      content = `${input}\n\nArquivos anexados:\n${fileRefs}`
+      content = `${input}\n\nAttached files:\n${fileRefs}`
     }
     const userMsg: Msg = { role: 'user', content }
     const newMessages = [...messages, userMsg]
@@ -338,14 +338,14 @@ export default function BuilderPage() {
 
   const handleClone = async (url: string) => {
     if (!subscription?.is_active) {
-      toast.error('Você precisa de um plano ativo para clonar.', {
-        action: { label: 'Ver planos', onClick: () => navigate('/pricing') },
+      toast.error('You need an active plan to clone.', {
+        action: { label: 'View plans', onClick: () => navigate('/pricing') },
       })
       return
     }
     if (!canEdit) {
-      toast('Suas edições acabaram!', {
-        action: { label: 'Recarregar', onClick: () => navigate('/pricing') },
+      toast('Your edits are used up!', {
+        action: { label: 'Reload', onClick: () => navigate('/pricing') },
       })
       return
     }
@@ -353,7 +353,7 @@ export default function BuilderPage() {
     setIsCloning(true)
     setShowCloneDialog(false)
 
-    const cloneMsg: Msg = { role: 'user', content: `🔗 Clonar: ${url}` }
+    const cloneMsg: Msg = { role: 'user', content: `🔗 Clone: ${url}` }
     const newMessages = [...messages, cloneMsg]
     setMessages(newMessages)
     setIsLoading(true)
@@ -385,7 +385,7 @@ export default function BuilderPage() {
           setIsCloning(false)
           const html = extractHtml(assistantSoFar)
           if (html.includes('<')) saveProject(html, finalMessages)
-          toast.success('Site clonado com sucesso! 🎉')
+          toast.success('Site cloned successfully! 🎉')
         },
         onError: (error) => {
           toast.error(error)
@@ -395,7 +395,7 @@ export default function BuilderPage() {
       })
     } catch (e) {
       console.error(e)
-      toast.error('Falha ao clonar o site')
+      toast.error('Failed to clone the site')
       setIsLoading(false)
       setIsCloning(false)
     }
@@ -499,8 +499,8 @@ export default function BuilderPage() {
                     </div>
                   ) : (
                     <div>
-                      <p>{msg.content.replace(/\n\nArquivos anexados:\n[\s\S]*$/, '')}</p>
-                      {msg.content.includes('Arquivos anexados:') && (
+                      <p>{msg.content.replace(/\n\nAttached files:\n[\s\S]*$/, '')}</p>
+                      {msg.content.includes('Attached files:') && (
                         <div className="mt-2 space-y-1">
                           {msg.content
                             .match(/\[(\w+): ([^\]]+)\]\(([^)]+)\)/g)
@@ -567,11 +567,11 @@ export default function BuilderPage() {
                 onScreenshot={() => toast.info('Screenshot functionality coming soon')}
                 onAddReference={(url) => {
                   setInput(prev => prev + `\n[Reference: ${url}]`)
-                  toast.success('Referência adicionada')
+                  toast.success('Reference added')
                 }}
               />
               <div className="relative flex-1">
-                <textarea value={input} onChange={(e) => setInput(e.target.value)} placeholder="Descreva o que você quer construir. Ex: 'app de delivery com pagamento via Pix e cripto'" rows={2}
+                <textarea value={input} onChange={(e) => setInput(e.target.value)} placeholder="Describe what you want to build. E.g., 'delivery app with Pix and crypto payment'" rows={2}
                   className="w-full resize-none bg-secondary rounded-xl px-4 py-3 pr-12 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                   onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
                   onPaste={(e) => {
@@ -588,7 +588,7 @@ export default function BuilderPage() {
                   variant="ghost"
                   className="absolute right-12 bottom-2 h-8 w-8 rounded-lg text-primary hover:text-primary"
                   onClick={() => setShowRunway(true)}
-                  title="RunwayML — Gerar vídeo/imagem (28 créditos)"
+                  title="RunwayML — Generate video/image (28 credits)"
                 >
                   <Film className="h-3.5 w-3.5" />
                 </Button>

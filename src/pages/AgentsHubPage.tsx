@@ -69,11 +69,11 @@ export default function AgentsHubPage() {
       });
       if (error) throw error;
       setResult(data);
-      toast({ title: `${selected.name} executado`, description: `${selected.credit_cost} créditos consumidos.` });
+      toast({ title: `${selected.name} executed`, description: `${selected.credit_cost} credits consumed.` });
       void refreshJobs();
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      toast({ title: "Falhou", description: msg, variant: "destructive" });
+      toast({ title: "Failed", description: msg, variant: "destructive" });
     } finally {
       setRunning(false);
     }
@@ -93,11 +93,11 @@ export default function AgentsHubPage() {
               KUBO Agents
             </h1>
             <p className="text-muted-foreground mt-1">
-              Microsserviços criativos do KUBO — cada agente é uma edge function com débito atômico de créditos.
+              KUBO creative microservices — each agent is an edge function with atomic credit debit.
             </p>
           </div>
           <Badge variant="secondary" className="text-sm">
-            {agents.filter(a => a.status === "active").length} ativos
+            {agents.filter(a => a.status === "active").length} active
           </Badge>
         </div>
 
@@ -127,13 +127,13 @@ export default function AgentsHubPage() {
                       <CardContent className="pt-0 space-y-2">
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <Zap className="w-3 h-3" />
-                          {a.credit_cost} créditos
+                          {a.credit_cost} credits
                           <span className="ml-auto font-mono opacity-60">{a.edge_function}</span>
                         </div>
                         <div className="flex gap-2">
                           <Button size="sm" variant="outline" className="flex-1" onClick={() => setSelected(a)}>Quick run</Button>
                           <Link to={`/agents/${a.slug}`} className="flex-1">
-                            <Button size="sm" className="w-full">Abrir</Button>
+                            <Button size="sm" className="w-full">Open</Button>
                           </Link>
                         </div>
                       </CardContent>
@@ -148,7 +148,7 @@ export default function AgentsHubPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">
-                  {selected ? `Executar: ${selected.name}` : "Selecione um agente"}
+                  {selected ? `Run: ${selected.name}` : "Select an agent"}
                 </CardTitle>
                 {selected && (
                   <CardDescription className="text-xs">{selected.description}</CardDescription>
@@ -156,7 +156,7 @@ export default function AgentsHubPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <Textarea
-                  placeholder="Escreva o prompt/instrução…"
+                  placeholder="Write the prompt/instruction…"
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   rows={5}
@@ -180,11 +180,11 @@ export default function AgentsHubPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Últimas execuções</CardTitle>
+                <CardTitle className="text-base">Latest executions</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 max-h-80 overflow-auto">
                 {jobs.length === 0 && (
-                  <p className="text-xs text-muted-foreground">Nenhum job ainda.</p>
+                  <p className="text-xs text-muted-foreground">No jobs yet.</p>
                 )}
                 {jobs.map((j) => (
                   <div key={j.id} className="text-xs border-l-2 border-border pl-3 py-1">

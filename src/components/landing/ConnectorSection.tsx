@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 
 const connectorCategories = [
   {
-    title: "IA & Automação",
+    title: "AI & Automation",
     icon: Bot,
     accent: "from-primary/20 to-accent",
     items: ["OpenAI", "Claude", "Gemini", "DeepSeek"],
@@ -17,16 +17,16 @@ const connectorCategories = [
     items: ["Stripe", "Mercado Pago", "PayPal", "Pix"],
   },
   {
-    title: "Banco de Dados",
+    title: "Database",
     icon: Database,
     accent: "from-violet-900/30 to-purple-900/20",
     items: ["Supabase", "PostgreSQL", "Firebase", "MongoDB"],
   },
   {
-    title: "Sua API",
+    title: "Your API",
     icon: Code,
     accent: "from-emerald-900/30 to-teal-900/20",
-    items: ["REST", "GraphQL", "Webhooks", "APIs Proprietárias"],
+    items: ["REST", "GraphQL", "Webhooks", "Proprietary APIs"],
   },
 ];
 
@@ -44,12 +44,12 @@ const ConnectorSection = () => {
           viewport={{ once: true }}
           className="text-center mb-16"
         >
-          <span className="text-xs font-medium text-primary uppercase tracking-widest mb-3 block">Integrações Ilimitadas</span>
+          <span className="text-xs font-medium text-primary uppercase tracking-widest mb-3 block">Unlimited Integrations</span>
           <h2 className="text-3xl md:text-4xl font-display font-bold text-foreground">
-            Conecte qualquer tecnologia
+            Connect any technology
           </h2>
           <p className="text-muted-foreground mt-4 max-w-2xl mx-auto">
-            IA, pagamentos, bancos de dados e APIs externas integradas ao seu aplicativo em poucos segundos.
+            AI, payments, databases, and external APIs integrated into your app in seconds.
           </p>
         </motion.div>
 
@@ -97,7 +97,7 @@ const ConnectorSection = () => {
             className="gap-2 rounded-xl px-10 h-14 text-base font-semibold group shadow-lg hover:shadow-primary/20 transition-all"
           >
             <Plug className="h-5 w-5 group-hover:rotate-12 transition-transform" />
-            Adicionar conector ao meu app
+            Add connector to my app
             <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
           </Button>
         </motion.div>

@@ -69,8 +69,8 @@ export default function DomainsPage() {
               <Globe className="w-7 h-7 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="font-orbitron text-3xl font-bold tracking-tight">KUBO Domínios</h1>
-              <p className="text-muted-foreground">Compre, transfira e publique com infraestrutura profissional.</p>
+              <h1 className="font-orbitron text-3xl font-bold tracking-tight">KUBO Domains</h1>
+              <p className="text-muted-foreground">Buy, transfer, and publish with professional infrastructure.</p>
             </div>
           </motion.div>
         </div>
@@ -81,10 +81,10 @@ export default function DomainsPage() {
 
         <Tabs defaultValue={showOnboarding ? "buy" : "mine"} className="space-y-6">
           <TabsList className="grid grid-cols-6 w-full max-w-4xl bg-card/60 backdrop-blur border border-border/40">
-            <TabsTrigger value="mine"><Globe className="w-4 h-4 mr-2" />Meus</TabsTrigger>
-            <TabsTrigger value="buy"><Search className="w-4 h-4 mr-2" />Comprar</TabsTrigger>
-            <TabsTrigger value="transfer"><ArrowLeftRight className="w-4 h-4 mr-2" />Transferir</TabsTrigger>
-            <TabsTrigger value="connect"><Link2 className="w-4 h-4 mr-2" />Conectar</TabsTrigger>
+            <TabsTrigger value="mine"><Globe className="w-4 h-4 mr-2" />Mine</TabsTrigger>
+            <TabsTrigger value="buy"><Search className="w-4 h-4 mr-2" />Buy</TabsTrigger>
+            <TabsTrigger value="transfer"><ArrowLeftRight className="w-4 h-4 mr-2" />Transfer</TabsTrigger>
+            <TabsTrigger value="connect"><Link2 className="w-4 h-4 mr-2" />Connect</TabsTrigger>
             <TabsTrigger value="dns"><ServerCog className="w-4 h-4 mr-2" />DNS</TabsTrigger>
             <TabsTrigger value="debug"><Terminal className="w-4 h-4 mr-2" />Debug</TabsTrigger>
           </TabsList>
@@ -106,13 +106,13 @@ function OnboardingBanner() {
     <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}>
       <Card className="border-primary/30 bg-gradient-to-br from-primary/10 via-card/60 to-card/40 backdrop-blur">
         <CardHeader>
-          <CardTitle className="font-orbitron flex items-center gap-2"><Rocket className="w-5 h-5 text-primary" /> Bem-vindo aos Domínios KUBO</CardTitle>
-          <CardDescription>Tudo o que você precisa para colocar sua marca no ar — usando créditos KUBO.</CardDescription>
+          <CardTitle className="font-orbitron flex items-center gap-2"><Rocket className="w-5 h-5 text-primary" /> Welcome to KUBO Domains</CardTitle>
+          <CardDescription>Everything you need to get your brand online — using KUBO credits.</CardDescription>
         </CardHeader>
         <CardContent className="grid md:grid-cols-3 gap-4">
-          <Step icon={<Search className="w-5 h-5" />} title="1. Buscar" body="Encontre nomes via IA + verificação IONOS em tempo real." />
-          <Step icon={<Zap className="w-5 h-5" />} title="2. Pagar em créditos" body="Débito atômico — se algo falhar, seus créditos são preservados." />
-          <Step icon={<Shield className="w-5 h-5" />} title="3. SSL + DNS auto" body="Certificado provisionado e editor DNS pronto para uso." />
+          <Step icon={<Search className="w-5 h-5" />} title="1. Search" body="Find names via AI + real-time IONOS verification." />
+          <Step icon={<Zap className="w-5 h-5" />} title="2. Pay with credits" body="Atomic debit — if anything fails, your credits are preserved." />
+          <Step icon={<Shield className="w-5 h-5" />} title="3. SSL + Auto DNS" body="Certificate provisioned and DNS editor ready to use." />
         </CardContent>
       </Card>
     </motion.div>
@@ -155,8 +155,8 @@ function MineTab({ domains, loading, onChange }: { domains: Domain[]; loading: b
       <Card className="border-dashed border-border/40 bg-card/40">
         <CardContent className="py-16 text-center">
           <Globe className="w-12 h-12 mx-auto mb-4 text-muted-foreground/60" />
-          <p className="text-muted-foreground mb-2">Nenhum domínio ainda.</p>
-          <p className="text-sm text-muted-foreground/70">Vá em <strong>Comprar</strong> para registrar sua marca.</p>
+          <p className="text-muted-foreground mb-2">No domains yet.</p>
+          <p className="text-sm text-muted-foreground/70">Go to <strong>Buy</strong> to register your brand.</p>
         </CardContent>
       </Card>
     );
@@ -164,7 +164,7 @@ function MineTab({ domains, loading, onChange }: { domains: Domain[]; loading: b
   const remove = async () => {
     if (!toDelete) return;
     await supabase.from("kubo_domains").delete().eq("id", toDelete.id);
-    toast.success("Removido");
+    toast.success("Removed");
     setToDelete(null);
     onChange();
   };
@@ -185,9 +185,9 @@ function MineTab({ domains, loading, onChange }: { domains: Domain[]; loading: b
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
                 <div className="flex items-center gap-2 text-muted-foreground"><Shield className="w-3.5 h-3.5" /> SSL: <span className="text-foreground">{d.ssl_status}</span></div>
-                <div className="flex items-center gap-2 text-muted-foreground"><Zap className="w-3.5 h-3.5" /> Créditos: <span className="text-foreground">{d.credits_spent}</span></div>
+                <div className="flex items-center gap-2 text-muted-foreground"><Zap className="w-3.5 h-3.5" /> Credits: <span className="text-foreground">{d.credits_spent}</span></div>
                 <Button size="sm" variant="ghost" className="text-red-400 hover:text-red-300 hover:bg-red-500/10" onClick={() => setToDelete(d)}>
-                  <Trash2 className="w-3.5 h-3.5 mr-1" /> Remover
+                  <Trash2 className="w-3.5 h-3.5 mr-1" /> Remove
                 </Button>
               </CardContent>
             </Card>
@@ -198,12 +198,12 @@ function MineTab({ domains, loading, onChange }: { domains: Domain[]; loading: b
       <AlertDialog open={!!toDelete} onOpenChange={(o) => !o && setToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remover {toDelete?.domain_name} do painel?</AlertDialogTitle>
-            <AlertDialogDescription>Isto remove apenas do painel KUBO. O registro do domínio na IONOS não é cancelado.</AlertDialogDescription>
+            <AlertDialogTitle>Remove {toDelete?.domain_name} from the dashboard?</AlertDialogTitle>
+            <AlertDialogDescription>This only removes it from the KUBO dashboard. The domain registration at IONOS is not cancelled.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={remove} className="bg-red-600 hover:bg-red-700">Remover</AlertDialogAction>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={remove} className="bg-red-600 hover:bg-red-700">Remove</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -225,7 +225,7 @@ function BuyTab({ onPurchased }: { onPurchased: () => void }) {
     setSearching(false);
     if (error) { toast.error(error.message); return; }
     setResults(data?.results ?? []);
-    if (!data?.has_ionos) toast.warning("IONOS não configurada — disponibilidade indicativa.");
+    if (!data?.has_ionos) toast.warning("IONOS not configured — availability is indicative.");
   };
 
   const doBuy = async () => {
@@ -237,7 +237,7 @@ function BuyTab({ onPurchased }: { onPurchased: () => void }) {
     setBuying(null);
     if (error) { toast.error(error.message); return; }
     if (data?.error) { toast.error(data.error); return; }
-    toast.success(`✓ ${r.domain} registrado · saldo: ${data?.balance_after ?? "?"}`);
+    toast.success(`✓ ${r.domain} registered · balance: ${data?.balance_after ?? "?"}`);
     onPurchased();
   };
 
@@ -245,14 +245,14 @@ function BuyTab({ onPurchased }: { onPurchased: () => void }) {
     <>
       <Card className="bg-card/60 backdrop-blur border-border/40">
         <CardHeader>
-          <CardTitle className="font-orbitron flex items-center gap-2"><Sparkles className="w-5 h-5 text-primary" /> Buscar domínio</CardTitle>
-          <CardDescription>Sugestões geradas por IA + verificação em tempo real na IONOS.</CardDescription>
+          <CardTitle className="font-orbitron flex items-center gap-2"><Sparkles className="w-5 h-5 text-primary" /> Search Domain</CardTitle>
+          <CardDescription>AI-generated suggestions + real-time verification via IONOS.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex gap-2">
-            <Input placeholder="minhamarca ou minhamarca.com" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && search()} className="bg-background/60" />
+            <Input placeholder="mybrand or mybrand.com" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && search()} className="bg-background/60" />
             <Button onClick={search} disabled={searching} className="bg-gradient-to-r from-primary to-purple-600">
-              {searching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />} Buscar
+              {searching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />} Search
             </Button>
           </div>
           <div className="grid gap-2">
@@ -264,7 +264,7 @@ function BuyTab({ onPurchased }: { onPurchased: () => void }) {
                   {r.available === null && <span className="w-5 h-5 rounded-full bg-muted shrink-0" title={r.note ?? r.reason} />}
                   <div className="min-w-0">
                     <div className="font-mono text-sm truncate">{r.domain}</div>
-                    <div className="text-xs text-muted-foreground">.{r.tld} · {r.price_credits} créditos</div>
+                    <div className="text-xs text-muted-foreground">.{r.tld} · {r.price_credits} credits</div>
                   </div>
                 </div>
                 <Button size="sm" disabled={r.available === false || buying === r.domain} onClick={() => setConfirmBuy(r)} variant={r.available === true ? "default" : "secondary"}>
@@ -279,21 +279,21 @@ function BuyTab({ onPurchased }: { onPurchased: () => void }) {
       <AlertDialog open={!!confirmBuy} onOpenChange={(o) => !o && setConfirmBuy(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="font-orbitron">Confirmar registro</AlertDialogTitle>
+            <AlertDialogTitle className="font-orbitron">Confirm registration</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3">
-                <p>Você está prestes a registrar:</p>
+                <p>You are about to register:</p>
                 <div className="p-3 rounded-lg bg-muted/40 border border-border/40">
                   <div className="font-mono text-lg text-foreground">{confirmBuy?.domain}</div>
-                  <div className="text-sm text-muted-foreground mt-1">.{confirmBuy?.tld} · <span className="text-primary font-semibold">{confirmBuy?.price_credits} créditos</span></div>
+                  <div className="text-sm text-muted-foreground mt-1">.{confirmBuy?.tld} · <span className="text-primary font-semibold">{confirmBuy?.price_credits} credits</span></div>
                 </div>
-                <p className="text-xs">O débito é atômico e idempotente. Em caso de falha pós-débito, abra um ticket para reembolso.</p>
+                <p className="text-xs">The debit is atomic and idempotent. In case of post-debit failure, open a ticket for a refund.</p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={doBuy} className="bg-gradient-to-r from-primary to-purple-600">Confirmar e pagar</AlertDialogAction>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={doBuy} className="bg-gradient-to-r from-primary to-purple-600">Confirm and pay</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -370,9 +370,9 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = `transferencias-auditoria-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.href = url; a.download = `transfers-audit-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click(); URL.revokeObjectURL(url);
-    toast.success(`${filteredTransfers.length} transferências exportadas`);
+    toast.success(`${filteredTransfers.length} transfers exported`);
   };
 
   const tld = domain.includes(".") ? tldOf(domain) : null;
@@ -386,7 +386,7 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
     });
     setBusy(false);
     if (error || data?.error) { toast.error(error?.message ?? data.error); return; }
-    toast.success(`Transferência iniciada · saldo: ${data?.balance_after ?? "?"}`);
+    toast.success(`Transfer started · balance: ${data?.balance_after ?? "?"}`);
     setDomain(""); setAuthCode(""); setRegistrar(""); setNotifyEmail("");
     onTransferred();
   };
@@ -415,12 +415,12 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
 
   const resendEmail = async (t: Transfer) => {
     const left = cooldownLeft(t);
-    if (left > 0) { toast.error(`Aguarde ${left}s antes de reenviar o e-mail.`); return; }
+    if (left > 0) { toast.error(`Wait ${left}s before resending the email.`); return; }
     setResendingEmail(t.id);
     const { data: userData } = await supabase.auth.getUser();
     const recipient = t.notify_email || userData.user?.email;
     if (!recipient) {
-      toast.error("Nenhum e-mail de destino encontrado. Adicione um e-mail de notificação na transferência.");
+      toast.error("No destination email found. Add a notification email to the transfer.");
       setResendingEmail(null);
       return;
     }
@@ -444,7 +444,7 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
     }
     await supabase.from("kubo_domain_transfers").update({ last_notified_at: new Date().toISOString() }).eq("id", t.id);
     setResendingEmail(null);
-    toast.success(`E-mail de status reenviado para ${recipient}`);
+    toast.success(`Status email resent to ${recipient}`);
     onTransferred();
   };
 
@@ -454,24 +454,24 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
     <div className="space-y-6">
       <Card className="bg-card/60 backdrop-blur border-border/40 max-w-2xl">
         <CardHeader>
-          <CardTitle className="font-orbitron flex items-center gap-2"><ArrowLeftRight className="w-5 h-5 text-primary" /> Transferir domínio</CardTitle>
-          <CardDescription>Tempo médio: 5–7 dias. Você precisa do AUTH/EPP code do registrar atual.</CardDescription>
+          <CardTitle className="font-orbitron flex items-center gap-2"><ArrowLeftRight className="w-5 h-5 text-primary" /> Transfer Domain</CardTitle>
+          <CardDescription>Average time: 5–7 days. You need the AUTH/EPP code from the current registrar.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div><Label>Domínio</Label><Input placeholder="minhaempresa.com" value={domain} onChange={(e) => setDomain(e.target.value.toLowerCase())} /></div>
+          <div><Label>Domain</Label><Input placeholder="mycompany.com" value={domain} onChange={(e) => setDomain(e.target.value.toLowerCase())} /></div>
           <div><Label>AUTH / EPP Code</Label><Input placeholder="xxxx-xxxx-xxxx" value={authCode} onChange={(e) => setAuthCode(e.target.value)} /></div>
-          <div><Label>Registrar atual (opcional)</Label><Input placeholder="GoDaddy, Registro.br…" value={registrar} onChange={(e) => setRegistrar(e.target.value)} /></div>
+          <div><Label>Current registrar (optional)</Label><Input placeholder="GoDaddy, Namecheap…" value={registrar} onChange={(e) => setRegistrar(e.target.value)} /></div>
           <div>
-            <Label className="flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" /> Email para notificações (opcional)</Label>
-            <Input type="email" placeholder="você@empresa.com — usa seu email se vazio" value={notifyEmail} onChange={(e) => setNotifyEmail(e.target.value)} />
+            <Label className="flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" /> Notification email (optional)</Label>
+            <Input type="email" placeholder="you@company.com — uses your email if blank" value={notifyEmail} onChange={(e) => setNotifyEmail(e.target.value)} />
           </div>
           {tld && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground p-2 rounded bg-background/40 border border-border/30">
-              <Info className="w-4 h-4 text-primary" /> Custo estimado: <span className="text-primary font-semibold">{price} créditos</span>
+              <Info className="w-4 h-4 text-primary" /> Estimated cost: <span className="text-primary font-semibold">{price} créditos</span>
             </div>
           )}
           <Button onClick={() => setConfirm(true)} disabled={busy || !canSubmit} className="w-full bg-gradient-to-r from-primary to-purple-600">
-            {busy ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ArrowLeftRight className="w-4 h-4 mr-2" />} Iniciar transferência
+            {busy ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ArrowLeftRight className="w-4 h-4 mr-2" />} Start transfer
           </Button>
         </CardContent>
       </Card>
@@ -481,19 +481,19 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
           <CardHeader>
             <div className="flex items-start justify-between gap-3 flex-wrap">
               <div>
-                <CardTitle className="font-orbitron text-lg">Transferências</CardTitle>
-                <CardDescription>Atualização automática a cada 5 minutos. Você pode atualizar manualmente ou cancelar a qualquer momento.</CardDescription>
+                <CardTitle className="font-orbitron text-lg">Transfers</CardTitle>
+                <CardDescription>Automatic update every 5 minutes. You can refresh manually or cancel at any time.</CardDescription>
               </div>
-              <Button size="sm" variant="outline" onClick={exportCsv} title="Exportar auditoria em CSV">
+              <Button size="sm" variant="outline" onClick={exportCsv} title="Export audit as CSV">
                 <Download className="w-3.5 h-3.5 mr-1.5" /> CSV
               </Button>
             </div>
             <div className="flex gap-2 mt-3 flex-wrap">
-              <Input placeholder="Buscar por domínio…" value={filterQuery} onChange={(e) => setFilterQuery(e.target.value)} className="max-w-xs h-9" />
+              <Input placeholder="Search by domain…" value={filterQuery} onChange={(e) => setFilterQuery(e.target.value)} className="max-w-xs h-9" />
               <Select value={filterStatus} onValueChange={setFilterStatus}>
                 <SelectTrigger className="w-48 h-9"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos os status</SelectItem>
+                  <SelectItem value="all">All statuses</SelectItem>
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="validating">Validating</SelectItem>
                   <SelectItem value="transferring">Transferring</SelectItem>
@@ -502,12 +502,12 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
                   <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
               </Select>
-              <span className="text-xs text-muted-foreground self-center">{filteredTransfers.length} de {transfers.length}</span>
+              <span className="text-xs text-muted-foreground self-center">{filteredTransfers.length} of {transfers.length}</span>
             </div>
           </CardHeader>
           <CardContent className="space-y-2">
             {filteredTransfers.length === 0 && (
-              <div className="text-sm text-muted-foreground text-center py-6">Nenhuma transferência corresponde aos filtros.</div>
+              <div className="text-sm text-muted-foreground text-center py-6">No transfers match the current filters.</div>
             )}
             {filteredTransfers.map((t) => {
               const inProgress = ["pending", "validating", "transferring"].includes(t.status);
@@ -518,7 +518,7 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-mono text-sm">{t.domain_name}</span>
                       <StatusBadge status={t.status} />
-                      {t.current_registrar && <span className="text-xs text-muted-foreground">de {t.current_registrar}</span>}
+                      {t.current_registrar && <span className="text-xs text-muted-foreground">from {t.current_registrar}</span>}
                       {t.retry_count > 0 && <Badge variant="outline" className="text-[10px]">retry {t.retry_count}</Badge>}
                     </div>
                     {t.status_message && <div className="text-xs text-muted-foreground mt-1 truncate">{t.status_message}</div>}
@@ -529,14 +529,14 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
                     </div>
                   </div>
                   <div className="flex gap-1.5 shrink-0">
-                    <Button size="sm" variant="outline" onClick={() => openConfirmResend(t)} disabled={resendingEmail === t.id || cdLeft > 0} title={cdLeft > 0 ? `Aguarde ${cdLeft}s para reenviar` : (t.last_notified_at ? `Último e-mail: ${new Date(t.last_notified_at).toLocaleString("pt-BR")}` : "Reenviar e-mail de status")}>
+                    <Button size="sm" variant="outline" onClick={() => openConfirmResend(t)} disabled={resendingEmail === t.id || cdLeft > 0} title={cdLeft > 0 ? `Aguarde ${cdLeft}s para reenviar` : (t.last_notified_at ? `Último e-mail: ${new Date(t.last_notified_at).toLocaleString("pt-BR")}` : "Resend status email")}>
                       {resendingEmail === t.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => refresh(t.id)} disabled={refreshing === t.id} title="Atualizar status">
                       {refreshing === t.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
                     </Button>
                     {inProgress && (
-                      <Button size="sm" variant="outline" onClick={() => setCancelling(t)} className="text-red-400 hover:bg-red-500/10 border-red-500/30" title="Cancelar transferência">
+                      <Button size="sm" variant="outline" onClick={() => setCancelling(t)} className="text-red-400 hover:bg-red-500/10 border-red-500/30" title="Cancel Transfer">
                         <Ban className="w-3.5 h-3.5" />
                       </Button>
                     )}
@@ -552,21 +552,21 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
       <AlertDialog open={confirm} onOpenChange={setConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="font-orbitron">Confirmar transferência</AlertDialogTitle>
+            <AlertDialogTitle className="font-orbitron">Confirm Transfer</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3">
-                <p>Você vai iniciar a transferência de:</p>
+                <p>You are about to start the transfer of:</p>
                 <div className="p-3 rounded-lg bg-muted/40 border border-border/40">
                   <div className="font-mono text-lg text-foreground">{domain}</div>
-                  <div className="text-sm text-muted-foreground mt-1">Custo: <span className="text-primary font-semibold">{price} créditos</span></div>
+                  <div className="text-sm text-muted-foreground mt-1">Cost: <span className="text-primary font-semibold">{price} credits</span></div>
                 </div>
-                <p className="text-xs">Os créditos são debitados agora. Acompanhamento e notificação por email são automáticos.</p>
+                <p className="text-xs">Credits are debited now. Tracking and email notification are automatic.</p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={start} className="bg-gradient-to-r from-primary to-purple-600">Confirmar e iniciar</AlertDialogAction>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={start} className="bg-gradient-to-r from-primary to-purple-600">Confirm and start</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -574,21 +574,21 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
       <AlertDialog open={!!cancelling} onOpenChange={(o) => !o && setCancelling(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="font-orbitron">Cancelar transferência</AlertDialogTitle>
+            <AlertDialogTitle className="font-orbitron">Cancel Transfer</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3">
-                <p>Você vai cancelar a transferência de <strong className="font-mono">{cancelling?.domain_name}</strong>. O pedido será cancelado na IONOS e o status persistido com auditoria.</p>
+                <p>You are about to cancel the transfer of <strong className="font-mono">{cancelling?.domain_name}</strong>. The request will be cancelled at IONOS and the status saved with an audit trail.</p>
                 <div>
-                  <Label className="text-xs">Motivo (opcional)</Label>
-                  <Input value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} placeholder="Ex.: domínio incorreto" />
+                  <Label className="text-xs">Reason (optional)</Label>
+                  <Input value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} placeholder="e.g., wrong domain" />
                 </div>
-                <p className="text-xs text-amber-500">⚠ Créditos não são reembolsados automaticamente. Abra um ticket se necessário.</p>
+                <p className="text-xs text-amber-500">⚠ Credits are not automatically refunded. Open a ticket if needed.</p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Voltar</AlertDialogCancel>
-            <AlertDialogAction onClick={cancelNow} className="bg-red-500 hover:bg-red-600">Confirmar cancelamento</AlertDialogAction>
+            <AlertDialogCancel>Back</AlertDialogCancel>
+            <AlertDialogAction onClick={cancelNow} className="bg-red-500 hover:bg-red-600">Confirm cancellation</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -596,27 +596,27 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
       <AlertDialog open={!!confirmResend} onOpenChange={(o) => !o && setConfirmResend(null)}>
         <AlertDialogContent className="max-w-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle className="font-orbitron">Reenviar e-mail de status</AlertDialogTitle>
+            <AlertDialogTitle className="font-orbitron">Resend status email</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3">
-                <p>Você vai reenviar o e-mail de status da transferência:</p>
+                <p>You are about to resend the status email for the transfer:</p>
                 <div className="p-3 rounded-lg bg-muted/40 border border-border/40">
                   <div className="font-mono text-lg text-foreground">{confirmResend?.domain_name}</div>
-                  <div className="text-sm text-muted-foreground mt-1">Status atual: <span className="text-primary font-semibold">{confirmResend?.status}</span></div>
-                  <div className="text-sm text-muted-foreground mt-1">Destinatário: {confirmResend?.notify_email || "e-mail do usuário logado"}</div>
+                  <div className="text-sm text-muted-foreground mt-1">Current status: <span className="text-primary font-semibold">{confirmResend?.status}</span></div>
+                  <div className="text-sm text-muted-foreground mt-1">Recipient: {confirmResend?.notify_email || "logged-in user's email"}</div>
                   {confirmResend?.last_notified_at && (
-                    <div className="text-xs text-muted-foreground mt-1">Último e-mail enviado: {new Date(confirmResend.last_notified_at).toLocaleString("pt-BR")}</div>
+                    <div className="text-xs text-muted-foreground mt-1">Last email sent: {new Date(confirmResend.last_notified_at).toLocaleString("pt-BR")}</div>
                   )}
                   {confirmResend && cooldownLeft(confirmResend) > 0 && (
-                    <div className="text-xs text-amber-500 mt-1">⏳ Cooldown: aguarde {cooldownLeft(confirmResend)}s para reenviar.</div>
+                    <div className="text-xs text-amber-500 mt-1">⏳ Cooldown: wait {cooldownLeft(confirmResend)}s to resend.</div>
                   )}
                 </div>
 
                 <div>
-                  <div className="text-xs font-semibold uppercase text-muted-foreground mb-1.5 flex items-center gap-1.5"><Mail className="w-3 h-3" /> Histórico de e-mails</div>
+                  <div className="text-xs font-semibold uppercase text-muted-foreground mb-1.5 flex items-center gap-1.5"><Mail className="w-3 h-3" /> Email History</div>
                   <div className="max-h-32 overflow-y-auto rounded border border-border/40 bg-background/40 text-xs divide-y divide-border/30">
-                    {modalLoading && <div className="p-2 text-muted-foreground">Carregando…</div>}
-                    {!modalLoading && modalEmails.length === 0 && <div className="p-2 text-muted-foreground">Nenhum e-mail registrado ainda.</div>}
+                    {modalLoading && <div className="p-2 text-muted-foreground">Loading…</div>}
+                    {!modalLoading && modalEmails.length === 0 && <div className="p-2 text-muted-foreground">No emails recorded yet.</div>}
                     {modalEmails.map((m) => (
                       <div key={m.id} className="p-2 flex justify-between gap-2">
                         <span className="font-mono">{m.status}</span>
@@ -627,10 +627,10 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
                 </div>
 
                 <div>
-                  <div className="text-xs font-semibold uppercase text-muted-foreground mb-1.5 flex items-center gap-1.5"><Terminal className="w-3 h-3" /> Logs de auditoria</div>
+                  <div className="text-xs font-semibold uppercase text-muted-foreground mb-1.5 flex items-center gap-1.5"><Terminal className="w-3 h-3" /> Audit Logs</div>
                   <div className="max-h-40 overflow-y-auto rounded border border-border/40 bg-background/40 text-xs divide-y divide-border/30">
-                    {modalLoading && <div className="p-2 text-muted-foreground">Carregando…</div>}
-                    {!modalLoading && modalEvents.length === 0 && <div className="p-2 text-muted-foreground">Nenhum evento registrado.</div>}
+                    {modalLoading && <div className="p-2 text-muted-foreground">Loading…</div>}
+                    {!modalLoading && modalEvents.length === 0 && <div className="p-2 text-muted-foreground">No events recorded.</div>}
                     {modalEvents.map((e) => (
                       <div key={e.id} className="p-2">
                         <div className="flex justify-between gap-2">
@@ -733,7 +733,7 @@ function DnsTab({ domains }: { domains: Domain[] }) {
   const del = async (id: string) => {
     const { error } = await supabase.functions.invoke("domain-dns", { body: { action: "delete", domain_id: selected, record_id: id } });
     if (error) { toast.error(error.message); return; }
-    toast.success("Removido");
+    toast.success("Removed");
     load(selected);
   };
 
