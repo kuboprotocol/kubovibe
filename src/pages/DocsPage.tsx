@@ -415,6 +415,23 @@ testimonials and a waitlist form.`}</Pre>
           Every shader is statically analysed before compilation. Patterns like infinite
           loops, unbounded runtime arrays and atomic abuse are rejected with HTTP 403.
         </P>
+        <H3>Modules &amp; Routes</H3>
+        <UL>
+          <li><Code>/game</Code> — Hub with the AI-driven sandbox world.</li>
+          <li><Code>/game/editor</Code> — Visual scene editor for entities and components.</li>
+          <li><Code>/game/retro</Code> — 8-bit/16-bit canvas renderer (palette, sprites, tilemaps).</li>
+          <li><Code>/game/rpg</Code> — Turn-based RPG template with battles, inventory and dialogue.</li>
+          <li><Code>/game/metaverse</Code> — Realtime multiplayer 3D rooms (presence + broadcast).</li>
+          <li><Code>/game/sdk</Code> — Public <Code>@kubo/sdk</Code> playground for external developers.</li>
+        </UL>
+        <H3>SDK Usage</H3>
+        <P>
+          Import the public surface from <Code>@/sdk</Code> to embed any template in a
+          third-party app: <Code>createRetroGame</Code>, <Code>createRpgGame</Code> and{' '}
+          <Code>createMetaverseRoom</Code> wrap the engines behind a stable contract.
+          React bindings live in <Code>@/sdk/react</Code> (<Code>useRetroGame</Code>,{' '}
+          <Code>useMetaverseRoom</Code>).
+        </P>
       </>
     ),
   },
