@@ -146,6 +146,18 @@ export default function BuilderPage() {
   const [showLoading, setShowLoading] = useState(false)
   const generationDoneRef = useRef(false)
   const pendingSaveRef = useRef<(() => void) | null>(null)
+  const pendingPreviewHtmlRef = useRef('')
+
+  const queuePreviewHtml = useCallback((html: string) => {
+    if (!html.includes('<')) return
+    pendingPreviewHtmlRef.current = html
+  }, [])
+
+  const flushPreviewHtml = useCallback(() => {
+    const nextHtml = pendingPreviewHtmlRef.current
+    if (!nextHtml || nextHtml === generatedCode) return
+    setGeneratedCode(nextHtml)
+  }, [generatedCode])
 
   // Detect chat language from user messages
   const chatLanguage = useMemo(() => {
@@ -161,6 +173,7 @@ export default function BuilderPage() {
       loadingStartRef.current = Date.now()
       generationDoneRef.current = false
       pendingSaveRef.current = null
+      pendingPreviewHtmlRef.current = ''
       setShowLoading(true)
     }
     if (!isLoading && showLoading) {
@@ -169,18 +182,20 @@ export default function BuilderPage() {
       const remaining = MIN_LOADING_MS - elapsed
       if (remaining > 0) {
         const timeout = setTimeout(() => {
+          flushPreviewHtml()
           setShowLoading(false)
           pendingSaveRef.current?.()
           pendingSaveRef.current = null
         }, remaining)
         return () => clearTimeout(timeout)
       } else {
+        flushPreviewHtml()
         setShowLoading(false)
         pendingSaveRef.current?.()
         pendingSaveRef.current = null
       }
     }
-  }, [isLoading])
+  }, [flushPreviewHtml, isLoading, showLoading])
 
   const chatEndRef = useRef<HTMLDivElement>(null)
 
