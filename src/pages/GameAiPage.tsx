@@ -277,11 +277,22 @@ export default function GameAiPage() {
 
           {blueprint && (
             <Card className="glass-premium p-5 space-y-4">
-              <div className="flex flex-wrap gap-2">
-                {(blueprint.pillars ?? []).map((p, i) => (
-                  <Badge key={i} variant="secondary">{p}</Badge>
-                ))}
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap gap-2">
+                  {(blueprint.pillars ?? []).map((p, i) => (
+                    <Badge key={i} variant="secondary">{p}</Badge>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={downloadBlueprint} className="gap-2">
+                    <Download className="w-4 h-4" /> JSON
+                  </Button>
+                  <Button size="sm" onClick={sendToEditor} className="gap-2">
+                    <Rocket className="w-4 h-4" /> Send to Editor
+                  </Button>
+                </div>
               </div>
+
 
               {blueprint.lore && (
                 <section>
