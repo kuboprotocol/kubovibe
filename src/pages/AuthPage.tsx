@@ -114,12 +114,45 @@ export default function AuthPage() {
       oauth_denied: 'GitHub access was denied.',
     }
     const baseMsg = messages[err] || `GitHub sign-in failed: ${err}`
-    toast.error(baseMsg, {
+    // Include the Reference ID in the main toast message so screen readers
+    // announce it via sonner's aria-live region (description is not always read).
+    const announced = reqId ? `${baseMsg} Reference ID: ${reqId}.` : baseMsg
+    toast.error(announced, {
       description: reqId ? `Reference ID: ${reqId}` : undefined,
       duration: 10000,
       action: { label: 'Try again', onClick: () => handleGithubLogin() },
       cancel: reqId ? { label: 'Copy ID', onClick: () => copyReferenceId(reqId) } : undefined,
     })
+
+    // Try to auto-copy the Reference ID to the clipboard for quick log correlation.
+    // Browser clipboard APIs typically require a user gesture, so we fall back to
+    // an explicit confirmation toast with a "Copy Reference ID" button on failure.
+    if (reqId) {
+      const auto = navigator.clipboard?.writeText?.(reqId)
+      if (auto && typeof (auto as Promise<void>).then === 'function') {
+        ;(auto as Promise<void>)
+          .then(() => {
+            toast.success('Reference ID copied to clipboard', {
+              description: reqId,
+              duration: 6000,
+            })
+          })
+          .catch(() => {
+            toast('Copy Reference ID?', {
+              description: reqId,
+              duration: 12000,
+              action: { label: 'Copy Reference ID', onClick: () => copyReferenceId(reqId) },
+            })
+          })
+      } else {
+        toast('Copy Reference ID?', {
+          description: reqId,
+          duration: 12000,
+          action: { label: 'Copy Reference ID', onClick: () => copyReferenceId(reqId) },
+        })
+      }
+    }
+
     // Clean URL
     const url = new URL(window.location.href)
     url.searchParams.delete('auth_error')
