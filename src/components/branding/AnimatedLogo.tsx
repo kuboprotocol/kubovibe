@@ -33,18 +33,55 @@ export default function AnimatedLogo({ size = 32, className = '' }: AnimatedLogo
     transform: `translate(-50%, -50%)`,
   }
 
+  // Ultra-realistic gold face: layered specular highlight + radial sheen + metallic gradient
   const faceBase: CSSProperties = {
     position: 'absolute',
     width: cube,
     height: cube,
-    background:
-      'linear-gradient(135deg, hsl(43 78% 62%) 0%, hsl(43 70% 45%) 40%, hsl(38 65% 30%) 100%)',
-    border: '1px solid hsl(43 80% 70% / 0.6)',
-    boxShadow: 'inset 0 0 12px hsl(43 90% 80% / 0.45), 0 0 16px hsl(43 80% 50% / 0.35)',
+    background: [
+      // top-left specular hot-spot
+      'radial-gradient(circle at 25% 20%, hsl(48 100% 96% / 0.95) 0%, hsl(45 95% 80% / 0.45) 14%, transparent 38%)',
+      // bottom-right ambient bounce
+      'radial-gradient(circle at 80% 85%, hsl(38 90% 55% / 0.55) 0%, transparent 55%)',
+      // diagonal metallic sheen band
+      'linear-gradient(125deg, transparent 30%, hsl(48 100% 92% / 0.35) 45%, transparent 60%)',
+      // base brushed gold gradient
+      'linear-gradient(135deg, hsl(45 92% 72%) 0%, hsl(43 85% 55%) 35%, hsl(38 78% 38%) 70%, hsl(32 70% 24%) 100%)',
+    ].join(', '),
+    border: '1px solid hsl(45 95% 80% / 0.85)',
+    boxShadow: [
+      'inset 0 0 14px hsl(48 100% 92% / 0.55)',
+      'inset 0 2px 6px hsl(50 100% 95% / 0.7)',
+      'inset 0 -2px 8px hsl(28 80% 18% / 0.6)',
+      '0 0 18px hsl(43 90% 55% / 0.55)',
+      '0 0 38px hsl(43 95% 60% / 0.35)',
+    ].join(', '),
     backfaceVisibility: 'hidden',
+    overflow: 'hidden',
+  }
+
+  // Moving glint overlay placed on each face for realtime reflection
+  const glintStyle: CSSProperties = {
+    position: 'absolute',
+    inset: 0,
+    background:
+      'linear-gradient(115deg, transparent 35%, hsl(0 0% 100% / 0.55) 48%, hsl(48 100% 90% / 0.25) 52%, transparent 65%)',
+    backgroundSize: '250% 250%',
+    animation: 'kubo-glint 6s ease-in-out infinite',
+    mixBlendMode: 'screen',
+    pointerEvents: 'none',
   }
 
   const half = cube / 2
+
+  const faces: CSSProperties[] = [
+    { transform: `translateZ(${half}px)` },
+    { transform: `rotateY(180deg) translateZ(${half}px)` },
+    { transform: `rotateY(90deg) translateZ(${half}px)` },
+    { transform: `rotateY(-90deg) translateZ(${half}px)` },
+    { transform: `rotateX(90deg) translateZ(${half}px)` },
+    { transform: `rotateX(-90deg) translateZ(${half}px)` },
+  ]
 
   return (
     <div className={`relative inline-flex items-center justify-center ${className}`} style={sceneStyle}>
@@ -57,6 +94,15 @@ export default function AnimatedLogo({ size = 32, className = '' }: AnimatedLogo
           0%   { transform: rotateY(0deg); }
           100% { transform: rotateY(360deg); }
         }
+        @keyframes kubo-glint {
+          0%   { background-position: 0% 0%; opacity: 0.6; }
+          50%  { background-position: 100% 100%; opacity: 1; }
+          100% { background-position: 0% 0%; opacity: 0.6; }
+        }
+        @keyframes kubo-halo {
+          0%, 100% { opacity: 0.55; transform: translate(-50%, -50%) scale(1); }
+          50%      { opacity: 0.9;  transform: translate(-50%, -50%) scale(1.15); }
+        }
       `}</style>
 
       <span
@@ -66,17 +112,30 @@ export default function AnimatedLogo({ size = 32, className = '' }: AnimatedLogo
         KUBO&nbsp;VIBE
       </span>
 
-      {/* Orbiting cube layer (visually in front, sized to span the wordmark) */}
+      {/* Orbiting cube layer */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ transformStyle: 'preserve-3d' }}>
         <div style={orbitStyle} className="relative">
-          {/* cube positioned at the orbit edge */}
           <div className="absolute top-1/2 left-full" style={cubeWrapStyle}>
-            <div style={{ ...faceBase, transform: `translateZ(${half}px)` }} />
-            <div style={{ ...faceBase, transform: `rotateY(180deg) translateZ(${half}px)` }} />
-            <div style={{ ...faceBase, transform: `rotateY(90deg) translateZ(${half}px)` }} />
-            <div style={{ ...faceBase, transform: `rotateY(-90deg) translateZ(${half}px)` }} />
-            <div style={{ ...faceBase, transform: `rotateX(90deg) translateZ(${half}px)` }} />
-            <div style={{ ...faceBase, transform: `rotateX(-90deg) translateZ(${half}px)` }} />
+            {/* glow halo behind the cube for ambient bloom */}
+            <div
+              style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                width: cube * 1.8,
+                height: cube * 1.8,
+                background:
+                  'radial-gradient(circle, hsl(43 95% 60% / 0.55) 0%, hsl(43 90% 50% / 0.25) 35%, transparent 70%)',
+                filter: 'blur(6px)',
+                animation: 'kubo-halo 4s ease-in-out infinite',
+                pointerEvents: 'none',
+              }}
+            />
+            {faces.map((f, i) => (
+              <div key={i} style={{ ...faceBase, ...f }}>
+                <div style={glintStyle} />
+              </div>
+            ))}
           </div>
         </div>
       </div>
