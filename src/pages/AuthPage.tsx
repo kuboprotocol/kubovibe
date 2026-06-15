@@ -55,6 +55,7 @@ export default function AuthPage() {
   useEffect(() => {
     const err = searchParams.get('auth_error')
     if (!err) return
+    const reqId = searchParams.get('auth_req_id') || ''
     const messages: Record<string, string> = {
       github_not_configured: 'GitHub sign-in is temporarily unavailable. Please use email or Google.',
       server_misconfigured: 'Sign-in service is not configured. Please try again later.',
@@ -63,10 +64,15 @@ export default function AuthPage() {
       missing_code_or_state: 'GitHub did not return a valid response. Please try again.',
       oauth_denied: 'GitHub access was denied.',
     }
-    toast.error(messages[err] || `GitHub sign-in failed: ${err}`)
+    const baseMsg = messages[err] || `GitHub sign-in failed: ${err}`
+    toast.error(baseMsg, {
+      description: reqId ? `Reference ID: ${reqId}` : undefined,
+      duration: 8000,
+    })
     // Clean URL
     const url = new URL(window.location.href)
     url.searchParams.delete('auth_error')
+    url.searchParams.delete('auth_req_id')
     window.history.replaceState({}, '', url.toString())
   }, [searchParams])
 
