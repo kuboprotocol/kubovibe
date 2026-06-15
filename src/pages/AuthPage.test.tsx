@@ -39,9 +39,9 @@ const toastSuccess = vi.fn()
 const toastLoading = vi.fn(() => 'tid-1')
 vi.mock('sonner', () => ({
   toast: {
-    error: (...a: any[]) => toastError(...a),
-    success: (...a: any[]) => toastSuccess(...a),
-    loading: (...a: any[]) => toastLoading(...a),
+    error: (msg: any, opts?: any) => toastError(msg, opts),
+    success: (msg: any, opts?: any) => toastSuccess(msg, opts),
+    loading: (msg: any, opts?: any) => toastLoading(msg, opts),
   },
 }))
 
