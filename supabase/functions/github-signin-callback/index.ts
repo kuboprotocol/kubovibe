@@ -89,15 +89,21 @@ function resolveAppOrigin(req: Request): string {
   return 'https://kubovibe.dev'
 }
 
-Deno.serve(async (req) => {
+export async function handleRequest(req: Request): Promise<Response> {
+  const reqId = crypto.randomUUID()
+  const startedAt = Date.now()
   const url = new URL(req.url)
   const code = url.searchParams.get('code')
   const stateParam = url.searchParams.get('state')
   const oauthError = url.searchParams.get('error')
 
   const appOrigin = resolveAppOrigin(req)
-  const errRedirect = (err: string) =>
-    pageRedirect(`${appOrigin}/auth?auth_error=${encodeURIComponent(err)}`)
+  const errRedirect = (err: string) => {
+    logEvent('callback_error', { reqId, err, durationMs: Date.now() - startedAt })
+    return pageRedirect(`${appOrigin}/auth?auth_error=${encodeURIComponent(err)}`)
+  }
+
+  logEvent('callback_received', { reqId, hasCode: !!code, hasState: !!stateParam, hasOauthError: !!oauthError })
 
   try {
     const clientId = Deno.env.get('GITHUB_CLIENT_ID')
@@ -114,7 +120,7 @@ Deno.serve(async (req) => {
     const state = await verifyState(stateParam, stateSecret)
     if (!state || state.p !== 'signin') return errRedirect('invalid_state')
 
-    const returnUrl: string = typeof state.r === 'string' && state.r.startsWith('/') ? state.r : '/dashboard'
+    const returnUrl = safeReturnPath(state.r)
 
     // Exchange code for access token
     const tokenRes = await fetch('https://github.com/login/oauth/access_token', {
@@ -149,7 +155,6 @@ Deno.serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false },
     })
 
-    // Ensure user exists (idempotent: ignore duplicate error)
     await admin.auth.admin.createUser({
       email,
       email_confirm: true,
@@ -161,7 +166,6 @@ Deno.serve(async (req) => {
       },
     }).catch(() => { /* user already exists */ })
 
-    // Generate a magic link → action_link signs them in and redirects to returnUrl
     const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
       type: 'magiclink',
       email,
@@ -171,10 +175,16 @@ Deno.serve(async (req) => {
       return errRedirect(linkErr?.message || 'link_generation_failed')
     }
 
+    logEvent('callback_success', { reqId, ghLogin: ghUser?.login, durationMs: Date.now() - startedAt })
     return pageRedirect(linkData.properties.action_link)
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'unknown_error'
-    console.error('[github-signin-callback]', msg)
+    logEvent('callback_exception', { reqId, err: msg, durationMs: Date.now() - startedAt })
     return errRedirect(msg)
   }
-})
+}
+
+// Export internals for tests
+export const __test = { safeReturnPath, isAllowedOrigin, verifyState }
+
+Deno.serve(handleRequest)
