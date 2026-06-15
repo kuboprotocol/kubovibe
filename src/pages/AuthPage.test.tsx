@@ -36,7 +36,7 @@ vi.mock('@/hooks/useAuth', () => ({
 
 const toastError = vi.fn()
 const toastSuccess = vi.fn()
-const toastLoading = vi.fn(() => 'tid-1')
+const toastLoading = vi.fn((_msg?: any, _opts?: any) => 'tid-1')
 vi.mock('sonner', () => ({
   toast: {
     error: (msg: any, opts?: any) => toastError(msg, opts),
