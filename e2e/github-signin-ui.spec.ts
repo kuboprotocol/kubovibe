@@ -51,9 +51,42 @@ test.describe('GitHub login UI', () => {
     await expect(page.getByText(/session expired/i)).toBeVisible()
     await expect(page.getByText(/Reference ID: req-xyz-123/)).toBeVisible()
 
+    // a11y: sonner toast container should announce updates via aria-live
+    const liveRegion = page.locator('[aria-live]').first()
+    await expect(liveRegion).toHaveCount(1)
+
+    // "Try again" action should be exposed as a button
+    await expect(page.getByRole('button', { name: /try again/i })).toBeVisible()
+
+    // "Copy ID" button copies the reference ID to the clipboard
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
+    await page.getByRole('button', { name: /copy id/i }).click()
+    const clip = await page.evaluate(() => navigator.clipboard.readText())
+    expect(clip).toBe('req-xyz-123')
+
     // URL should be cleaned of auth params after the toast is shown
     await expect.poll(() => new URL(page.url()).search).not.toContain('auth_error')
     await expect.poll(() => new URL(page.url()).search).not.toContain('auth_req_id')
+  })
+
+  test('callback error "Try again" re-initiates the OAuth flow with same redirect target', async ({ page }) => {
+    let initiateCalls = 0
+    let lastBody = ''
+    await page.route(INITIATE_URL_RE, async (route: Route) => {
+      initiateCalls++
+      lastBody = route.request().postData() || ''
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ url: 'about:blank' }),
+      })
+    })
+    await page.route('about:blank', (route) => route.fulfill({ status: 200, body: '' }))
+
+    await page.goto('/auth?redirect=/connectors/github&auth_error=invalid_state&auth_req_id=r-1')
+    await page.getByRole('button', { name: /try again/i }).click()
+    await expect.poll(() => initiateCalls).toBeGreaterThanOrEqual(1)
+    expect(lastBody).toContain('"returnUrl":"/connectors/github"')
   })
 
   test('callback error without reqId shows toast without reference line', async ({ page }) => {
