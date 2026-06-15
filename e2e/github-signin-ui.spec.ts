@@ -109,7 +109,77 @@ test.describe('GitHub login UI', () => {
 
     await page.goto('/auth?redirect=/connectors/github')
     await page.getByTestId('auth-github').click()
-    await expect.poll(() => capturedBody).toContain('"returnUrl":"/connectors/github"')
+    await expect.poll(() => capturedBody).toContain(''"returnUrl":"/connectors/github"')
+  })
+
+  test('safe redirect: external/unknown redirect is normalized to /dashboard for Try again', async ({ page }) => {
+    let capturedBody = ''
+    await page.route(INITIATE_URL_RE, async (route: Route) => {
+      capturedBody = route.request().postData() || ''
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ url: 'about:blank' }),
+      })
+    })
+    await page.route('about:blank', (route) => route.fulfill({ status: 200, body: '' }))
+
+    // Unknown prefix and protocol-relative should both fall back to /dashboard
+    await page.goto('/auth?redirect=//evil.com&auth_error=invalid_state&auth_req_id=r-redir-1')
+    await page.getByRole('button', { name: /try again/i }).click()
+    await expect.poll(() => capturedBody).toContain('"returnUrl":"/dashboard"')
+  })
+
+  test('keyboard: Try again is reachable via Tab and activates with Enter', async ({ page }) => {
+    let initiateCalls = 0
+    await page.route(INITIATE_URL_RE, async (route: Route) => {
+      initiateCalls++
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ url: 'about:blank' }),
+      })
+    })
+    await page.route('about:blank', (route) => route.fulfill({ status: 200, body: '' }))
+
+    await page.goto('/auth?auth_error=invalid_state&auth_req_id=r-kbd-1')
+    const tryAgain = page.getByRole('button', { name: /try again/i })
+    await expect(tryAgain).toBeVisible()
+    await tryAgain.focus()
+    await expect(tryAgain).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect.poll(() => initiateCalls).toBeGreaterThanOrEqual(1)
+  })
+
+  test('keyboard: Copy ID activates with Space and clipboard receives reference id', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+    await page.goto('/auth?auth_error=invalid_state&auth_req_id=r-kbd-2')
+    const copyBtn = page.getByRole('button', { name: /copy id/i })
+    await expect(copyBtn).toBeVisible()
+    await copyBtn.focus()
+    await expect(copyBtn).toBeFocused()
+    await page.keyboard.press('Space')
+    await expect.poll(async () =>
+      await page.evaluate(() => navigator.clipboard.readText()),
+    ).toBe('r-kbd-2')
+  })
+
+  test('a11y: error toast announces Reference ID inline (in the live region text)', async ({ page }) => {
+    await page.goto('/auth?auth_error=invalid_state&auth_req_id=r-live-1')
+    // sonner renders an aria-live region containing the toast title; the reqId
+    // must appear in that announced text so screen readers correlate the error.
+    const liveRegion = page.locator('[aria-live]').first()
+    await expect(liveRegion).toBeAttached()
+    await expect(page.getByText(/session expired.*Reference ID: r-live-1/i)).toBeVisible()
+  })
+
+  test('a11y: auto-copy succeeds when clipboard permission is granted', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+    await page.goto('/auth?auth_error=invalid_state&auth_req_id=r-auto-1')
+    await expect(page.getByText(/Reference ID copied to clipboard/i)).toBeVisible()
+    const clip = await page.evaluate(() => navigator.clipboard.readText())
+    expect(clip).toBe('r-auto-1')
+  })
 
   test('sign-out: spinner has role=status and toast region is announced', async ({ page }) => {
     // Simulate a logged-in session so the sign-out banner is visible.
@@ -135,14 +205,12 @@ test.describe('GitHub login UI', () => {
     if (await btn.count() === 0) test.skip(true, 'Sign-out banner not rendered without real session')
 
     await btn.click()
-    // Spinner should be exposed as a status to AT (role=status, accessible name)
     const spinner = page.getByTestId('auth-signout-spinner')
     await expect(spinner).toHaveAttribute('role', 'status')
     await expect(spinner).toHaveAttribute('aria-label', /signing out/i)
-    // Button should be aria-busy while signing out
     await expect(btn).toHaveAttribute('aria-busy', 'true')
-    // Sonner renders an aria-live region for toasts
     await expect(page.locator('[aria-live]').first()).toBeAttached()
   })
 })
+
 
