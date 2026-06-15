@@ -78,19 +78,23 @@ export default function AuthPage() {
 
   const handleGithubLogin = async () => {
     setGithubLoading(true)
+    const startingId = toast.loading('Starting GitHub sign-in…')
     try {
       const { data, error } = await supabase.functions.invoke('github-signin-initiate', {
         body: { returnUrl: safeRedirect },
       })
       if (error) throw error
       if (data?.error === 'github_not_configured') {
-        toast.error('GitHub sign-in is not configured yet. Please use email or Google.')
+        toast.error('GitHub sign-in is not configured yet. Please use email or Google.', { id: startingId })
+        setGithubLoading(false)
         return
       }
       if (!data?.url) throw new Error('No authorization URL returned')
-      window.location.href = data.url
+      toast.success('Redirecting to GitHub…', { id: startingId })
+      // Small delay so user sees the toast before navigation
+      setTimeout(() => { window.location.href = data.url }, 250)
     } catch (err: any) {
-      toast.error(err?.message || 'Could not start GitHub sign-in')
+      toast.error(err?.message || 'Could not start GitHub sign-in', { id: startingId })
       setGithubLoading(false)
     }
   }
