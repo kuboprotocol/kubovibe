@@ -44,18 +44,46 @@ function pageRedirect(target: string) {
   )
 }
 
+// Structured JSON logger for production observability
+function logEvent(event: string, data: Record<string, unknown> = {}) {
+  console.log(JSON.stringify({
+    ts: new Date().toISOString(),
+    fn: 'github-signin-callback',
+    event,
+    ...data,
+  }))
+}
+
+// Allowlist of safe app origins for post-OAuth redirects
+const ALLOWED_HOSTS = ['kubovibe.dev', 'kubovibe.lovable.app', 'localhost', '127.0.0.1']
+function isAllowedOrigin(origin: string): boolean {
+  try {
+    const u = new URL(origin)
+    if (ALLOWED_HOSTS.includes(u.hostname)) return true
+    if (u.hostname.endsWith('.kubovibe.dev')) return true
+    if (u.hostname.endsWith('.lovable.app')) return true
+    return false
+  } catch { return false }
+}
+
+// Allowlist of safe internal paths (prefix match)
+const ALLOWED_RETURN_PREFIXES = ['/dashboard', '/connectors', '/builder', '/canvas', '/profile', '/agents', '/docs', '/game', '/']
+function safeReturnPath(p: string): string {
+  if (typeof p !== 'string' || !p.startsWith('/') || p.startsWith('//')) return '/dashboard'
+  if (ALLOWED_RETURN_PREFIXES.some(prefix => p === prefix || p.startsWith(prefix + '/') || p.startsWith(prefix + '?'))) {
+    return p
+  }
+  return '/dashboard'
+}
+
 function resolveAppOrigin(req: Request): string {
-  // Prefer the Origin/Referer that started the flow — but for GitHub redirect we get neither.
-  // Fall back to a configured app URL via env, then to kubovibe.dev.
   const envApp = Deno.env.get('APP_URL')
-  if (envApp) return envApp.replace(/\/$/, '')
+  if (envApp && isAllowedOrigin(envApp)) return envApp.replace(/\/$/, '')
   const referer = req.headers.get('referer')
   if (referer) {
     try {
       const u = new URL(referer)
-      if (u.hostname === 'kubovibe.dev' || u.hostname.endsWith('.kubovibe.dev') || u.hostname === 'localhost') {
-        return u.origin
-      }
+      if (isAllowedOrigin(u.origin)) return u.origin
     } catch { /* ignore */ }
   }
   return 'https://kubovibe.dev'
