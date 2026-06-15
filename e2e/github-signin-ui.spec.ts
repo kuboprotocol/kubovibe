@@ -109,7 +109,7 @@ test.describe('GitHub login UI', () => {
 
     await page.goto('/auth?redirect=/connectors/github')
     await page.getByTestId('auth-github').click()
-    await expect.poll(() => capturedBody).toContain(''"returnUrl":"/connectors/github"')
+    await expect.poll(() => capturedBody).toContain('"returnUrl":"/connectors/github"')
   })
 
   test('safe redirect: external/unknown redirect is normalized to /dashboard for Try again', async ({ page }) => {
