@@ -15,9 +15,20 @@ export default function AuthPage() {
   const [searchParams] = useSearchParams()
   const refCode = searchParams.get('ref') || ''
   const redirectParam = searchParams.get('redirect') || ''
-  // Only allow internal paths (must start with single "/") to prevent open redirects
-  const safeRedirect =
-    redirectParam.startsWith('/') && !redirectParam.startsWith('//') ? redirectParam : '/dashboard'
+  // Allowlist of safe internal route prefixes (mirrors the edge function callback).
+  // Prevents open redirects AND ensures "Try again" after an OAuth failure always
+  // lands on an authorized in-app route.
+  const ALLOWED_REDIRECT_PREFIXES = [
+    '/dashboard', '/connectors', '/builder', '/canvas', '/profile',
+    '/agents', '/docs', '/game', '/',
+  ]
+  const isAllowedRedirect = (p: string): boolean => {
+    if (typeof p !== 'string' || !p.startsWith('/') || p.startsWith('//')) return false
+    return ALLOWED_REDIRECT_PREFIXES.some(
+      (pre) => p === pre || p.startsWith(pre + '/') || p.startsWith(pre + '?'),
+    )
+  }
+  const safeRedirect = isAllowedRedirect(redirectParam) ? redirectParam : '/dashboard'
   const { user, loading, signOut } = useAuth()
   const [isLogin, setIsLogin] = useState(true)
   const [email, setEmail] = useState('')
@@ -103,12 +114,45 @@ export default function AuthPage() {
       oauth_denied: 'GitHub access was denied.',
     }
     const baseMsg = messages[err] || `GitHub sign-in failed: ${err}`
-    toast.error(baseMsg, {
+    // Include the Reference ID in the main toast message so screen readers
+    // announce it via sonner's aria-live region (description is not always read).
+    const announced = reqId ? `${baseMsg} Reference ID: ${reqId}.` : baseMsg
+    toast.error(announced, {
       description: reqId ? `Reference ID: ${reqId}` : undefined,
       duration: 10000,
       action: { label: 'Try again', onClick: () => handleGithubLogin() },
       cancel: reqId ? { label: 'Copy ID', onClick: () => copyReferenceId(reqId) } : undefined,
     })
+
+    // Try to auto-copy the Reference ID to the clipboard for quick log correlation.
+    // Browser clipboard APIs typically require a user gesture, so we fall back to
+    // an explicit confirmation toast with a "Copy Reference ID" button on failure.
+    if (reqId) {
+      const auto = navigator.clipboard?.writeText?.(reqId)
+      if (auto && typeof (auto as Promise<void>).then === 'function') {
+        ;(auto as Promise<void>)
+          .then(() => {
+            toast.success('Reference ID copied to clipboard', {
+              description: reqId,
+              duration: 6000,
+            })
+          })
+          .catch(() => {
+            toast('Copy Reference ID?', {
+              description: reqId,
+              duration: 12000,
+              action: { label: 'Copy Reference ID', onClick: () => copyReferenceId(reqId) },
+            })
+          })
+      } else {
+        toast('Copy Reference ID?', {
+          description: reqId,
+          duration: 12000,
+          action: { label: 'Copy Reference ID', onClick: () => copyReferenceId(reqId) },
+        })
+      }
+    }
+
     // Clean URL
     const url = new URL(window.location.href)
     url.searchParams.delete('auth_error')
