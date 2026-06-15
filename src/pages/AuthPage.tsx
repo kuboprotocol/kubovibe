@@ -37,14 +37,15 @@ export default function AuthPage() {
 
   const handleSignOut = async () => {
     setSigningOut(true)
+    const tId = toast.loading('Signing you out…')
     try {
       await signOut()
-      toast.success('Signed out successfully')
+      toast.success('Signed out successfully. You can sign in again below.', { id: tId })
       const url = new URL(window.location.href)
       url.searchParams.delete('signout')
       window.history.replaceState({}, '', url.toString())
     } catch (err: any) {
-      toast.error(err?.message || 'Could not sign out')
+      toast.error(err?.message || 'Could not sign out', { id: tId })
     } finally {
       setSigningOut(false)
     }
