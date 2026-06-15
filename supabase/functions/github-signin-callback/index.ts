@@ -100,7 +100,7 @@ export async function handleRequest(req: Request): Promise<Response> {
   const appOrigin = resolveAppOrigin(req)
   const errRedirect = (err: string) => {
     logEvent('callback_error', { reqId, err, durationMs: Date.now() - startedAt })
-    return pageRedirect(`${appOrigin}/auth?auth_error=${encodeURIComponent(err)}`)
+    return pageRedirect(`${appOrigin}/auth?auth_error=${encodeURIComponent(err)}&auth_req_id=${encodeURIComponent(reqId)}`)
   }
 
   logEvent('callback_received', { reqId, hasCode: !!code, hasState: !!stateParam, hasOauthError: !!oauthError })
