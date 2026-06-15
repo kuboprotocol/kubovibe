@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { ArrowRight, Zap, Loader2, Globe, Palette } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
-import logoImg from '@/assets/logo-kubovibe-3d.png'
+import AnimatedLogo from '@/components/branding/AnimatedLogo'
 import PromptAttachMenu from '@/components/landing/PromptAttachMenu'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/hooks/useAuth'
@@ -128,7 +128,7 @@ export default function HeroSection() {
           transition={{ duration: 0.6, delay: 0.05 }}
           className="flex justify-center mb-8"
         >
-          <img src={logoImg} alt="KUBO VIBE" className="h-16 md:h-20 drop-shadow-2xl" />
+          <AnimatedLogo size={48} className="drop-shadow-2xl" />
         </motion.div>
 
         <motion.h1

@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import logoImg from '@/assets/logo-kubovibe-3d.png'
+import AnimatedLogo from '@/components/branding/AnimatedLogo'
 
 export default function Navbar() {
   const navigate = useNavigate()
@@ -8,8 +8,8 @@ export default function Navbar() {
   return (
     <nav className="sticky top-0 z-50 glass glass-border">
       <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-3 group">
-          <img src={logoImg} alt="KUBO VIBE" className="h-8 group-hover:scale-105 transition-transform" />
+        <Link to="/" aria-label="KUBO VIBE" className="flex items-center gap-3 group">
+          <AnimatedLogo size={18} className="group-hover:scale-105 transition-transform" />
         </Link>
 
         <div className="hidden md:flex items-center gap-1">
