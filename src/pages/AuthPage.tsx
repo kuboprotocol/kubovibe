@@ -51,6 +51,44 @@ export default function AuthPage() {
     }
   }
 
+  const copyReferenceId = async (reqId: string) => {
+    try {
+      await navigator.clipboard.writeText(reqId)
+      toast.success('Reference ID copied to clipboard')
+    } catch {
+      toast.error('Could not copy reference ID')
+    }
+  }
+
+  const handleGithubLogin = async () => {
+    setGithubLoading(true)
+    const startingId = toast.loading('Starting GitHub sign-in…')
+    try {
+      const { data, error } = await supabase.functions.invoke('github-signin-initiate', {
+        body: { returnUrl: safeRedirect },
+      })
+      if (error) throw error
+      if (data?.error === 'github_not_configured') {
+        toast.error('GitHub sign-in is not configured yet. Please use email or Google.', {
+          id: startingId,
+          action: { label: 'Try again', onClick: () => handleGithubLogin() },
+        })
+        setGithubLoading(false)
+        return
+      }
+      if (!data?.url) throw new Error('No authorization URL returned')
+      toast.success('Redirecting to GitHub…', { id: startingId })
+      // Small delay so user sees the toast before navigation
+      setTimeout(() => { window.location.href = data.url }, 250)
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not start GitHub sign-in', {
+        id: startingId,
+        action: { label: 'Try again', onClick: () => handleGithubLogin() },
+      })
+      setGithubLoading(false)
+    }
+  }
+
   // Surface OAuth errors coming back from the GitHub callback
   useEffect(() => {
     const err = searchParams.get('auth_error')
@@ -67,13 +105,16 @@ export default function AuthPage() {
     const baseMsg = messages[err] || `GitHub sign-in failed: ${err}`
     toast.error(baseMsg, {
       description: reqId ? `Reference ID: ${reqId}` : undefined,
-      duration: 8000,
+      duration: 10000,
+      action: { label: 'Try again', onClick: () => handleGithubLogin() },
+      cancel: reqId ? { label: 'Copy ID', onClick: () => copyReferenceId(reqId) } : undefined,
     })
     // Clean URL
     const url = new URL(window.location.href)
     url.searchParams.delete('auth_error')
     url.searchParams.delete('auth_req_id')
     window.history.replaceState({}, '', url.toString())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
 
   const handleGoogleLogin = async () => {
@@ -81,29 +122,6 @@ export default function AuthPage() {
       redirect_uri: `${window.location.origin}${safeRedirect}`,
     })
     if (error) toast.error('Error signing in with Google')
-  }
-
-  const handleGithubLogin = async () => {
-    setGithubLoading(true)
-    const startingId = toast.loading('Starting GitHub sign-in…')
-    try {
-      const { data, error } = await supabase.functions.invoke('github-signin-initiate', {
-        body: { returnUrl: safeRedirect },
-      })
-      if (error) throw error
-      if (data?.error === 'github_not_configured') {
-        toast.error('GitHub sign-in is not configured yet. Please use email or Google.', { id: startingId })
-        setGithubLoading(false)
-        return
-      }
-      if (!data?.url) throw new Error('No authorization URL returned')
-      toast.success('Redirecting to GitHub…', { id: startingId })
-      // Small delay so user sees the toast before navigation
-      setTimeout(() => { window.location.href = data.url }, 250)
-    } catch (err: any) {
-      toast.error(err?.message || 'Could not start GitHub sign-in', { id: startingId })
-      setGithubLoading(false)
-    }
   }
 
 
