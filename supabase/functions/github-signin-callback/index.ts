@@ -13,23 +13,23 @@ function b64urlDecode(s: string): Uint8Array {
 }
 
 async function verifyState(state: string, secret: string): Promise<any | null> {
-  const [data, sig] = state.split('.')
-  if (!data || !sig) return null
-  const key = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['verify'],
-  )
-  const valid = await crypto.subtle.verify(
-    'HMAC',
-    key,
-    b64urlDecode(sig),
-    new TextEncoder().encode(data),
-  )
-  if (!valid) return null
   try {
+    const [data, sig] = state.split('.')
+    if (!data || !sig) return null
+    const key = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['verify'],
+    )
+    const valid = await crypto.subtle.verify(
+      'HMAC',
+      key,
+      b64urlDecode(sig) as BufferSource,
+      new TextEncoder().encode(data),
+    )
+    if (!valid) return null
     const json = new TextDecoder().decode(b64urlDecode(data))
     const parsed = JSON.parse(json)
     if (typeof parsed.t !== 'number' || Date.now() - parsed.t > 10 * 60 * 1000) return null
@@ -44,32 +44,66 @@ function pageRedirect(target: string) {
   )
 }
 
+// Structured JSON logger for production observability
+function logEvent(event: string, data: Record<string, unknown> = {}) {
+  console.log(JSON.stringify({
+    ts: new Date().toISOString(),
+    fn: 'github-signin-callback',
+    event,
+    ...data,
+  }))
+}
+
+// Allowlist of safe app origins for post-OAuth redirects
+const ALLOWED_HOSTS = ['kubovibe.dev', 'kubovibe.lovable.app', 'localhost', '127.0.0.1']
+function isAllowedOrigin(origin: string): boolean {
+  try {
+    const u = new URL(origin)
+    if (ALLOWED_HOSTS.includes(u.hostname)) return true
+    if (u.hostname.endsWith('.kubovibe.dev')) return true
+    if (u.hostname.endsWith('.lovable.app')) return true
+    return false
+  } catch { return false }
+}
+
+// Allowlist of safe internal paths (prefix match)
+const ALLOWED_RETURN_PREFIXES = ['/dashboard', '/connectors', '/builder', '/canvas', '/profile', '/agents', '/docs', '/game', '/']
+function safeReturnPath(p: string): string {
+  if (typeof p !== 'string' || !p.startsWith('/') || p.startsWith('//')) return '/dashboard'
+  if (ALLOWED_RETURN_PREFIXES.some(prefix => p === prefix || p.startsWith(prefix + '/') || p.startsWith(prefix + '?'))) {
+    return p
+  }
+  return '/dashboard'
+}
+
 function resolveAppOrigin(req: Request): string {
-  // Prefer the Origin/Referer that started the flow — but for GitHub redirect we get neither.
-  // Fall back to a configured app URL via env, then to kubovibe.dev.
   const envApp = Deno.env.get('APP_URL')
-  if (envApp) return envApp.replace(/\/$/, '')
+  if (envApp && isAllowedOrigin(envApp)) return envApp.replace(/\/$/, '')
   const referer = req.headers.get('referer')
   if (referer) {
     try {
       const u = new URL(referer)
-      if (u.hostname === 'kubovibe.dev' || u.hostname.endsWith('.kubovibe.dev') || u.hostname === 'localhost') {
-        return u.origin
-      }
+      if (isAllowedOrigin(u.origin)) return u.origin
     } catch { /* ignore */ }
   }
   return 'https://kubovibe.dev'
 }
 
-Deno.serve(async (req) => {
+export async function handleRequest(req: Request): Promise<Response> {
+  const reqId = crypto.randomUUID()
+  const startedAt = Date.now()
   const url = new URL(req.url)
   const code = url.searchParams.get('code')
   const stateParam = url.searchParams.get('state')
   const oauthError = url.searchParams.get('error')
 
   const appOrigin = resolveAppOrigin(req)
-  const errRedirect = (err: string) =>
-    pageRedirect(`${appOrigin}/auth?auth_error=${encodeURIComponent(err)}`)
+  const errRedirect = (err: string) => {
+    logEvent('callback_error', { reqId, err, durationMs: Date.now() - startedAt })
+    return pageRedirect(`${appOrigin}/auth?auth_error=${encodeURIComponent(err)}`)
+  }
+
+  logEvent('callback_received', { reqId, hasCode: !!code, hasState: !!stateParam, hasOauthError: !!oauthError })
 
   try {
     const clientId = Deno.env.get('GITHUB_CLIENT_ID')
@@ -86,7 +120,7 @@ Deno.serve(async (req) => {
     const state = await verifyState(stateParam, stateSecret)
     if (!state || state.p !== 'signin') return errRedirect('invalid_state')
 
-    const returnUrl: string = typeof state.r === 'string' && state.r.startsWith('/') ? state.r : '/dashboard'
+    const returnUrl = safeReturnPath(state.r)
 
     // Exchange code for access token
     const tokenRes = await fetch('https://github.com/login/oauth/access_token', {
@@ -121,7 +155,6 @@ Deno.serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false },
     })
 
-    // Ensure user exists (idempotent: ignore duplicate error)
     await admin.auth.admin.createUser({
       email,
       email_confirm: true,
@@ -133,7 +166,6 @@ Deno.serve(async (req) => {
       },
     }).catch(() => { /* user already exists */ })
 
-    // Generate a magic link → action_link signs them in and redirects to returnUrl
     const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
       type: 'magiclink',
       email,
@@ -143,10 +175,16 @@ Deno.serve(async (req) => {
       return errRedirect(linkErr?.message || 'link_generation_failed')
     }
 
+    logEvent('callback_success', { reqId, ghLogin: ghUser?.login, durationMs: Date.now() - startedAt })
     return pageRedirect(linkData.properties.action_link)
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'unknown_error'
-    console.error('[github-signin-callback]', msg)
+    logEvent('callback_exception', { reqId, err: msg, durationMs: Date.now() - startedAt })
     return errRedirect(msg)
   }
-})
+}
+
+// Export internals for tests
+export const __test = { safeReturnPath, isAllowedOrigin, verifyState }
+
+Deno.serve(handleRequest)

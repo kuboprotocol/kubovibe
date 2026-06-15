@@ -18,19 +18,37 @@ export default function AuthPage() {
   // Only allow internal paths (must start with single "/") to prevent open redirects
   const safeRedirect =
     redirectParam.startsWith('/') && !redirectParam.startsWith('//') ? redirectParam : '/dashboard'
-  const { user, loading } = useAuth()
+  const { user, loading, signOut } = useAuth()
   const [isLogin, setIsLogin] = useState(true)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [githubLoading, setGithubLoading] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
   const [forgotPassword, setForgotPassword] = useState(false)
   const [resetEmail, setResetEmail] = useState('')
 
+  // Auto-redirect logged-in users unless ?signout=1 was explicitly requested
+  const wantsSignout = searchParams.get('signout') === '1'
   useEffect(() => {
-    if (!loading && user) navigate(safeRedirect, { replace: true })
-  }, [user, loading, navigate, safeRedirect])
+    if (!loading && user && !wantsSignout) navigate(safeRedirect, { replace: true })
+  }, [user, loading, navigate, safeRedirect, wantsSignout])
+
+  const handleSignOut = async () => {
+    setSigningOut(true)
+    try {
+      await signOut()
+      toast.success('Signed out successfully')
+      const url = new URL(window.location.href)
+      url.searchParams.delete('signout')
+      window.history.replaceState({}, '', url.toString())
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not sign out')
+    } finally {
+      setSigningOut(false)
+    }
+  }
 
   // Surface OAuth errors coming back from the GitHub callback
   useEffect(() => {
@@ -60,19 +78,23 @@ export default function AuthPage() {
 
   const handleGithubLogin = async () => {
     setGithubLoading(true)
+    const startingId = toast.loading('Starting GitHub sign-in…')
     try {
       const { data, error } = await supabase.functions.invoke('github-signin-initiate', {
         body: { returnUrl: safeRedirect },
       })
       if (error) throw error
       if (data?.error === 'github_not_configured') {
-        toast.error('GitHub sign-in is not configured yet. Please use email or Google.')
+        toast.error('GitHub sign-in is not configured yet. Please use email or Google.', { id: startingId })
+        setGithubLoading(false)
         return
       }
       if (!data?.url) throw new Error('No authorization URL returned')
-      window.location.href = data.url
+      toast.success('Redirecting to GitHub…', { id: startingId })
+      // Small delay so user sees the toast before navigation
+      setTimeout(() => { window.location.href = data.url }, 250)
     } catch (err: any) {
-      toast.error(err?.message || 'Could not start GitHub sign-in')
+      toast.error(err?.message || 'Could not start GitHub sign-in', { id: startingId })
       setGithubLoading(false)
     }
   }
@@ -217,6 +239,24 @@ export default function AuthPage() {
                   {isLogin ? 'Access your projects on KUBO VIBE' : 'Start building amazing apps'}
                 </p>
               </div>
+
+              {user && (
+                <div className="mb-5 flex items-center justify-between gap-3 rounded-xl border border-border/50 bg-secondary/40 p-3.5">
+                  <div className="text-xs text-foreground/80 leading-relaxed">
+                    Signed in as <span className="font-semibold text-foreground">{user.email}</span>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleSignOut}
+                    disabled={signingOut}
+                    data-testid="auth-signout"
+                    className="h-8 rounded-lg text-xs"
+                  >
+                    {signingOut ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Sign out'}
+                  </Button>
+                </div>
+              )}
 
               {redirectParam && (
                 <motion.div
