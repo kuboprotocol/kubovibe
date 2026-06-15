@@ -18,19 +18,37 @@ export default function AuthPage() {
   // Only allow internal paths (must start with single "/") to prevent open redirects
   const safeRedirect =
     redirectParam.startsWith('/') && !redirectParam.startsWith('//') ? redirectParam : '/dashboard'
-  const { user, loading } = useAuth()
+  const { user, loading, signOut } = useAuth()
   const [isLogin, setIsLogin] = useState(true)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [githubLoading, setGithubLoading] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
   const [forgotPassword, setForgotPassword] = useState(false)
   const [resetEmail, setResetEmail] = useState('')
 
+  // Auto-redirect logged-in users unless ?signout=1 was explicitly requested
+  const wantsSignout = searchParams.get('signout') === '1'
   useEffect(() => {
-    if (!loading && user) navigate(safeRedirect, { replace: true })
-  }, [user, loading, navigate, safeRedirect])
+    if (!loading && user && !wantsSignout) navigate(safeRedirect, { replace: true })
+  }, [user, loading, navigate, safeRedirect, wantsSignout])
+
+  const handleSignOut = async () => {
+    setSigningOut(true)
+    try {
+      await signOut()
+      toast.success('Signed out successfully')
+      const url = new URL(window.location.href)
+      url.searchParams.delete('signout')
+      window.history.replaceState({}, '', url.toString())
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not sign out')
+    } finally {
+      setSigningOut(false)
+    }
+  }
 
   // Surface OAuth errors coming back from the GitHub callback
   useEffect(() => {
