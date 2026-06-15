@@ -8,3 +8,9 @@ verify_jwt = false
 
 [functions.gmail-sync-accounts]
 verify_jwt = false
+
+[functions.github-signin-initiate]
+verify_jwt = false
+
+[functions.github-signin-callback]
+verify_jwt = false
