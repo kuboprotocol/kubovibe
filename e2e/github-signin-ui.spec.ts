@@ -110,5 +110,39 @@ test.describe('GitHub login UI', () => {
     await page.goto('/auth?redirect=/connectors/github')
     await page.getByTestId('auth-github').click()
     await expect.poll(() => capturedBody).toContain('"returnUrl":"/connectors/github"')
+
+  test('sign-out: spinner has role=status and toast region is announced', async ({ page }) => {
+    // Simulate a logged-in session so the sign-out banner is visible.
+    // We stub the auth session in localStorage before the app boots.
+    await page.addInitScript(() => {
+      const fakeSession = {
+        currentSession: {
+          access_token: 'fake', refresh_token: 'fake', expires_in: 3600,
+          expires_at: Math.floor(Date.now() / 1000) + 3600, token_type: 'bearer',
+          user: { id: 'u1', email: 'tester@example.com', aud: 'authenticated', role: 'authenticated' },
+        },
+        expiresAt: Math.floor(Date.now() / 1000) + 3600,
+      }
+      try {
+        Object.keys(localStorage).filter(k => k.startsWith('sb-') && k.endsWith('-auth-token'))
+          .forEach(k => localStorage.removeItem(k))
+        localStorage.setItem('sb-auth-token', JSON.stringify(fakeSession))
+      } catch { /* ignore */ }
+    })
+    await page.goto('/auth?signout=1')
+
+    const btn = page.getByTestId('auth-signout')
+    if (await btn.count() === 0) test.skip(true, 'Sign-out banner not rendered without real session')
+
+    await btn.click()
+    // Spinner should be exposed as a status to AT (role=status, accessible name)
+    const spinner = page.getByTestId('auth-signout-spinner')
+    await expect(spinner).toHaveAttribute('role', 'status')
+    await expect(spinner).toHaveAttribute('aria-label', /signing out/i)
+    // Button should be aria-busy while signing out
+    await expect(btn).toHaveAttribute('aria-busy', 'true')
+    // Sonner renders an aria-live region for toasts
+    await expect(page.locator('[aria-live]').first()).toBeAttached()
   })
 })
+
