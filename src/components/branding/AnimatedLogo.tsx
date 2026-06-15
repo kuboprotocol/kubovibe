@@ -22,14 +22,14 @@ export default function AnimatedLogo({ size = 32, className = '' }: AnimatedLogo
     width: orbitRadius * 2,
     height: orbitRadius * 2,
     transformStyle: 'preserve-3d',
-    animation: 'kubo-orbit 9s linear infinite',
+    animation: 'kubo-orbit 24s ease-in-out infinite',
   }
 
   const cubeWrapStyle: CSSProperties = {
     width: cube,
     height: cube,
     transformStyle: 'preserve-3d',
-    animation: 'kubo-spin 4s linear infinite',
+    animation: 'kubo-spin 12s ease-in-out infinite',
     transform: `translate(-50%, -50%)`,
   }
 
