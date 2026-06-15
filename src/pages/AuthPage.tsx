@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client'
 import { lovable } from '@/integrations/lovable/index'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Loader2, Mail, Lock, User, ArrowRight, KeyRound, ShieldAlert } from 'lucide-react'
+import { Loader2, Mail, Lock, User, ArrowRight, KeyRound, ShieldAlert, Github } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/useAuth'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -24,6 +24,7 @@ export default function AuthPage() {
   const [password, setPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [githubLoading, setGithubLoading] = useState(false)
   const [forgotPassword, setForgotPassword] = useState(false)
   const [resetEmail, setResetEmail] = useState('')
 
@@ -31,12 +32,51 @@ export default function AuthPage() {
     if (!loading && user) navigate(safeRedirect, { replace: true })
   }, [user, loading, navigate, safeRedirect])
 
+  // Surface OAuth errors coming back from the GitHub callback
+  useEffect(() => {
+    const err = searchParams.get('auth_error')
+    if (!err) return
+    const messages: Record<string, string> = {
+      github_not_configured: 'GitHub sign-in is temporarily unavailable. Please use email or Google.',
+      server_misconfigured: 'Sign-in service is not configured. Please try again later.',
+      github_email_unavailable: 'Your GitHub account has no verified email. Please add one and retry.',
+      invalid_state: 'Sign-in session expired. Please try again.',
+      missing_code_or_state: 'GitHub did not return a valid response. Please try again.',
+      oauth_denied: 'GitHub access was denied.',
+    }
+    toast.error(messages[err] || `GitHub sign-in failed: ${err}`)
+    // Clean URL
+    const url = new URL(window.location.href)
+    url.searchParams.delete('auth_error')
+    window.history.replaceState({}, '', url.toString())
+  }, [searchParams])
+
   const handleGoogleLogin = async () => {
     const { error } = await lovable.auth.signInWithOAuth('google', {
       redirect_uri: `${window.location.origin}${safeRedirect}`,
     })
     if (error) toast.error('Error signing in with Google')
   }
+
+  const handleGithubLogin = async () => {
+    setGithubLoading(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('github-signin-initiate', {
+        body: { returnUrl: safeRedirect },
+      })
+      if (error) throw error
+      if (data?.error === 'github_not_configured') {
+        toast.error('GitHub sign-in is not configured yet. Please use email or Google.')
+        return
+      }
+      if (!data?.url) throw new Error('No authorization URL returned')
+      window.location.href = data.url
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not start GitHub sign-in')
+      setGithubLoading(false)
+    }
+  }
+
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -210,7 +250,7 @@ export default function AuthPage() {
 
               <Button
                 variant="outline"
-                className="w-full h-12 rounded-xl mb-4 gap-3 text-sm font-medium border-border/50 hover:bg-secondary/80"
+                className="w-full h-12 rounded-xl mb-3 gap-3 text-sm font-medium border-border/50 hover:bg-secondary/80"
                 onClick={handleGoogleLogin}
               >
                 <svg className="h-5 w-5" viewBox="0 0 24 24">
@@ -219,8 +259,24 @@ export default function AuthPage() {
                   <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
                   <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
                 </svg>
-                Sign In com Google
+                Sign in with Google
               </Button>
+
+              <Button
+                variant="outline"
+                className="w-full h-12 rounded-xl mb-4 gap-3 text-sm font-medium border-border/50 hover:bg-secondary/80"
+                onClick={handleGithubLogin}
+                disabled={githubLoading}
+                data-testid="auth-github"
+              >
+                {githubLoading ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <Github className="h-5 w-5" />
+                )}
+                Sign in with GitHub
+              </Button>
+
 
               <div className="flex items-center gap-3 mb-4">
                 <div className="h-px flex-1 bg-border/50" />
