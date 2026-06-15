@@ -25,7 +25,7 @@ async function verifyState(state: string, secret: string): Promise<any | null> {
   const valid = await crypto.subtle.verify(
     'HMAC',
     key,
-    b64urlDecode(sig),
+    b64urlDecode(sig) as BufferSource,
     new TextEncoder().encode(data),
   )
   if (!valid) return null
