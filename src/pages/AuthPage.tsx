@@ -240,6 +240,24 @@ export default function AuthPage() {
                 </p>
               </div>
 
+              {user && (
+                <div className="mb-5 flex items-center justify-between gap-3 rounded-xl border border-border/50 bg-secondary/40 p-3.5">
+                  <div className="text-xs text-foreground/80 leading-relaxed">
+                    Signed in as <span className="font-semibold text-foreground">{user.email}</span>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleSignOut}
+                    disabled={signingOut}
+                    data-testid="auth-signout"
+                    className="h-8 rounded-lg text-xs"
+                  >
+                    {signingOut ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Sign out'}
+                  </Button>
+                </div>
+              )}
+
               {redirectParam && (
                 <motion.div
                   initial={{ opacity: 0, y: -8 }}
