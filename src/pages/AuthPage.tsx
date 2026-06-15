@@ -15,9 +15,20 @@ export default function AuthPage() {
   const [searchParams] = useSearchParams()
   const refCode = searchParams.get('ref') || ''
   const redirectParam = searchParams.get('redirect') || ''
-  // Only allow internal paths (must start with single "/") to prevent open redirects
-  const safeRedirect =
-    redirectParam.startsWith('/') && !redirectParam.startsWith('//') ? redirectParam : '/dashboard'
+  // Allowlist of safe internal route prefixes (mirrors the edge function callback).
+  // Prevents open redirects AND ensures "Try again" after an OAuth failure always
+  // lands on an authorized in-app route.
+  const ALLOWED_REDIRECT_PREFIXES = [
+    '/dashboard', '/connectors', '/builder', '/canvas', '/profile',
+    '/agents', '/docs', '/game', '/',
+  ]
+  const isAllowedRedirect = (p: string): boolean => {
+    if (typeof p !== 'string' || !p.startsWith('/') || p.startsWith('//')) return false
+    return ALLOWED_REDIRECT_PREFIXES.some(
+      (pre) => p === pre || p.startsWith(pre + '/') || p.startsWith(pre + '?'),
+    )
+  }
+  const safeRedirect = isAllowedRedirect(redirectParam) ? redirectParam : '/dashboard'
   const { user, loading, signOut } = useAuth()
   const [isLogin, setIsLogin] = useState(true)
   const [email, setEmail] = useState('')
