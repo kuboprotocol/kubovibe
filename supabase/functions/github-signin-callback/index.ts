@@ -13,23 +13,23 @@ function b64urlDecode(s: string): Uint8Array {
 }
 
 async function verifyState(state: string, secret: string): Promise<any | null> {
-  const [data, sig] = state.split('.')
-  if (!data || !sig) return null
-  const key = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['verify'],
-  )
-  const valid = await crypto.subtle.verify(
-    'HMAC',
-    key,
-    b64urlDecode(sig) as BufferSource,
-    new TextEncoder().encode(data),
-  )
-  if (!valid) return null
   try {
+    const [data, sig] = state.split('.')
+    if (!data || !sig) return null
+    const key = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['verify'],
+    )
+    const valid = await crypto.subtle.verify(
+      'HMAC',
+      key,
+      b64urlDecode(sig) as BufferSource,
+      new TextEncoder().encode(data),
+    )
+    if (!valid) return null
     const json = new TextDecoder().decode(b64urlDecode(data))
     const parsed = JSON.parse(json)
     if (typeof parsed.t !== 'number' || Date.now() - parsed.t > 10 * 60 * 1000) return null
