@@ -22,15 +22,21 @@ async function signState(payload: object, secret: string) {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+  const reqId = crypto.randomUUID()
+  const log = (event: string, data: Record<string, unknown> = {}) =>
+    console.log(JSON.stringify({ ts: new Date().toISOString(), fn: 'github-signin-initiate', reqId, event, ...data }))
+
   try {
     const clientId = Deno.env.get('GITHUB_CLIENT_ID')
     const stateSecret = Deno.env.get('CONNECTOR_ENC_KEY') || Deno.env.get('SUPABASE_JWT_SECRET')
     if (!clientId) {
+      log('initiate_error', { err: 'github_not_configured' })
       return new Response(JSON.stringify({ error: 'github_not_configured' }), {
         status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
     if (!stateSecret) {
+      log('initiate_error', { err: 'state_secret_missing' })
       return new Response(JSON.stringify({ error: 'state_secret_missing' }), {
         status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -38,7 +44,6 @@ Deno.serve(async (req) => {
 
     const body = req.method === 'POST' ? await req.json().catch(() => ({})) : {}
     const returnUrl: string = typeof body?.returnUrl === 'string' ? body.returnUrl : ''
-    // Only allow safe internal paths
     const safeReturn = returnUrl.startsWith('/') && !returnUrl.startsWith('//') ? returnUrl : '/dashboard'
 
     const state = await signState({
@@ -56,11 +61,13 @@ Deno.serve(async (req) => {
       allow_signup: 'true',
     })
 
+    log('initiate_success', { returnUrl: safeReturn })
     return new Response(JSON.stringify({
       url: `https://github.com/login/oauth/authorize?${params.toString()}`,
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 })
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'unknown_error'
+    log('initiate_exception', { err: msg })
     return new Response(JSON.stringify({ error: msg }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
