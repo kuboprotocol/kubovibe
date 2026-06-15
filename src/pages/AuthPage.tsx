@@ -275,10 +275,16 @@ export default function AuthPage() {
                     variant="outline"
                     onClick={handleSignOut}
                     disabled={signingOut}
+                    aria-busy={signingOut}
+                    aria-label={signingOut ? 'Signing out' : 'Sign out'}
                     data-testid="auth-signout"
                     className="h-8 rounded-lg text-xs"
                   >
-                    {signingOut ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Sign out'}
+                    {signingOut ? (
+                      <Loader2 className="h-3 w-3 animate-spin" role="status" aria-label="Signing out" data-testid="auth-signout-spinner" />
+                    ) : (
+                      'Sign out'
+                    )}
                   </Button>
                 </div>
               )}
