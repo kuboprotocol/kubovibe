@@ -56,6 +56,7 @@ const ExportDetailsPage = lazy(() => import("./pages/creative/ExportDetailsPage"
 const AgentsHubPage = lazy(() => import("./pages/AgentsHubPage"));
 const AgentDetailPage = lazy(() => import("./pages/AgentDetailPage"));
 const AdminPage = lazy(() => import("./pages/AdminPage"));
+const AdminDeployPage = lazy(() => import("./pages/AdminDeployPage"));
 const OrchestratorPage = lazy(() => import("./pages/OrchestratorPage"));
 const PwaTelemetryPage = lazy(() => import("./pages/PwaTelemetry"));
 const PwaExportJobDetailsPage = lazy(() => import("./pages/PwaExportJobDetails"));
@@ -232,6 +233,7 @@ const App = () => {
                 <Route path="/agents" element={<ProtectedRoute><AgentsHubPage /></ProtectedRoute>} />
                 <Route path="/agents/:slug" element={<ProtectedRoute><AgentDetailPage /></ProtectedRoute>} />
                 <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
+                <Route path="/admin/deploy" element={<ProtectedRoute><AdminDeployPage /></ProtectedRoute>} />
                 <Route path="/orchestrator" element={<ProtectedRoute><OrchestratorPage /></ProtectedRoute>} />
                 <Route path="/pwa/telemetry" element={<ProtectedRoute><PwaTelemetryPage /></ProtectedRoute>} />
                 <Route path="/pwa/telemetry/jobs/:jobId" element={<ProtectedRoute><PwaExportJobDetailsPage /></ProtectedRoute>} />
