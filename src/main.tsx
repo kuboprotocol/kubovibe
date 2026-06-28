@@ -4,8 +4,17 @@ import "./index.css";
 import { assertFrontendEnv } from "./lib/envCheck";
 import { toast } from "sonner";
 import { clearTelemetry, getTelemetryEvents, saveTelemetryEvent } from "./utils/pwaTelemetry";
+import { installRuntimeReporter, reportRuntime } from "./lib/runtimeReporter";
 
-assertFrontendEnv();
+// Install error beacons FIRST so we catch errors thrown during boot.
+installRuntimeReporter();
+
+try {
+  assertFrontendEnv();
+} catch (e) {
+  reportRuntime({ severity: "fatal", message: `envCheck failed: ${(e as Error).message}`, stack: (e as Error).stack });
+  throw e;
+}
 
 // Intercept fetch calls to mock the telemetry API endpoint
 const originalFetch = window.fetch;

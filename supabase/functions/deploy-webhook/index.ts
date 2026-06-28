@@ -100,6 +100,23 @@ Deno.serve(async (req) => {
       // Mark as current; clear flag from others in same env
       await supa.from("deployments").update({ is_current: false }).eq("environment", deployment.environment).neq("id", deployment.id);
       await supa.from("deployments").update({ is_current: true, healthy: true }).eq("id", deployment.id);
+
+      // Fire post-deploy smoke test (fire-and-forget; the smoke function
+      // updates the deployment row + triggers rollback on failure).
+      try {
+        const smokeBody = JSON.stringify({ deployment_id: deployment.id, url: payload.url ?? deployment.url });
+        const key = await crypto.subtle.importKey(
+          "raw", new TextEncoder().encode(SECRET),
+          { name: "HMAC", hash: "SHA-256" }, false, ["sign"],
+        );
+        const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(smokeBody));
+        const smokeSig = Array.from(new Uint8Array(mac)).map(b => b.toString(16).padStart(2, "0")).join("");
+        fetch(`${SUPABASE_URL}/functions/v1/deploy-smoke-test`, {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-deploy-signature": smokeSig },
+          body: smokeBody,
+        }).catch(() => {});
+      } catch (_) { /* never block webhook */ }
     }
   } else {
     const { data: inserted } = await supa.from("deployments").insert({

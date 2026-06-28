@@ -148,8 +148,15 @@ export default defineConfig(({ command, mode }) => {
       sourcemap: !isProd,
       minify: 'terser',
       terserOptions: {
-        compress: { drop_console: isProd, drop_debugger: isProd, passes: 2 },
-        // NOTE: never enable `mangle.properties` here — it rewrites React's
+        compress: {
+          // Keep console.error / console.warn alive in production so the
+          // runtime reporter can forward them and so on-call engineers see
+          // them in the browser devtools on kubovibe.dev.
+          pure_funcs: isProd ? ["console.log", "console.debug", "console.info", "console.trace"] : [],
+          drop_debugger: isProd,
+          passes: 2,
+        },
+        // NEVER enable `mangle.properties` here — it rewrites React's
         // `__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED` and breaks
         // ReactCurrentOwner in production (white screen).
         mangle: true,

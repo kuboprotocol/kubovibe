@@ -20,3 +20,9 @@ verify_jwt = false
 
 [functions.deploy-healthcheck]
 verify_jwt = false
+
+[functions.runtime-error-beacon]
+verify_jwt = false
+
+[functions.deploy-smoke-test]
+verify_jwt = false
