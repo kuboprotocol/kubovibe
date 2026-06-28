@@ -148,8 +148,11 @@ export default defineConfig(({ command, mode }) => {
       sourcemap: !isProd,
       minify: 'terser',
       terserOptions: {
-        compress: { drop_console: isProd, drop_debugger: isProd, passes: 3 },
-        mangle: { properties: { regex: /^_/ } },
+        compress: { drop_console: isProd, drop_debugger: isProd, passes: 2 },
+        // NOTE: never enable `mangle.properties` here — it rewrites React's
+        // `__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED` and breaks
+        // ReactCurrentOwner in production (white screen).
+        mangle: true,
       },
       rollupOptions: {
         output: {
