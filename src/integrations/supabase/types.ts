@@ -917,6 +917,92 @@ export type Database = {
         }
         Relationships: []
       }
+      deployments: {
+        Row: {
+          branch: string | null
+          commit_message: string | null
+          commit_sha: string | null
+          created_at: string
+          duration_ms: number | null
+          environment: string
+          estimated_duration_ms: number | null
+          external_id: string | null
+          finished_at: string | null
+          healthy: boolean | null
+          id: string
+          is_current: boolean
+          log: string
+          meta: Json
+          provider: string | null
+          rolled_back_to: string | null
+          source: string
+          started_at: string
+          status: string
+          trigger_reason: string | null
+          triggered_by: string | null
+          updated_at: string
+          url: string | null
+        }
+        Insert: {
+          branch?: string | null
+          commit_message?: string | null
+          commit_sha?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          environment?: string
+          estimated_duration_ms?: number | null
+          external_id?: string | null
+          finished_at?: string | null
+          healthy?: boolean | null
+          id?: string
+          is_current?: boolean
+          log?: string
+          meta?: Json
+          provider?: string | null
+          rolled_back_to?: string | null
+          source?: string
+          started_at?: string
+          status?: string
+          trigger_reason?: string | null
+          triggered_by?: string | null
+          updated_at?: string
+          url?: string | null
+        }
+        Update: {
+          branch?: string | null
+          commit_message?: string | null
+          commit_sha?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          environment?: string
+          estimated_duration_ms?: number | null
+          external_id?: string | null
+          finished_at?: string | null
+          healthy?: boolean | null
+          id?: string
+          is_current?: boolean
+          log?: string
+          meta?: Json
+          provider?: string | null
+          rolled_back_to?: string | null
+          source?: string
+          started_at?: string
+          status?: string
+          trigger_reason?: string | null
+          triggered_by?: string | null
+          updated_at?: string
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deployments_rolled_back_to_fkey"
+            columns: ["rolled_back_to"]
+            isOneToOne: false
+            referencedRelation: "deployments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_send_log: {
         Row: {
           created_at: string

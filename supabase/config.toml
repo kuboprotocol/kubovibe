@@ -14,3 +14,9 @@ verify_jwt = false
 
 [functions.github-signin-callback]
 verify_jwt = false
+
+[functions.deploy-webhook]
+verify_jwt = false
+
+[functions.deploy-healthcheck]
+verify_jwt = false
