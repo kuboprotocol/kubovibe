@@ -11,7 +11,9 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "vite build && bun scripts/validate-pwa.ts && bun scripts/check-bundle-size.ts && bun scripts/validate-deployment.ts",
+    "build": "vite build && bun scripts/validate-pwa.ts && bun scripts/check-bundle-size.ts && bun scripts/validate-deployment.ts && node scripts/smoke-test.mjs",
+    "smoke": "node scripts/smoke-test.mjs",
+    "smoke:prod": "SMOKE_URL=https://kubovibe.dev node scripts/smoke-test.mjs",
     "build:dev": "vite build --mode development",
     "build:prod": "vite build --mode production && bun scripts/sentry-sourcemaps.ts",
     "preview": "vite preview",
