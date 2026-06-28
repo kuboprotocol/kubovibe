@@ -2271,6 +2271,45 @@ export type Database = {
           },
         ]
       }
+      runtime_errors: {
+        Row: {
+          created_at: string
+          id: string
+          ip: string | null
+          message: string
+          meta: Json
+          release: string | null
+          severity: string
+          stack: string | null
+          url: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          ip?: string | null
+          message: string
+          meta?: Json
+          release?: string | null
+          severity?: string
+          stack?: string | null
+          url?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          ip?: string | null
+          message?: string
+          meta?: Json
+          release?: string | null
+          severity?: string
+          stack?: string | null
+          url?: string | null
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
       security_audit_logs: {
         Row: {
           action: string
