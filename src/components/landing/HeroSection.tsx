@@ -1,13 +1,29 @@
-import { useState, useEffect } from 'react'
+'use client'
+import { useState, useEffect, Suspense, lazy, Component, ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { ArrowRight, Zap, Loader2, Globe, Palette } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
-import AnimatedLogo from '@/components/branding/AnimatedLogo'
 import PromptAttachMenu from '@/components/landing/PromptAttachMenu'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/hooks/useAuth'
+
+const AnimatedLogo = lazy(() => import('@/components/branding/AnimatedLogo'))
+
+class LogoBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { hasError: boolean }> {
+  state = { hasError: false }
+  static getDerivedStateFromError() { return { hasError: true } }
+  componentDidCatch(e: Error) { console.error('AnimatedLogo failed:', e) }
+  render() { return this.state.hasError ? this.props.fallback : this.props.children }
+}
+
+const LogoTextFallback = () => (
+  <span className="font-display font-bold tracking-[0.18em] text-foreground" style={{ fontSize: 48 }}>
+    KUBO&nbsp;VIBE
+  </span>
+)
+
 
 // Sugestões em linguagem natural — sem jargão técnico (Web2 ou Web3).
 // O orquestrador detecta a stack por trás. O usuário só descreve a ideia.
