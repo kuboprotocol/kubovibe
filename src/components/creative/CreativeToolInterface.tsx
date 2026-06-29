@@ -264,12 +264,16 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="moonshotai/kimi-k2.6">Kimi K2.6 (Nível 1 - Rápido)</SelectItem>
+                <SelectItem value="moonshotai/kimi-k2.6">Kimi K2.6 (Moonshot via OpenRouter)</SelectItem>
                 <SelectItem value="moonshotai/kimi-k2-0905">Kimi K2-0905 (Legado)</SelectItem>
-                <SelectItem value="moonshotai/kimi-k2-thinking">Kimi Thinking (Nível 2 - Análise)</SelectItem>
+                <SelectItem value="moonshotai/kimi-k2-thinking">Kimi Thinking (Análise)</SelectItem>
                 <SelectItem value="moonshotai/kimi-k2.5">Kimi K2.5 (Estável)</SelectItem>
                 <SelectItem value="moonshotai/kimi-k2">Kimi K2 (Básico)</SelectItem>
-                <SelectItem value="deepseek-chat">DeepSeek V3 (Nível 3 - Produção)</SelectItem>
+                <SelectItem value="deepseek-chat">DeepSeek V3 (Produção)</SelectItem>
+                <SelectItem value="groq/llama-3.3-70b-versatile">Groq LLaMA 3.3 70B (Ultra rápido)</SelectItem>
+                <SelectItem value="groq/llama-3.1-8b-instant">Groq LLaMA 3.1 8B (Instantâneo)</SelectItem>
+                <SelectItem value="openai/gpt-4o-mini">GPT-4o Mini (OpenRouter)</SelectItem>
+                <SelectItem value="moonshot/moonshot-v1-8k">Kimi Direto (Moonshot API)</SelectItem>
               </SelectContent>
             </Select>
           </div>

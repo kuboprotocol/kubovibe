@@ -22,6 +22,7 @@ import { useDebounce } from "@/hooks/use-debounce";
 import { ManusLauncher } from "@/components/creative/ManusLauncher";
 import { CreativeToolInterface } from "@/components/creative/CreativeToolInterface";
 import { SkillExecutionsList } from "@/components/creative/SkillExecutionsList";
+import { ApiStatusPanel } from "@/components/creative/ApiStatusPanel";
 
 type ToolKey = "dashboard" | "chat" | "nano_banana" | "downloader" | "clips" | "avatar" | "shorts" | "music" | "ebook" | "emo" | "unified_history";
 
@@ -1091,6 +1092,7 @@ export default function CreativePage() {
 
           <TabsContent value="dashboard">
              <div className="space-y-6">
+               <ApiStatusPanel />
                <ManusLauncher setActive={(k) => { setActive(k as ToolKey); navigate(k === "dashboard" ? "/creative" : `/creative/${k}`); }} />
                
                <div className="pt-6 border-t border-border/40">
