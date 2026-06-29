@@ -23,6 +23,7 @@ export default function AnimatedLogo({ size = 32, className = '' }: AnimatedLogo
     height: orbitRadius * 2,
     transformStyle: 'preserve-3d',
     animation: 'kubo-orbit 24s ease-in-out infinite',
+    willChange: 'transform',
   }
 
   const cubeWrapStyle: CSSProperties = {
@@ -31,6 +32,7 @@ export default function AnimatedLogo({ size = 32, className = '' }: AnimatedLogo
     transformStyle: 'preserve-3d',
     animation: 'kubo-spin 12s ease-in-out infinite',
     transform: `translate(-50%, -50%)`,
+    willChange: 'transform',
   }
 
   // Ultra-realistic gold face: layered specular highlight + radial sheen + metallic gradient
@@ -60,14 +62,13 @@ export default function AnimatedLogo({ size = 32, className = '' }: AnimatedLogo
     overflow: 'hidden',
   }
 
-  // Moving glint overlay placed on each face for realtime reflection
+  // Static sheen overlay (replaces animated glint for GPU safety)
   const glintStyle: CSSProperties = {
     position: 'absolute',
     inset: 0,
     background:
-      'linear-gradient(115deg, transparent 35%, hsl(0 0% 100% / 0.55) 48%, hsl(48 100% 90% / 0.25) 52%, transparent 65%)',
-    backgroundSize: '250% 250%',
-    animation: 'kubo-glint 6s ease-in-out infinite',
+      'linear-gradient(115deg, transparent 35%, hsl(0 0% 100% / 0.3) 50%, transparent 65%)',
+    opacity: 0.3,
     mixBlendMode: 'screen',
     pointerEvents: 'none',
   }
