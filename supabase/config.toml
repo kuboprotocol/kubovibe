@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.deploy-smoke-test]
 verify_jwt = false
+
+[functions.api-health-check]
+verify_jwt = false
