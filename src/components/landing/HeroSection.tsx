@@ -144,7 +144,11 @@ export default function HeroSection() {
           transition={{ duration: 0.6, delay: 0.05 }}
           className="flex justify-center mb-8"
         >
-          <AnimatedLogo size={48} className="drop-shadow-2xl" />
+          <LogoBoundary fallback={<LogoTextFallback />}>
+            <Suspense fallback={<LogoTextFallback />}>
+              <AnimatedLogo size={48} className="drop-shadow-2xl" />
+            </Suspense>
+          </LogoBoundary>
         </motion.div>
 
         <motion.h1
