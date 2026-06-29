@@ -1,4 +1,15 @@
-// Streaming chat for Kubo Chat. Primary: OpenRouter (gpt-4o-mini), Fallback: Lovable AI.
+// Streaming chat for Kubo Chat.
+// Provider chain (in order, first available wins on success):
+//   1. Groq (llama-3.3-70b-versatile) — ultra-fast & cheap
+//   2. Moonshot direct (if MOONSHOT_API_KEY)
+//   3. OpenRouter requested model (if client specified one)
+//   4. OpenRouter DeepSeek -> Kimi -> GPT-4o-mini
+//   5. Lovable AI Gateway (Gemini) — final fallback
+//
+// Client may pass `model` to force a specific path. Special prefixes:
+//   "groq/<model>"      -> Groq direct
+//   "moonshot/<model>"  -> Moonshot direct
+//   otherwise           -> OpenRouter
 import { corsHeaders } from "../_shared/cors.ts";
 import { getUser, deductCredits, recordAsset, sanitizeError } from "../_shared/creative.ts";
 import { z } from "npm:zod@3";
@@ -43,57 +54,73 @@ Deno.serve(async (req) => {
       });
     }
 
+    const GROQ = Deno.env.get("GROQ_API_KEY");
+    const MOONSHOT = Deno.env.get("MOONSHOT_API_KEY");
     const OR = Deno.env.get("OPENROUTER_API_KEY");
     const LK = Deno.env.get("LOVABLE_API_KEY");
 
     const sys = {
-      role: "system",
+      role: "system" as const,
       content: "Você é o Kubo Chat — assistente direto, claro, em PT-BR. Ajude com conversas, resumos, traduções e geração de textos.",
     };
-    const payload = { messages: [sys, ...messages], stream: true };
+    const basePayload = { messages: [sys, ...messages], stream: true };
 
-    const tries: Array<{ name: string; url: string; key?: string; model: string }> = [];
-    
-    // Se o cliente pedir um modelo específico, tentamos ele primeiro via OpenRouter
-    if (OR && model) {
-      tries.push({ name: "primary_requested", url: "https://openrouter.ai/api/v1/chat/completions", key: OR, model: model });
+    type Attempt = { name: string; url: string; key: string; model: string };
+    const tries: Attempt[] = [];
+
+    // Honor explicit model request first
+    if (model?.startsWith("groq/") && GROQ) {
+      tries.push({ name: "groq_requested", url: "https://api.groq.com/openai/v1/chat/completions", key: GROQ, model: model.slice(5) });
+    } else if (model?.startsWith("moonshot/") && MOONSHOT) {
+      tries.push({ name: "moonshot_requested", url: "https://api.moonshot.cn/v1/chat/completions", key: MOONSHOT, model: model.slice(9) });
+    } else if (model && OR) {
+      tries.push({ name: "openrouter_requested", url: "https://openrouter.ai/api/v1/chat/completions", key: OR, model });
     }
 
+    // Default chain
+    if (GROQ) tries.push({ name: "groq", url: "https://api.groq.com/openai/v1/chat/completions", key: GROQ, model: "llama-3.3-70b-versatile" });
+    if (MOONSHOT) tries.push({ name: "moonshot", url: "https://api.moonshot.cn/v1/chat/completions", key: MOONSHOT, model: "moonshot-v1-8k" });
     if (OR) {
-      // DeepSeek como prioridade Nível 3 se não for o pedido
-      if (model !== "deepseek/deepseek-chat") {
-        tries.push({ name: "deepseek", url: "https://openrouter.ai/api/v1/chat/completions", key: OR, model: "deepseek/deepseek-chat" });
-      }
+      tries.push({ name: "openrouter_deepseek", url: "https://openrouter.ai/api/v1/chat/completions", key: OR, model: "deepseek/deepseek-chat" });
       tries.push({ name: "openrouter_kimi", url: "https://openrouter.ai/api/v1/chat/completions", key: OR, model: "moonshotai/kimi-k2.6" });
-      tries.push({ name: "openrouter_fallback", url: "https://openrouter.ai/api/v1/chat/completions", key: OR, model: "openai/gpt-4o-mini" });
+      tries.push({ name: "openrouter_gpt4o_mini", url: "https://openrouter.ai/api/v1/chat/completions", key: OR, model: "openai/gpt-4o-mini" });
     }
-    
-    if (LK) tries.push({ name: "lovable", url: "https://ai.gateway.lovable.dev/v1/chat/completions", key: LK, model: "google/gemini-2.0-flash-exp" });
+    if (LK) tries.push({ name: "lovable_gemini", url: "https://ai.gateway.lovable.dev/v1/chat/completions", key: LK, model: "google/gemini-2.0-flash-exp" });
 
     for (const t of tries) {
-      const r = await fetch(t.url, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${t.key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          ...payload, 
-          model: t.model,
-          temperature: temperature ?? 0.7,
-          max_tokens: max_tokens ?? 2000
-        }),
-      });
-      if (r.ok) {
-        // Record asset (best-effort, fire-and-forget)
-        recordAsset(user.id, {
-          tool: "chat",
-          prompt: String(messages[messages.length - 1]?.content ?? "").slice(0, 1000),
-          credits_spent: COST,
-          metadata: { provider: t.name, model: t.model },
-        }).catch(() => {});
-        return new Response(r.body, {
-          headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+      try {
+        const r = await fetch(t.url, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${t.key}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...basePayload,
+            model: t.model,
+            temperature: temperature ?? 0.7,
+            max_tokens: max_tokens ?? 2000,
+          }),
         });
+        if (r.ok && r.body) {
+          recordAsset(user.id, {
+            tool: "chat",
+            prompt: String(messages[messages.length - 1]?.content ?? "").slice(0, 1000),
+            credits_spent: COST,
+            metadata: { provider: t.name, model: t.model },
+          }).catch(() => {});
+          return new Response(r.body, {
+            headers: {
+              ...corsHeaders,
+              "Content-Type": "text/event-stream",
+              "X-Provider": t.name,
+              "X-Model": t.model,
+            },
+          });
+        }
+        console.warn(`[creative-chat] provider ${t.name} failed: ${r.status}`);
+      } catch (e) {
+        console.warn(`[creative-chat] provider ${t.name} threw:`, e);
       }
     }
+
     return new Response(JSON.stringify({ error: "Nenhum provedor de IA disponível" }), {
       status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
