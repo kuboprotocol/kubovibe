@@ -1,5 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@^2";
-import { corsHeaders, sanitizeError } from "../_shared/cors.ts";
+import { sanitizeError } from "../_shared/cors.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,7 +10,6 @@ const corsHeaders = {
 const DAILY_LIMIT = 10;
 const REWARD_CREDITS = 0.5;
 
-// Streak bonus milestones
 const STREAK_BONUSES: { days: number; bonus: number }[] = [
   { days: 30, bonus: 5.0 },
   { days: 14, bonus: 2.0 },
@@ -69,7 +68,6 @@ Deno.serve(async (req: Request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Check daily ad limit
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
@@ -86,18 +84,16 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Record ad reward
     await supabaseAdmin.from("ad_rewards").insert({
       user_id: userId,
       reward_credits: REWARD_CREDITS,
-      ad_type: "unity_rewarded",
+      ad_type: "terra_smartlink",
     });
 
     const newCount = (count || 0) + 1;
     let streakBonus = 0;
     let currentStreak = 0;
 
-    // Update streak when all daily videos are completed
     if (newCount >= DAILY_LIMIT) {
       const today = new Date().toISOString().split("T")[0];
 
@@ -114,10 +110,8 @@ Deno.serve(async (req: Request) => {
         const yesterdayStr = yesterday.toISOString().split("T")[0];
 
         if (lastDate === today) {
-          // Already counted today
           currentStreak = streakData.current_streak;
         } else if (lastDate === yesterdayStr) {
-          // Consecutive day
           currentStreak = streakData.current_streak + 1;
           const longestStreak = Math.max(currentStreak, streakData.longest_streak);
           await supabaseAdmin
@@ -130,7 +124,6 @@ Deno.serve(async (req: Request) => {
             })
             .eq("user_id", userId);
         } else {
-          // Streak broken, restart
           currentStreak = 1;
           await supabaseAdmin
             .from("user_streaks")
@@ -142,7 +135,6 @@ Deno.serve(async (req: Request) => {
             .eq("user_id", userId);
         }
       } else {
-        // First streak record
         currentStreak = 1;
         await supabaseAdmin.from("user_streaks").insert({
           user_id: userId,
@@ -152,12 +144,9 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      // Calculate and credit streak bonus
       streakBonus = getStreakBonus(currentStreak);
 
-      // Unlock badges for streak milestones
       const BADGE_MILESTONES = [3, 7, 14, 30];
-      const newBadges: string[] = [];
       for (const milestone of BADGE_MILESTONES) {
         if (currentStreak >= milestone) {
           const badgeType = `streak_${milestone}`;
@@ -173,13 +162,11 @@ Deno.serve(async (req: Request) => {
               user_id: userId,
               badge_type: badgeType,
             });
-            newBadges.push(badgeType);
           }
         }
       }
     }
 
-    // Add credits to subscription
     const totalCredits = REWARD_CREDITS + streakBonus;
 
     const { data: sub } = await supabaseAdmin
@@ -217,7 +204,7 @@ Deno.serve(async (req: Request) => {
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err: any) {
-    console.error("unity-ad-reward error:", err);
+    console.error("terra-ad-reward error:", err);
     return new Response(JSON.stringify({ error: sanitizeError(err) }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

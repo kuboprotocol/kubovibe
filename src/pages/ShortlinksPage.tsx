@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { ArrowLeft, Zap, Play, Wallet, Gift, Send, Trophy } from 'lucide-react'
+import { ArrowLeft, Zap, ExternalLink, Wallet, Gift, Send, Trophy } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
@@ -11,49 +11,27 @@ import logoImg from '@/assets/logo-kubovibe-3d.png'
 import StreakCard from '@/components/shortlinks/StreakCard'
 import BadgesCard from '@/components/shortlinks/BadgesCard'
 import {
-  isNativePlatform,
-  initializeUnityAds,
-  loadRewardedAd,
-  showRewardedAd,
-} from '@/lib/unityAds'
+  TERRA_ADS_SMARTLINK_1,
+  TERRA_ADS_SMARTLINK_LABEL,
+  openTerraSmartlink,
+} from '@/lib/terraAds'
 
 const DAILY_LIMIT = 10
 const CREDIT_PER_VIEW = 0.5
-const WATCH_DURATION = 15 // seconds to watch before claiming (web only)
-
-// Pool of short YouTube videos (web fallback)
-const VIDEO_POOL = [
-  'dQw4w9WgXcQ',
-  'jNQXAC9IVRw',
-  'ZZ5LpwO-An4',
-  'kJQP7kiw5Fk',
-  '9bZkp7q19f0',
-  'RgKAFK5djSk',
-  'OPf0YbXqDm0',
-  'JGwWNGJdvx8',
-  'CevxZvSJLk8',
-  'hT_nvWreIhg',
-]
-
-function getRandomVideoId() {
-  return VIDEO_POOL[Math.floor(Math.random() * VIDEO_POOL.length)]
-}
+const WAIT_DURATION = 15 // seconds the user must wait on the smartlink before claiming
 
 export default function ShortlinksPage() {
   const navigate = useNavigate()
   const { user, isAdmin } = useAuth()
   const [todayCount, setTodayCount] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [watching, setWatching] = useState(false)
+  const [waiting, setWaiting] = useState(false)
   const [countdown, setCountdown] = useState(0)
   const [crediting, setCrediting] = useState(false)
   const [showConfetti, setShowConfetti] = useState(false)
   const [currentStreak, setCurrentStreak] = useState(0)
   const [longestStreak, setLongestStreak] = useState(0)
-  const [videoId, setVideoId] = useState('')
-  const [unityReady, setUnityReady] = useState(false)
-  const [adLoading, setAdLoading] = useState(false)
-  const isNative = isNativePlatform()
+  const popupRef = useRef<Window | null>(null)
 
   const fetchData = useCallback(async () => {
     if (!user) return
@@ -83,63 +61,32 @@ export default function ShortlinksPage() {
 
   useEffect(() => { fetchData() }, [fetchData])
 
-  // Initialize Unity Ads on native
-  useEffect(() => {
-    if (isNative) {
-      initializeUnityAds().then(ok => {
-        setUnityReady(ok)
-        if (ok) loadRewardedAd()
-      })
-    }
-  }, [isNative])
-
-  // Countdown timer
   useEffect(() => {
     if (countdown <= 0) return
     const t = setTimeout(() => setCountdown(c => c - 1), 1000)
     return () => clearTimeout(t)
   }, [countdown])
 
-  const showAd = async () => {
+  const openSmartlink = () => {
     if (!user) { navigate('/auth'); return }
     if (todayCount >= DAILY_LIMIT) {
       toast.info('Limite diário atingido! Volte amanhã 🌅')
       return
     }
-
-    // Native: use Unity Ads SDK
-    if (isNative && unityReady) {
-      setAdLoading(true)
-      try {
-        await loadRewardedAd()
-        const completed = await showRewardedAd()
-        if (completed) {
-          await creditReward()
-        } else {
-          toast.info('Assista o vídeo completo para ganhar créditos')
-        }
-        // Pre-load next ad
-        loadRewardedAd()
-      } catch (err) {
-        console.error('[UnityAds] Error:', err)
-        toast.error('Erro ao carregar anúncio. Tente novamente.')
-      } finally {
-        setAdLoading(false)
-      }
+    popupRef.current = openTerraSmartlink()
+    if (!popupRef.current) {
+      toast.error('Não foi possível abrir o shortlink. Desative o bloqueador de pop-ups e tente novamente.')
       return
     }
-
-    // Web fallback: YouTube video
-    setVideoId(getRandomVideoId())
-    setWatching(true)
-    setCountdown(WATCH_DURATION)
+    setWaiting(true)
+    setCountdown(WAIT_DURATION)
   }
 
   const creditReward = async () => {
     setCrediting(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      const res = await supabase.functions.invoke('unity-ad-reward', {
+      const res = await supabase.functions.invoke('terra-ad-reward', {
         body: { reward_type: 'completed' },
         headers: { Authorization: `Bearer ${session?.access_token}` },
       })
@@ -167,7 +114,7 @@ export default function ShortlinksPage() {
       toast.error(err.message || 'Erro ao creditar')
     } finally {
       setCrediting(false)
-      setWatching(false)
+      setWaiting(false)
       setCountdown(0)
     }
   }
@@ -177,7 +124,6 @@ export default function ShortlinksPage() {
   const remaining = DAILY_LIMIT - todayCount
 
   if (!user) { navigate('/auth'); return null }
-
 
   if (!isAdmin) {
     return (
@@ -197,7 +143,6 @@ export default function ShortlinksPage() {
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
-      {/* Confetti overlay */}
       <AnimatePresence>
         {showConfetti && (
           <motion.div
@@ -252,7 +197,7 @@ export default function ShortlinksPage() {
       </header>
 
       <main className="max-w-lg mx-auto px-4 sm:px-6 py-8 relative z-10">
-        {/* Wallet Card */}
+        {/* TERRA ADS - Smartlink section */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
           <div className="glass glass-border rounded-2xl p-5 border-primary/20">
             <div className="flex items-center gap-4">
@@ -260,8 +205,9 @@ export default function ShortlinksPage() {
                 <Wallet className="h-6 w-6 text-primary" />
               </div>
               <div className="flex-1">
-                <h2 className="font-display font-bold text-foreground text-lg">💰 Ganhar Créditos</h2>
-                <p className="text-sm text-muted-foreground">Assista {DAILY_LIMIT} vídeos por dia</p>
+                <h2 className="font-display font-bold text-foreground text-lg">TERRA ADS - Smartlink</h2>
+                <p className="text-xs text-muted-foreground">{TERRA_ADS_SMARTLINK_LABEL}</p>
+                <p className="text-sm text-muted-foreground mt-1">Acesse {DAILY_LIMIT} shortlinks por dia</p>
               </div>
               <div className="text-right">
                 <div className="text-2xl font-display font-bold text-primary">+{creditsEarned.toFixed(1)}</div>
@@ -271,13 +217,9 @@ export default function ShortlinksPage() {
           </div>
         </motion.div>
 
-        {/* Streak Card */}
         <StreakCard currentStreak={currentStreak} longestStreak={longestStreak} />
-
-        {/* Badges */}
         <BadgesCard />
 
-        {/* Progress */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass glass-border rounded-2xl p-4 mb-8">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm text-muted-foreground">Progresso diário</span>
@@ -289,52 +231,44 @@ export default function ShortlinksPage() {
           )}
         </motion.div>
 
-        {/* Main CTA / Video Player */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.2 }}
-          className="mb-8"
-        >
+        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2 }} className="mb-8">
           <AnimatePresence mode="wait">
-            {watching ? (
+            {waiting ? (
               <motion.div
-                key="watching"
+                key="waiting"
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="glass glass-border rounded-2xl p-4 border-primary/30 ring-2 ring-primary/20"
+                className="glass glass-border rounded-2xl p-6 border-primary/30 ring-2 ring-primary/20 text-center"
               >
-                {/* YouTube Video Embed */}
-                <div className="relative w-full rounded-xl overflow-hidden mb-4" style={{ aspectRatio: '16/9' }}>
-                  <iframe
-                    src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`}
-                    title="Assista para ganhar créditos"
-                    allow="autoplay; encrypted-media"
-                    allowFullScreen
-                    className="absolute inset-0 w-full h-full"
-                  />
-                </div>
-
-                <div className="text-center">
-                  <h3 className="font-display font-bold text-foreground text-lg mb-1">Assistindo vídeo...</h3>
-                  <p className="text-muted-foreground text-sm mb-4">Aguarde o timer para resgatar seu crédito</p>
-
-                  {countdown > 0 ? (
-                    <div className="mb-2">
-                      <div className="text-5xl font-display font-bold text-primary mb-3">{countdown}s</div>
-                      <Progress value={((WATCH_DURATION - countdown) / WATCH_DURATION) * 100} className="h-2 max-w-xs mx-auto" />
-                    </div>
-                  ) : (
-                    <Button
-                      variant="hero"
-                      className="h-14 px-10 rounded-xl text-base font-bold"
-                      onClick={creditReward}
-                      disabled={crediting}
-                    >
-                      {crediting ? 'Creditando...' : `✅ Resgatar +${CREDIT_PER_VIEW} crédito`}
-                    </Button>
-                  )}
+                <h3 className="font-display font-bold text-foreground text-lg mb-1">Shortlink aberto em nova aba</h3>
+                <p className="text-muted-foreground text-sm mb-4">
+                  Permaneça na página do shortlink até o timer acabar, depois resgate seu crédito.
+                </p>
+                {countdown > 0 ? (
+                  <div className="mb-2">
+                    <div className="text-5xl font-display font-bold text-primary mb-3">{countdown}s</div>
+                    <Progress value={((WAIT_DURATION - countdown) / WAIT_DURATION) * 100} className="h-2 max-w-xs mx-auto" />
+                  </div>
+                ) : (
+                  <Button
+                    variant="hero"
+                    className="h-14 px-10 rounded-xl text-base font-bold"
+                    onClick={creditReward}
+                    disabled={crediting}
+                  >
+                    {crediting ? 'Creditando...' : `✅ Resgatar +${CREDIT_PER_VIEW} crédito`}
+                  </Button>
+                )}
+                <div className="mt-4">
+                  <a
+                    href={TERRA_ADS_SMARTLINK_1}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-muted-foreground underline hover:text-primary"
+                  >
+                    Reabrir shortlink
+                  </a>
                 </div>
               </motion.div>
             ) : (
@@ -342,17 +276,15 @@ export default function ShortlinksPage() {
                 <Button
                   variant="hero"
                   className="w-full h-20 rounded-2xl text-lg font-display font-bold gap-3 relative overflow-hidden"
-                  onClick={showAd}
-                  disabled={todayCount >= DAILY_LIMIT || loading || adLoading}
+                  onClick={openSmartlink}
+                  disabled={todayCount >= DAILY_LIMIT || loading}
                 >
                   {todayCount >= DAILY_LIMIT ? (
                     <>🎉 Limite atingido! Volte amanhã</>
-                  ) : adLoading ? (
-                    <>⏳ Carregando anúncio...</>
                   ) : (
                     <>
-                      <Play className="h-6 w-6" />
-                      {isNative ? '🎬 Assistir Anúncio' : '🎬 Assistir Vídeo'} (+{CREDIT_PER_VIEW} crédito)
+                      <ExternalLink className="h-6 w-6" />
+                      🔗 Abrir shortlink TERRA ADS (+{CREDIT_PER_VIEW} crédito)
                       <span className="absolute top-2 right-3 text-xs opacity-70">{remaining} restantes</span>
                     </>
                   )}
@@ -362,7 +294,6 @@ export default function ShortlinksPage() {
           </AnimatePresence>
         </motion.div>
 
-        {/* Rewards breakdown */}
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}>
           <div className="glass glass-border rounded-2xl p-5">
             <h3 className="font-display font-bold text-foreground mb-3 flex items-center gap-2">
@@ -377,7 +308,7 @@ export default function ShortlinksPage() {
                     {i < todayCount ? '✓' : i + 1}
                   </div>
                   <span className={`text-sm flex-1 ${i < todayCount ? 'text-green-500' : 'text-muted-foreground'}`}>
-                    Vídeo {i + 1}
+                    Shortlink {i + 1}
                   </span>
                   <span className={`text-sm font-bold ${i < todayCount ? 'text-primary' : 'text-muted-foreground/50'}`}>
                     +{CREDIT_PER_VIEW}
@@ -392,7 +323,6 @@ export default function ShortlinksPage() {
           </div>
         </motion.div>
 
-        {/* CTAs */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="mt-6 flex flex-col items-center gap-3">
           <Button
             variant="outline"
