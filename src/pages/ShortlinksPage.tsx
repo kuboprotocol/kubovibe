@@ -10,6 +10,7 @@ import { toast } from 'sonner'
 import logoImg from '@/assets/logo-kubovibe-3d.png'
 import StreakCard from '@/components/shortlinks/StreakCard'
 import BadgesCard from '@/components/shortlinks/BadgesCard'
+import TerraNativeBanner from '@/components/shortlinks/TerraNativeBanner'
 import {
   TERRA_ADS_SMARTLINK_1,
   TERRA_ADS_SMARTLINK_LABEL,
@@ -18,7 +19,8 @@ import {
 
 const DAILY_LIMIT = 10
 const CREDIT_PER_VIEW = 0.5
-const WAIT_DURATION = 15 // seconds the user must wait on the smartlink before claiming
+const TENTH_BONUS = 5
+const WAIT_DURATION = 60 // 60 seconds fixed for all shortlinks
 
 export default function ShortlinksPage() {
   const navigate = useNavigate()
