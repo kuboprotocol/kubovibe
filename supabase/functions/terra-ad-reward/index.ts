@@ -168,7 +168,8 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const totalCredits = REWARD_CREDITS + streakBonus;
+    const tenthBonus = newCount >= DAILY_LIMIT ? TENTH_SHORTLINK_BONUS : 0;
+    const totalCredits = REWARD_CREDITS + tenthBonus + streakBonus;
 
     const { data: sub } = await supabaseAdmin
       .from("subscriptions")
