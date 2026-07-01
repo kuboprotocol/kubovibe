@@ -9,6 +9,7 @@ const corsHeaders = {
 
 const DAILY_LIMIT = 10;
 const REWARD_CREDITS = 0.5;
+const TENTH_SHORTLINK_BONUS = 5;
 
 const STREAK_BONUSES: { days: number; bonus: number }[] = [
   { days: 30, bonus: 5.0 },
