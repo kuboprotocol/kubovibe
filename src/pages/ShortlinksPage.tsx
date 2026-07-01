@@ -316,21 +316,25 @@ export default function ShortlinksPage() {
               <Gift className="h-5 w-5 text-primary" /> Resumo de hoje
             </h3>
             <div className="space-y-2">
-              {Array.from({ length: DAILY_LIMIT }).map((_, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${
-                    i < todayCount ? 'bg-green-500/20 text-green-500' : 'bg-muted text-muted-foreground'
-                  }`}>
-                    {i < todayCount ? '✓' : i + 1}
+              {Array.from({ length: DAILY_LIMIT }).map((_, i) => {
+                const isTenth = i === DAILY_LIMIT - 1
+                const reward = isTenth ? CREDIT_PER_VIEW + TENTH_BONUS : CREDIT_PER_VIEW
+                return (
+                  <div key={i} className="flex items-center gap-3">
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${
+                      i < todayCount ? 'bg-green-500/20 text-green-500' : 'bg-muted text-muted-foreground'
+                    }`}>
+                      {i < todayCount ? '✓' : i + 1}
+                    </div>
+                    <span className={`text-sm flex-1 ${i < todayCount ? 'text-green-500' : 'text-muted-foreground'}`}>
+                      Shortlink {i + 1} {isTenth && <span className="text-primary">🎁 bônus</span>}
+                    </span>
+                    <span className={`text-sm font-bold ${i < todayCount ? 'text-primary' : 'text-muted-foreground/50'}`}>
+                      +{reward}
+                    </span>
                   </div>
-                  <span className={`text-sm flex-1 ${i < todayCount ? 'text-green-500' : 'text-muted-foreground'}`}>
-                    Shortlink {i + 1}
-                  </span>
-                  <span className={`text-sm font-bold ${i < todayCount ? 'text-primary' : 'text-muted-foreground/50'}`}>
-                    +{CREDIT_PER_VIEW}
-                  </span>
-                </div>
-              ))}
+                )
+              })}
             </div>
             <div className="mt-4 pt-3 border-t border-border flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Total ganho hoje</span>
