@@ -236,8 +236,12 @@ export default function ShortlinksPage() {
             <span className="text-sm font-bold text-primary">{todayCount}/{DAILY_LIMIT}</span>
           </div>
           <Progress value={progressPercent} className="h-3" />
-          {todayCount >= DAILY_LIMIT && (
+          {todayCount >= DAILY_LIMIT ? (
             <p className="text-xs text-primary mt-2 text-center">🎉 Parabéns! Todos os créditos ganhos! Volte amanhã.</p>
+          ) : (
+            <p className="text-xs text-muted-foreground mt-2 text-center">
+              🎁 Faltam {DAILY_LIMIT - todayCount} para o bônus de +{TENTH_BONUS} créditos
+            </p>
           )}
         </motion.div>
 
