@@ -10,6 +10,7 @@ import { toast } from 'sonner'
 import logoImg from '@/assets/logo-kubovibe-3d.png'
 import StreakCard from '@/components/shortlinks/StreakCard'
 import BadgesCard from '@/components/shortlinks/BadgesCard'
+import TerraNativeBanner from '@/components/shortlinks/TerraNativeBanner'
 import {
   TERRA_ADS_SMARTLINK_1,
   TERRA_ADS_SMARTLINK_LABEL,
@@ -18,7 +19,8 @@ import {
 
 const DAILY_LIMIT = 10
 const CREDIT_PER_VIEW = 0.5
-const WAIT_DURATION = 15 // seconds the user must wait on the smartlink before claiming
+const TENTH_BONUS = 5
+const WAIT_DURATION = 60 // 60 seconds fixed for all shortlinks
 
 export default function ShortlinksPage() {
   const navigate = useNavigate()
@@ -100,16 +102,23 @@ export default function ShortlinksPage() {
         setLongestStreak(prev => Math.max(prev, result.current_streak))
       }
 
+      const bonusEarned = Number(result?.bonus_credits || 0)
+      const streakBonus = Number(result?.streak_bonus || 0)
+
       if (newCount >= DAILY_LIMIT) {
-        const bonusMsg = result?.streak_bonus > 0
-          ? ` + ${result.streak_bonus} bônus de streak 🔥`
-          : ''
-        toast.success(`🎉 Todos os créditos do dia conquistados!${bonusMsg}`)
+        toast.success(
+          `🏆 10 shortlinks completos! +${TENTH_BONUS} créditos bônus desbloqueados!${
+            streakBonus > 0 ? ` (+${streakBonus} de streak 🔥)` : ''
+          }`,
+          { duration: 6000 }
+        )
         setShowConfetti(true)
         setTimeout(() => setShowConfetti(false), 5000)
       } else {
         toast.success(`+${CREDIT_PER_VIEW} crédito ganho! 🎉`)
       }
+      // silence unused warning when bonus applied mid-flow
+      void bonusEarned
     } catch (err: any) {
       toast.error(err.message || 'Erro ao creditar')
     } finally {
@@ -122,6 +131,7 @@ export default function ShortlinksPage() {
   const creditsEarned = todayCount * CREDIT_PER_VIEW
   const progressPercent = (todayCount / DAILY_LIMIT) * 100
   const remaining = DAILY_LIMIT - todayCount
+  const currentShortlinkNumber = Math.min(todayCount + 1, DAILY_LIMIT)
 
   if (!user) { navigate('/auth'); return null }
 
@@ -196,7 +206,7 @@ export default function ShortlinksPage() {
         </div>
       </header>
 
-      <main className="max-w-lg mx-auto px-4 sm:px-6 py-8 relative z-10">
+      <main className="max-w-lg mx-auto px-4 sm:px-6 py-8 pb-28 relative z-10">
         {/* TERRA ADS - Smartlink section */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
           <div className="glass glass-border rounded-2xl p-5 border-primary/20">
@@ -226,8 +236,12 @@ export default function ShortlinksPage() {
             <span className="text-sm font-bold text-primary">{todayCount}/{DAILY_LIMIT}</span>
           </div>
           <Progress value={progressPercent} className="h-3" />
-          {todayCount >= DAILY_LIMIT && (
+          {todayCount >= DAILY_LIMIT ? (
             <p className="text-xs text-primary mt-2 text-center">🎉 Parabéns! Todos os créditos ganhos! Volte amanhã.</p>
+          ) : (
+            <p className="text-xs text-muted-foreground mt-2 text-center">
+              🎁 Faltam {DAILY_LIMIT - todayCount} para o bônus de +{TENTH_BONUS} créditos
+            </p>
           )}
         </motion.div>
 
@@ -241,7 +255,9 @@ export default function ShortlinksPage() {
                 exit={{ opacity: 0, scale: 0.95 }}
                 className="glass glass-border rounded-2xl p-6 border-primary/30 ring-2 ring-primary/20 text-center"
               >
-                <h3 className="font-display font-bold text-foreground text-lg mb-1">Shortlink aberto em nova aba</h3>
+              <h3 className="font-display font-bold text-foreground text-lg mb-1">
+                  Aguarde 60s para o Shortlink {currentShortlinkNumber}
+                </h3>
                 <p className="text-muted-foreground text-sm mb-4">
                   Permaneça na página do shortlink até o timer acabar, depois resgate seu crédito.
                 </p>
@@ -300,21 +316,25 @@ export default function ShortlinksPage() {
               <Gift className="h-5 w-5 text-primary" /> Resumo de hoje
             </h3>
             <div className="space-y-2">
-              {Array.from({ length: DAILY_LIMIT }).map((_, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${
-                    i < todayCount ? 'bg-green-500/20 text-green-500' : 'bg-muted text-muted-foreground'
-                  }`}>
-                    {i < todayCount ? '✓' : i + 1}
+              {Array.from({ length: DAILY_LIMIT }).map((_, i) => {
+                const isTenth = i === DAILY_LIMIT - 1
+                const reward = isTenth ? CREDIT_PER_VIEW + TENTH_BONUS : CREDIT_PER_VIEW
+                return (
+                  <div key={i} className="flex items-center gap-3">
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${
+                      i < todayCount ? 'bg-green-500/20 text-green-500' : 'bg-muted text-muted-foreground'
+                    }`}>
+                      {i < todayCount ? '✓' : i + 1}
+                    </div>
+                    <span className={`text-sm flex-1 ${i < todayCount ? 'text-green-500' : 'text-muted-foreground'}`}>
+                      Shortlink {i + 1} {isTenth && <span className="text-primary">🎁 bônus</span>}
+                    </span>
+                    <span className={`text-sm font-bold ${i < todayCount ? 'text-primary' : 'text-muted-foreground/50'}`}>
+                      +{reward}
+                    </span>
                   </div>
-                  <span className={`text-sm flex-1 ${i < todayCount ? 'text-green-500' : 'text-muted-foreground'}`}>
-                    Shortlink {i + 1}
-                  </span>
-                  <span className={`text-sm font-bold ${i < todayCount ? 'text-primary' : 'text-muted-foreground/50'}`}>
-                    +{CREDIT_PER_VIEW}
-                  </span>
-                </div>
-              ))}
+                )
+              })}
             </div>
             <div className="mt-4 pt-3 border-t border-border flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Total ganho hoje</span>
@@ -342,6 +362,7 @@ export default function ShortlinksPage() {
           </Button>
         </motion.div>
       </main>
+      <TerraNativeBanner />
     </div>
   )
 }

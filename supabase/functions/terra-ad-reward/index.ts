@@ -9,6 +9,7 @@ const corsHeaders = {
 
 const DAILY_LIMIT = 10;
 const REWARD_CREDITS = 0.5;
+const TENTH_SHORTLINK_BONUS = 5;
 
 const STREAK_BONUSES: { days: number; bonus: number }[] = [
   { days: 30, bonus: 5.0 },
@@ -167,7 +168,8 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const totalCredits = REWARD_CREDITS + streakBonus;
+    const tenthBonus = newCount >= DAILY_LIMIT ? TENTH_SHORTLINK_BONUS : 0;
+    const totalCredits = REWARD_CREDITS + tenthBonus + streakBonus;
 
     const { data: sub } = await supabaseAdmin
       .from("subscriptions")
@@ -197,6 +199,7 @@ Deno.serve(async (req: Request) => {
       JSON.stringify({
         success: true,
         credits_earned: REWARD_CREDITS,
+        bonus_credits: tenthBonus,
         streak_bonus: streakBonus,
         current_streak: currentStreak,
         daily_completed: newCount >= DAILY_LIMIT,
