@@ -362,6 +362,7 @@ export default function ShortlinksPage() {
           </Button>
         </motion.div>
       </main>
+      <TerraNativeBanner />
     </div>
   )
 }
