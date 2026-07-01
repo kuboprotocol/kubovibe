@@ -255,7 +255,9 @@ export default function ShortlinksPage() {
                 exit={{ opacity: 0, scale: 0.95 }}
                 className="glass glass-border rounded-2xl p-6 border-primary/30 ring-2 ring-primary/20 text-center"
               >
-                <h3 className="font-display font-bold text-foreground text-lg mb-1">Shortlink aberto em nova aba</h3>
+              <h3 className="font-display font-bold text-foreground text-lg mb-1">
+                  Aguarde 60s para o Shortlink {currentShortlinkNumber}
+                </h3>
                 <p className="text-muted-foreground text-sm mb-4">
                   Permaneça na página do shortlink até o timer acabar, depois resgate seu crédito.
                 </p>
