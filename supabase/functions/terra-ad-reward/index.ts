@@ -199,6 +199,7 @@ Deno.serve(async (req: Request) => {
       JSON.stringify({
         success: true,
         credits_earned: REWARD_CREDITS,
+        bonus_credits: tenthBonus,
         streak_bonus: streakBonus,
         current_streak: currentStreak,
         daily_completed: newCount >= DAILY_LIMIT,
