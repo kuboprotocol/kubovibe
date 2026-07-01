@@ -206,7 +206,7 @@ export default function ShortlinksPage() {
         </div>
       </header>
 
-      <main className="max-w-lg mx-auto px-4 sm:px-6 py-8 relative z-10">
+      <main className="max-w-lg mx-auto px-4 sm:px-6 py-8 pb-28 relative z-10">
         {/* TERRA ADS - Smartlink section */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
           <div className="glass glass-border rounded-2xl p-5 border-primary/20">
