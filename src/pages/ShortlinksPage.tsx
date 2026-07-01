@@ -102,16 +102,23 @@ export default function ShortlinksPage() {
         setLongestStreak(prev => Math.max(prev, result.current_streak))
       }
 
+      const bonusEarned = Number(result?.bonus_credits || 0)
+      const streakBonus = Number(result?.streak_bonus || 0)
+
       if (newCount >= DAILY_LIMIT) {
-        const bonusMsg = result?.streak_bonus > 0
-          ? ` + ${result.streak_bonus} bônus de streak 🔥`
-          : ''
-        toast.success(`🎉 Todos os créditos do dia conquistados!${bonusMsg}`)
+        toast.success(
+          `🏆 10 shortlinks completos! +${TENTH_BONUS} créditos bônus desbloqueados!${
+            streakBonus > 0 ? ` (+${streakBonus} de streak 🔥)` : ''
+          }`,
+          { duration: 6000 }
+        )
         setShowConfetti(true)
         setTimeout(() => setShowConfetti(false), 5000)
       } else {
         toast.success(`+${CREDIT_PER_VIEW} crédito ganho! 🎉`)
       }
+      // silence unused warning when bonus applied mid-flow
+      void bonusEarned
     } catch (err: any) {
       toast.error(err.message || 'Erro ao creditar')
     } finally {
@@ -124,6 +131,7 @@ export default function ShortlinksPage() {
   const creditsEarned = todayCount * CREDIT_PER_VIEW
   const progressPercent = (todayCount / DAILY_LIMIT) * 100
   const remaining = DAILY_LIMIT - todayCount
+  const currentShortlinkNumber = Math.min(todayCount + 1, DAILY_LIMIT)
 
   if (!user) { navigate('/auth'); return null }
 
