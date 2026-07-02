@@ -10,6 +10,9 @@ interface Subscription {
   edits_used: number
   edits_limit: number
   is_active: boolean
+  partnership_agreement_signed?: boolean
+  last_daily_credit_at?: string | null
+  signup_credits_granted?: boolean
 }
 
 export function useSubscription() {

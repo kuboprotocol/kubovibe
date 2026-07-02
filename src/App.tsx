@@ -7,6 +7,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { lazy, Suspense } from "react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import AdGate from "@/components/AdGate";
 
 // Lazy loading all pages
 const Index = lazy(() => import("./pages/Index"));
@@ -174,6 +175,7 @@ const App = () => {
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <AdGate />
             <ErrorBoundary resourceName="App">
               <Suspense fallback={<PageLoader />}>
 
