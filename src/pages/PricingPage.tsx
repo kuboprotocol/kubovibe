@@ -15,7 +15,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion'
-import { Navbar } from '@/components/landing/Navbar'
+import Navbar from '@/components/landing/Navbar'
 import { cn } from '@/lib/utils'
 
 type Period = 'monthly' | 'annual' | 'lifetime'
