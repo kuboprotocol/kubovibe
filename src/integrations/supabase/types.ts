@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      ad_impressions: {
+        Row: {
+          ad_type: string
+          created_at: string
+          id: string
+          last_shown_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ad_type?: string
+          created_at?: string
+          id?: string
+          last_shown_at?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ad_type?: string
+          created_at?: string
+          id?: string
+          last_shown_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       ad_rewards: {
         Row: {
           ad_type: string
@@ -1790,6 +1817,39 @@ export type Database = {
         }
         Relationships: []
       }
+      plan_config: {
+        Row: {
+          ad_frequency_hours: number | null
+          created_at: string
+          daily_credits: number
+          display_name: string
+          partnership_required: boolean
+          plan: string
+          price_usd: number
+          signup_credits: number
+        }
+        Insert: {
+          ad_frequency_hours?: number | null
+          created_at?: string
+          daily_credits?: number
+          display_name: string
+          partnership_required?: boolean
+          plan: string
+          price_usd?: number
+          signup_credits?: number
+        }
+        Update: {
+          ad_frequency_hours?: number | null
+          created_at?: string
+          daily_credits?: number
+          display_name?: string
+          partnership_required?: boolean
+          plan?: string
+          price_usd?: number
+          signup_credits?: number
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -2603,8 +2663,11 @@ export type Database = {
           edits_used: number
           id: string
           is_active: boolean
+          last_daily_credit_at: string | null
           paid_at: string | null
+          partnership_agreement_signed: boolean
           plan: string
+          signup_credits_granted: boolean
           updated_at: string
           user_id: string
         }
@@ -2614,8 +2677,11 @@ export type Database = {
           edits_used?: number
           id?: string
           is_active?: boolean
+          last_daily_credit_at?: string | null
           paid_at?: string | null
+          partnership_agreement_signed?: boolean
           plan?: string
+          signup_credits_granted?: boolean
           updated_at?: string
           user_id: string
         }
@@ -2625,8 +2691,11 @@ export type Database = {
           edits_used?: number
           id?: string
           is_active?: boolean
+          last_daily_credit_at?: string | null
           paid_at?: string | null
+          partnership_agreement_signed?: boolean
           plan?: string
+          signup_credits_granted?: boolean
           updated_at?: string
           user_id?: string
         }
