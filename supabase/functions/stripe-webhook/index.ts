@@ -1,140 +1,78 @@
-import Stripe from "npm:stripe@^18";
 import { createClient } from "npm:@supabase/supabase-js@^2";
-import { corsHeaders, sanitizeError } from "../_shared/cors.ts";
+import Stripe from "npm:stripe@^14";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
-
-const PLAN_CREDITS: Record<string, number> = {
-  starter: 35,
-  basic: 80,
-  pro: 120,
-  advanced: 200,
-  elite: 350,
-};
+const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, { apiVersion: "2024-06-20" });
+const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET")!;
+const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, stripe-signature" };
+const BUSINESS_PLANS = ["business_1","business_2","business_3","business_4","business_5","business_6","business_7","enterprise"];
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const signature = req.headers.get("stripe-signature");
+  if (!signature) return new Response("Missing signature", { status: 400 });
+
+  let event: Stripe.Event;
+  try {
+    const body = await req.text();
+    event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
+  } catch (err: any) {
+    return new Response(`Webhook error: ${err.message}`, { status: 400 });
   }
+
+  const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
   try {
-    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
-    const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
-
-    if (!stripeKey || !webhookSecret) {
-      console.error("Missing STRIPE_SECRET_KEY or STRIPE_WEBHOOK_SECRET");
-      return new Response(JSON.stringify({ error: "Server misconfigured" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const stripe = new Stripe(stripeKey);
-    const body = await req.text();
-    const sig = req.headers.get("stripe-signature");
-
-    if (!sig) {
-      return new Response(JSON.stringify({ error: "Missing signature" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    let event: Stripe.Event;
-    try {
-      event = await stripe.webhooks.constructEventAsync(body, sig, webhookSecret);
-    } catch (err: any) {
-      console.error("Webhook signature verification failed:", err.message);
-      return new Response(JSON.stringify({ error: "Invalid signature" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     if (event.type === "checkout.session.completed") {
       const session = event.data.object as Stripe.Checkout.Session;
+      const userId = session.metadata?.supabase_user_id;
+      const plan = session.metadata?.plan;
+      const period = session.metadata?.period;
+      if (!userId || !plan) return new Response("Missing metadata", { status: 400 });
 
-      const userId = session.metadata?.user_id || session.client_reference_id;
-      const planId = session.metadata?.plan_id;
-      const creditsFromMeta = session.metadata?.credits
-        ? parseInt(session.metadata.credits, 10)
-        : null;
+      const now = new Date().toISOString();
+      const { data: existingSub } = await supabase.from("subscriptions").select("id").eq("user_id", userId).maybeSingle();
+      const subPayload: any = { plan, is_active: true, paid_at: now, stripe_session_id: session.id, stripe_subscription_id: (session.subscription as string) || null, updated_at: now };
 
-      if (!userId || !planId) {
-        console.error("Missing user_id or plan_id in session metadata", session.id);
-        return new Response(JSON.stringify({ received: true, skipped: true }), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+      if (existingSub) {
+        await supabase.from("subscriptions").update(subPayload).eq("id", existingSub.id);
+      } else {
+        await supabase.from("subscriptions").insert({ user_id: userId, edits_used: 0, edits_limit: 0, ...subPayload });
       }
 
-      const credits = creditsFromMeta || PLAN_CREDITS[planId] || 0;
-
-      const supabase = createClient(
-        Deno.env.get("SUPABASE_URL")!,
-        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-      );
-
-      // Check if user already has a subscription
-      const { data: existing } = await supabase
-        .from("subscriptions")
-        .select("id, edits_limit, edits_used")
-        .eq("user_id", userId)
-        .maybeSingle();
-
-      if (existing) {
-        // Add credits to existing subscription
-        const newLimit = existing.edits_limit + credits;
-        const { error: updateErr } = await supabase
-          .from("subscriptions")
-          .update({
-            plan: planId,
-            edits_limit: newLimit,
-            is_active: true,
-            paid_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", existing.id);
-
-        if (updateErr) {
-          console.error("Error updating subscription:", updateErr);
-        } else {
-          console.log(`✅ Credited ${credits} to user ${userId} (total limit: ${newLimit})`);
-        }
-      } else {
-        // Create new subscription
-        const { error: insertErr } = await supabase
-          .from("subscriptions")
-          .insert({
-            user_id: userId,
-            plan: planId,
-            edits_used: 0,
-            edits_limit: credits,
-            is_active: true,
-            paid_at: new Date().toISOString(),
+      if (BUSINESS_PLANS.includes(plan)) {
+        try {
+          await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-partnership-email`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`, "x-user-id": userId },
           });
+        } catch (e) { console.warn("partnership email failed:", e); }
+      }
+      console.log(`✅ Plan activated: ${plan} (${period}) for user ${userId}`);
+    }
 
-        if (insertErr) {
-          console.error("Error creating subscription:", insertErr);
-        } else {
-          console.log(`✅ Created subscription for user ${userId} with ${credits} credits`);
-        }
+    if (event.type === "customer.subscription.deleted") {
+      const subscription = event.data.object as Stripe.Subscription;
+      const userId = subscription.metadata?.supabase_user_id;
+      if (userId) {
+        await supabase.from("subscriptions").update({ plan: "free", is_active: false, stripe_subscription_id: null, updated_at: new Date().toISOString() } as any).eq("user_id", userId);
       }
     }
 
-    return new Response(JSON.stringify({ received: true }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    if (event.type === "invoice.payment_succeeded") {
+      const invoice = event.data.object as Stripe.Invoice;
+      const subId = (invoice as any).subscription as string;
+      if (subId) {
+        const stripeSub = await stripe.subscriptions.retrieve(subId);
+        const userId = stripeSub.metadata?.supabase_user_id;
+        if (userId) {
+          await supabase.from("subscriptions").update({ is_active: true, paid_at: new Date().toISOString(), updated_at: new Date().toISOString() } as any).eq("user_id", userId);
+        }
+      }
+    }
   } catch (err: any) {
-    console.error("stripe-webhook error:", err);
-    return new Response(JSON.stringify({ error: sanitizeError(err) }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    console.error("Webhook error:", err);
+    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
+
+  return new Response(JSON.stringify({ received: true }), { status: 200, headers: { "Content-Type": "application/json" } });
 });

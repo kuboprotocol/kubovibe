@@ -1857,6 +1857,7 @@ export type Database = {
           display_name: string | null
           id: string
           referral_code: string | null
+          stripe_customer_id: string | null
           updated_at: string
         }
         Insert: {
@@ -1865,6 +1866,7 @@ export type Database = {
           display_name?: string | null
           id: string
           referral_code?: string | null
+          stripe_customer_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -1873,6 +1875,7 @@ export type Database = {
           display_name?: string | null
           id?: string
           referral_code?: string | null
+          stripe_customer_id?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -2668,6 +2671,8 @@ export type Database = {
           partnership_agreement_signed: boolean
           plan: string
           signup_credits_granted: boolean
+          stripe_session_id: string | null
+          stripe_subscription_id: string | null
           updated_at: string
           user_id: string
         }
@@ -2682,6 +2687,8 @@ export type Database = {
           partnership_agreement_signed?: boolean
           plan?: string
           signup_credits_granted?: boolean
+          stripe_session_id?: string | null
+          stripe_subscription_id?: string | null
           updated_at?: string
           user_id: string
         }
@@ -2696,6 +2703,8 @@ export type Database = {
           partnership_agreement_signed?: boolean
           plan?: string
           signup_credits_granted?: boolean
+          stripe_session_id?: string | null
+          stripe_subscription_id?: string | null
           updated_at?: string
           user_id?: string
         }
