@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Plus, FileText, Trash2, LogOut, Code, Pencil, UserCircle, Search, MoreHorizontal, Zap, Globe, BarChart3, CreditCard, Gift, Mail, BookOpen } from 'lucide-react'
@@ -37,6 +37,26 @@ export default function DashboardPage() {
   const [renameProject, setRenameProject] = useState<Project | null>(null)
   const [newTitle, setNewTitle] = useState('')
   const [search, setSearch] = useState('')
+
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  useEffect(() => {
+    if (searchParams.get('checkout') === 'success') {
+      const plan = searchParams.get('plan') || ''
+      const period = searchParams.get('period') || ''
+      const planLabel = plan.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+      const periodLabel = period === 'monthly' ? 'Monthly' : period === 'annual' ? 'Annual' : 'Lifetime'
+      toast.success(`🎉 ${planLabel} plan activated successfully!`, {
+        description: `Your credits are now available. Period: ${periodLabel}.`,
+        duration: 8000,
+      })
+      setSearchParams({})
+    }
+    if (searchParams.get('checkout') === 'cancelled') {
+      toast.info('Checkout cancelled. You can subscribe anytime.')
+      setSearchParams({})
+    }
+  }, [searchParams, setSearchParams])
 
   useEffect(() => { loadProjects() }, [])
 
