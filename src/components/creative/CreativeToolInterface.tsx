@@ -958,12 +958,11 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       }
       {
         const isFetchError = e.message === 'Failed to fetch' || e.message?.includes('fetch');
-        const fnName = TOOL_TO_FN?.[toolKey];
         toast.error(
           isFetchError
             ? 'Erro de conexão com o servidor. Verifique sua internet ou tente novamente.'
             : e.message,
-          { description: isFetchError ? `Endpoint: ${fnName ?? toolKey} | Tente recarregar a página.` : undefined }
+          { description: isFetchError ? `Ferramenta: ${toolKey} | Tente recarregar a página.` : undefined }
         );
       }
     } finally {
