@@ -956,7 +956,15 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
           )
         );
       }
-      toast.error(e.message);
+      {
+        const isFetchError = e.message === 'Failed to fetch' || e.message?.includes('fetch');
+        toast.error(
+          isFetchError
+            ? 'Erro de conexão com o servidor. Verifique sua internet ou tente novamente.'
+            : e.message,
+          { description: isFetchError ? `Ferramenta: ${toolKey} | Tente recarregar a página.` : undefined }
+        );
+      }
     } finally {
       setLoading(false);
     }
