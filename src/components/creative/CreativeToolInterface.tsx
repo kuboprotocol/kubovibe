@@ -796,20 +796,8 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       }
       await logAuditAction("Configuration", "execution_start", { toolKey });
       const { data: { session } } = await supabase.auth.getSession();
-      
-      const TOOL_TO_FN: Record<string, string> = {
-        chat: "creative-chat",
-        nano_banana: "creative-image",
-        downloader: "creative-download",
-        clips: "creative-clips",
-        avatar: "creative-video",
-        shorts: "creative-video",
-        music: "creative-music",
-        ebook: "creative-ebook",
-        emo: "emo-animate"
-      };
-
       const fnName = TOOL_TO_FN[toolKey];
+
       const executionStartTime = new Date().toISOString();
       
       const body: any = { prompt, metadata };
