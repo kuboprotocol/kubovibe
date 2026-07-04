@@ -955,6 +955,8 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
           traceId: tId || "N/A"
         });
       }
+      setExecutionPhase("done");
+      dbg("execute_success", { toolKey, duration });
       toast.success("Solicitação enviada!", {
         description: "Você pode acompanhar o progresso no histórico.",
       });
@@ -963,7 +965,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       if (toolKey === "avatar") {
         setTimeout(async () => {
           await fetchLastResult();
-          updateStep("render", "done", undefined, { 
+          updateStep("render", "done", undefined, {
             resultUrl: data?.asset_url || "Disponível no histórico",
             completedAt: new Date().toLocaleTimeString(),
             duration: `${((Date.now() - new Date(executionStartTime).getTime()) / 1000).toFixed(1)}s`
@@ -971,14 +973,15 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
         }, 1500);
       }
     } catch (e: any) {
-      console.error("[CreativePanel:Configuration] execution_exception", { toolKey, error: e.message, stack: e.stack });
+      setExecutionPhase("error");
+      dbg("execute_exception", { toolKey, error: e?.message, stack: e?.stack });
       setSessionHistory(prev => [{
         id: crypto.randomUUID(),
         timestamp: new Date().toLocaleTimeString(),
         prompt,
         status: "error",
         metadata: { ...metadata, uploadedImageUrl },
-        logs: progressSteps // Capture current logs even on error
+        logs: progressSteps
       }, ...prev]);
       setErrorState({
         message: e.message,
@@ -989,28 +992,21 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       if (toolKey === "avatar") {
         setProgressSteps((prev) =>
           prev.map((s) =>
-            s.status === "active" ? { 
-              ...s, 
-              status: "error" as const, 
-              errorMessage: e.message, 
-              details: { ...s.details, fullError: e.stack || e.message, timestamp: new Date().toISOString() } 
+            s.status === "active" ? {
+              ...s,
+              status: "error" as const,
+              errorMessage: e.message,
+              details: { ...s.details, fullError: e.stack || e.message, timestamp: new Date().toISOString() }
             } : s
           )
         );
       }
-      {
-        const isFetchError = e.message === 'Failed to fetch' || e.message?.includes('fetch');
-        toast.error(
-          isFetchError
-            ? 'Erro de conexão com o servidor. Verifique sua internet ou tente novamente.'
-            : e.message,
-          { description: isFetchError ? `Endpoint: ${TOOL_TO_FN[toolKey] ?? toolKey} | Tente recarregar a página.` : undefined }
-        );
-      }
+      notifyError(e, { endpoint: TOOL_TO_FN[toolKey] ?? toolKey, phase: executionPhase });
     } finally {
       setLoading(false);
     }
   };
+
 
   const handleReplay = (item: typeof sessionHistory[0]) => {
     setPrompt(item.prompt);
