@@ -1,6 +1,8 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+
 import { assertFrontendEnv } from "./lib/envCheck";
 import { toast } from "sonner";
 import { clearTelemetry, getTelemetryEvents, saveTelemetryEvent } from "./utils/pwaTelemetry";
