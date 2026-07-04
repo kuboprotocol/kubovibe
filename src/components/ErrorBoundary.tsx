@@ -76,6 +76,24 @@ export class ErrorBoundary extends Component<Props, State> {
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error("[ErrorBoundary] Uncaught error:", error, errorInfo);
     this.setState({ errorInfo });
+    // Correlate with Sentry: send event with breadcrumbs + release + tags.
+    let sentryEventId: string | undefined;
+    try {
+      addBreadcrumb("boundary caught error", "boundary", {
+        resource: this.props.resourceName ?? "App",
+        route: window.location.pathname + window.location.search,
+        message: error.message,
+      }, "error");
+      sentryEventId = captureBoundaryError(error, {
+        componentStack: errorInfo.componentStack,
+        resource: this.props.resourceName,
+        retryCount: this.state.retryCount,
+        route: window.location.pathname + window.location.search,
+      });
+      if (sentryEventId) this.setState({ sentryEventId });
+    } catch (e) {
+      console.warn("[ErrorBoundary] Sentry capture failed", e);
+    }
     try {
       (window as any).__lastFatalError = {
         message: error.message,
@@ -83,6 +101,8 @@ export class ErrorBoundary extends Component<Props, State> {
         componentStack: errorInfo.componentStack,
         at: new Date().toISOString(),
         route: window.location.pathname + window.location.search,
+        sentryEventId,
+        release: APP_RELEASE,
       };
     } catch {}
     if (this.props.global) void this.runHealthCheck();
