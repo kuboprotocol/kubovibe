@@ -146,7 +146,20 @@ const TOOL_CONFIGS: Record<ToolKey, {
   }
 };
 
+const TOOL_TO_FN: Record<string, string> = {
+  chat: "creative-chat",
+  nano_banana: "creative-image",
+  downloader: "creative-download",
+  clips: "creative-clips",
+  avatar: "creative-video",
+  shorts: "creative-video",
+  music: "creative-music",
+  ebook: "creative-ebook",
+  emo: "emo-animate",
+};
+
 import { DeliveryFlow } from "./DeliveryFlow";
+
 
 export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
   const config = TOOL_CONFIGS[toolKey];
