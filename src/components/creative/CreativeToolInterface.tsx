@@ -146,7 +146,20 @@ const TOOL_CONFIGS: Record<ToolKey, {
   }
 };
 
+const TOOL_TO_FN: Record<string, string> = {
+  chat: "creative-chat",
+  nano_banana: "creative-image",
+  downloader: "creative-download",
+  clips: "creative-clips",
+  avatar: "creative-video",
+  shorts: "creative-video",
+  music: "creative-music",
+  ebook: "creative-ebook",
+  emo: "emo-animate",
+};
+
 import { DeliveryFlow } from "./DeliveryFlow";
+
 
 export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
   const config = TOOL_CONFIGS[toolKey];
@@ -796,20 +809,8 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       }
       await logAuditAction("Configuration", "execution_start", { toolKey });
       const { data: { session } } = await supabase.auth.getSession();
-      
-      const TOOL_TO_FN: Record<string, string> = {
-        chat: "creative-chat",
-        nano_banana: "creative-image",
-        downloader: "creative-download",
-        clips: "creative-clips",
-        avatar: "creative-video",
-        shorts: "creative-video",
-        music: "creative-music",
-        ebook: "creative-ebook",
-        emo: "emo-animate"
-      };
-
       const fnName = TOOL_TO_FN[toolKey];
+
       const executionStartTime = new Date().toISOString();
       
       const body: any = { prompt, metadata };
@@ -962,7 +963,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
           isFetchError
             ? 'Erro de conexão com o servidor. Verifique sua internet ou tente novamente.'
             : e.message,
-          { description: isFetchError ? `Ferramenta: ${toolKey} | Tente recarregar a página.` : undefined }
+          { description: isFetchError ? `Endpoint: ${TOOL_TO_FN[toolKey] ?? toolKey} | Tente recarregar a página.` : undefined }
         );
       }
     } finally {
