@@ -1,6 +1,8 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+
 import { assertFrontendEnv } from "./lib/envCheck";
 import { toast } from "sonner";
 import { clearTelemetry, getTelemetryEvents, saveTelemetryEvent } from "./utils/pwaTelemetry";
@@ -98,6 +100,10 @@ if (typeof window !== 'undefined') {
   }, true);
 }
 
-createRoot(document.getElementById("root")!).render(<App />);
+createRoot(document.getElementById("root")!).render(
+  <ErrorBoundary global resourceName="Root">
+    <App />
+  </ErrorBoundary>
+);
 
 
