@@ -59,7 +59,12 @@ export class ErrorBoundary extends Component<Props, State> {
     health: "idle",
     checks: [],
     copied: false,
+    consent: (typeof window !== "undefined" && (localStorage.getItem(CONSENT_KEY) as any)) || "unset",
+    submitState: "idle",
+    submittedId: null,
+    submitError: null,
   };
+
 
   public static getDerivedStateFromError(error: Error): Partial<State> {
     return { hasError: true, error };
