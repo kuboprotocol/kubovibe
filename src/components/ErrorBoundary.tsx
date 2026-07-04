@@ -73,7 +73,6 @@ export class ErrorBoundary extends Component<Props, State> {
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error("[ErrorBoundary] Uncaught error:", error, errorInfo);
     this.setState({ errorInfo });
-    // Push into runtime reporter ring buffer if available
     try {
       (window as any).__lastFatalError = {
         message: error.message,
@@ -84,16 +83,68 @@ export class ErrorBoundary extends Component<Props, State> {
       };
     } catch {}
     if (this.props.global) void this.runHealthCheck();
+    // Auto-submit only when consent is granted
+    if (this.state.consent === "granted") {
+      // Wait a tick so health checks can populate
+      setTimeout(() => void this.submitReport(error, errorInfo), 500);
+    }
   }
 
-  // ---- Health check ----
-  private runHealthCheck = async () => {
-    this.setState({ health: "checking", checks: [
-      { name: "Network", status: "pending" },
-      { name: "Backend", status: "pending" },
-      { name: "Auth session", status: "pending" },
-      { name: "Local storage", status: "pending" },
-    ]});
+  // ---- Consent ----
+  private setConsent = (consent: "granted" | "denied") => {
+    try { localStorage.setItem(CONSENT_KEY, consent); } catch {}
+    this.setState({ consent });
+    if (consent === "granted" && this.state.error) {
+      void this.submitReport(this.state.error, this.state.errorInfo);
+    }
+  };
+
+  // ---- Remote submit ----
+  private submitReport = async (error: Error, errorInfo: ErrorInfo | null) => {
+    if (this.state.submitState === "sending") return;
+    this.setState({ submitState: "sending", submitError: null });
+    try {
+      const url = import.meta.env.VITE_SUPABASE_URL;
+      const anon = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      if (!url || !anon) throw new Error("Supabase env missing");
+      // Best-effort auth token
+      let authHeader: string | undefined;
+      try {
+        const { supabase } = await import("@/integrations/supabase/client");
+        const { data } = await supabase.auth.getSession();
+        if (data.session?.access_token) authHeader = `Bearer ${data.session.access_token}`;
+      } catch {}
+      const body = {
+        message: error.message,
+        stack: error.stack,
+        componentStack: errorInfo?.componentStack,
+        resource: this.props.resourceName ?? "App",
+        route: window.location.pathname + window.location.search,
+        userAgent: navigator.userAgent,
+        viewport: `${window.innerWidth}x${window.innerHeight}`,
+        retryCount: this.state.retryCount,
+        health: this.state.checks.length ? { state: this.state.health, checks: this.state.checks } : null,
+        metadata: { at: new Date().toISOString() },
+      };
+      const r = await fetch(`${url}/functions/v1/crash-report`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: anon,
+          ...(authHeader ? { Authorization: authHeader } : { Authorization: `Bearer ${anon}` }),
+        },
+        body: JSON.stringify(body),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data?.error || `HTTP ${r.status}`);
+      this.setState({ submitState: "sent", submittedId: data?.id ?? null });
+    } catch (e: any) {
+      console.error("[ErrorBoundary] submitReport failed:", e);
+      this.setState({ submitState: "failed", submitError: e?.message || "failed" });
+    }
+  };
+
+
     const checks: HealthCheck[] = [];
 
     // 1. Network
