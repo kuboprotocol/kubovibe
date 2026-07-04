@@ -843,10 +843,22 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       }
       await logAuditAction("Configuration", "execution_start", { toolKey });
       const { data: { session } } = await supabase.auth.getSession();
+
+      // ---- Endpoint validation ----
       const fnName = TOOL_TO_FN[toolKey];
+      if (!fnName) {
+        const known = Object.keys(TOOL_TO_FN).join(", ");
+        dbg("endpoint_invalid", { toolKey, known });
+        throw new Error(`Endpoint não mapeado para a ferramenta "${toolKey}". Ferramentas conhecidas: ${known}`);
+      }
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      if (!supabaseUrl) {
+        dbg("supabase_url_missing");
+        throw new Error("VITE_SUPABASE_URL ausente — não é possível chamar a função.");
+      }
 
       const executionStartTime = new Date().toISOString();
-      
+
       const body: any = { prompt, metadata };
       if (toolKey === "chat") {
         body.messages = [{ role: "user", content: prompt }];
@@ -860,14 +872,10 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       }
       if (toolKey === "shorts") body.mode = "shorts";
       if (toolKey === "ebook") body.topic = prompt;
-      
-      const endpoint = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${fnName}`;
-      console.log(`[CreativeToolInterface] Invocando ferramenta: ${toolKey}`, {
-        endpoint,
-        fnName,
-        payload: body,
-        hasToken: !!session?.access_token
-      });
+
+      const endpoint = `${supabaseUrl}/functions/v1/${fnName}`;
+      setExecutionPhase("requesting");
+      dbg("request_dispatch", { endpoint, fnName, hasToken: !!session?.access_token, bodyKeys: Object.keys(body) });
 
       const r = await fetch(endpoint, {
         method: "POST",
@@ -879,21 +887,20 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
         body: JSON.stringify(body),
       });
 
+      setExecutionPhase("processing");
+      dbg("response_received", { status: r.status, ok: r.ok });
+
       const data = await r.json().catch(() => ({ error: "Resposta inválida do servidor" }));
-      
+
       const cId = r.headers.get("x-correlation-id");
       const tId = r.headers.get("x-trace-id");
       if (cId || tId) setTraceInfo({ correlationId: cId || undefined, traceId: tId || undefined });
 
       if (!r.ok) {
-        console.error("[CreativePanel:Configuration] execution_failed", { 
-          toolKey, 
-          error: data.error, 
-          correlationId: cId, 
-          traceId: tId 
-        });
-        throw new Error(data.error || "Erro na execução");
+        dbg("execution_failed", { toolKey, status: r.status, error: data.error, correlationId: cId, traceId: tId });
+        throw new Error(data.error || `Erro na execução (HTTP ${r.status})`);
       }
+
 
       const endTime = Date.now();
       const duration = ((endTime - new Date(executionStartTime).getTime()) / 1000).toFixed(2);
