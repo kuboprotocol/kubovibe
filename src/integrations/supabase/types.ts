@@ -432,6 +432,54 @@ export type Database = {
           },
         ]
       }
+      crash_reports: {
+        Row: {
+          component_stack: string | null
+          created_at: string
+          health: Json | null
+          id: string
+          message: string
+          metadata: Json | null
+          resource: string | null
+          retry_count: number | null
+          route: string | null
+          stack: string | null
+          user_agent: string | null
+          user_id: string | null
+          viewport: string | null
+        }
+        Insert: {
+          component_stack?: string | null
+          created_at?: string
+          health?: Json | null
+          id?: string
+          message: string
+          metadata?: Json | null
+          resource?: string | null
+          retry_count?: number | null
+          route?: string | null
+          stack?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+          viewport?: string | null
+        }
+        Update: {
+          component_stack?: string | null
+          created_at?: string
+          health?: Json | null
+          id?: string
+          message?: string
+          metadata?: Json | null
+          resource?: string | null
+          retry_count?: number | null
+          route?: string | null
+          stack?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+          viewport?: string | null
+        }
+        Relationships: []
+      }
       creative_assets: {
         Row: {
           cancelled_by: string | null
