@@ -319,10 +319,46 @@ export class ErrorBoundary extends Component<Props, State> {
             </div>
           )}
 
+          {/* Consent banner */}
+          {consent === "unset" && (
+            <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
+              <div className="text-sm font-semibold">Enviar relatório de erro automaticamente?</div>
+              <p className="text-xs text-muted-foreground">
+                Podemos enviar detalhes técnicos deste crash (mensagem, stack, rota, user-agent) para os nossos servidores
+                para ajudar a corrigir o problema. Nenhum dado pessoal do formulário é incluído. Você pode mudar de ideia depois.
+              </p>
+              <div className="flex gap-2">
+                <Button size="sm" onClick={() => this.setConsent("granted")}>Permitir e enviar</Button>
+                <Button size="sm" variant="ghost" onClick={() => this.setConsent("denied")}>Agora não</Button>
+              </div>
+            </div>
+          )}
+
+          {/* Submit status */}
+          {consent === "granted" && submitState !== "idle" && (
+            <div className={`rounded-lg border p-3 text-xs flex items-center gap-2 ${
+              submitState === "sent" ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-400" :
+              submitState === "failed" ? "border-destructive/30 bg-destructive/5 text-destructive" :
+              "border-border/60 bg-muted/30 text-muted-foreground"
+            }`}>
+              {submitState === "sending" && (<><Loader2 className="h-3.5 w-3.5 animate-spin" /> Enviando relatório…</>)}
+              {submitState === "sent" && (<><CheckCircle2 className="h-3.5 w-3.5" /> Relatório enviado{submittedId ? ` (id ${submittedId.slice(0, 8)})` : ""}. Obrigado!</>)}
+              {submitState === "failed" && (
+                <>
+                  <XCircle className="h-3.5 w-3.5" /> Falha ao enviar: {submitError}
+                  <Button size="sm" variant="ghost" className="ml-auto h-6 px-2 text-xs" onClick={() => error && this.submitReport(error, errorInfo)}>
+                    Tentar de novo
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
+
           <div className="flex flex-wrap gap-2">
             <Button onClick={this.handleRetry} className="gap-2">
               <RotateCcw className="h-4 w-4" /> Tentar novamente
             </Button>
+
             <Button variant="outline" onClick={this.handleReload} className="gap-2">
               <RotateCcw className="h-4 w-4" /> Recarregar página
             </Button>
