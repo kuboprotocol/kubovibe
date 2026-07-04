@@ -175,6 +175,9 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
   const [traceInfo, setTraceInfo] = useState<{ correlationId?: string; traceId?: string } | null>(null);
   const [errorState, setErrorState] = useState<{ message: string; correlationId?: string; traceId?: string; stack?: string } | null>(null);
   const [showErrorModal, setShowErrorModal] = useState(false);
+  type ExecPhase = "idle" | "validating" | "requesting" | "processing" | "done" | "error";
+  const [executionPhase, setExecutionPhase] = useState<ExecPhase>("idle");
+
   const [simulationMode, setSimulationMode] = useState(() => localStorage.getItem("creative_simulation_mode") === "true");
   const [latencyLimit, setLatencyLimit] = useState(() => Number(localStorage.getItem("creative_latency_limit")) || 5);
   const [fallbackRateLimit, setFallbackRateLimit] = useState(() => Number(localStorage.getItem("creative_fallback_limit")) || 30);
