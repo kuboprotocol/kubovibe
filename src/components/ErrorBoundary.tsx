@@ -14,6 +14,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
+import { captureBoundaryError, addBreadcrumb, APP_RELEASE } from "@/lib/sentry";
 
 interface Props {
   children: ReactNode;
