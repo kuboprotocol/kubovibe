@@ -692,9 +692,40 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     toast.success(`Logs exportados em .${format}`);
   };
 
+  // ---- Debug logger (ring buffer + console) ----
+  const dbg = useCallback((scope: string, data?: unknown) => {
+    const entry = { ts: new Date().toISOString(), tool: toolKey, scope, data };
+    const buf: any[] = ((window as any).__creativeDebugLogs ||= []);
+    buf.push(entry);
+    if (buf.length > 200) buf.shift();
+    console.debug(`[Creative:${toolKey}] ${scope}`, data ?? "");
+  }, [toolKey]);
+
+  // ---- Standardized error toast ----
+  const notifyError = useCallback((err: any, ctx?: { endpoint?: string; phase?: ExecPhase }) => {
+    const msg: string = err?.message || String(err);
+    const isFetchError = msg === "Failed to fetch" || /fetch|networkerror|failed to load/i.test(msg);
+    const isEndpointError = /endpoint|toolkey|not mapped|unknown tool/i.test(msg);
+    const title = isFetchError
+      ? "Erro de conexão com o servidor. Verifique sua internet ou tente novamente."
+      : isEndpointError
+      ? "Ferramenta não configurada corretamente."
+      : msg;
+    const parts = [
+      ctx?.endpoint ? `Endpoint: ${ctx.endpoint}` : null,
+      ctx?.phase ? `Fase: ${ctx.phase}` : null,
+      isFetchError ? "Tente recarregar a página." : null,
+    ].filter(Boolean);
+    toast.error(title, { description: parts.length ? parts.join(" • ") : undefined });
+    dbg("toast_error", { title, ctx, raw: msg });
+  }, [dbg]);
 
   const handleExecute = async () => {
     if (loading) return;
+    setExecutionPhase("validating");
+    dbg("execute_start", { toolKey, promptLen: prompt.length });
+
+
     
     if (!prompt.trim() && toolKey !== "emo" && toolKey !== "avatar") {
       toast.error("O campo de prompt/URL é obrigatório");
