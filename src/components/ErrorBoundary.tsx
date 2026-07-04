@@ -260,6 +260,11 @@ export class ErrorBoundary extends Component<Props, State> {
   };
 
   private handleReport = () => {
+    // Prefer sending to backend if consent granted; otherwise fall back to mailto.
+    if (this.state.consent === "granted" && this.state.error) {
+      void this.submitReport(this.state.error, this.state.errorInfo);
+      return;
+    }
     const subject = encodeURIComponent(`[KUBO VIBE] Crash em ${this.props.resourceName ?? "App"}`);
     const body = encodeURIComponent(this.buildReport().slice(0, 1800));
     window.location.href = `mailto:support@kubovibe.dev?subject=${subject}&body=${body}`;
@@ -269,7 +274,8 @@ export class ErrorBoundary extends Component<Props, State> {
     if (!this.state.hasError) return this.props.children;
     if (this.props.fallback) return this.props.fallback;
 
-    const { error, errorInfo, showDiagnostics, health, checks, retryCount, copied } = this.state;
+    const { error, errorInfo, showDiagnostics, health, checks, retryCount, copied, consent, submitState, submittedId, submitError } = this.state;
+
 
     const healthBadge = () => {
       if (health === "idle") return null;
