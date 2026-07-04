@@ -100,6 +100,10 @@ if (typeof window !== 'undefined') {
   }, true);
 }
 
-createRoot(document.getElementById("root")!).render(<App />);
+createRoot(document.getElementById("root")!).render(
+  <ErrorBoundary global resourceName="Root">
+    <App />
+  </ErrorBoundary>
+);
 
 
