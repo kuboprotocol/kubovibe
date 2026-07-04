@@ -40,7 +40,14 @@ interface State {
   health: HealthState;
   checks: HealthCheck[];
   copied: boolean;
+  consent: "granted" | "denied" | "unset";
+  submitState: "idle" | "sending" | "sent" | "failed";
+  submittedId: string | null;
+  submitError: string | null;
 }
+
+const CONSENT_KEY = "kubo:crash-report-consent";
+
 
 export class ErrorBoundary extends Component<Props, State> {
   public state: State = {
