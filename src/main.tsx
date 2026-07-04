@@ -7,9 +7,12 @@ import { assertFrontendEnv } from "./lib/envCheck";
 import { toast } from "sonner";
 import { clearTelemetry, getTelemetryEvents, saveTelemetryEvent } from "./utils/pwaTelemetry";
 import { installRuntimeReporter, reportRuntime } from "./lib/runtimeReporter";
+import { initSentry, addBreadcrumb } from "./lib/sentry";
 
 // Install error beacons FIRST so we catch errors thrown during boot.
+initSentry();
 installRuntimeReporter();
+addBreadcrumb("boot", "app", { at: new Date().toISOString() });
 
 try {
   assertFrontendEnv();
