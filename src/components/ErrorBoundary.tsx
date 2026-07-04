@@ -144,8 +144,16 @@ export class ErrorBoundary extends Component<Props, State> {
     }
   };
 
-
+  // ---- Health check ----
+  private runHealthCheck = async () => {
+    this.setState({ health: "checking", checks: [
+      { name: "Network", status: "pending" },
+      { name: "Backend", status: "pending" },
+      { name: "Auth session", status: "pending" },
+      { name: "Local storage", status: "pending" },
+    ]});
     const checks: HealthCheck[] = [];
+
 
     // 1. Network
     try {
