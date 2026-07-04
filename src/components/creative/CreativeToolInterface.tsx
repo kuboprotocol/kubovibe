@@ -728,12 +728,14 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
 
     
     if (!prompt.trim() && toolKey !== "emo" && toolKey !== "avatar") {
-      toast.error("O campo de prompt/URL é obrigatório");
+      notifyError(new Error("O campo de prompt/URL é obrigatório"), { phase: "validating" });
+      setExecutionPhase("idle");
       return;
     }
 
     if (toolKey === "avatar" && !uploadedImageUrl) {
-      toast.error("Por favor, selecione uma imagem para o avatar.");
+      notifyError(new Error("Selecione uma imagem para o avatar."), { phase: "validating" });
+      setExecutionPhase("idle");
       return;
     }
 
