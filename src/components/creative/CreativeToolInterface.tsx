@@ -963,7 +963,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
           isFetchError
             ? 'Erro de conexão com o servidor. Verifique sua internet ou tente novamente.'
             : e.message,
-          { description: isFetchError ? `Ferramenta: ${toolKey} | Tente recarregar a página.` : undefined }
+          { description: isFetchError ? `Endpoint: ${TOOL_TO_FN[toolKey] ?? toolKey} | Tente recarregar a página.` : undefined }
         );
       }
     } finally {
