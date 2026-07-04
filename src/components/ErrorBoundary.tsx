@@ -65,6 +65,7 @@ export class ErrorBoundary extends Component<Props, State> {
     submitState: "idle",
     submittedId: null,
     submitError: null,
+    sentryEventId: null,
   };
 
 
