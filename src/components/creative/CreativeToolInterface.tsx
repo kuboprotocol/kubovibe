@@ -175,6 +175,9 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
   const [traceInfo, setTraceInfo] = useState<{ correlationId?: string; traceId?: string } | null>(null);
   const [errorState, setErrorState] = useState<{ message: string; correlationId?: string; traceId?: string; stack?: string } | null>(null);
   const [showErrorModal, setShowErrorModal] = useState(false);
+  type ExecPhase = "idle" | "validating" | "requesting" | "processing" | "done" | "error";
+  const [executionPhase, setExecutionPhase] = useState<ExecPhase>("idle");
+
   const [simulationMode, setSimulationMode] = useState(() => localStorage.getItem("creative_simulation_mode") === "true");
   const [latencyLimit, setLatencyLimit] = useState(() => Number(localStorage.getItem("creative_latency_limit")) || 5);
   const [fallbackRateLimit, setFallbackRateLimit] = useState(() => Number(localStorage.getItem("creative_fallback_limit")) || 30);
@@ -689,17 +692,50 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
     toast.success(`Logs exportados em .${format}`);
   };
 
+  // ---- Debug logger (ring buffer + console) ----
+  const dbg = useCallback((scope: string, data?: unknown) => {
+    const entry = { ts: new Date().toISOString(), tool: toolKey, scope, data };
+    const buf: any[] = ((window as any).__creativeDebugLogs ||= []);
+    buf.push(entry);
+    if (buf.length > 200) buf.shift();
+    console.debug(`[Creative:${toolKey}] ${scope}`, data ?? "");
+  }, [toolKey]);
+
+  // ---- Standardized error toast ----
+  const notifyError = useCallback((err: any, ctx?: { endpoint?: string; phase?: ExecPhase }) => {
+    const msg: string = err?.message || String(err);
+    const isFetchError = msg === "Failed to fetch" || /fetch|networkerror|failed to load/i.test(msg);
+    const isEndpointError = /endpoint|toolkey|not mapped|unknown tool/i.test(msg);
+    const title = isFetchError
+      ? "Erro de conexão com o servidor. Verifique sua internet ou tente novamente."
+      : isEndpointError
+      ? "Ferramenta não configurada corretamente."
+      : msg;
+    const parts = [
+      ctx?.endpoint ? `Endpoint: ${ctx.endpoint}` : null,
+      ctx?.phase ? `Fase: ${ctx.phase}` : null,
+      isFetchError ? "Tente recarregar a página." : null,
+    ].filter(Boolean);
+    toast.error(title, { description: parts.length ? parts.join(" • ") : undefined });
+    dbg("toast_error", { title, ctx, raw: msg });
+  }, [dbg]);
 
   const handleExecute = async () => {
     if (loading) return;
+    setExecutionPhase("validating");
+    dbg("execute_start", { toolKey, promptLen: prompt.length });
+
+
     
     if (!prompt.trim() && toolKey !== "emo" && toolKey !== "avatar") {
-      toast.error("O campo de prompt/URL é obrigatório");
+      notifyError(new Error("O campo de prompt/URL é obrigatório"), { phase: "validating" });
+      setExecutionPhase("idle");
       return;
     }
 
     if (toolKey === "avatar" && !uploadedImageUrl) {
-      toast.error("Por favor, selecione uma imagem para o avatar.");
+      notifyError(new Error("Selecione uma imagem para o avatar."), { phase: "validating" });
+      setExecutionPhase("idle");
       return;
     }
 
@@ -809,10 +845,22 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       }
       await logAuditAction("Configuration", "execution_start", { toolKey });
       const { data: { session } } = await supabase.auth.getSession();
+
+      // ---- Endpoint validation ----
       const fnName = TOOL_TO_FN[toolKey];
+      if (!fnName) {
+        const known = Object.keys(TOOL_TO_FN).join(", ");
+        dbg("endpoint_invalid", { toolKey, known });
+        throw new Error(`Endpoint não mapeado para a ferramenta "${toolKey}". Ferramentas conhecidas: ${known}`);
+      }
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      if (!supabaseUrl) {
+        dbg("supabase_url_missing");
+        throw new Error("VITE_SUPABASE_URL ausente — não é possível chamar a função.");
+      }
 
       const executionStartTime = new Date().toISOString();
-      
+
       const body: any = { prompt, metadata };
       if (toolKey === "chat") {
         body.messages = [{ role: "user", content: prompt }];
@@ -826,14 +874,10 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       }
       if (toolKey === "shorts") body.mode = "shorts";
       if (toolKey === "ebook") body.topic = prompt;
-      
-      const endpoint = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${fnName}`;
-      console.log(`[CreativeToolInterface] Invocando ferramenta: ${toolKey}`, {
-        endpoint,
-        fnName,
-        payload: body,
-        hasToken: !!session?.access_token
-      });
+
+      const endpoint = `${supabaseUrl}/functions/v1/${fnName}`;
+      setExecutionPhase("requesting");
+      dbg("request_dispatch", { endpoint, fnName, hasToken: !!session?.access_token, bodyKeys: Object.keys(body) });
 
       const r = await fetch(endpoint, {
         method: "POST",
@@ -845,21 +889,20 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
         body: JSON.stringify(body),
       });
 
+      setExecutionPhase("processing");
+      dbg("response_received", { status: r.status, ok: r.ok });
+
       const data = await r.json().catch(() => ({ error: "Resposta inválida do servidor" }));
-      
+
       const cId = r.headers.get("x-correlation-id");
       const tId = r.headers.get("x-trace-id");
       if (cId || tId) setTraceInfo({ correlationId: cId || undefined, traceId: tId || undefined });
 
       if (!r.ok) {
-        console.error("[CreativePanel:Configuration] execution_failed", { 
-          toolKey, 
-          error: data.error, 
-          correlationId: cId, 
-          traceId: tId 
-        });
-        throw new Error(data.error || "Erro na execução");
+        dbg("execution_failed", { toolKey, status: r.status, error: data.error, correlationId: cId, traceId: tId });
+        throw new Error(data.error || `Erro na execução (HTTP ${r.status})`);
       }
+
 
       const endTime = Date.now();
       const duration = ((endTime - new Date(executionStartTime).getTime()) / 1000).toFixed(2);
@@ -914,6 +957,8 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
           traceId: tId || "N/A"
         });
       }
+      setExecutionPhase("done");
+      dbg("execute_success", { toolKey, duration });
       toast.success("Solicitação enviada!", {
         description: "Você pode acompanhar o progresso no histórico.",
       });
@@ -922,7 +967,7 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       if (toolKey === "avatar") {
         setTimeout(async () => {
           await fetchLastResult();
-          updateStep("render", "done", undefined, { 
+          updateStep("render", "done", undefined, {
             resultUrl: data?.asset_url || "Disponível no histórico",
             completedAt: new Date().toLocaleTimeString(),
             duration: `${((Date.now() - new Date(executionStartTime).getTime()) / 1000).toFixed(1)}s`
@@ -930,14 +975,15 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
         }, 1500);
       }
     } catch (e: any) {
-      console.error("[CreativePanel:Configuration] execution_exception", { toolKey, error: e.message, stack: e.stack });
+      setExecutionPhase("error");
+      dbg("execute_exception", { toolKey, error: e?.message, stack: e?.stack });
       setSessionHistory(prev => [{
         id: crypto.randomUUID(),
         timestamp: new Date().toLocaleTimeString(),
         prompt,
         status: "error",
         metadata: { ...metadata, uploadedImageUrl },
-        logs: progressSteps // Capture current logs even on error
+        logs: progressSteps
       }, ...prev]);
       setErrorState({
         message: e.message,
@@ -948,28 +994,21 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       if (toolKey === "avatar") {
         setProgressSteps((prev) =>
           prev.map((s) =>
-            s.status === "active" ? { 
-              ...s, 
-              status: "error" as const, 
-              errorMessage: e.message, 
-              details: { ...s.details, fullError: e.stack || e.message, timestamp: new Date().toISOString() } 
+            s.status === "active" ? {
+              ...s,
+              status: "error" as const,
+              errorMessage: e.message,
+              details: { ...s.details, fullError: e.stack || e.message, timestamp: new Date().toISOString() }
             } : s
           )
         );
       }
-      {
-        const isFetchError = e.message === 'Failed to fetch' || e.message?.includes('fetch');
-        toast.error(
-          isFetchError
-            ? 'Erro de conexão com o servidor. Verifique sua internet ou tente novamente.'
-            : e.message,
-          { description: isFetchError ? `Endpoint: ${TOOL_TO_FN[toolKey] ?? toolKey} | Tente recarregar a página.` : undefined }
-        );
-      }
+      notifyError(e, { endpoint: TOOL_TO_FN[toolKey] ?? toolKey, phase: executionPhase });
     } finally {
       setLoading(false);
     }
   };
+
 
   const handleReplay = (item: typeof sessionHistory[0]) => {
     setPrompt(item.prompt);
@@ -1861,18 +1900,29 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
               <label htmlFor="sim-mode" className="text-[10px] uppercase font-bold text-muted-foreground cursor-pointer">Simular Falha</label>
             </div>
           </div>
-          <Button 
-            onClick={handleExecute} 
-            disabled={loading}
-            className="px-8 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all"
-          >
-            {loading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Sparkles className="mr-2 h-4 w-4" />
+          <div className="flex items-center gap-3">
+            {loading && executionPhase !== "idle" && (
+              <Badge variant="secondary" className="text-[10px] uppercase tracking-wider animate-pulse">
+                {executionPhase === "validating" && "Validando…"}
+                {executionPhase === "requesting" && "Enviando requisição…"}
+                {executionPhase === "processing" && "Processando resposta…"}
+                {executionPhase === "done" && "Concluído"}
+                {executionPhase === "error" && "Erro"}
+              </Badge>
             )}
-            Gerar Agora
-          </Button>
+            <Button
+              onClick={handleExecute}
+              disabled={loading}
+              className="px-8 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all"
+            >
+              {loading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="mr-2 h-4 w-4" />
+              )}
+              Gerar Agora
+            </Button>
+          </div>
         </div>
       </Card>
 
