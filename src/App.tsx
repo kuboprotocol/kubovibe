@@ -176,7 +176,7 @@ const App = () => {
           <Sonner />
           <BrowserRouter>
             <AdGate />
-            <ErrorBoundary resourceName="App">
+            <ErrorBoundary global resourceName="App">
               <Suspense fallback={<PageLoader />}>
 
 
