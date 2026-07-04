@@ -40,7 +40,14 @@ interface State {
   health: HealthState;
   checks: HealthCheck[];
   copied: boolean;
+  consent: "granted" | "denied" | "unset";
+  submitState: "idle" | "sending" | "sent" | "failed";
+  submittedId: string | null;
+  submitError: string | null;
 }
+
+const CONSENT_KEY = "kubo:crash-report-consent";
+
 
 export class ErrorBoundary extends Component<Props, State> {
   public state: State = {
@@ -52,7 +59,12 @@ export class ErrorBoundary extends Component<Props, State> {
     health: "idle",
     checks: [],
     copied: false,
+    consent: (typeof window !== "undefined" && (localStorage.getItem(CONSENT_KEY) as any)) || "unset",
+    submitState: "idle",
+    submittedId: null,
+    submitError: null,
   };
+
 
   public static getDerivedStateFromError(error: Error): Partial<State> {
     return { hasError: true, error };
@@ -61,7 +73,6 @@ export class ErrorBoundary extends Component<Props, State> {
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error("[ErrorBoundary] Uncaught error:", error, errorInfo);
     this.setState({ errorInfo });
-    // Push into runtime reporter ring buffer if available
     try {
       (window as any).__lastFatalError = {
         message: error.message,
@@ -72,7 +83,66 @@ export class ErrorBoundary extends Component<Props, State> {
       };
     } catch {}
     if (this.props.global) void this.runHealthCheck();
+    // Auto-submit only when consent is granted
+    if (this.state.consent === "granted") {
+      // Wait a tick so health checks can populate
+      setTimeout(() => void this.submitReport(error, errorInfo), 500);
+    }
   }
+
+  // ---- Consent ----
+  private setConsent = (consent: "granted" | "denied") => {
+    try { localStorage.setItem(CONSENT_KEY, consent); } catch {}
+    this.setState({ consent });
+    if (consent === "granted" && this.state.error) {
+      void this.submitReport(this.state.error, this.state.errorInfo);
+    }
+  };
+
+  // ---- Remote submit ----
+  private submitReport = async (error: Error, errorInfo: ErrorInfo | null) => {
+    if (this.state.submitState === "sending") return;
+    this.setState({ submitState: "sending", submitError: null });
+    try {
+      const url = import.meta.env.VITE_SUPABASE_URL;
+      const anon = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      if (!url || !anon) throw new Error("Supabase env missing");
+      // Best-effort auth token
+      let authHeader: string | undefined;
+      try {
+        const { supabase } = await import("@/integrations/supabase/client");
+        const { data } = await supabase.auth.getSession();
+        if (data.session?.access_token) authHeader = `Bearer ${data.session.access_token}`;
+      } catch {}
+      const body = {
+        message: error.message,
+        stack: error.stack,
+        componentStack: errorInfo?.componentStack,
+        resource: this.props.resourceName ?? "App",
+        route: window.location.pathname + window.location.search,
+        userAgent: navigator.userAgent,
+        viewport: `${window.innerWidth}x${window.innerHeight}`,
+        retryCount: this.state.retryCount,
+        health: this.state.checks.length ? { state: this.state.health, checks: this.state.checks } : null,
+        metadata: { at: new Date().toISOString() },
+      };
+      const r = await fetch(`${url}/functions/v1/crash-report`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: anon,
+          ...(authHeader ? { Authorization: authHeader } : { Authorization: `Bearer ${anon}` }),
+        },
+        body: JSON.stringify(body),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data?.error || `HTTP ${r.status}`);
+      this.setState({ submitState: "sent", submittedId: data?.id ?? null });
+    } catch (e: any) {
+      console.error("[ErrorBoundary] submitReport failed:", e);
+      this.setState({ submitState: "failed", submitError: e?.message || "failed" });
+    }
+  };
 
   // ---- Health check ----
   private runHealthCheck = async () => {
@@ -83,6 +153,7 @@ export class ErrorBoundary extends Component<Props, State> {
       { name: "Local storage", status: "pending" },
     ]});
     const checks: HealthCheck[] = [];
+
 
     // 1. Network
     try {
@@ -189,6 +260,11 @@ export class ErrorBoundary extends Component<Props, State> {
   };
 
   private handleReport = () => {
+    // Prefer sending to backend if consent granted; otherwise fall back to mailto.
+    if (this.state.consent === "granted" && this.state.error) {
+      void this.submitReport(this.state.error, this.state.errorInfo);
+      return;
+    }
     const subject = encodeURIComponent(`[KUBO VIBE] Crash em ${this.props.resourceName ?? "App"}`);
     const body = encodeURIComponent(this.buildReport().slice(0, 1800));
     window.location.href = `mailto:support@kubovibe.dev?subject=${subject}&body=${body}`;
@@ -198,7 +274,8 @@ export class ErrorBoundary extends Component<Props, State> {
     if (!this.state.hasError) return this.props.children;
     if (this.props.fallback) return this.props.fallback;
 
-    const { error, errorInfo, showDiagnostics, health, checks, retryCount, copied } = this.state;
+    const { error, errorInfo, showDiagnostics, health, checks, retryCount, copied, consent, submitState, submittedId, submitError } = this.state;
+
 
     const healthBadge = () => {
       if (health === "idle") return null;
@@ -242,10 +319,46 @@ export class ErrorBoundary extends Component<Props, State> {
             </div>
           )}
 
+          {/* Consent banner */}
+          {consent === "unset" && (
+            <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
+              <div className="text-sm font-semibold">Enviar relatório de erro automaticamente?</div>
+              <p className="text-xs text-muted-foreground">
+                Podemos enviar detalhes técnicos deste crash (mensagem, stack, rota, user-agent) para os nossos servidores
+                para ajudar a corrigir o problema. Nenhum dado pessoal do formulário é incluído. Você pode mudar de ideia depois.
+              </p>
+              <div className="flex gap-2">
+                <Button size="sm" onClick={() => this.setConsent("granted")}>Permitir e enviar</Button>
+                <Button size="sm" variant="ghost" onClick={() => this.setConsent("denied")}>Agora não</Button>
+              </div>
+            </div>
+          )}
+
+          {/* Submit status */}
+          {consent === "granted" && submitState !== "idle" && (
+            <div className={`rounded-lg border p-3 text-xs flex items-center gap-2 ${
+              submitState === "sent" ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-400" :
+              submitState === "failed" ? "border-destructive/30 bg-destructive/5 text-destructive" :
+              "border-border/60 bg-muted/30 text-muted-foreground"
+            }`}>
+              {submitState === "sending" && (<><Loader2 className="h-3.5 w-3.5 animate-spin" /> Enviando relatório…</>)}
+              {submitState === "sent" && (<><CheckCircle2 className="h-3.5 w-3.5" /> Relatório enviado{submittedId ? ` (id ${submittedId.slice(0, 8)})` : ""}. Obrigado!</>)}
+              {submitState === "failed" && (
+                <>
+                  <XCircle className="h-3.5 w-3.5" /> Falha ao enviar: {submitError}
+                  <Button size="sm" variant="ghost" className="ml-auto h-6 px-2 text-xs" onClick={() => error && this.submitReport(error, errorInfo)}>
+                    Tentar de novo
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
+
           <div className="flex flex-wrap gap-2">
             <Button onClick={this.handleRetry} className="gap-2">
               <RotateCcw className="h-4 w-4" /> Tentar novamente
             </Button>
+
             <Button variant="outline" onClick={this.handleReload} className="gap-2">
               <RotateCcw className="h-4 w-4" /> Recarregar página
             </Button>
@@ -259,7 +372,7 @@ export class ErrorBoundary extends Component<Props, State> {
               <Copy className="h-4 w-4" /> {copied ? "Copiado!" : "Copiar relatório"}
             </Button>
             <Button variant="destructive" onClick={this.handleReport} className="gap-2">
-              <Bug className="h-4 w-4" /> Reportar problema
+              <Bug className="h-4 w-4" /> {consent === "granted" ? "Reenviar relatório" : "Reportar problema"}
             </Button>
           </div>
 
