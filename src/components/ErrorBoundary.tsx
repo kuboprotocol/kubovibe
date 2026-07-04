@@ -372,7 +372,7 @@ export class ErrorBoundary extends Component<Props, State> {
               <Copy className="h-4 w-4" /> {copied ? "Copiado!" : "Copiar relatório"}
             </Button>
             <Button variant="destructive" onClick={this.handleReport} className="gap-2">
-              <Bug className="h-4 w-4" /> Reportar problema
+              <Bug className="h-4 w-4" /> {consent === "granted" ? "Reenviar relatório" : "Reportar problema"}
             </Button>
           </div>
 
