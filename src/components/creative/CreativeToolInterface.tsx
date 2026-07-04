@@ -1900,18 +1900,29 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
               <label htmlFor="sim-mode" className="text-[10px] uppercase font-bold text-muted-foreground cursor-pointer">Simular Falha</label>
             </div>
           </div>
-          <Button 
-            onClick={handleExecute} 
-            disabled={loading}
-            className="px-8 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all"
-          >
-            {loading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Sparkles className="mr-2 h-4 w-4" />
+          <div className="flex items-center gap-3">
+            {loading && executionPhase !== "idle" && (
+              <Badge variant="secondary" className="text-[10px] uppercase tracking-wider animate-pulse">
+                {executionPhase === "validating" && "Validando…"}
+                {executionPhase === "requesting" && "Enviando requisição…"}
+                {executionPhase === "processing" && "Processando resposta…"}
+                {executionPhase === "done" && "Concluído"}
+                {executionPhase === "error" && "Erro"}
+              </Badge>
             )}
-            Gerar Agora
-          </Button>
+            <Button
+              onClick={handleExecute}
+              disabled={loading}
+              className="px-8 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all"
+            >
+              {loading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="mr-2 h-4 w-4" />
+              )}
+              Gerar Agora
+            </Button>
+          </div>
         </div>
       </Card>
 
