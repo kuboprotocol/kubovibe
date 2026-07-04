@@ -45,6 +45,7 @@ interface State {
   submitState: "idle" | "sending" | "sent" | "failed";
   submittedId: string | null;
   submitError: string | null;
+  sentryEventId: string | null;
 }
 
 const CONSENT_KEY = "kubo:crash-report-consent";
