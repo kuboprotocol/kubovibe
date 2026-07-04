@@ -147,7 +147,7 @@ export class ErrorBoundary extends Component<Props, State> {
         viewport: `${window.innerWidth}x${window.innerHeight}`,
         retryCount: this.state.retryCount,
         health: this.state.checks.length ? { state: this.state.health, checks: this.state.checks } : null,
-        metadata: { at: new Date().toISOString() },
+        metadata: { at: new Date().toISOString(), sentryEventId: this.state.sentryEventId, release: APP_RELEASE },
       };
       const r = await fetch(`${url}/functions/v1/crash-report`, {
         method: "POST",
