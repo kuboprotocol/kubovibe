@@ -1,4 +1,4 @@
-// Image generation: Lovable Gateway (Nano Banana) primary, Bytez fallback.
+// redeploy: 2026-07-03                                                                                                                // Image generation: Lovable Gateway (Nano Banana) primary, Bytez fallback.
 import { corsHeaders } from "../_shared/cors.ts";
 import { getUser, deductCredits, recordAsset, sanitizeError } from "../_shared/creative.ts";
 
