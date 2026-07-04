@@ -256,6 +256,8 @@ export class ErrorBoundary extends Component<Props, State> {
       `Viewport: ${window.innerWidth}x${window.innerHeight}`,
       `Retry count: ${this.state.retryCount}`,
       `Resource: ${this.props.resourceName ?? "App"}`,
+      `Release: ${APP_RELEASE}`,
+      `Sentry event: ${this.state.sentryEventId ?? "(not sent)"}`,
       "",
       `Message: ${error?.message ?? "(unknown)"}`,
       "",
