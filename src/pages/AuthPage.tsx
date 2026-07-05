@@ -10,6 +10,10 @@ import { useAuth } from '@/hooks/useAuth'
 import { motion, AnimatePresence } from 'framer-motion'
 import logoImg from '@/assets/logo-kubovibe-3d.png'
 
+// Temporary flag to hide Google sign-in while the OAuth 404 (redirect URI)
+// is being fixed. Set back to true once the provider callback is restored.
+const SHOW_GOOGLE_LOGIN = false
+
 export default function AuthPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
