@@ -174,7 +174,39 @@ export default function PreviewFrame({
       iframe.removeEventListener('load', onLoad)
       iframe.removeEventListener('error', onError)
     }
-  }, [generatedCode, previewKey])
+  }, [generatedCode, previewKey, reloadNonce])
+
+  // Manual reprocess — remount iframe + notify parent
+  const reprocess = useCallback(() => {
+    lastReloadAtRef.current = Date.now()
+    setReloadNonce((n) => n + 1)
+    onRefresh()
+  }, [onRefresh])
+
+  // Auto-reload on external canvas/save events, throttled + debounced
+  useEffect(() => {
+    const schedule = () => {
+      if (reloadDebounceRef.current) window.clearTimeout(reloadDebounceRef.current)
+      reloadDebounceRef.current = window.setTimeout(() => {
+        if (Date.now() - lastReloadAtRef.current < 1000) return
+        lastReloadAtRef.current = Date.now()
+        setReloadNonce((n) => n + 1)
+      }, 400)
+    }
+    window.addEventListener('kubo:canvas:updated', schedule)
+    window.addEventListener('kubo:canvas:saved', schedule)
+    window.addEventListener('kubo:preview:reload', schedule)
+    return () => {
+      if (reloadDebounceRef.current) window.clearTimeout(reloadDebounceRef.current)
+      window.removeEventListener('kubo:canvas:updated', schedule)
+      window.removeEventListener('kubo:canvas:saved', schedule)
+      window.removeEventListener('kubo:preview:reload', schedule)
+    }
+  }, [])
+
+  useEffect(() => () => {
+    if (flashTimerRef.current) window.clearTimeout(flashTimerRef.current)
+  }, [])
 
 
   const toggleFullscreen = useCallback(async () => {
