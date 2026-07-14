@@ -833,6 +833,79 @@ export default function PreviewFrame({
           </div>
         </div>
       </div>
+
+      {/* Diff overlay — compares selected snapshot to current live code */}
+      {diffTarget && diffParts && (
+        <div
+          className="absolute inset-0 z-40 flex items-center justify-center bg-background/70 backdrop-blur-sm p-6"
+          onClick={() => setDiffTarget(null)}
+        >
+          <div
+            className="w-full max-w-3xl max-h-full flex flex-col rounded-lg border border-border bg-popover text-popover-foreground shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-border">
+              <div className="flex items-center gap-2 text-xs">
+                <DiffIcon className="h-4 w-4 text-primary" />
+                <span className="font-semibold">Diff</span>
+                <span className="font-mono text-muted-foreground">
+                  #{diffTarget.id} → live #{history[0]?.id ?? snapshotId}
+                </span>
+                <span className="text-[10px] text-muted-foreground/70">
+                  ({new Date(diffTarget.ts).toLocaleTimeString()})
+                </span>
+              </div>
+              <button
+                className="text-muted-foreground hover:text-foreground"
+                onClick={() => setDiffTarget(null)}
+                title="Fechar (Esc)"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto font-mono text-[11px] leading-relaxed">
+              {diffParts.length === 0 || (diffParts.length === 1 && !diffParts[0].added && !diffParts[0].removed) ? (
+                <div className="p-6 text-center text-xs text-muted-foreground">
+                  Nenhuma diferença — os snapshots são idênticos.
+                </div>
+              ) : (
+                <pre className="m-0 p-0">
+                  {diffParts.map((p, idx) => {
+                    const cls = p.added
+                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                      : p.removed
+                      ? 'bg-destructive/10 text-destructive'
+                      : 'text-muted-foreground'
+                    const sign = p.added ? '+' : p.removed ? '-' : ' '
+                    const lines = p.value.replace(/\n$/, '').split('\n')
+                    return lines.map((line, li) => (
+                      <div key={`${idx}-${li}`} className={`px-3 py-0.5 whitespace-pre-wrap break-all ${cls}`}>
+                        <span className="opacity-50 mr-2 select-none">{sign}</span>
+                        {line || ' '}
+                      </div>
+                    ))
+                  })}
+                </pre>
+              )}
+            </div>
+            <div className="flex items-center justify-between px-4 py-2 border-t border-border text-[10px] text-muted-foreground">
+              <span>
+                {diffParts.reduce((a, p) => a + (p.added ? (p.count ?? 0) : 0), 0)} adicionadas ·{' '}
+                {diffParts.reduce((a, p) => a + (p.removed ? (p.count ?? 0) : 0), 0)} removidas
+              </span>
+              <button
+                onClick={() => {
+                  setPinnedSnapshot({ id: diffTarget.id, code: diffTarget.code, ts: diffTarget.ts })
+                  setDiffTarget(null)
+                }}
+                className="text-primary hover:underline"
+              >
+                Abrir este snapshot na prévia
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
