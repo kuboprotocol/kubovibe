@@ -147,6 +147,7 @@ export default function PreviewFrame({
       setStatus('ready')
       setFrozen(false)
       setRenderedVersion(canvasVersion)
+      setLastRenderedAt(new Date())
       triggerUpdatedFlash()
       // Freeze/hang detection via rAF heartbeat (best-effort, same-origin only)
       try {
