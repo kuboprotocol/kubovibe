@@ -556,7 +556,7 @@ export default function PreviewFrame({
                   className="text-[10px] text-muted-foreground hover:text-foreground"
                   onClick={() => {
                     setHistory([])
-                    try { localStorage.removeItem('kubo:previewHistory:v1') } catch {}
+                    try { localStorage.removeItem(historyKey) } catch {}
                   }}
                 >
                   Limpar
