@@ -192,7 +192,7 @@ export default function CanvasPage() {
         </AnimatePresence>
 
         {!showTemplates && (
-          <TLDrawEditor onSave={handleSave} />
+          <TLDrawEditor onSave={handleSave} onChange={handleAutoChange} />
         )}
 
         <AnimatePresence>
