@@ -293,6 +293,21 @@ export default function PreviewFrame({
         <div className="flex-1 flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-secondary/60 border border-border/50 text-[11px] font-mono text-muted-foreground truncate">
           <Lock className="h-3 w-3 text-emerald-500 shrink-0" />
           <span className="truncate">{displayUrl}</span>
+          {status === 'loading' && (
+            <span className="ml-auto flex items-center gap-1 text-[10px] text-primary shrink-0">
+              <Loader2 className="h-3 w-3 animate-spin" /> loading
+            </span>
+          )}
+          {status === 'ready' && updatedFlash && (
+            <span className="ml-auto flex items-center gap-1 text-[10px] text-emerald-500 shrink-0 animate-in fade-in slide-in-from-right-2">
+              <CheckCircle2 className="h-3 w-3" /> atualizado
+            </span>
+          )}
+          {status === 'error' && (
+            <span className="ml-auto flex items-center gap-1 text-[10px] text-destructive shrink-0">
+              <AlertTriangle className="h-3 w-3" /> erro
+            </span>
+          )}
         </div>
 
         {/* Zoom controls */}
