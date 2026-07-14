@@ -63,6 +63,7 @@ export default function PreviewFrame({
   const [frozen, setFrozen] = useState(false)
   const [lastRenderedAt, setLastRenderedAt] = useState<Date | null>(null)
   const [, forceTick] = useState(0)
+  const containerRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const loadTimeoutRef = useRef<number | null>(null)
