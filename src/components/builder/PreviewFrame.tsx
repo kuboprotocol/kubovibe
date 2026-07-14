@@ -363,14 +363,36 @@ export default function PreviewFrame({
         <div className="flex-1 flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-secondary/60 border border-border/50 text-[11px] font-mono text-muted-foreground truncate">
           <Lock className="h-3 w-3 text-emerald-500 shrink-0" />
           <span className="truncate">{displayUrl}</span>
+
+          {/* Snapshot id + version */}
+          <span
+            className="ml-2 flex items-center gap-1 text-[10px] text-muted-foreground/80 shrink-0"
+            title={`Snapshot ${snapshotId} · canvas v${canvasVersion} · rendered v${renderedVersion}`}
+          >
+            <GitCommit className="h-3 w-3" />
+            <span>#{snapshotId}</span>
+            <span className="opacity-60">v{renderedVersion}/{canvasVersion}</span>
+          </span>
+
+          {/* Live status pill */}
           {status === 'loading' && (
             <span className="ml-auto flex items-center gap-1 text-[10px] text-primary shrink-0">
               <Loader2 className="h-3 w-3 animate-spin" /> loading
             </span>
           )}
-          {status === 'ready' && updatedFlash && (
-            <span className="ml-auto flex items-center gap-1 text-[10px] text-emerald-500 shrink-0 animate-in fade-in slide-in-from-right-2">
-              <CheckCircle2 className="h-3 w-3" /> atualizado
+          {status === 'ready' && frozen && (
+            <span className="ml-auto flex items-center gap-1 text-[10px] text-amber-500 shrink-0">
+              <Snowflake className="h-3 w-3" /> travado
+            </span>
+          )}
+          {status === 'ready' && !frozen && inSync && (
+            <span className={`ml-auto flex items-center gap-1 text-[10px] text-emerald-500 shrink-0 ${updatedFlash ? 'animate-in fade-in slide-in-from-right-2' : ''}`}>
+              <CheckCircle2 className="h-3 w-3" /> em sincronia
+            </span>
+          )}
+          {status === 'ready' && !frozen && !inSync && (
+            <span className="ml-auto flex items-center gap-1 text-[10px] text-amber-500 shrink-0">
+              <AlertTriangle className="h-3 w-3" /> desatualizada
             </span>
           )}
           {status === 'error' && (
