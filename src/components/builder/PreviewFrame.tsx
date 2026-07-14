@@ -299,6 +299,7 @@ export default function PreviewFrame({
             style={{
               width: '100%',
               height: '100%',
+              position: 'relative',
               ...(isDesktop ? {} : {
                 border: '8px solid hsl(var(--border))',
                 borderRadius: '24px',
@@ -319,6 +320,41 @@ export default function PreviewFrame({
                 ...(isDesktop ? {} : { borderRadius: '12px' }),
               }}
             />
+
+            {/* Empty state */}
+            {status === 'idle' && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/95 text-center p-6">
+                <FileCode2 className="h-10 w-10 text-muted-foreground/60" />
+                <div className="text-sm font-medium text-foreground">Nenhuma prévia ainda</div>
+                <p className="text-xs text-muted-foreground max-w-xs">
+                  Gere ou cole código no builder para ver o resultado aqui.
+                </p>
+              </div>
+            )}
+
+            {/* Loading state */}
+            {status === 'loading' && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/80 backdrop-blur-sm">
+                <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                <div className="text-xs font-medium text-muted-foreground">Carregando prévia…</div>
+              </div>
+            )}
+
+            {/* Error state */}
+            {status === 'error' && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/95 text-center p-6">
+                <div className="h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center">
+                  <AlertTriangle className="h-6 w-6 text-destructive" />
+                </div>
+                <div className="text-sm font-semibold text-foreground">Falha ao carregar a prévia</div>
+                <p className="text-xs text-muted-foreground max-w-sm break-words">
+                  {errorMsg || 'Ocorreu um erro inesperado ao renderizar o preview.'}
+                </p>
+                <Button size="sm" variant="outline" onClick={onRefresh} className="gap-2 mt-1">
+                  <RotateCw className="h-3 w-3" /> Tentar novamente
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </div>
