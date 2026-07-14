@@ -423,9 +423,27 @@ export default function PreviewFrame({
                 <p className="text-xs text-muted-foreground max-w-sm break-words">
                   {errorMsg || 'Ocorreu um erro inesperado ao renderizar o preview.'}
                 </p>
-                <Button size="sm" variant="outline" onClick={onRefresh} className="gap-2 mt-1">
-                  <RotateCw className="h-3 w-3" /> Tentar novamente
-                </Button>
+                {errorDetail && (
+                  <code className="text-[10px] font-mono text-muted-foreground/80 bg-muted/60 px-2 py-1 rounded max-w-sm truncate" title={errorDetail}>
+                    {errorDetail}
+                  </code>
+                )}
+                <div className="flex items-center gap-2 mt-1">
+                  <Button size="sm" variant="outline" onClick={reprocess} className="gap-2">
+                    <RotateCw className="h-3 w-3" /> Tentar novamente
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      const payload = `${errorMsg || ''}${errorDetail ? '\n' + errorDetail : ''}`
+                      navigator.clipboard.writeText(payload).then(() => toast.success('Erro copiado'))
+                    }}
+                    className="text-xs"
+                  >
+                    Copiar erro
+                  </Button>
+                </div>
               </div>
             )}
           </div>
