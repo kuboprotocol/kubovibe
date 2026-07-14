@@ -435,6 +435,16 @@ export default function PreviewFrame({
               <AlertTriangle className="h-3 w-3" /> erro
             </span>
           )}
+
+          {/* Last completed render timestamp */}
+          {lastRenderedAt && (
+            <span
+              className="ml-2 text-[10px] text-muted-foreground/70 shrink-0 tabular-nums"
+              title={`Último render concluído em ${lastRenderedAt.toLocaleString()}`}
+            >
+              · {lastRenderedAt.toLocaleTimeString()} ({formatRelative(lastRenderedAt)})
+            </span>
+          )}
         </div>
 
         {/* Zoom controls */}
