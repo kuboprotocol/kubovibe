@@ -211,12 +211,38 @@ export default function PreviewFrame({
     }
   }, [generatedCode, previewKey, reloadNonce, canvasVersion])
 
-  // Manual reprocess — remount iframe + notify parent
+  // Manual reprocess — remount iframe + notify parent. Enforces a 1.2s cooldown
+  // to prevent excessive re-renders (spam-click, held shortcut, etc.).
+  const REPROCESS_COOLDOWN_MS = 1200
   const reprocess = useCallback(() => {
+    const since = Date.now() - lastReloadAtRef.current
+    if (since < REPROCESS_COOLDOWN_MS) {
+      const wait = Math.ceil((REPROCESS_COOLDOWN_MS - since) / 100) / 10
+      toast('Aguarde para reprocessar', { description: `Cooldown ativo (${wait}s)` })
+      return
+    }
     lastReloadAtRef.current = Date.now()
     setReloadNonce((n) => n + 1)
     onRefresh()
   }, [onRefresh])
+
+  // Keyboard shortcut: Ctrl/Cmd + Shift + R → reprocessar
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'r' || e.key === 'R')) {
+        e.preventDefault()
+        reprocess()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [reprocess])
+
+  // Tick every 10s to refresh the relative "há Xs" label
+  useEffect(() => {
+    const id = window.setInterval(() => forceTick((n) => n + 1), 10000)
+    return () => window.clearInterval(id)
+  }, [])
 
   // Auto-reload on external canvas/save events, throttled + debounced
   useEffect(() => {
