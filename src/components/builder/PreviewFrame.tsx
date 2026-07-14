@@ -218,6 +218,7 @@ export default function PreviewFrame({
   // Auto-reload on external canvas/save events, throttled + debounced
   useEffect(() => {
     const schedule = () => {
+      setCanvasVersion((v) => v + 1)
       if (reloadDebounceRef.current) window.clearTimeout(reloadDebounceRef.current)
       reloadDebounceRef.current = window.setTimeout(() => {
         if (Date.now() - lastReloadAtRef.current < 1000) return
@@ -236,9 +237,46 @@ export default function PreviewFrame({
     }
   }, [])
 
+  // Bump canvas version whenever the code prop changes externally
+  useEffect(() => { setCanvasVersion((v) => v + 1) }, [generatedCode])
+
   useEffect(() => () => {
     if (flashTimerRef.current) window.clearTimeout(flashTimerRef.current)
+    if (heartbeatRef.current) window.clearInterval(heartbeatRef.current)
   }, [])
+
+  // Build & download an error report as JSON
+  const exportErrorReport = useCallback(() => {
+    const report = {
+      generatedAt: new Date().toISOString(),
+      snapshotId,
+      canvasVersion,
+      renderedVersion,
+      inSync,
+      frozen,
+      status,
+      errorMsg,
+      errorDetail,
+      device: deviceFrame,
+      landscape,
+      viewport: { w, h },
+      previewId: previewId || null,
+      projectTitle: projectTitle || null,
+      publishedUrl: publishedUrl || null,
+      userAgent: navigator.userAgent,
+      pageUrl: window.location.href,
+      codeLength: (generatedCode || '').length,
+      codeExcerpt: (generatedCode || '').slice(0, 2000),
+    }
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `preview-error-${snapshotId}-${Date.now()}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success('Relatório de erro exportado')
+  }, [snapshotId, canvasVersion, renderedVersion, inSync, frozen, status, errorMsg, errorDetail, deviceFrame, landscape, w, h, previewId, projectTitle, publishedUrl, generatedCode])
 
 
   const toggleFullscreen = useCallback(async () => {
