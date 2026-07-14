@@ -143,7 +143,24 @@ export default function PreviewFrame({
     const onLoad = () => {
       clearTimer()
       setStatus('ready')
+      setFrozen(false)
+      setRenderedVersion(canvasVersion)
       triggerUpdatedFlash()
+      // Freeze/hang detection via rAF heartbeat (best-effort, same-origin only)
+      try {
+        const win = iframe.contentWindow as any
+        if (win && typeof win.requestAnimationFrame === 'function') {
+          lastTickRef.current = Date.now()
+          if (heartbeatRef.current) window.clearInterval(heartbeatRef.current)
+          heartbeatRef.current = window.setInterval(() => {
+            try {
+              win.requestAnimationFrame(() => { lastTickRef.current = Date.now() })
+            } catch {}
+            const gap = Date.now() - lastTickRef.current
+            setFrozen(gap > 5000)
+          }, 2000)
+        }
+      } catch {}
       // Hook runtime errors inside iframe
       try {
         const win = iframe.contentWindow
