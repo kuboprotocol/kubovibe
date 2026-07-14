@@ -202,10 +202,11 @@ export default function PreviewFrame({
 
     return () => {
       clearTimer()
+      if (heartbeatRef.current) { window.clearInterval(heartbeatRef.current); heartbeatRef.current = null }
       iframe.removeEventListener('load', onLoad)
       iframe.removeEventListener('error', onError)
     }
-  }, [generatedCode, previewKey, reloadNonce])
+  }, [generatedCode, previewKey, reloadNonce, canvasVersion])
 
   // Manual reprocess — remount iframe + notify parent
   const reprocess = useCallback(() => {
