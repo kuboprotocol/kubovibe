@@ -173,6 +173,18 @@ export default function PreviewFrame({
       setRenderedVersion(canvasVersion)
       setLastRenderedAt(new Date())
       triggerUpdatedFlash()
+      // Push into history only when rendering LIVE code (not when browsing history)
+      if (!isViewingHistory) {
+        setHistory((prev) => {
+          if (prev[0]?.id === snapshotId) return prev
+          const next = [
+            { id: snapshotId, code: effectiveCode, ts: Date.now(), version: canvasVersion },
+            ...prev,
+          ].slice(0, 10)
+          try { localStorage.setItem('kubo:previewHistory:v1', JSON.stringify(next)) } catch {}
+          return next
+        })
+      }
       // Freeze/hang detection via rAF heartbeat (best-effort, same-origin only)
       try {
         const win = iframe.contentWindow as any
