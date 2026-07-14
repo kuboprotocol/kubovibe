@@ -531,7 +531,7 @@ export default function PreviewFrame({
                     {errorDetail}
                   </code>
                 )}
-                <div className="flex items-center gap-2 mt-1">
+                <div className="flex items-center gap-2 mt-1 flex-wrap justify-center">
                   <Button size="sm" variant="outline" onClick={reprocess} className="gap-2">
                     <RotateCw className="h-3 w-3" /> Tentar novamente
                   </Button>
@@ -539,14 +539,40 @@ export default function PreviewFrame({
                     size="sm"
                     variant="ghost"
                     onClick={() => {
-                      const payload = `${errorMsg || ''}${errorDetail ? '\n' + errorDetail : ''}`
+                      const payload = `[${snapshotId} v${renderedVersion}/${canvasVersion}] ${errorMsg || ''}${errorDetail ? '\n' + errorDetail : ''}`
                       navigator.clipboard.writeText(payload).then(() => toast.success('Erro copiado'))
                     }}
                     className="text-xs"
                   >
                     Copiar erro
                   </Button>
+                  <Button size="sm" variant="ghost" onClick={exportErrorReport} className="text-xs gap-1.5">
+                    <FileDown className="h-3 w-3" /> Exportar relatório
+                  </Button>
                 </div>
+                <div className="text-[10px] font-mono text-muted-foreground/60 mt-1">
+                  snapshot #{snapshotId} · v{renderedVersion}/{canvasVersion}
+                </div>
+              </div>
+            )}
+
+            {/* Frozen / hang overlay (non-blocking) */}
+            {status === 'ready' && frozen && (
+              <div className="absolute top-2 left-1/2 -translate-x-1/2 flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/15 border border-amber-500/40 backdrop-blur text-[11px] font-medium text-amber-600 dark:text-amber-400 shadow-lg z-20">
+                <Snowflake className="h-3.5 w-3.5" />
+                Iframe travado — sem frames há mais de 5s
+                <button
+                  onClick={reprocess}
+                  className="ml-1 underline underline-offset-2 hover:text-amber-700 dark:hover:text-amber-300"
+                >
+                  reprocessar
+                </button>
+                <button
+                  onClick={exportErrorReport}
+                  className="underline underline-offset-2 hover:text-amber-700 dark:hover:text-amber-300"
+                >
+                  exportar
+                </button>
               </div>
             )}
           </div>
