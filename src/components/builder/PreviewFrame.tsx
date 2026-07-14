@@ -382,27 +382,43 @@ export default function PreviewFrame({
   const removeHistoryItem = useCallback((id: string, ts: number) => {
     const item = history.find((h) => h.id === id && h.ts === ts)
     const label = item ? new Date(item.ts).toLocaleString() : 'este item'
-    if (!window.confirm(`Remover o snapshot de ${label}? Esta ação não pode ser desfeita.`)) return
-    setHistory((prev) => {
-      const next = prev.filter((h) => !(h.id === id && h.ts === ts))
-      persistHistory(next)
-      return next
+    setConfirmState({
+      title: 'Remover snapshot?',
+      description: `O snapshot de ${label} será removido do histórico. Esta ação não pode ser desfeita.`,
+      confirmLabel: 'Remover',
+      destructive: true,
+      onConfirm: () => {
+        setHistory((prev) => {
+          const next = prev.filter((h) => !(h.id === id && h.ts === ts))
+          persistHistory(next)
+          return next
+        })
+        if (pinnedSnapshot?.id === id && pinnedSnapshot?.ts === ts) setPinnedSnapshot(null)
+        if (diffTarget?.id === id && diffTarget?.ts === ts) setDiffTarget(null)
+        setFocusIdx((i) => Math.max(0, Math.min(i, history.length - 2)))
+      },
     })
-    if (pinnedSnapshot?.id === id && pinnedSnapshot?.ts === ts) setPinnedSnapshot(null)
-    if (diffTarget?.id === id && diffTarget?.ts === ts) setDiffTarget(null)
-    setFocusIdx((i) => Math.max(0, Math.min(i, history.length - 2)))
   }, [persistHistory, pinnedSnapshot, diffTarget, history])
 
   const clearHistory = useCallback(() => {
     if (history.length === 0) return
-    if (!window.confirm(`Limpar todo o histórico (${history.length} snapshot${history.length === 1 ? '' : 's'})? Esta ação não pode ser desfeita.`)) return
-    setHistory([])
-    persistHistory([])
-    setPinnedSnapshot(null)
-    setDiffTarget(null)
-    setHistoryOpen(false)
-    toast.success('Histórico limpo')
+    const count = history.length
+    setConfirmState({
+      title: 'Limpar todo o histórico?',
+      description: `${count} snapshot${count === 1 ? '' : 's'} serão removidos permanentemente. Esta ação não pode ser desfeita.`,
+      confirmLabel: 'Limpar tudo',
+      destructive: true,
+      onConfirm: () => {
+        setHistory([])
+        persistHistory([])
+        setPinnedSnapshot(null)
+        setDiffTarget(null)
+        setHistoryOpen(false)
+        toast.success('Histórico limpo')
+      },
+    })
   }, [persistHistory, history.length])
+
 
 
   const openHistoryItem = useCallback((idx: number) => {
