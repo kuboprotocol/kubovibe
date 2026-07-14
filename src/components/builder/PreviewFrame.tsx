@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { Maximize2, Minimize2, Camera, RotateCw, Lock, ZoomIn, ZoomOut, Loader2, AlertTriangle, FileCode2, CheckCircle2 } from 'lucide-react'
+import { Maximize2, Minimize2, Camera, RotateCw, Lock, ZoomIn, ZoomOut, Loader2, AlertTriangle, FileCode2, CheckCircle2, Snowflake, FileDown, GitCommit } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import { toast } from 'sonner'
@@ -58,6 +58,9 @@ export default function PreviewFrame({
   const [errorDetail, setErrorDetail] = useState<string | null>(null)
   const [reloadNonce, setReloadNonce] = useState(0)
   const [updatedFlash, setUpdatedFlash] = useState(false)
+  const [canvasVersion, setCanvasVersion] = useState(0)
+  const [renderedVersion, setRenderedVersion] = useState(0)
+  const [frozen, setFrozen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const iframeRef = useRef<HTMLIFrameElement>(null)
@@ -65,6 +68,17 @@ export default function PreviewFrame({
   const reloadDebounceRef = useRef<number | null>(null)
   const lastReloadAtRef = useRef<number>(0)
   const flashTimerRef = useRef<number | null>(null)
+  const heartbeatRef = useRef<number | null>(null)
+  const lastTickRef = useRef<number>(0)
+
+  // Short deterministic hash of the currently generated code (snapshot id)
+  const snapshotId = (() => {
+    const s = generatedCode || ''
+    let h = 5381
+    for (let i = 0; i < s.length; i++) h = ((h << 5) + h) ^ s.charCodeAt(i)
+    return (h >>> 0).toString(16).padStart(8, '0').slice(0, 8)
+  })()
+  const inSync = status === 'ready' && renderedVersion >= canvasVersion && !frozen
 
   const isDesktop = deviceFrame === 'desktop'
   const base = DEVICE_SIZES[deviceFrame]
@@ -129,7 +143,24 @@ export default function PreviewFrame({
     const onLoad = () => {
       clearTimer()
       setStatus('ready')
+      setFrozen(false)
+      setRenderedVersion(canvasVersion)
       triggerUpdatedFlash()
+      // Freeze/hang detection via rAF heartbeat (best-effort, same-origin only)
+      try {
+        const win = iframe.contentWindow as any
+        if (win && typeof win.requestAnimationFrame === 'function') {
+          lastTickRef.current = Date.now()
+          if (heartbeatRef.current) window.clearInterval(heartbeatRef.current)
+          heartbeatRef.current = window.setInterval(() => {
+            try {
+              win.requestAnimationFrame(() => { lastTickRef.current = Date.now() })
+            } catch {}
+            const gap = Date.now() - lastTickRef.current
+            setFrozen(gap > 5000)
+          }, 2000)
+        }
+      } catch {}
       // Hook runtime errors inside iframe
       try {
         const win = iframe.contentWindow
@@ -171,10 +202,11 @@ export default function PreviewFrame({
 
     return () => {
       clearTimer()
+      if (heartbeatRef.current) { window.clearInterval(heartbeatRef.current); heartbeatRef.current = null }
       iframe.removeEventListener('load', onLoad)
       iframe.removeEventListener('error', onError)
     }
-  }, [generatedCode, previewKey, reloadNonce])
+  }, [generatedCode, previewKey, reloadNonce, canvasVersion])
 
   // Manual reprocess — remount iframe + notify parent
   const reprocess = useCallback(() => {
@@ -186,6 +218,7 @@ export default function PreviewFrame({
   // Auto-reload on external canvas/save events, throttled + debounced
   useEffect(() => {
     const schedule = () => {
+      setCanvasVersion((v) => v + 1)
       if (reloadDebounceRef.current) window.clearTimeout(reloadDebounceRef.current)
       reloadDebounceRef.current = window.setTimeout(() => {
         if (Date.now() - lastReloadAtRef.current < 1000) return
@@ -204,9 +237,46 @@ export default function PreviewFrame({
     }
   }, [])
 
+  // Bump canvas version whenever the code prop changes externally
+  useEffect(() => { setCanvasVersion((v) => v + 1) }, [generatedCode])
+
   useEffect(() => () => {
     if (flashTimerRef.current) window.clearTimeout(flashTimerRef.current)
+    if (heartbeatRef.current) window.clearInterval(heartbeatRef.current)
   }, [])
+
+  // Build & download an error report as JSON
+  const exportErrorReport = useCallback(() => {
+    const report = {
+      generatedAt: new Date().toISOString(),
+      snapshotId,
+      canvasVersion,
+      renderedVersion,
+      inSync,
+      frozen,
+      status,
+      errorMsg,
+      errorDetail,
+      device: deviceFrame,
+      landscape,
+      viewport: { w, h },
+      previewId: previewId || null,
+      projectTitle: projectTitle || null,
+      publishedUrl: publishedUrl || null,
+      userAgent: navigator.userAgent,
+      pageUrl: window.location.href,
+      codeLength: (generatedCode || '').length,
+      codeExcerpt: (generatedCode || '').slice(0, 2000),
+    }
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `preview-error-${snapshotId}-${Date.now()}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success('Relatório de erro exportado')
+  }, [snapshotId, canvasVersion, renderedVersion, inSync, frozen, status, errorMsg, errorDetail, deviceFrame, landscape, w, h, previewId, projectTitle, publishedUrl, generatedCode])
 
 
   const toggleFullscreen = useCallback(async () => {
@@ -293,14 +363,36 @@ export default function PreviewFrame({
         <div className="flex-1 flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-secondary/60 border border-border/50 text-[11px] font-mono text-muted-foreground truncate">
           <Lock className="h-3 w-3 text-emerald-500 shrink-0" />
           <span className="truncate">{displayUrl}</span>
+
+          {/* Snapshot id + version */}
+          <span
+            className="ml-2 flex items-center gap-1 text-[10px] text-muted-foreground/80 shrink-0"
+            title={`Snapshot ${snapshotId} · canvas v${canvasVersion} · rendered v${renderedVersion}`}
+          >
+            <GitCommit className="h-3 w-3" />
+            <span>#{snapshotId}</span>
+            <span className="opacity-60">v{renderedVersion}/{canvasVersion}</span>
+          </span>
+
+          {/* Live status pill */}
           {status === 'loading' && (
             <span className="ml-auto flex items-center gap-1 text-[10px] text-primary shrink-0">
               <Loader2 className="h-3 w-3 animate-spin" /> loading
             </span>
           )}
-          {status === 'ready' && updatedFlash && (
-            <span className="ml-auto flex items-center gap-1 text-[10px] text-emerald-500 shrink-0 animate-in fade-in slide-in-from-right-2">
-              <CheckCircle2 className="h-3 w-3" /> atualizado
+          {status === 'ready' && frozen && (
+            <span className="ml-auto flex items-center gap-1 text-[10px] text-amber-500 shrink-0">
+              <Snowflake className="h-3 w-3" /> travado
+            </span>
+          )}
+          {status === 'ready' && !frozen && inSync && (
+            <span className={`ml-auto flex items-center gap-1 text-[10px] text-emerald-500 shrink-0 ${updatedFlash ? 'animate-in fade-in slide-in-from-right-2' : ''}`}>
+              <CheckCircle2 className="h-3 w-3" /> em sincronia
+            </span>
+          )}
+          {status === 'ready' && !frozen && !inSync && (
+            <span className="ml-auto flex items-center gap-1 text-[10px] text-amber-500 shrink-0">
+              <AlertTriangle className="h-3 w-3" /> desatualizada
             </span>
           )}
           {status === 'error' && (
@@ -439,7 +531,7 @@ export default function PreviewFrame({
                     {errorDetail}
                   </code>
                 )}
-                <div className="flex items-center gap-2 mt-1">
+                <div className="flex items-center gap-2 mt-1 flex-wrap justify-center">
                   <Button size="sm" variant="outline" onClick={reprocess} className="gap-2">
                     <RotateCw className="h-3 w-3" /> Tentar novamente
                   </Button>
@@ -447,14 +539,40 @@ export default function PreviewFrame({
                     size="sm"
                     variant="ghost"
                     onClick={() => {
-                      const payload = `${errorMsg || ''}${errorDetail ? '\n' + errorDetail : ''}`
+                      const payload = `[${snapshotId} v${renderedVersion}/${canvasVersion}] ${errorMsg || ''}${errorDetail ? '\n' + errorDetail : ''}`
                       navigator.clipboard.writeText(payload).then(() => toast.success('Erro copiado'))
                     }}
                     className="text-xs"
                   >
                     Copiar erro
                   </Button>
+                  <Button size="sm" variant="ghost" onClick={exportErrorReport} className="text-xs gap-1.5">
+                    <FileDown className="h-3 w-3" /> Exportar relatório
+                  </Button>
                 </div>
+                <div className="text-[10px] font-mono text-muted-foreground/60 mt-1">
+                  snapshot #{snapshotId} · v{renderedVersion}/{canvasVersion}
+                </div>
+              </div>
+            )}
+
+            {/* Frozen / hang overlay (non-blocking) */}
+            {status === 'ready' && frozen && (
+              <div className="absolute top-2 left-1/2 -translate-x-1/2 flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/15 border border-amber-500/40 backdrop-blur text-[11px] font-medium text-amber-600 dark:text-amber-400 shadow-lg z-20">
+                <Snowflake className="h-3.5 w-3.5" />
+                Iframe travado — sem frames há mais de 5s
+                <button
+                  onClick={reprocess}
+                  className="ml-1 underline underline-offset-2 hover:text-amber-700 dark:hover:text-amber-300"
+                >
+                  reprocessar
+                </button>
+                <button
+                  onClick={exportErrorReport}
+                  className="underline underline-offset-2 hover:text-amber-700 dark:hover:text-amber-300"
+                >
+                  exportar
+                </button>
               </div>
             )}
           </div>
