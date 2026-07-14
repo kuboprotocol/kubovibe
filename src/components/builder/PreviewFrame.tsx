@@ -2,6 +2,16 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { Maximize2, Minimize2, Camera, RotateCw, Lock, ZoomIn, ZoomOut, Loader2, AlertTriangle, FileCode2, CheckCircle2, Snowflake, FileDown, GitCommit, History, X, Trash2, Diff as DiffIcon } from 'lucide-react'
 import { diffLines } from 'diff'
 import { Button } from '@/components/ui/button'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Slider } from '@/components/ui/slider'
 import { toast } from 'sonner'
 import { wrapPreviewHtml } from '@/lib/iframePreview'
@@ -82,6 +92,13 @@ export default function PreviewFrame({
   const [history, setHistory] = useState<Array<{ id: string; code: string; ts: number; version: number }>>([])
   const [focusIdx, setFocusIdx] = useState(0)
   const [diffTarget, setDiffTarget] = useState<{ id: string; code: string; ts: number } | null>(null)
+  const [confirmState, setConfirmState] = useState<{
+    title: string
+    description: string
+    confirmLabel: string
+    destructive?: boolean
+    onConfirm: () => void
+  } | null>(null)
 
   // Load history whenever the scope (previewId) changes; also drop any pinned snapshot
   useEffect(() => {
@@ -365,27 +382,43 @@ export default function PreviewFrame({
   const removeHistoryItem = useCallback((id: string, ts: number) => {
     const item = history.find((h) => h.id === id && h.ts === ts)
     const label = item ? new Date(item.ts).toLocaleString() : 'este item'
-    if (!window.confirm(`Remover o snapshot de ${label}? Esta ação não pode ser desfeita.`)) return
-    setHistory((prev) => {
-      const next = prev.filter((h) => !(h.id === id && h.ts === ts))
-      persistHistory(next)
-      return next
+    setConfirmState({
+      title: 'Remover snapshot?',
+      description: `O snapshot de ${label} será removido do histórico. Esta ação não pode ser desfeita.`,
+      confirmLabel: 'Remover',
+      destructive: true,
+      onConfirm: () => {
+        setHistory((prev) => {
+          const next = prev.filter((h) => !(h.id === id && h.ts === ts))
+          persistHistory(next)
+          return next
+        })
+        if (pinnedSnapshot?.id === id && pinnedSnapshot?.ts === ts) setPinnedSnapshot(null)
+        if (diffTarget?.id === id && diffTarget?.ts === ts) setDiffTarget(null)
+        setFocusIdx((i) => Math.max(0, Math.min(i, history.length - 2)))
+      },
     })
-    if (pinnedSnapshot?.id === id && pinnedSnapshot?.ts === ts) setPinnedSnapshot(null)
-    if (diffTarget?.id === id && diffTarget?.ts === ts) setDiffTarget(null)
-    setFocusIdx((i) => Math.max(0, Math.min(i, history.length - 2)))
   }, [persistHistory, pinnedSnapshot, diffTarget, history])
 
   const clearHistory = useCallback(() => {
     if (history.length === 0) return
-    if (!window.confirm(`Limpar todo o histórico (${history.length} snapshot${history.length === 1 ? '' : 's'})? Esta ação não pode ser desfeita.`)) return
-    setHistory([])
-    persistHistory([])
-    setPinnedSnapshot(null)
-    setDiffTarget(null)
-    setHistoryOpen(false)
-    toast.success('Histórico limpo')
+    const count = history.length
+    setConfirmState({
+      title: 'Limpar todo o histórico?',
+      description: `${count} snapshot${count === 1 ? '' : 's'} serão removidos permanentemente. Esta ação não pode ser desfeita.`,
+      confirmLabel: 'Limpar tudo',
+      destructive: true,
+      onConfirm: () => {
+        setHistory([])
+        persistHistory([])
+        setPinnedSnapshot(null)
+        setDiffTarget(null)
+        setHistoryOpen(false)
+        toast.success('Histórico limpo')
+      },
+    })
   }, [persistHistory, history.length])
+
 
 
   const openHistoryItem = useCallback((idx: number) => {
@@ -912,6 +945,29 @@ export default function PreviewFrame({
           </div>
         </div>
       )}
+      <AlertDialog
+        open={!!confirmState}
+        onOpenChange={(open) => { if (!open) setConfirmState(null) }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmState?.title}</AlertDialogTitle>
+            <AlertDialogDescription>{confirmState?.description}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel autoFocus>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                confirmState?.onConfirm()
+                setConfirmState(null)
+              }}
+              className={confirmState?.destructive ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : undefined}
+            >
+              {confirmState?.confirmLabel ?? 'Confirmar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
