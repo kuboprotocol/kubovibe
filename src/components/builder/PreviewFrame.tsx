@@ -621,31 +621,34 @@ export default function PreviewFrame({
             <History className="h-3 w-3" />
           </Button>
           {historyOpen && history.length > 0 && (
-            <div className="absolute right-0 top-7 z-30 w-72 rounded-md border border-border bg-popover shadow-lg text-popover-foreground overflow-hidden">
+            <div className="absolute right-0 top-7 z-30 w-80 rounded-md border border-border bg-popover shadow-lg text-popover-foreground overflow-hidden">
               <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-                <span className="text-[11px] font-semibold">Histórico da prévia</span>
+                <div className="flex flex-col">
+                  <span className="text-[11px] font-semibold">Histórico da prévia</span>
+                  <span className="text-[9px] text-muted-foreground">↑↓ navegar · Enter abrir · D diff · Del remover</span>
+                </div>
                 <button
-                  className="text-[10px] text-muted-foreground hover:text-foreground"
-                  onClick={() => {
-                    setHistory([])
-                    try { localStorage.removeItem(historyKey) } catch {}
-                  }}
+                  className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-destructive transition"
+                  onClick={clearHistory}
+                  title="Limpar histórico completo"
                 >
-                  Limpar
+                  <Trash2 className="h-3 w-3" /> Limpar
                 </button>
               </div>
               <ul className="max-h-64 overflow-y-auto">
                 {history.map((h, i) => {
                   const active = pinnedSnapshot?.id === h.id || (!pinnedSnapshot && i === 0)
+                  const focused = i === focusIdx
                   return (
-                    <li key={`${h.id}-${h.ts}`}>
+                    <li
+                      key={`${h.id}-${h.ts}`}
+                      className={`group flex items-center gap-1 px-2 py-1 text-[11px] transition ${focused ? 'bg-primary/10 ring-1 ring-primary/40' : ''} ${active && !focused ? 'bg-muted/40' : ''} hover:bg-muted/60`}
+                    >
                       <button
-                        onClick={() => {
-                          if (i === 0 && !pinnedSnapshot) return
-                          setPinnedSnapshot(i === 0 ? null : { id: h.id, code: h.code, ts: h.ts })
-                          setHistoryOpen(false)
-                        }}
-                        className={`w-full text-left px-3 py-2 text-[11px] flex items-center gap-2 hover:bg-muted/60 transition ${active ? 'bg-muted/40' : ''}`}
+                        onClick={() => openHistoryItem(i)}
+                        onMouseEnter={() => setFocusIdx(i)}
+                        className="flex-1 text-left flex items-center gap-2 min-w-0"
+                        title={i === 0 ? 'Snapshot ao vivo' : `Abrir snapshot #${h.id}`}
                       >
                         <GitCommit className="h-3 w-3 shrink-0 text-muted-foreground" />
                         <span className="font-mono">#{h.id}</span>
@@ -656,6 +659,20 @@ export default function PreviewFrame({
                         {i === 0 && (
                           <span className="text-[9px] uppercase tracking-wide text-emerald-500">live</span>
                         )}
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setDiffTarget({ id: h.id, code: h.code, ts: h.ts }) }}
+                        className="p-1 rounded opacity-60 hover:opacity-100 hover:text-primary"
+                        title="Ver diff vs. live"
+                      >
+                        <DiffIcon className="h-3 w-3" />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); removeHistoryItem(h.id, h.ts) }}
+                        className="p-1 rounded opacity-60 hover:opacity-100 hover:text-destructive"
+                        title="Remover este snapshot"
+                      >
+                        <X className="h-3 w-3" />
                       </button>
                     </li>
                   )
