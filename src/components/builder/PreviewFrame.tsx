@@ -533,7 +533,7 @@ export default function PreviewFrame({
     : '/builder-preview')
 
   return (
-    <div ref={containerRef} className="absolute inset-0 flex flex-col bg-muted overflow-hidden">
+    <div ref={containerRef} className="absolute inset-0 flex flex-col bg-muted overflow-hidden min-h-0 min-w-0">
       {/* Fixed address bar */}
       <div className="flex items-center gap-2 px-3 py-1.5 bg-card/95 backdrop-blur border-b border-border shrink-0 z-10">
         <div className="flex gap-1.5">
@@ -730,11 +730,18 @@ export default function PreviewFrame({
       </div>
 
       {/* Stage */}
-      <div ref={stageRef} className="flex-1 overflow-auto flex items-start justify-center p-6">
+      <div
+        ref={stageRef}
+        className={`flex-1 min-h-0 min-w-0 overflow-auto bg-muted ${
+          isDesktop ? 'flex' : 'flex items-start justify-center p-6'
+        }`}
+      >
         <div
           style={{
             width: isDesktop ? '100%' : `${w}px`,
             height: isDesktop ? '100%' : `${h}px`,
+            minHeight: isDesktop ? '100%' : undefined,
+            flex: isDesktop ? '1 1 auto' : undefined,
             transform: isDesktop ? undefined : `scale(${zoom})`,
             transformOrigin: 'top center',
             transition: 'transform 120ms ease-out',
