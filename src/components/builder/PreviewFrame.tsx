@@ -93,14 +93,18 @@ export default function PreviewFrame({
   const heartbeatRef = useRef<number | null>(null)
   const lastTickRef = useRef<number>(0)
 
-  // Short deterministic hash of the currently generated code (snapshot id)
+  // When a historical snapshot is pinned, the iframe renders that code instead of live
+  const effectiveCode = pinnedSnapshot ? pinnedSnapshot.code : generatedCode
+  const isViewingHistory = !!pinnedSnapshot
+
+  // Short deterministic hash of the currently displayed code (snapshot id)
   const snapshotId = (() => {
-    const s = generatedCode || ''
+    const s = effectiveCode || ''
     let h = 5381
     for (let i = 0; i < s.length; i++) h = ((h << 5) + h) ^ s.charCodeAt(i)
     return (h >>> 0).toString(16).padStart(8, '0').slice(0, 8)
   })()
-  const inSync = status === 'ready' && renderedVersion >= canvasVersion && !frozen
+  const inSync = !isViewingHistory && status === 'ready' && renderedVersion >= canvasVersion && !frozen
 
   const isDesktop = deviceFrame === 'desktop'
   const base = DEVICE_SIZES[deviceFrame]
