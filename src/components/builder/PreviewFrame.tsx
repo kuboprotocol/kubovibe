@@ -93,6 +93,64 @@ export default function PreviewFrame({
     return () => document.removeEventListener('fullscreenchange', onChange)
   }, [])
 
+  // Track iframe load lifecycle: loading spinner, timeout error, runtime errors
+  useEffect(() => {
+    if (!generatedCode || !generatedCode.trim()) {
+      setStatus('idle')
+      setErrorMsg(null)
+      return
+    }
+    setStatus('loading')
+    setErrorMsg(null)
+    const iframe = iframeRef.current
+    if (!iframe) return
+
+    const clearTimer = () => {
+      if (loadTimeoutRef.current) {
+        window.clearTimeout(loadTimeoutRef.current)
+        loadTimeoutRef.current = null
+      }
+    }
+
+    const onLoad = () => {
+      clearTimer()
+      setStatus('ready')
+      // Hook runtime errors inside iframe
+      try {
+        const win = iframe.contentWindow
+        if (win) {
+          win.addEventListener('error', (ev: ErrorEvent) => {
+            setStatus('error')
+            setErrorMsg(ev.message || 'Erro em tempo de execução')
+          })
+          win.addEventListener('unhandledrejection', (ev: PromiseRejectionEvent) => {
+            setStatus('error')
+            setErrorMsg(String((ev as any).reason?.message || (ev as any).reason || 'Promise rejeitada'))
+          })
+        }
+      } catch {}
+    }
+    const onError = () => {
+      clearTimer()
+      setStatus('error')
+      setErrorMsg('Falha ao carregar a prévia')
+    }
+
+    iframe.addEventListener('load', onLoad)
+    iframe.addEventListener('error', onError)
+    loadTimeoutRef.current = window.setTimeout(() => {
+      setStatus((s) => (s === 'loading' ? 'error' : s))
+      setErrorMsg((m) => m || 'Tempo esgotado ao carregar a prévia (>15s)')
+    }, 15000)
+
+    return () => {
+      clearTimer()
+      iframe.removeEventListener('load', onLoad)
+      iframe.removeEventListener('error', onError)
+    }
+  }, [generatedCode, previewKey])
+
+
   const toggleFullscreen = useCallback(async () => {
     const el = containerRef.current
     if (!el) return
