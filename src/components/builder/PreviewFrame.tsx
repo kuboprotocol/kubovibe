@@ -74,15 +74,23 @@ export default function PreviewFrame({
   const [frozen, setFrozen] = useState(false)
   const [lastRenderedAt, setLastRenderedAt] = useState<Date | null>(null)
   const [, forceTick] = useState(0)
+  // Per-project history key — keeps snapshots isolated between different canvases/projects
+  const historyKey = `kubo:previewHistory:v1:${previewId || 'default'}`
   const [pinnedSnapshot, setPinnedSnapshot] = useState<{ id: string; code: string; ts: number } | null>(null)
   const [historyOpen, setHistoryOpen] = useState(false)
-  const [history, setHistory] = useState<Array<{ id: string; code: string; ts: number; version: number }>>(() => {
+  const [history, setHistory] = useState<Array<{ id: string; code: string; ts: number; version: number }>>([])
+
+  // Load history whenever the scope (previewId) changes; also drop any pinned snapshot
+  useEffect(() => {
+    setPinnedSnapshot(null)
+    setHistoryOpen(false)
     try {
-      const raw = localStorage.getItem('kubo:previewHistory:v1')
-      if (raw) return JSON.parse(raw)
-    } catch {}
-    return []
-  })
+      const raw = localStorage.getItem(historyKey)
+      setHistory(raw ? JSON.parse(raw) : [])
+    } catch {
+      setHistory([])
+    }
+  }, [historyKey])
   const containerRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const iframeRef = useRef<HTMLIFrameElement>(null)
