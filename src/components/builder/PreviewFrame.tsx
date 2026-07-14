@@ -945,6 +945,29 @@ export default function PreviewFrame({
           </div>
         </div>
       )}
+      <AlertDialog
+        open={!!confirmState}
+        onOpenChange={(open) => { if (!open) setConfirmState(null) }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmState?.title}</AlertDialogTitle>
+            <AlertDialogDescription>{confirmState?.description}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel autoFocus>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                confirmState?.onConfirm()
+                setConfirmState(null)
+              }}
+              className={confirmState?.destructive ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : undefined}
+            >
+              {confirmState?.confirmLabel ?? 'Confirmar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
