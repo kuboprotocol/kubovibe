@@ -17,6 +17,7 @@ export default function CanvasPage() {
   const [currentCanvasId] = useState(canvasId || crypto.randomUUID())
   const [canvasName, setCanvasName] = useState('Unnamed Canvas')
   const [saving, setSaving] = useState(false)
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
   const [showTemplates, setShowTemplates] = useState(!canvasId)
   const [showInfo, setShowInfo] = useState(true)
   const [showRunway, setShowRunway] = useState(false)
