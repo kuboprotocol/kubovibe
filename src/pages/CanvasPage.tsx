@@ -62,6 +62,9 @@ export default function CanvasPage() {
     setSaving(true)
     try {
       persistCanvas(snapshot)
+      try {
+        window.dispatchEvent(new CustomEvent('kubo:canvas:saved', { detail: { snapshot } }))
+      } catch {}
       toast.success('Canvas saved successfully!')
     } catch (err) {
       toast.error('Error saving canvas')
