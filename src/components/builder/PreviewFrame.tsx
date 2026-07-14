@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { Maximize2, Minimize2, Camera, RotateCw, Lock, ZoomIn, ZoomOut, Loader2, AlertTriangle, FileCode2 } from 'lucide-react'
+import { Maximize2, Minimize2, Camera, RotateCw, Lock, ZoomIn, ZoomOut, Loader2, AlertTriangle, FileCode2, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import { toast } from 'sonner'
@@ -55,10 +55,16 @@ export default function PreviewFrame({
   const [shooting, setShooting] = useState(false)
   const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [errorDetail, setErrorDetail] = useState<string | null>(null)
+  const [reloadNonce, setReloadNonce] = useState(0)
+  const [updatedFlash, setUpdatedFlash] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const loadTimeoutRef = useRef<number | null>(null)
+  const reloadDebounceRef = useRef<number | null>(null)
+  const lastReloadAtRef = useRef<number>(0)
+  const flashTimerRef = useRef<number | null>(null)
 
   const isDesktop = deviceFrame === 'desktop'
   const base = DEVICE_SIZES[deviceFrame]
@@ -98,10 +104,12 @@ export default function PreviewFrame({
     if (!generatedCode || !generatedCode.trim()) {
       setStatus('idle')
       setErrorMsg(null)
+      setErrorDetail(null)
       return
     }
     setStatus('loading')
     setErrorMsg(null)
+    setErrorDetail(null)
     const iframe = iframeRef.current
     if (!iframe) return
 
@@ -112,35 +120,53 @@ export default function PreviewFrame({
       }
     }
 
+    const triggerUpdatedFlash = () => {
+      setUpdatedFlash(true)
+      if (flashTimerRef.current) window.clearTimeout(flashTimerRef.current)
+      flashTimerRef.current = window.setTimeout(() => setUpdatedFlash(false), 1800)
+    }
+
     const onLoad = () => {
       clearTimer()
       setStatus('ready')
+      triggerUpdatedFlash()
       // Hook runtime errors inside iframe
       try {
         const win = iframe.contentWindow
         if (win) {
           win.addEventListener('error', (ev: ErrorEvent) => {
             setStatus('error')
-            setErrorMsg(ev.message || 'Erro em tempo de execução')
+            setErrorMsg(ev.message || 'Runtime error')
+            setErrorDetail(
+              [ev.filename, ev.lineno && `line ${ev.lineno}`, ev.colno && `col ${ev.colno}`]
+                .filter(Boolean).join(' · ') || null,
+            )
           })
           win.addEventListener('unhandledrejection', (ev: PromiseRejectionEvent) => {
             setStatus('error')
-            setErrorMsg(String((ev as any).reason?.message || (ev as any).reason || 'Promise rejeitada'))
+            const reason: any = (ev as any).reason
+            setErrorMsg(String(reason?.message || reason || 'Promise rejected'))
+            setErrorDetail(reason?.stack ? String(reason.stack).split('\n')[1]?.trim() || null : null)
           })
         }
-      } catch {}
+      } catch (e: any) {
+        // Cross-origin — non-fatal
+        console.debug('[Preview] cannot attach iframe listeners:', e?.message)
+      }
     }
-    const onError = () => {
+    const onError = (ev: Event) => {
       clearTimer()
       setStatus('error')
-      setErrorMsg('Falha ao carregar a prévia')
+      setErrorMsg('Failed to load preview')
+      setErrorDetail((ev as any)?.message || 'Network or sandbox error')
     }
 
     iframe.addEventListener('load', onLoad)
     iframe.addEventListener('error', onError)
     loadTimeoutRef.current = window.setTimeout(() => {
       setStatus((s) => (s === 'loading' ? 'error' : s))
-      setErrorMsg((m) => m || 'Tempo esgotado ao carregar a prévia (>15s)')
+      setErrorMsg((m) => m || 'Load timeout')
+      setErrorDetail((d) => d || 'Preview took longer than 15s to load')
     }, 15000)
 
     return () => {
@@ -148,7 +174,39 @@ export default function PreviewFrame({
       iframe.removeEventListener('load', onLoad)
       iframe.removeEventListener('error', onError)
     }
-  }, [generatedCode, previewKey])
+  }, [generatedCode, previewKey, reloadNonce])
+
+  // Manual reprocess — remount iframe + notify parent
+  const reprocess = useCallback(() => {
+    lastReloadAtRef.current = Date.now()
+    setReloadNonce((n) => n + 1)
+    onRefresh()
+  }, [onRefresh])
+
+  // Auto-reload on external canvas/save events, throttled + debounced
+  useEffect(() => {
+    const schedule = () => {
+      if (reloadDebounceRef.current) window.clearTimeout(reloadDebounceRef.current)
+      reloadDebounceRef.current = window.setTimeout(() => {
+        if (Date.now() - lastReloadAtRef.current < 1000) return
+        lastReloadAtRef.current = Date.now()
+        setReloadNonce((n) => n + 1)
+      }, 400)
+    }
+    window.addEventListener('kubo:canvas:updated', schedule)
+    window.addEventListener('kubo:canvas:saved', schedule)
+    window.addEventListener('kubo:preview:reload', schedule)
+    return () => {
+      if (reloadDebounceRef.current) window.clearTimeout(reloadDebounceRef.current)
+      window.removeEventListener('kubo:canvas:updated', schedule)
+      window.removeEventListener('kubo:canvas:saved', schedule)
+      window.removeEventListener('kubo:preview:reload', schedule)
+    }
+  }, [])
+
+  useEffect(() => () => {
+    if (flashTimerRef.current) window.clearTimeout(flashTimerRef.current)
+  }, [])
 
 
   const toggleFullscreen = useCallback(async () => {
@@ -229,12 +287,27 @@ export default function PreviewFrame({
           <span className="w-2.5 h-2.5 rounded-full bg-yellow-400/80" />
           <span className="w-2.5 h-2.5 rounded-full bg-green-400/80" />
         </div>
-        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onRefresh} title="Recarregar">
-          <RotateCw className="h-3 w-3" />
+        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={reprocess} title="Reprocessar prévia">
+          <RotateCw className={`h-3 w-3 ${status === 'loading' ? 'animate-spin' : ''}`} />
         </Button>
         <div className="flex-1 flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-secondary/60 border border-border/50 text-[11px] font-mono text-muted-foreground truncate">
           <Lock className="h-3 w-3 text-emerald-500 shrink-0" />
           <span className="truncate">{displayUrl}</span>
+          {status === 'loading' && (
+            <span className="ml-auto flex items-center gap-1 text-[10px] text-primary shrink-0">
+              <Loader2 className="h-3 w-3 animate-spin" /> loading
+            </span>
+          )}
+          {status === 'ready' && updatedFlash && (
+            <span className="ml-auto flex items-center gap-1 text-[10px] text-emerald-500 shrink-0 animate-in fade-in slide-in-from-right-2">
+              <CheckCircle2 className="h-3 w-3" /> atualizado
+            </span>
+          )}
+          {status === 'error' && (
+            <span className="ml-auto flex items-center gap-1 text-[10px] text-destructive shrink-0">
+              <AlertTriangle className="h-3 w-3" /> erro
+            </span>
+          )}
         </div>
 
         {/* Zoom controls */}
@@ -310,7 +383,7 @@ export default function PreviewFrame({
           >
             <iframe
               ref={iframeRef}
-              key={previewKey}
+              key={`${previewKey}-${reloadNonce}`}
               srcDoc={wrapPreviewHtml(generatedCode || '', { previewId })}
               className="w-full h-full border-0 block"
               sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
@@ -350,9 +423,27 @@ export default function PreviewFrame({
                 <p className="text-xs text-muted-foreground max-w-sm break-words">
                   {errorMsg || 'Ocorreu um erro inesperado ao renderizar o preview.'}
                 </p>
-                <Button size="sm" variant="outline" onClick={onRefresh} className="gap-2 mt-1">
-                  <RotateCw className="h-3 w-3" /> Tentar novamente
-                </Button>
+                {errorDetail && (
+                  <code className="text-[10px] font-mono text-muted-foreground/80 bg-muted/60 px-2 py-1 rounded max-w-sm truncate" title={errorDetail}>
+                    {errorDetail}
+                  </code>
+                )}
+                <div className="flex items-center gap-2 mt-1">
+                  <Button size="sm" variant="outline" onClick={reprocess} className="gap-2">
+                    <RotateCw className="h-3 w-3" /> Tentar novamente
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      const payload = `${errorMsg || ''}${errorDetail ? '\n' + errorDetail : ''}`
+                      navigator.clipboard.writeText(payload).then(() => toast.success('Erro copiado'))
+                    }}
+                    className="text-xs"
+                  >
+                    Copiar erro
+                  </Button>
+                </div>
               </div>
             )}
           </div>
