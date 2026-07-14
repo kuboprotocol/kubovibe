@@ -189,7 +189,7 @@ export default function PreviewFrame({
             { id: snapshotId, code: effectiveCode, ts: Date.now(), version: canvasVersion },
             ...prev,
           ].slice(0, 10)
-          try { localStorage.setItem('kubo:previewHistory:v1', JSON.stringify(next)) } catch {}
+          try { localStorage.setItem(historyKey, JSON.stringify(next)) } catch {}
           return next
         })
       }
