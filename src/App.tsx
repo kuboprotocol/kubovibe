@@ -15,6 +15,7 @@ const AuthPage = lazy(() => import("./pages/AuthPage"));
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const BuilderPage = lazy(() => import("./pages/BuilderPage"));
+const CanvasPage = lazy(() => import("./pages/CanvasPage"));
 const ProfilePage = lazy(() => import("./pages/ProfilePage"));
 const TermsPage = lazy(() => import("./pages/TermsPage"));
 const PrivacyPage = lazy(() => import("./pages/PrivacyPage"));
@@ -193,6 +194,8 @@ const App = () => {
                 <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
                 <Route path="/builder" element={<ProtectedRoute><BuilderPage /></ProtectedRoute>} />
                 <Route path="/builder/:projectId" element={<ProtectedRoute><BuilderPage /></ProtectedRoute>} />
+                <Route path="/canvas" element={<ProtectedRoute><CanvasPage /></ProtectedRoute>} />
+                <Route path="/canvas/:canvasId" element={<ProtectedRoute><CanvasPage /></ProtectedRoute>} />
                 <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
                 
                 <Route path="/connect" element={<ProtectedRoute><ConnectPage /></ProtectedRoute>} />

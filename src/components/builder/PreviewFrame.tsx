@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { Maximize2, Minimize2, Camera, RotateCw, Lock, ZoomIn, ZoomOut, Loader2, AlertTriangle, FileCode2, CheckCircle2, Snowflake, FileDown, GitCommit } from 'lucide-react'
+import { Maximize2, Minimize2, Camera, RotateCw, Lock, ZoomIn, ZoomOut, Loader2, AlertTriangle, FileCode2, CheckCircle2, Snowflake, FileDown, GitCommit, History, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import { toast } from 'sonner'
@@ -74,6 +74,15 @@ export default function PreviewFrame({
   const [frozen, setFrozen] = useState(false)
   const [lastRenderedAt, setLastRenderedAt] = useState<Date | null>(null)
   const [, forceTick] = useState(0)
+  const [pinnedSnapshot, setPinnedSnapshot] = useState<{ id: string; code: string; ts: number } | null>(null)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [history, setHistory] = useState<Array<{ id: string; code: string; ts: number; version: number }>>(() => {
+    try {
+      const raw = localStorage.getItem('kubo:previewHistory:v1')
+      if (raw) return JSON.parse(raw)
+    } catch {}
+    return []
+  })
   const containerRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const iframeRef = useRef<HTMLIFrameElement>(null)
@@ -84,14 +93,18 @@ export default function PreviewFrame({
   const heartbeatRef = useRef<number | null>(null)
   const lastTickRef = useRef<number>(0)
 
-  // Short deterministic hash of the currently generated code (snapshot id)
+  // When a historical snapshot is pinned, the iframe renders that code instead of live
+  const effectiveCode = pinnedSnapshot ? pinnedSnapshot.code : generatedCode
+  const isViewingHistory = !!pinnedSnapshot
+
+  // Short deterministic hash of the currently displayed code (snapshot id)
   const snapshotId = (() => {
-    const s = generatedCode || ''
+    const s = effectiveCode || ''
     let h = 5381
     for (let i = 0; i < s.length; i++) h = ((h << 5) + h) ^ s.charCodeAt(i)
     return (h >>> 0).toString(16).padStart(8, '0').slice(0, 8)
   })()
-  const inSync = status === 'ready' && renderedVersion >= canvasVersion && !frozen
+  const inSync = !isViewingHistory && status === 'ready' && renderedVersion >= canvasVersion && !frozen
 
   const isDesktop = deviceFrame === 'desktop'
   const base = DEVICE_SIZES[deviceFrame]
@@ -128,7 +141,7 @@ export default function PreviewFrame({
 
   // Track iframe load lifecycle: loading spinner, timeout error, runtime errors
   useEffect(() => {
-    if (!generatedCode || !generatedCode.trim()) {
+    if (!effectiveCode || !effectiveCode.trim()) {
       setStatus('idle')
       setErrorMsg(null)
       setErrorDetail(null)
@@ -160,6 +173,18 @@ export default function PreviewFrame({
       setRenderedVersion(canvasVersion)
       setLastRenderedAt(new Date())
       triggerUpdatedFlash()
+      // Push into history only when rendering LIVE code (not when browsing history)
+      if (!isViewingHistory) {
+        setHistory((prev) => {
+          if (prev[0]?.id === snapshotId) return prev
+          const next = [
+            { id: snapshotId, code: effectiveCode, ts: Date.now(), version: canvasVersion },
+            ...prev,
+          ].slice(0, 10)
+          try { localStorage.setItem('kubo:previewHistory:v1', JSON.stringify(next)) } catch {}
+          return next
+        })
+      }
       // Freeze/hang detection via rAF heartbeat (best-effort, same-origin only)
       try {
         const win = iframe.contentWindow as any
@@ -220,7 +245,7 @@ export default function PreviewFrame({
       iframe.removeEventListener('load', onLoad)
       iframe.removeEventListener('error', onError)
     }
-  }, [generatedCode, previewKey, reloadNonce, canvasVersion])
+  }, [effectiveCode, previewKey, reloadNonce, canvasVersion, isViewingHistory, snapshotId])
 
   // Manual reprocess — remount iframe + notify parent. Enforces a 1.2s cooldown
   // to prevent excessive re-renders (spam-click, held shortcut, etc.).
@@ -502,6 +527,64 @@ export default function PreviewFrame({
           <RotateCw className={`h-3 w-3 ${status === 'loading' ? 'animate-spin' : ''}`} />
           Reprocessar
         </Button>
+
+        {/* Snapshot history */}
+        <div className="relative">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={() => setHistoryOpen((o) => !o)}
+            title="Histórico de snapshots"
+            disabled={history.length === 0}
+          >
+            <History className="h-3 w-3" />
+          </Button>
+          {historyOpen && history.length > 0 && (
+            <div className="absolute right-0 top-7 z-30 w-72 rounded-md border border-border bg-popover shadow-lg text-popover-foreground overflow-hidden">
+              <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+                <span className="text-[11px] font-semibold">Histórico da prévia</span>
+                <button
+                  className="text-[10px] text-muted-foreground hover:text-foreground"
+                  onClick={() => {
+                    setHistory([])
+                    try { localStorage.removeItem('kubo:previewHistory:v1') } catch {}
+                  }}
+                >
+                  Limpar
+                </button>
+              </div>
+              <ul className="max-h-64 overflow-y-auto">
+                {history.map((h, i) => {
+                  const active = pinnedSnapshot?.id === h.id || (!pinnedSnapshot && i === 0)
+                  return (
+                    <li key={`${h.id}-${h.ts}`}>
+                      <button
+                        onClick={() => {
+                          if (i === 0 && !pinnedSnapshot) return
+                          setPinnedSnapshot(i === 0 ? null : { id: h.id, code: h.code, ts: h.ts })
+                          setHistoryOpen(false)
+                        }}
+                        className={`w-full text-left px-3 py-2 text-[11px] flex items-center gap-2 hover:bg-muted/60 transition ${active ? 'bg-muted/40' : ''}`}
+                      >
+                        <GitCommit className="h-3 w-3 shrink-0 text-muted-foreground" />
+                        <span className="font-mono">#{h.id}</span>
+                        <span className="text-muted-foreground/70">v{h.version}</span>
+                        <span className="ml-auto text-[10px] text-muted-foreground tabular-nums">
+                          {new Date(h.ts).toLocaleTimeString()}
+                        </span>
+                        {i === 0 && (
+                          <span className="text-[9px] uppercase tracking-wide text-emerald-500">live</span>
+                        )}
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          )}
+        </div>
+
         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => takeScreenshot()} disabled={shooting || !generatedCode} title="Capturar screenshot">
           <Camera className={`h-3 w-3 ${shooting ? 'animate-pulse' : ''}`} />
         </Button>
@@ -532,6 +615,7 @@ export default function PreviewFrame({
               width: '100%',
               height: '100%',
               position: 'relative',
+              backgroundColor: '#ffffff', // always keep the preview surface white — avoids perceived "black screen" in dark theme
               ...(isDesktop ? {} : {
                 border: '8px solid hsl(var(--border))',
                 borderRadius: '24px',
@@ -543,7 +627,7 @@ export default function PreviewFrame({
             <iframe
               ref={iframeRef}
               key={`${previewKey}-${reloadNonce}`}
-              srcDoc={wrapPreviewHtml(generatedCode || '', { previewId })}
+              srcDoc={wrapPreviewHtml(effectiveCode || '', { previewId })}
               className="w-full h-full border-0 block"
               sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
               title="App Preview"
@@ -552,6 +636,24 @@ export default function PreviewFrame({
                 ...(isDesktop ? {} : { borderRadius: '12px' }),
               }}
             />
+
+            {/* Viewing-history banner */}
+            {isViewingHistory && pinnedSnapshot && (
+              <div className="absolute top-2 left-1/2 -translate-x-1/2 flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/15 border border-primary/40 backdrop-blur text-[11px] font-medium text-primary shadow-lg z-20">
+                <History className="h-3.5 w-3.5" />
+                Visualizando snapshot #{pinnedSnapshot.id}
+                <span className="text-primary/70">
+                  ({new Date(pinnedSnapshot.ts).toLocaleTimeString()})
+                </span>
+                <button
+                  onClick={() => setPinnedSnapshot(null)}
+                  className="ml-1 flex items-center gap-1 underline underline-offset-2 hover:text-primary/80"
+                >
+                  <X className="h-3 w-3" /> voltar ao live
+                </button>
+              </div>
+            )}
+
 
             {/* Empty state */}
             {status === 'idle' && (
