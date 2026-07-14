@@ -621,7 +621,7 @@ export default function BuilderPage() {
         <div className="flex-1 relative bg-muted">
           <AnimatePresence mode="wait">
             {activeTab === 'preview' ? (
-              <motion.div key="preview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 flex items-start justify-center overflow-auto relative">
+              <motion.div key="preview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 min-h-0 min-w-0 overflow-hidden">
                 {/* Loading overlay — sits on top of everything */}
                 {showLoading && (
                   <div className="absolute inset-0 z-20">
