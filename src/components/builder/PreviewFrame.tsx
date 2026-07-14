@@ -141,7 +141,7 @@ export default function PreviewFrame({
 
   // Track iframe load lifecycle: loading spinner, timeout error, runtime errors
   useEffect(() => {
-    if (!generatedCode || !generatedCode.trim()) {
+    if (!effectiveCode || !effectiveCode.trim()) {
       setStatus('idle')
       setErrorMsg(null)
       setErrorDetail(null)
