@@ -30,6 +30,8 @@ function loadSettings(): PersistedSettings {
 
 function saveSettings(s: PersistedSettings) {
   try { localStorage.setItem(LS_KEY, JSON.stringify(s)) } catch {}
+}
+
 function formatRelative(d: Date): string {
   const s = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000))
   if (s < 5) return 'agora'
