@@ -80,6 +80,8 @@ export default function PreviewFrame({
   const [pinnedSnapshot, setPinnedSnapshot] = useState<{ id: string; code: string; ts: number } | null>(null)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [history, setHistory] = useState<Array<{ id: string; code: string; ts: number; version: number }>>([])
+  const [focusIdx, setFocusIdx] = useState(0)
+  const [diffTarget, setDiffTarget] = useState<{ id: string; code: string; ts: number } | null>(null)
 
   // Load history whenever the scope (previewId) changes; also drop any pinned snapshot
   useEffect(() => {
