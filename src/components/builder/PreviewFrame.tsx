@@ -557,6 +557,7 @@ export default function PreviewFrame({
               width: '100%',
               height: '100%',
               position: 'relative',
+              backgroundColor: '#ffffff', // always keep the preview surface white — avoids perceived "black screen" in dark theme
               ...(isDesktop ? {} : {
                 border: '8px solid hsl(var(--border))',
                 borderRadius: '24px',
