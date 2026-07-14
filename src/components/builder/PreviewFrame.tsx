@@ -527,6 +527,64 @@ export default function PreviewFrame({
           <RotateCw className={`h-3 w-3 ${status === 'loading' ? 'animate-spin' : ''}`} />
           Reprocessar
         </Button>
+
+        {/* Snapshot history */}
+        <div className="relative">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={() => setHistoryOpen((o) => !o)}
+            title="Histórico de snapshots"
+            disabled={history.length === 0}
+          >
+            <History className="h-3 w-3" />
+          </Button>
+          {historyOpen && history.length > 0 && (
+            <div className="absolute right-0 top-7 z-30 w-72 rounded-md border border-border bg-popover shadow-lg text-popover-foreground overflow-hidden">
+              <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+                <span className="text-[11px] font-semibold">Histórico da prévia</span>
+                <button
+                  className="text-[10px] text-muted-foreground hover:text-foreground"
+                  onClick={() => {
+                    setHistory([])
+                    try { localStorage.removeItem('kubo:previewHistory:v1') } catch {}
+                  }}
+                >
+                  Limpar
+                </button>
+              </div>
+              <ul className="max-h-64 overflow-y-auto">
+                {history.map((h, i) => {
+                  const active = pinnedSnapshot?.id === h.id || (!pinnedSnapshot && i === 0)
+                  return (
+                    <li key={`${h.id}-${h.ts}`}>
+                      <button
+                        onClick={() => {
+                          if (i === 0 && !pinnedSnapshot) return
+                          setPinnedSnapshot(i === 0 ? null : { id: h.id, code: h.code, ts: h.ts })
+                          setHistoryOpen(false)
+                        }}
+                        className={`w-full text-left px-3 py-2 text-[11px] flex items-center gap-2 hover:bg-muted/60 transition ${active ? 'bg-muted/40' : ''}`}
+                      >
+                        <GitCommit className="h-3 w-3 shrink-0 text-muted-foreground" />
+                        <span className="font-mono">#{h.id}</span>
+                        <span className="text-muted-foreground/70">v{h.version}</span>
+                        <span className="ml-auto text-[10px] text-muted-foreground tabular-nums">
+                          {new Date(h.ts).toLocaleTimeString()}
+                        </span>
+                        {i === 0 && (
+                          <span className="text-[9px] uppercase tracking-wide text-emerald-500">live</span>
+                        )}
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          )}
+        </div>
+
         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => takeScreenshot()} disabled={shooting || !generatedCode} title="Capturar screenshot">
           <Camera className={`h-3 w-3 ${shooting ? 'animate-pulse' : ''}`} />
         </Button>
