@@ -637,6 +637,24 @@ export default function PreviewFrame({
               }}
             />
 
+            {/* Viewing-history banner */}
+            {isViewingHistory && pinnedSnapshot && (
+              <div className="absolute top-2 left-1/2 -translate-x-1/2 flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/15 border border-primary/40 backdrop-blur text-[11px] font-medium text-primary shadow-lg z-20">
+                <History className="h-3.5 w-3.5" />
+                Visualizando snapshot #{pinnedSnapshot.id}
+                <span className="text-primary/70">
+                  ({new Date(pinnedSnapshot.ts).toLocaleTimeString()})
+                </span>
+                <button
+                  onClick={() => setPinnedSnapshot(null)}
+                  className="ml-1 flex items-center gap-1 underline underline-offset-2 hover:text-primary/80"
+                >
+                  <X className="h-3 w-3" /> voltar ao live
+                </button>
+              </div>
+            )}
+
+
             {/* Empty state */}
             {status === 'idle' && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/95 text-center p-6">
