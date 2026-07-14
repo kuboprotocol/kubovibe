@@ -194,6 +194,8 @@ const App = () => {
                 <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
                 <Route path="/builder" element={<ProtectedRoute><BuilderPage /></ProtectedRoute>} />
                 <Route path="/builder/:projectId" element={<ProtectedRoute><BuilderPage /></ProtectedRoute>} />
+                <Route path="/canvas" element={<ProtectedRoute><CanvasPage /></ProtectedRoute>} />
+                <Route path="/canvas/:canvasId" element={<ProtectedRoute><CanvasPage /></ProtectedRoute>} />
                 <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
                 
                 <Route path="/connect" element={<ProtectedRoute><ConnectPage /></ProtectedRoute>} />
