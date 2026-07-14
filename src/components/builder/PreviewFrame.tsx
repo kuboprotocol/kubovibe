@@ -354,6 +354,75 @@ export default function PreviewFrame({
     toast.success('Relatório de erro exportado')
   }, [snapshotId, canvasVersion, renderedVersion, inSync, frozen, status, errorMsg, errorDetail, deviceFrame, landscape, w, h, previewId, projectTitle, publishedUrl, generatedCode])
 
+  // ---- Snapshot history helpers ----
+  const persistHistory = useCallback((next: typeof history) => {
+    try {
+      if (next.length === 0) localStorage.removeItem(historyKey)
+      else localStorage.setItem(historyKey, JSON.stringify(next))
+    } catch {}
+  }, [historyKey])
+
+  const removeHistoryItem = useCallback((id: string, ts: number) => {
+    setHistory((prev) => {
+      const next = prev.filter((h) => !(h.id === id && h.ts === ts))
+      persistHistory(next)
+      return next
+    })
+    if (pinnedSnapshot?.id === id && pinnedSnapshot?.ts === ts) setPinnedSnapshot(null)
+    if (diffTarget?.id === id && diffTarget?.ts === ts) setDiffTarget(null)
+    setFocusIdx((i) => Math.max(0, Math.min(i, history.length - 2)))
+  }, [persistHistory, pinnedSnapshot, diffTarget, history.length])
+
+  const clearHistory = useCallback(() => {
+    setHistory([])
+    persistHistory([])
+    setPinnedSnapshot(null)
+    setDiffTarget(null)
+    setHistoryOpen(false)
+    toast.success('Histórico limpo')
+  }, [persistHistory])
+
+  const openHistoryItem = useCallback((idx: number) => {
+    const h = history[idx]
+    if (!h) return
+    if (idx === 0) setPinnedSnapshot(null) // top = live
+    else setPinnedSnapshot({ id: h.id, code: h.code, ts: h.ts })
+    setHistoryOpen(false)
+  }, [history])
+
+  // Keyboard navigation while the history dropdown is open
+  useEffect(() => {
+    if (!historyOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setHistoryOpen(false); return }
+      if (e.key === 'ArrowDown') { e.preventDefault(); setFocusIdx((i) => Math.min(history.length - 1, i + 1)); return }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setFocusIdx((i) => Math.max(0, i - 1)); return }
+      if (e.key === 'Enter') { e.preventDefault(); openHistoryItem(focusIdx); return }
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        const item = history[focusIdx]
+        if (item) { e.preventDefault(); removeHistoryItem(item.id, item.ts) }
+        return
+      }
+      if (e.key.toLowerCase() === 'd') {
+        const item = history[focusIdx]
+        if (item) { e.preventDefault(); setDiffTarget({ id: item.id, code: item.code, ts: item.ts }) }
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [historyOpen, history, focusIdx, openHistoryItem, removeHistoryItem])
+
+  // Compute line diff between the diff target and current live code
+  const diffParts = useMemo(() => {
+    if (!diffTarget) return null
+    const live = history[0]?.code ?? generatedCode ?? ''
+    try {
+      return diffLines(diffTarget.code || '', live || '')
+    } catch {
+      return null
+    }
+  }, [diffTarget, history, generatedCode])
+
 
   const toggleFullscreen = useCallback(async () => {
     const el = containerRef.current
