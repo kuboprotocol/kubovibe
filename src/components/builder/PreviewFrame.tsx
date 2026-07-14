@@ -386,7 +386,13 @@ export default function PreviewFrame({
           <span className="w-2.5 h-2.5 rounded-full bg-yellow-400/80" />
           <span className="w-2.5 h-2.5 rounded-full bg-green-400/80" />
         </div>
-        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={reprocess} title="Reprocessar prévia">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6"
+          onClick={reprocess}
+          title="Reprocessar prévia (Ctrl/Cmd+Shift+R)"
+        >
           <RotateCw className={`h-3 w-3 ${status === 'loading' ? 'animate-spin' : ''}`} />
         </Button>
         <div className="flex-1 flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-secondary/60 border border-border/50 text-[11px] font-mono text-muted-foreground truncate">
