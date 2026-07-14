@@ -53,9 +53,12 @@ export default function PreviewFrame({
   const [autoFit, setAutoFit] = useState<boolean>(initial.autoFit)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [shooting, setShooting] = useState(false)
+  const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const iframeRef = useRef<HTMLIFrameElement>(null)
+  const loadTimeoutRef = useRef<number | null>(null)
 
   const isDesktop = deviceFrame === 'desktop'
   const base = DEVICE_SIZES[deviceFrame]
