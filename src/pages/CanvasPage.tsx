@@ -17,6 +17,7 @@ export default function CanvasPage() {
   const [currentCanvasId] = useState(canvasId || crypto.randomUUID())
   const [canvasName, setCanvasName] = useState('Unnamed Canvas')
   const [saving, setSaving] = useState(false)
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
   const [showTemplates, setShowTemplates] = useState(!canvasId)
   const [showInfo, setShowInfo] = useState(true)
   const [showRunway, setShowRunway] = useState(false)
@@ -39,35 +40,44 @@ export default function CanvasPage() {
     }
   }
 
+  const persistCanvas = useCallback((snapshot: any) => {
+    const data = {
+      canvasId: currentCanvasId,
+      name: canvasName,
+      snapshot,
+      savedAt: new Date().toISOString(),
+    }
+    localStorage.setItem(`canvas-${currentCanvasId}`, JSON.stringify(data))
+
+    const list = JSON.parse(localStorage.getItem('canvas-list') || '[]')
+    const existing = list.findIndex((c: any) => c.id === currentCanvasId)
+    const entry = { id: currentCanvasId, name: canvasName, updatedAt: data.savedAt }
+    if (existing >= 0) list[existing] = entry
+    else list.push(entry)
+    localStorage.setItem('canvas-list', JSON.stringify(list))
+    setLastSavedAt(new Date())
+  }, [currentCanvasId, canvasName])
+
   const handleSave = useCallback(async (snapshot: any) => {
     setSaving(true)
     try {
-      const data = {
-        canvasId: currentCanvasId,
-        name: canvasName,
-        snapshot,
-        savedAt: new Date().toISOString(),
-      }
-      localStorage.setItem(`canvas-${currentCanvasId}`, JSON.stringify(data))
-
-      // Update canvas list
-      const list = JSON.parse(localStorage.getItem('canvas-list') || '[]')
-      const existing = list.findIndex((c: any) => c.id === currentCanvasId)
-      const entry = { id: currentCanvasId, name: canvasName, updatedAt: data.savedAt }
-      if (existing >= 0) {
-        list[existing] = entry
-      } else {
-        list.push(entry)
-      }
-      localStorage.setItem('canvas-list', JSON.stringify(list))
-
+      persistCanvas(snapshot)
       toast.success('Canvas saved successfully!')
     } catch (err) {
       toast.error('Error saving canvas')
     } finally {
       setSaving(false)
     }
-  }, [currentCanvasId, canvasName])
+  }, [persistCanvas])
+
+  // Auto-save + auto-refresh preview (silent, debounced inside TLDrawEditor)
+  const handleAutoChange = useCallback((snapshot: any) => {
+    try {
+      persistCanvas(snapshot)
+    } catch (err) {
+      console.error('[Canvas] Auto-save failed:', err)
+    }
+  }, [persistCanvas])
 
   const handleQuickSave = () => {
     const editor = (window as any).tldrawEditor
@@ -154,6 +164,11 @@ export default function CanvasPage() {
             <Share2 className="h-4 w-4 mr-1.5" />
             <span className="hidden sm:inline">Share</span>
           </Button>
+          {lastSavedAt && (
+            <span className="hidden md:inline text-[11px] text-muted-foreground tabular-nums">
+              Auto-saved · {lastSavedAt.toLocaleTimeString()}
+            </span>
+          )}
           <Button
             variant="hero"
             size="sm"
@@ -170,6 +185,7 @@ export default function CanvasPage() {
         </div>
       </motion.header>
 
+
       {/* Canvas area */}
       <div className="flex-1 relative">
         <AnimatePresence>
@@ -182,7 +198,7 @@ export default function CanvasPage() {
         </AnimatePresence>
 
         {!showTemplates && (
-          <TLDrawEditor onSave={handleSave} />
+          <TLDrawEditor onSave={handleSave} onChange={handleAutoChange} />
         )}
 
         <AnimatePresence>
