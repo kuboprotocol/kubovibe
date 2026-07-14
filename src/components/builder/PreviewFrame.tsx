@@ -383,7 +383,7 @@ export default function PreviewFrame({
           >
             <iframe
               ref={iframeRef}
-              key={previewKey}
+              key={`${previewKey}-${reloadNonce}`}
               srcDoc={wrapPreviewHtml(generatedCode || '', { previewId })}
               className="w-full h-full border-0 block"
               sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
