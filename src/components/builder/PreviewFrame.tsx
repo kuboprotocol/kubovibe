@@ -2,6 +2,16 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { Maximize2, Minimize2, Camera, RotateCw, Lock, ZoomIn, ZoomOut, Loader2, AlertTriangle, FileCode2, CheckCircle2, Snowflake, FileDown, GitCommit, History, X, Trash2, Diff as DiffIcon } from 'lucide-react'
 import { diffLines } from 'diff'
 import { Button } from '@/components/ui/button'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Slider } from '@/components/ui/slider'
 import { toast } from 'sonner'
 import { wrapPreviewHtml } from '@/lib/iframePreview'
