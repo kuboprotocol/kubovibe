@@ -40,35 +40,44 @@ export default function CanvasPage() {
     }
   }
 
+  const persistCanvas = useCallback((snapshot: any) => {
+    const data = {
+      canvasId: currentCanvasId,
+      name: canvasName,
+      snapshot,
+      savedAt: new Date().toISOString(),
+    }
+    localStorage.setItem(`canvas-${currentCanvasId}`, JSON.stringify(data))
+
+    const list = JSON.parse(localStorage.getItem('canvas-list') || '[]')
+    const existing = list.findIndex((c: any) => c.id === currentCanvasId)
+    const entry = { id: currentCanvasId, name: canvasName, updatedAt: data.savedAt }
+    if (existing >= 0) list[existing] = entry
+    else list.push(entry)
+    localStorage.setItem('canvas-list', JSON.stringify(list))
+    setLastSavedAt(new Date())
+  }, [currentCanvasId, canvasName])
+
   const handleSave = useCallback(async (snapshot: any) => {
     setSaving(true)
     try {
-      const data = {
-        canvasId: currentCanvasId,
-        name: canvasName,
-        snapshot,
-        savedAt: new Date().toISOString(),
-      }
-      localStorage.setItem(`canvas-${currentCanvasId}`, JSON.stringify(data))
-
-      // Update canvas list
-      const list = JSON.parse(localStorage.getItem('canvas-list') || '[]')
-      const existing = list.findIndex((c: any) => c.id === currentCanvasId)
-      const entry = { id: currentCanvasId, name: canvasName, updatedAt: data.savedAt }
-      if (existing >= 0) {
-        list[existing] = entry
-      } else {
-        list.push(entry)
-      }
-      localStorage.setItem('canvas-list', JSON.stringify(list))
-
+      persistCanvas(snapshot)
       toast.success('Canvas saved successfully!')
     } catch (err) {
       toast.error('Error saving canvas')
     } finally {
       setSaving(false)
     }
-  }, [currentCanvasId, canvasName])
+  }, [persistCanvas])
+
+  // Auto-save + auto-refresh preview (silent, debounced inside TLDrawEditor)
+  const handleAutoChange = useCallback((snapshot: any) => {
+    try {
+      persistCanvas(snapshot)
+    } catch (err) {
+      console.error('[Canvas] Auto-save failed:', err)
+    }
+  }, [persistCanvas])
 
   const handleQuickSave = () => {
     const editor = (window as any).tldrawEditor
