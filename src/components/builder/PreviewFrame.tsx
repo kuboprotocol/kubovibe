@@ -533,7 +533,7 @@ export default function PreviewFrame({
     : '/builder-preview')
 
   return (
-    <div ref={containerRef} className="absolute inset-0 flex flex-col bg-muted overflow-hidden">
+    <div ref={containerRef} className="absolute inset-0 flex flex-col bg-muted overflow-hidden min-h-0 min-w-0">
       {/* Fixed address bar */}
       <div className="flex items-center gap-2 px-3 py-1.5 bg-card/95 backdrop-blur border-b border-border shrink-0 z-10">
         <div className="flex gap-1.5">
