@@ -104,10 +104,12 @@ export default function PreviewFrame({
     if (!generatedCode || !generatedCode.trim()) {
       setStatus('idle')
       setErrorMsg(null)
+      setErrorDetail(null)
       return
     }
     setStatus('loading')
     setErrorMsg(null)
+    setErrorDetail(null)
     const iframe = iframeRef.current
     if (!iframe) return
 
@@ -118,35 +120,53 @@ export default function PreviewFrame({
       }
     }
 
+    const triggerUpdatedFlash = () => {
+      setUpdatedFlash(true)
+      if (flashTimerRef.current) window.clearTimeout(flashTimerRef.current)
+      flashTimerRef.current = window.setTimeout(() => setUpdatedFlash(false), 1800)
+    }
+
     const onLoad = () => {
       clearTimer()
       setStatus('ready')
+      triggerUpdatedFlash()
       // Hook runtime errors inside iframe
       try {
         const win = iframe.contentWindow
         if (win) {
           win.addEventListener('error', (ev: ErrorEvent) => {
             setStatus('error')
-            setErrorMsg(ev.message || 'Erro em tempo de execução')
+            setErrorMsg(ev.message || 'Runtime error')
+            setErrorDetail(
+              [ev.filename, ev.lineno && `line ${ev.lineno}`, ev.colno && `col ${ev.colno}`]
+                .filter(Boolean).join(' · ') || null,
+            )
           })
           win.addEventListener('unhandledrejection', (ev: PromiseRejectionEvent) => {
             setStatus('error')
-            setErrorMsg(String((ev as any).reason?.message || (ev as any).reason || 'Promise rejeitada'))
+            const reason: any = (ev as any).reason
+            setErrorMsg(String(reason?.message || reason || 'Promise rejected'))
+            setErrorDetail(reason?.stack ? String(reason.stack).split('\n')[1]?.trim() || null : null)
           })
         }
-      } catch {}
+      } catch (e: any) {
+        // Cross-origin — non-fatal
+        console.debug('[Preview] cannot attach iframe listeners:', e?.message)
+      }
     }
-    const onError = () => {
+    const onError = (ev: Event) => {
       clearTimer()
       setStatus('error')
-      setErrorMsg('Falha ao carregar a prévia')
+      setErrorMsg('Failed to load preview')
+      setErrorDetail((ev as any)?.message || 'Network or sandbox error')
     }
 
     iframe.addEventListener('load', onLoad)
     iframe.addEventListener('error', onError)
     loadTimeoutRef.current = window.setTimeout(() => {
       setStatus((s) => (s === 'loading' ? 'error' : s))
-      setErrorMsg((m) => m || 'Tempo esgotado ao carregar a prévia (>15s)')
+      setErrorMsg((m) => m || 'Load timeout')
+      setErrorDetail((d) => d || 'Preview took longer than 15s to load')
     }, 15000)
 
     return () => {
