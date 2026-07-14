@@ -245,7 +245,7 @@ export default function PreviewFrame({
       iframe.removeEventListener('load', onLoad)
       iframe.removeEventListener('error', onError)
     }
-  }, [generatedCode, previewKey, reloadNonce, canvasVersion])
+  }, [effectiveCode, previewKey, reloadNonce, canvasVersion, isViewingHistory, snapshotId])
 
   // Manual reprocess — remount iframe + notify parent. Enforces a 1.2s cooldown
   // to prevent excessive re-renders (spam-click, held shortcut, etc.).
