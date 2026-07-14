@@ -343,6 +343,17 @@ export default function PreviewFrame({
           </button>
         </div>
 
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-6 gap-1.5 px-2 text-[10px] font-medium"
+          onClick={reprocess}
+          disabled={status === 'loading' || !generatedCode}
+          title="Reprocessar prévia com o último snapshot"
+        >
+          <RotateCw className={`h-3 w-3 ${status === 'loading' ? 'animate-spin' : ''}`} />
+          Reprocessar
+        </Button>
         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => takeScreenshot()} disabled={shooting || !generatedCode} title="Capturar screenshot">
           <Camera className={`h-3 w-3 ${shooting ? 'animate-pulse' : ''}`} />
         </Button>
