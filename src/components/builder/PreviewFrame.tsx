@@ -30,7 +30,16 @@ function loadSettings(): PersistedSettings {
 
 function saveSettings(s: PersistedSettings) {
   try { localStorage.setItem(LS_KEY, JSON.stringify(s)) } catch {}
+function formatRelative(d: Date): string {
+  const s = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000))
+  if (s < 5) return 'agora'
+  if (s < 60) return `há ${s}s`
+  const m = Math.floor(s / 60)
+  if (m < 60) return `há ${m}min`
+  const h = Math.floor(m / 60)
+  return `há ${h}h`
 }
+
 
 interface PreviewFrameProps {
   generatedCode: string
