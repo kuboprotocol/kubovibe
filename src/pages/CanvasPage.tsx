@@ -185,6 +185,7 @@ export default function CanvasPage() {
         </div>
       </motion.header>
 
+
       {/* Canvas area */}
       <div className="flex-1 relative">
         <AnimatePresence>
