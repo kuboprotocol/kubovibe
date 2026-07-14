@@ -55,10 +55,16 @@ export default function PreviewFrame({
   const [shooting, setShooting] = useState(false)
   const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [errorDetail, setErrorDetail] = useState<string | null>(null)
+  const [reloadNonce, setReloadNonce] = useState(0)
+  const [updatedFlash, setUpdatedFlash] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const loadTimeoutRef = useRef<number | null>(null)
+  const reloadDebounceRef = useRef<number | null>(null)
+  const lastReloadAtRef = useRef<number>(0)
+  const flashTimerRef = useRef<number | null>(null)
 
   const isDesktop = deviceFrame === 'desktop'
   const base = DEVICE_SIZES[deviceFrame]
