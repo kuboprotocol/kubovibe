@@ -309,6 +309,17 @@ export default function PreviewFrame({
     return () => window.clearInterval(id)
   }, [])
 
+  // Track elapsed loading time (1s tick while status === 'loading')
+  useEffect(() => {
+    if (status !== 'loading') { setLoadingElapsed(0); return }
+    const start = Date.now()
+    setLoadingElapsed(0)
+    const id = window.setInterval(() => {
+      setLoadingElapsed(Math.floor((Date.now() - start) / 1000))
+    }, 500)
+    return () => window.clearInterval(id)
+  }, [status, reloadNonce, previewKey])
+
   // Auto-reload on external canvas/save events, throttled + debounced
   useEffect(() => {
     const schedule = () => {
