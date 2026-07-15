@@ -852,13 +852,48 @@ export default function PreviewFrame({
               </div>
             )}
 
-            {/* Loading state */}
-            {status === 'loading' && (
-              <div className="pointer-events-none absolute left-1/2 top-3 z-30 flex -translate-x-1/2 items-center gap-2 rounded-md border border-border bg-card/95 px-3 py-2 shadow-lg backdrop-blur-sm">
-                <Loader2 className="h-4 w-4 text-primary animate-spin" />
-                <div className="text-xs font-medium text-muted-foreground">Carregando prévia…</div>
-              </div>
-            )}
+            {/* Loading state — progressive overlay with elapsed time + hints */}
+            {status === 'loading' && (() => {
+              const hint = loadingElapsed < 3
+                ? 'Preparando ambiente…'
+                : loadingElapsed < 6
+                ? 'Injetando HTML e scripts…'
+                : loadingElapsed < 10
+                ? 'Aguardando primeiro paint…'
+                : loadingElapsed < 15
+                ? 'Isso está demorando — verificando bloqueios de rede/sandbox…'
+                : 'Ainda travado. Considere reprocessar ou inspecionar o Diagnostics.'
+              const pct = Math.min(95, Math.round((loadingElapsed / 15) * 100))
+              return (
+                <>
+                  <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-white/70 backdrop-blur-[1px]">
+                    <div className="flex w-[280px] flex-col items-center gap-3 rounded-xl border border-border bg-card/95 px-5 py-4 shadow-xl">
+                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                      <div className="text-sm font-medium text-foreground">Carregando prévia…</div>
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full bg-primary transition-all duration-500"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <div className="flex w-full items-center justify-between text-[10px] text-muted-foreground">
+                        <span className="tabular-nums">{loadingElapsed}s</span>
+                        <span>timeout 15s</span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground text-center leading-snug">{hint}</p>
+                      {loadingElapsed >= 10 && (
+                        <button
+                          onClick={reprocess}
+                          className="pointer-events-auto text-[11px] text-primary hover:underline"
+                        >
+                          Reprocessar agora
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )
+            })()}
 
             {/* Error state */}
             {status === 'error' && (
