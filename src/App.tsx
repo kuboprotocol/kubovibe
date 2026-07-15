@@ -237,11 +237,11 @@ const App = () => {
                 
                 <Route path="/agents" element={<ProtectedRoute><AgentsHubPage /></ProtectedRoute>} />
                 <Route path="/agents/:slug" element={<ProtectedRoute><AgentDetailPage /></ProtectedRoute>} />
-                <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
-                <Route path="/admin/deploy" element={<ProtectedRoute><AdminDeployPage /></ProtectedRoute>} />
-                <Route path="/orchestrator" element={<ProtectedRoute><OrchestratorPage /></ProtectedRoute>} />
-                <Route path="/pwa/telemetry" element={<ProtectedRoute><PwaTelemetryPage /></ProtectedRoute>} />
-                <Route path="/pwa/telemetry/jobs/:jobId" element={<ProtectedRoute><PwaExportJobDetailsPage /></ProtectedRoute>} />
+                <Route path="/admin" element={<ProtectedRoute requireRoles={["admin"]}><AdminPage /></ProtectedRoute>} />
+                <Route path="/admin/deploy" element={<ProtectedRoute requireRoles={["admin"]}><AdminDeployPage /></ProtectedRoute>} />
+                <Route path="/orchestrator" element={<ProtectedRoute requireRoles={["admin"]}><OrchestratorPage /></ProtectedRoute>} />
+                <Route path="/pwa/telemetry" element={<ProtectedRoute requireRoles={["admin"]}><PwaTelemetryPage /></ProtectedRoute>} />
+                <Route path="/pwa/telemetry/jobs/:jobId" element={<ProtectedRoute requireRoles={["admin"]}><PwaExportJobDetailsPage /></ProtectedRoute>} />
 
                 
                 <Route path="*" element={<NotFound />} />
