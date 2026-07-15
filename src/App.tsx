@@ -224,7 +224,7 @@ const App = () => {
                 <Route path="/game/sdk" element={<ProtectedRoute><GameSdkPage /></ProtectedRoute>} />
                 <Route path="/game/vr" element={<ProtectedRoute><GameVrPage /></ProtectedRoute>} />
                 <Route path="/game/ai" element={<ProtectedRoute><GameAiPage /></ProtectedRoute>} />
-                <Route path="/admin/skills" element={<ProtectedRoute><AdminSkillsPage /></ProtectedRoute>} />
+                <Route path="/admin/skills" element={<ProtectedRoute requireRoles={["admin"]}><AdminSkillsPage /></ProtectedRoute>} />
                 <Route path="/domains" element={<ProtectedRoute><DomainsPage /></ProtectedRoute>} />
                 
                 <Route path="/creative" element={<ProtectedRoute><CreativePage /></ProtectedRoute>} />
