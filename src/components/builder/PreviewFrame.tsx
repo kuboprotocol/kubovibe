@@ -533,7 +533,7 @@ export default function PreviewFrame({
     : '/builder-preview')
 
   return (
-    <div ref={containerRef} className="absolute inset-0 flex flex-col bg-muted overflow-hidden min-h-0 min-w-0">
+    <div ref={containerRef} className="relative flex h-full w-full min-h-0 min-w-0 flex-col overflow-hidden bg-muted">
       {/* Fixed address bar */}
       <div className="flex items-center gap-2 px-3 py-1.5 bg-card/95 backdrop-blur border-b border-border shrink-0 z-10">
         <div className="flex gap-1.5">
@@ -732,7 +732,7 @@ export default function PreviewFrame({
       {/* Stage */}
       <div
         ref={stageRef}
-        className={`flex-1 min-h-0 min-w-0 overflow-auto bg-muted ${
+        className={`relative h-full w-full flex-1 min-h-0 min-w-0 overflow-auto bg-muted ${
           isDesktop ? 'flex' : 'flex items-start justify-center p-6'
         }`}
       >
@@ -746,7 +746,7 @@ export default function PreviewFrame({
             transformOrigin: 'top center',
             transition: 'transform 120ms ease-out',
           }}
-          className="relative"
+          className="relative min-h-0 min-w-0"
         >
           {!isDesktop && (
             <div className="absolute -top-6 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-md bg-background/80 backdrop-blur border border-border text-[10px] font-mono text-muted-foreground z-10 whitespace-nowrap">
@@ -771,9 +771,25 @@ export default function PreviewFrame({
               ref={iframeRef}
               key={`${previewKey}-${reloadNonce}`}
               srcDoc={wrapPreviewHtml(effectiveCode || '', { previewId })}
-              className="w-full h-full border-0 block"
+              className="absolute inset-0 block h-full min-h-full w-full min-w-full border-0"
               sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
               title="App Preview"
+              onLoad={() => {
+                // srcDoc can finish before the effect-based listener is attached.
+                // Keep this direct handler as the authoritative visual fallback so
+                // the loading layer can never hide an already-rendered application.
+                setStatus('ready')
+                setErrorMsg(null)
+                setErrorDetail(null)
+                setFrozen(false)
+                setRenderedVersion(canvasVersion)
+                setLastRenderedAt(new Date())
+              }}
+              onError={() => {
+                setStatus('error')
+                setErrorMsg('Failed to load preview')
+                setErrorDetail('Network or sandbox error')
+              }}
               style={{
                 backgroundColor: '#ffffff',
                 ...(isDesktop ? {} : { borderRadius: '12px' }),
@@ -811,8 +827,8 @@ export default function PreviewFrame({
 
             {/* Loading state */}
             {status === 'loading' && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/80 backdrop-blur-sm">
-                <Loader2 className="h-8 w-8 text-primary animate-spin" />
+              <div className="pointer-events-none absolute left-1/2 top-3 z-30 flex -translate-x-1/2 items-center gap-2 rounded-md border border-border bg-card/95 px-3 py-2 shadow-lg backdrop-blur-sm">
+                <Loader2 className="h-4 w-4 text-primary animate-spin" />
                 <div className="text-xs font-medium text-muted-foreground">Carregando prévia…</div>
               </div>
             )}

@@ -113,6 +113,8 @@ function buildInstrumentation(previewId?: string): string {
 </script>`
 }
 
+const PREVIEW_BASE_STYLE = `<style data-kubo-preview-base>html,body{width:100%;min-width:100%;min-height:100%;margin:0}body{overflow-x:hidden}</style>`
+
 /**
  * Wraps user code so it always renders full-screen with a white background
  * and instrumented error capture. Detects whether code is a fragment or a
@@ -126,11 +128,12 @@ export function wrapPreviewHtml(code: string, opts: { instrument?: boolean; prev
   const inject = instrument ? buildInstrumentation(opts.previewId) : ''
 
   if (hasDoctype || hasHtmlTag) {
-    if (!instrument) return src
-    // Inject before </head> if present, otherwise before </body>, else append.
-    if (/<\/head>/i.test(src)) return src.replace(/<\/head>/i, `${inject}</head>`)
-    if (/<\/body>/i.test(src)) return src.replace(/<\/body>/i, `${inject}</body>`)
-    return src + inject
+    const additions = `${PREVIEW_BASE_STYLE}${inject}`
+    // Always inject the dimensional base style, even when instrumentation is
+    // disabled, so complete HTML documents cannot collapse inside the iframe.
+    if (/<\/head>/i.test(src)) return src.replace(/<\/head>/i, `${additions}</head>`)
+    if (/<\/body>/i.test(src)) return src.replace(/<\/body>/i, `${additions}</body>`)
+    return src + additions
   }
 
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;padding:0;background:#ffffff;color:#111;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;min-height:100vh}</style>${inject}</head><body>${src}</body></html>`

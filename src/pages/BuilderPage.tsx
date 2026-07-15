@@ -471,10 +471,10 @@ export default function BuilderPage() {
       />
 
       {/* Main content */}
-      <div className="flex-1 flex min-h-0">
+      <div className="flex min-h-0 min-w-0 flex-1">
         {/* Chat panel */}
         <div
-          className={`w-[380px] flex flex-col border-r border-border/50 bg-card/50 backdrop-blur-sm relative transition-colors ${isDragging ? 'bg-primary/5' : ''}`}
+          className={`relative flex w-[min(380px,42vw)] min-w-[300px] shrink-0 flex-col border-r border-border/50 bg-card/50 backdrop-blur-sm transition-colors ${isDragging ? 'bg-primary/5' : ''}`}
           onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true) }}
           onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false) }}
           onDrop={(e) => {
@@ -618,10 +618,10 @@ export default function BuilderPage() {
         </div>
 
         {/* Preview / Code panel */}
-        <div className="flex-1 relative bg-muted">
+        <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden bg-muted">
           <AnimatePresence mode="wait">
             {activeTab === 'preview' ? (
-              <motion.div key="preview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 min-h-0 min-w-0 overflow-hidden">
+              <motion.div key="preview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 flex h-full w-full min-h-0 min-w-0 overflow-hidden">
                 {/* Loading overlay — sits on top of everything */}
                 {showLoading && (
                   <div className="absolute inset-0 z-20">
