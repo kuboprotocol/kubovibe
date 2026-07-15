@@ -224,7 +224,7 @@ const App = () => {
                 <Route path="/game/sdk" element={<ProtectedRoute><GameSdkPage /></ProtectedRoute>} />
                 <Route path="/game/vr" element={<ProtectedRoute><GameVrPage /></ProtectedRoute>} />
                 <Route path="/game/ai" element={<ProtectedRoute><GameAiPage /></ProtectedRoute>} />
-                <Route path="/admin/skills" element={<ProtectedRoute><AdminSkillsPage /></ProtectedRoute>} />
+                <Route path="/admin/skills" element={<ProtectedRoute requireRoles={["admin"]}><AdminSkillsPage /></ProtectedRoute>} />
                 <Route path="/domains" element={<ProtectedRoute><DomainsPage /></ProtectedRoute>} />
                 
                 <Route path="/creative" element={<ProtectedRoute><CreativePage /></ProtectedRoute>} />
@@ -237,11 +237,11 @@ const App = () => {
                 
                 <Route path="/agents" element={<ProtectedRoute><AgentsHubPage /></ProtectedRoute>} />
                 <Route path="/agents/:slug" element={<ProtectedRoute><AgentDetailPage /></ProtectedRoute>} />
-                <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
-                <Route path="/admin/deploy" element={<ProtectedRoute><AdminDeployPage /></ProtectedRoute>} />
-                <Route path="/orchestrator" element={<ProtectedRoute><OrchestratorPage /></ProtectedRoute>} />
-                <Route path="/pwa/telemetry" element={<ProtectedRoute><PwaTelemetryPage /></ProtectedRoute>} />
-                <Route path="/pwa/telemetry/jobs/:jobId" element={<ProtectedRoute><PwaExportJobDetailsPage /></ProtectedRoute>} />
+                <Route path="/admin" element={<ProtectedRoute requireRoles={["admin"]}><AdminPage /></ProtectedRoute>} />
+                <Route path="/admin/deploy" element={<ProtectedRoute requireRoles={["admin"]}><AdminDeployPage /></ProtectedRoute>} />
+                <Route path="/orchestrator" element={<ProtectedRoute requireRoles={["admin"]}><OrchestratorPage /></ProtectedRoute>} />
+                <Route path="/pwa/telemetry" element={<ProtectedRoute requireRoles={["admin"]}><PwaTelemetryPage /></ProtectedRoute>} />
+                <Route path="/pwa/telemetry/jobs/:jobId" element={<ProtectedRoute requireRoles={["admin"]}><PwaExportJobDetailsPage /></ProtectedRoute>} />
 
                 
                 <Route path="*" element={<NotFound />} />

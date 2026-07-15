@@ -1,9 +1,15 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
-import { Loader2 } from 'lucide-react'
+import { Loader2, ShieldAlert } from 'lucide-react'
 
-export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth()
+interface ProtectedRouteProps {
+  children: React.ReactNode
+  /** Optional role(s) required to access this route. If provided, user must have at least one. */
+  requireRoles?: string[]
+}
+
+export default function ProtectedRoute({ children, requireRoles }: ProtectedRouteProps) {
+  const { user, loading, hasAnyRole } = useAuth()
   const location = useLocation()
 
   if (loading) {
@@ -18,6 +24,18 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
     const redirectTo = `${location.pathname}${location.search}${location.hash}`
     const search = redirectTo && redirectTo !== '/' ? `?redirect=${encodeURIComponent(redirectTo)}` : ''
     return <Navigate to={`/auth${search}`} replace />
+  }
+
+  if (requireRoles && requireRoles.length > 0 && !hasAnyRole(requireRoles)) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-4 px-6 text-center">
+        <ShieldAlert className="h-12 w-12 text-destructive" />
+        <h1 className="text-2xl font-semibold">Access restricted</h1>
+        <p className="text-muted-foreground max-w-md">
+          You don't have permission to access this area. Contact an administrator if you believe this is a mistake.
+        </p>
+      </div>
+    )
   }
 
   return <>{children}</>
