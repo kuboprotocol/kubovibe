@@ -84,6 +84,7 @@ export default function PreviewFrame({
   const [renderedVersion, setRenderedVersion] = useState(0)
   const [frozen, setFrozen] = useState(false)
   const [lastRenderedAt, setLastRenderedAt] = useState<Date | null>(null)
+  const [loadingElapsed, setLoadingElapsed] = useState(0)
   const [, forceTick] = useState(0)
   // Per-project history key — keeps snapshots isolated between different canvases/projects
   const historyKey = `kubo:previewHistory:v1:${previewId || 'default'}`
