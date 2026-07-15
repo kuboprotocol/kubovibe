@@ -790,6 +790,21 @@ export default function PreviewFrame({
                 // srcDoc can finish before the effect-based listener is attached.
                 // Keep this direct handler as the authoritative visual fallback so
                 // the loading layer can never hide an already-rendered application.
+                try {
+                  const doc = iframeRef.current?.contentDocument
+                  const body = doc?.body
+                  const txt = (body?.textContent || '').trim()
+                  const kids = body?.children?.length ?? 0
+                  const codeLen = (effectiveCode || '').trim().length
+                  // If the iframe body is genuinely empty AND we had code to render,
+                  // surface a "blank content" fallback instead of a silent black area.
+                  if (codeLen > 0 && kids === 0 && txt.length === 0) {
+                    setStatus('error')
+                    setErrorMsg('Prévia carregou em branco')
+                    setErrorDetail('O documento foi carregado mas o <body> está vazio. Verifique se o HTML gerado inclui conteúdo renderizável.')
+                    return
+                  }
+                } catch { /* cross-origin: ignore */ }
                 setStatus('ready')
                 setErrorMsg(null)
                 setErrorDetail(null)
