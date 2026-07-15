@@ -84,6 +84,7 @@ export default function PreviewFrame({
   const [renderedVersion, setRenderedVersion] = useState(0)
   const [frozen, setFrozen] = useState(false)
   const [lastRenderedAt, setLastRenderedAt] = useState<Date | null>(null)
+  const [loadingElapsed, setLoadingElapsed] = useState(0)
   const [, forceTick] = useState(0)
   // Per-project history key — keeps snapshots isolated between different canvases/projects
   const historyKey = `kubo:previewHistory:v1:${previewId || 'default'}`
@@ -307,6 +308,17 @@ export default function PreviewFrame({
     const id = window.setInterval(() => forceTick((n) => n + 1), 10000)
     return () => window.clearInterval(id)
   }, [])
+
+  // Track elapsed loading time (1s tick while status === 'loading')
+  useEffect(() => {
+    if (status !== 'loading') { setLoadingElapsed(0); return }
+    const start = Date.now()
+    setLoadingElapsed(0)
+    const id = window.setInterval(() => {
+      setLoadingElapsed(Math.floor((Date.now() - start) / 1000))
+    }, 500)
+    return () => window.clearInterval(id)
+  }, [status, reloadNonce, previewKey])
 
   // Auto-reload on external canvas/save events, throttled + debounced
   useEffect(() => {
@@ -778,6 +790,21 @@ export default function PreviewFrame({
                 // srcDoc can finish before the effect-based listener is attached.
                 // Keep this direct handler as the authoritative visual fallback so
                 // the loading layer can never hide an already-rendered application.
+                try {
+                  const doc = iframeRef.current?.contentDocument
+                  const body = doc?.body
+                  const txt = (body?.textContent || '').trim()
+                  const kids = body?.children?.length ?? 0
+                  const codeLen = (effectiveCode || '').trim().length
+                  // If the iframe body is genuinely empty AND we had code to render,
+                  // surface a "blank content" fallback instead of a silent black area.
+                  if (codeLen > 0 && kids === 0 && txt.length === 0) {
+                    setStatus('error')
+                    setErrorMsg('Prévia carregou em branco')
+                    setErrorDetail('O documento foi carregado mas o <body> está vazio. Verifique se o HTML gerado inclui conteúdo renderizável.')
+                    return
+                  }
+                } catch { /* cross-origin: ignore */ }
                 setStatus('ready')
                 setErrorMsg(null)
                 setErrorDetail(null)
@@ -825,13 +852,48 @@ export default function PreviewFrame({
               </div>
             )}
 
-            {/* Loading state */}
-            {status === 'loading' && (
-              <div className="pointer-events-none absolute left-1/2 top-3 z-30 flex -translate-x-1/2 items-center gap-2 rounded-md border border-border bg-card/95 px-3 py-2 shadow-lg backdrop-blur-sm">
-                <Loader2 className="h-4 w-4 text-primary animate-spin" />
-                <div className="text-xs font-medium text-muted-foreground">Carregando prévia…</div>
-              </div>
-            )}
+            {/* Loading state — progressive overlay with elapsed time + hints */}
+            {status === 'loading' && (() => {
+              const hint = loadingElapsed < 3
+                ? 'Preparando ambiente…'
+                : loadingElapsed < 6
+                ? 'Injetando HTML e scripts…'
+                : loadingElapsed < 10
+                ? 'Aguardando primeiro paint…'
+                : loadingElapsed < 15
+                ? 'Isso está demorando — verificando bloqueios de rede/sandbox…'
+                : 'Ainda travado. Considere reprocessar ou inspecionar o Diagnostics.'
+              const pct = Math.min(95, Math.round((loadingElapsed / 15) * 100))
+              return (
+                <>
+                  <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-white/70 backdrop-blur-[1px]">
+                    <div className="flex w-[280px] flex-col items-center gap-3 rounded-xl border border-border bg-card/95 px-5 py-4 shadow-xl">
+                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                      <div className="text-sm font-medium text-foreground">Carregando prévia…</div>
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full bg-primary transition-all duration-500"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <div className="flex w-full items-center justify-between text-[10px] text-muted-foreground">
+                        <span className="tabular-nums">{loadingElapsed}s</span>
+                        <span>timeout 15s</span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground text-center leading-snug">{hint}</p>
+                      {loadingElapsed >= 10 && (
+                        <button
+                          onClick={reprocess}
+                          className="pointer-events-auto text-[11px] text-primary hover:underline"
+                        >
+                          Reprocessar agora
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )
+            })()}
 
             {/* Error state */}
             {status === 'error' && (
