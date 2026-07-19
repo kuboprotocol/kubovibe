@@ -42,14 +42,13 @@ export default function LeaderboardPage() {
       }
 
       const userIds = streaks.map((s) => s.user_id)
-      const { data: profiles } = await supabase
+      const { data: profilesRaw } = await supabase
         .from('public_profiles' as any)
         .select('id, display_name, avatar_url')
         .in('id', userIds)
+      const profiles = (profilesRaw ?? []) as Array<{ id: string; display_name: string | null; avatar_url: string | null }>
 
-      const profileMap = new Map(
-        (profiles || []).map(p => [p.id, p])
-      )
+      const profileMap = new Map(profiles.map(p => [p.id, p]))
 
       const merged: LeaderboardEntry[] = streaks.map((s) => {
         const profile = profileMap.get(s.user_id)
