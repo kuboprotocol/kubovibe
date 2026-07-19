@@ -46,7 +46,7 @@ export default function LeaderboardPage() {
         .from('public_profiles' as any)
         .select('id, display_name, avatar_url')
         .in('id', userIds)
-      const profiles = (profilesRaw ?? []) as Array<{ id: string; display_name: string | null; avatar_url: string | null }>
+      const profiles = ((profilesRaw ?? []) as unknown) as Array<{ id: string; display_name: string | null; avatar_url: string | null }>
 
       const profileMap = new Map(profiles.map(p => [p.id, p]))
 
