@@ -17,17 +17,17 @@ type Health = {
   openrouter: ProviderStatus;
   lovable: ProviderStatus;
   suno: ProviderStatus;
-  bytez: ProviderStatus;
   moonshot: ProviderStatus;
+  deepseek: ProviderStatus;
 };
 
 const PROVIDERS: { key: keyof Omit<Health, "checked_at">; label: string; purpose: string }[] = [
+  { key: "openrouter", label: "OpenRouter", purpose: "Kimi (chat, slides, agentes)" },
+  { key: "deepseek", label: "DeepSeek", purpose: "Geração de SaaS e apps" },
   { key: "groq", label: "Groq", purpose: "Chat ultra-rápido + Whisper" },
-  { key: "openrouter", label: "OpenRouter", purpose: "DeepSeek, Kimi, GPT-4o" },
-  { key: "lovable", label: "Lovable AI", purpose: "Gemini + Nano Banana" },
+  { key: "moonshot", label: "Moonshot", purpose: "Kimi direto (fallback)" },
+  { key: "lovable", label: "Lovable AI", purpose: "Gemini + Nano Banana (imagem)" },
   { key: "suno", label: "Suno", purpose: "Geração de música" },
-  { key: "bytez", label: "Bytez", purpose: "SDXL (fallback imagem)" },
-  { key: "moonshot", label: "Moonshot", purpose: "Kimi direto" },
 ];
 
 export function ApiStatusPanel() {

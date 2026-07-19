@@ -1,5 +1,7 @@
-// Chat Inteligente — conversação multi-turno via Gemini Flash.
-import { runAgent, getSecret } from "../_shared/agentRuntime.ts";
+// Chat Inteligente — conversação multi-turno via OpenRouter Kimi (moonshotai/kimi-k2)
+// com fallback Groq → DeepSeek → Lovable Gemini.
+import { runAgent } from "../_shared/agentRuntime.ts";
+import { callLlm } from "../_shared/llm.ts";
 import { z } from "npm:zod@3";
 
 const MsgSchema = z.object({
@@ -33,17 +35,10 @@ Deno.serve((req) =>
     if (prompt) msgs.push({ role: "user", content: prompt });
     if (msgs.length < 2) throw new Error("missing_prompt_or_messages");
 
-    const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${getSecret("LOVABLE_API_KEY")}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "google/gemini-2.5-flash", messages: msgs }),
+    const { content, provider, model, usage } = await callLlm({
+      prefer: "kimi",
+      messages: msgs,
     });
-    if (!r.ok) {
-      const errorText = await r.text();
-      console.error(`[agent-chat] AI Gateway error ${r.status}:`, errorText);
-      throw new Error(`ai_service_error`);
-    }
-    const data = await r.json();
-    return { output: { reply: data?.choices?.[0]?.message?.content ?? "", usage: data?.usage ?? null } };
+    return { output: { reply: content, provider, model, usage } };
   })
 );

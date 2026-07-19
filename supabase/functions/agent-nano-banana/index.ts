@@ -1,6 +1,8 @@
-// Nano Banana — gerador rápido de conteúdo (legendas, posts, ideias).
-// Usa Lovable AI Gateway (gemini-flash) — ultra barato, ultra rápido.
-import { runAgent, getSecret } from "../_shared/agentRuntime.ts";
+// Nano Banana Agent (texto) — gerador rápido de conteúdo (legendas, posts, ideias).
+// Roteia via OpenRouter Kimi (moonshotai/kimi-k2) com fallback Groq → Lovable Gemini.
+// (A geração de imagem "Nano Banana" continua em `creative-image`, via Lovable Gemini.)
+import { runAgent } from "../_shared/agentRuntime.ts";
+import { callLlm } from "../_shared/llm.ts";
 import { z } from "npm:zod@3";
 
 const InputSchema = z.object({
@@ -24,42 +26,18 @@ Deno.serve((req) =>
       throw new Error(`invalid_input: ${JSON.stringify(parsed.error.flatten().fieldErrors)}`);
     }
     const { prompt, format, count, language } = parsed.data;
-    if (!prompt || typeof prompt !== "string") {
-      throw new Error("invalid_prompt");
-    }
 
     const sys =
       `${FORMAT_PROMPTS[format] ?? FORMAT_PROMPTS.post} Responda em ${language}. Gere exatamente ${Math.min(Math.max(count, 1), 20)} variações.`;
 
-    const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${getSecret("LOVABLE_API_KEY")}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.0-flash-exp",
-        messages: [
-          { role: "system", content: sys },
-          { role: "user", content: prompt },
-        ],
-      }),
+    const { content, provider, model, usage } = await callLlm({
+      prefer: "kimi",
+      messages: [
+        { role: "system", content: sys },
+        { role: "user", content: prompt },
+      ],
     });
 
-    if (!resp.ok) {
-      const txt = await resp.text();
-      throw new Error(`ai_gateway_${resp.status}:${txt.slice(0, 200)}`);
-    }
-    const data = await resp.json();
-    const content = data?.choices?.[0]?.message?.content ?? "";
-
-    return {
-      output: {
-        format,
-        language,
-        text: content,
-        usage: data?.usage ?? null,
-      },
-    };
+    return { output: { format, language, text: content, provider, model, usage } };
   })
 );
