@@ -29,11 +29,11 @@ Deno.serve(async (req) => {
   const OR = Deno.env.get("OPENROUTER_API_KEY");
   const LK = Deno.env.get("LOVABLE_API_KEY");
   const SUNO = Deno.env.get("SUNO_API_KEY");
-  const BYTEZ = Deno.env.get("BYTEZ_API_KEY");
   const MOONSHOT = Deno.env.get("MOONSHOT_API_KEY");
+  const DEEPSEEK = Deno.env.get("DEEPSEEK_API_KEY");
   const SUNO_BASE = Deno.env.get("SUNO_API_BASE") ?? "https://apibox.erweima.ai";
 
-  const [groq, openrouter, lovable, suno, bytez, moonshot] = await Promise.all([
+  const [groq, openrouter, lovable, suno, moonshot, deepseek] = await Promise.all([
     ping("groq", GROQ, () => fetch("https://api.groq.com/openai/v1/models", {
       headers: { Authorization: `Bearer ${GROQ}` },
     })),
@@ -46,19 +46,17 @@ Deno.serve(async (req) => {
     ping("suno", SUNO, () => fetch(`${SUNO_BASE}/api/v1/generate/credit`, {
       headers: { Authorization: `Bearer ${SUNO}` },
     })),
-    ping("bytez", BYTEZ, () => fetch("https://api.bytez.com/models/v2/Qwen/Qwen3-4B", {
-      method: "POST",
-      headers: { Authorization: BYTEZ!, "Content-Type": "application/json" },
-      body: JSON.stringify({ messages: [{ role: "user", content: "ping" }] }),
-    })),
     ping("moonshot", MOONSHOT, () => fetch("https://api.moonshot.cn/v1/models", {
       headers: { Authorization: `Bearer ${MOONSHOT}` },
+    })),
+    ping("deepseek", DEEPSEEK, () => fetch("https://api.deepseek.com/models", {
+      headers: { Authorization: `Bearer ${DEEPSEEK}` },
     })),
   ]);
 
   const body = {
     checked_at: new Date().toISOString(),
-    groq, openrouter, lovable, suno, bytez, moonshot,
+    groq, openrouter, lovable, suno, moonshot, deepseek,
   };
   return new Response(JSON.stringify(body), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
