@@ -65,6 +65,18 @@ export const puterListModels = () => (puter.ai as any).listModels();
 export const puterTxt2Img = (prompt: string, options?: Record<string, unknown>) =>
   (puter.ai as any).txt2img(prompt, options);
 
+/**
+ * Text to image returning the image `src` (data URL).
+ * `testMode` uses Puter's free test images and does not consume API credits.
+ */
+export async function puterTxt2ImgUrl(prompt: string, testMode = false): Promise<string> {
+  const img: HTMLImageElement = await (puter.ai as any).txt2img(prompt, testMode);
+  const src = img?.src ?? "";
+  if (!src) throw new Error("Puter txt2img não retornou imagem");
+  return src;
+}
+
+
 /** OCR — extracts text from an image URL or File. */
 export const puterImg2Txt = (source: string | File) => (puter.ai as any).img2txt(source);
 
