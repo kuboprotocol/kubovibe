@@ -80,7 +80,8 @@ const TOOL_CONFIGS: Record<ToolKey, {
     promptLabel: "Descreva a imagem",
     placeholder: "Um astronauta andando a cavalo em Marte, estilo futurista...",
     options: [
-      { key: "size", label: "Tamanho", type: "select", options: ["1024x1024", "1024x1792", "1792x1024"], default: "1024x1024" }
+      { key: "size", label: "Tamanho", type: "select", options: ["1024x1024", "1024x1792", "1792x1024"], default: "1024x1024" },
+      { key: "style", label: "Estilo Visual", type: "select", options: ["Realista", "Cyberpunk", "Anime", "Minimalista", "3D Render", "Óleo sobre tela"], default: "Realista" }
     ]
   },
   downloader: { 
