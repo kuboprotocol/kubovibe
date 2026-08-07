@@ -291,6 +291,10 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
                 <SelectItem value="groq/llama-3.1-8b-instant">Groq LLaMA 3.1 8B (Instantâneo)</SelectItem>
                 <SelectItem value="openai/gpt-4o-mini">GPT-4o Mini (OpenRouter)</SelectItem>
                 <SelectItem value="moonshot/moonshot-v1-8k">Kimi Direto (Moonshot API)</SelectItem>
+                {PUTER_MODELS.map((m) => (
+                  <SelectItem key={m.id} value={`${PUTER_PREFIX}${m.id}`}>{m.label}</SelectItem>
+                ))}
+
               </SelectContent>
             </Select>
           </div>
