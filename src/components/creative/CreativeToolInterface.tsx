@@ -49,7 +49,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AvatarCropDialog } from "./AvatarCropDialog";
 import { AvatarProgressSteps, type AvatarStepState, type AvatarStepKey } from "./AvatarProgressSteps";
 import { cn } from "@/lib/utils";
-import { puter } from "@heyputer/puter.js";
+import { puterChatStream, isPuterModel, PUTER_MODELS, PUTER_PREFIX } from "@/lib/puterAI";
 
 type ToolKey = "chat" | "nano_banana" | "downloader" | "clips" | "avatar" | "shorts" | "music" | "ebook" | "emo";
 
