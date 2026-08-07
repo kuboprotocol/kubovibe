@@ -56,7 +56,7 @@ function buildChain(prefer: "kimi" | "deepseek" | "groq"): Provider[] {
       ? [deepseek, deepseekOR, kimi, groq, lovable]
       : prefer === "groq"
       ? [groq, kimi, deepseek, deepseekOR, lovable]
-      : [kimi, groq, deepseek, deepseekOR, lovable];
+      : [kimi, deepseek, deepseekOR, groq, lovable];
 
   return order.filter((p): p is Provider => !!p);
 }

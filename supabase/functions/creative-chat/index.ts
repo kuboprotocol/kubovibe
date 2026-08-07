@@ -78,13 +78,13 @@ Deno.serve(async (req) => {
     }
 
     // Default chain
-    if (GROQ) tries.push({ name: "groq", url: "https://api.groq.com/openai/v1/chat/completions", key: GROQ, model: "llama-3.3-70b-versatile" });
-    if (MOONSHOT) tries.push({ name: "moonshot", url: "https://api.moonshot.cn/v1/chat/completions", key: MOONSHOT, model: "moonshot-v1-8k" });
     if (OR) {
-      tries.push({ name: "openrouter_deepseek", url: "https://openrouter.ai/api/v1/chat/completions", key: OR, model: "deepseek/deepseek-chat" });
       tries.push({ name: "openrouter_kimi", url: "https://openrouter.ai/api/v1/chat/completions", key: OR, model: "moonshotai/kimi-k2.6" });
+      tries.push({ name: "openrouter_deepseek", url: "https://openrouter.ai/api/v1/chat/completions", key: OR, model: "deepseek/deepseek-chat" });
       tries.push({ name: "openrouter_gpt4o_mini", url: "https://openrouter.ai/api/v1/chat/completions", key: OR, model: "openai/gpt-4o-mini" });
     }
+    if (GROQ) tries.push({ name: "groq", url: "https://api.groq.com/openai/v1/chat/completions", key: GROQ, model: "llama-3.3-70b-versatile" });
+    if (MOONSHOT) tries.push({ name: "moonshot", url: "https://api.moonshot.cn/v1/chat/completions", key: MOONSHOT, model: "moonshot-v1-8k" });
     if (LK) tries.push({ name: "lovable_gemini", url: "https://ai.gateway.lovable.dev/v1/chat/completions", key: LK, model: "google/gemini-2.0-flash-exp" });
 
     for (const t of tries) {
