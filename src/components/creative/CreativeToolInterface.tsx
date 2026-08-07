@@ -81,9 +81,11 @@ const TOOL_CONFIGS: Record<ToolKey, {
     placeholder: "Um astronauta andando a cavalo em Marte, estilo futurista...",
     options: [
       { key: "size", label: "Tamanho", type: "select", options: ["1024x1024", "1024x1792", "1792x1024"], default: "1024x1024" },
-      { key: "style", label: "Estilo Visual", type: "select", options: ["Realista", "Cyberpunk", "Anime", "Minimalista", "3D Render", "Óleo sobre tela"], default: "Realista" }
+      { key: "style", label: "Estilo Visual", type: "select", options: ["Realista", "Cyberpunk", "Anime", "Minimalista", "3D Render", "Óleo sobre tela"], default: "Realista" },
+      { key: "engine", label: "Motor", type: "select", options: ["Servidor (créditos)", "Puter.js (grátis)", "Puter.js (teste grátis)"], default: "Servidor (créditos)" }
     ]
   },
+
   downloader: { 
     title: "Downloader Universal", 
     description: "Baixe vídeos de qualquer rede social (YouTube, TikTok, Instagram).", 
