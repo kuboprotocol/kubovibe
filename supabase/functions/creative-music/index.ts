@@ -36,7 +36,12 @@ Deno.serve(async (req) => {
           instrumental,
           style,
           model: "V4",
-          callBackUrl: `${Deno.env.get("SUPABASE_URL")}/functions/v1/creative-music`, // placeholder, polled instead
+          // The system will only handle music (audio), avoiding cover art generation costs/delays
+          config: {
+            generate_cover: false 
+          },
+          callBackUrl: `${Deno.env.get("SUPABASE_URL")}/functions/v1/creative-music`, 
+
         }),
       });
       const data = await r.json();
