@@ -12,7 +12,7 @@ Deno.serve(async (req) => {
 
   const idempotencyKey = req.headers.get("X-Idempotency-Key") ?? undefined;
   try {
-    const { prompt, size } = await req.json();
+    const { prompt, size, style } = await req.json();
     if (!prompt || typeof prompt !== "string") return j(400, { error: "prompt required" });
 
     const LK = Deno.env.get("LOVABLE_API_KEY");
@@ -25,8 +25,8 @@ Deno.serve(async (req) => {
       method: "POST",
       headers: { Authorization: `Bearer ${LK}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image",
-        messages: [{ role: "user", content: prompt }],
+        model: "google/gemini-2.0-flash-exp",
+        messages: [{ role: "user", content: style ? `${prompt} | Style: ${style}` : prompt }],
         modalities: ["image", "text"],
       }),
     });

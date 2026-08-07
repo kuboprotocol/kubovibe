@@ -26,7 +26,7 @@ Deno.serve((req) =>
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image-preview",
+        model: "google/gemini-2.0-flash-exp",
         messages: [{ role: "user", content: finalPrompt }],
         modalities: ["image", "text"],
       }),
