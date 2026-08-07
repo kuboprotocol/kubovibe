@@ -29,6 +29,9 @@ Deno.serve((req) =>
         customMode: true,
         instrumental,
         model: "V4",
+        config: {
+          generate_cover: false 
+        },
         callBackUrl: "https://example.com/noop",
       }),
     });
