@@ -36,7 +36,6 @@ Deno.serve(async (req) => {
           instrumental,
           style,
           model: "V4",
-          // The system will only handle music (audio), avoiding cover art generation costs/delays
           config: {
             generate_cover: false 
           },
