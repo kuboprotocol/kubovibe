@@ -746,8 +746,41 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       return;
     }
 
+    // Fluxo Texto → Imagem via Puter.js (grátis, client-side)
+    if (toolKey === "nano_banana" && String(metadata.engine ?? "").startsWith("Puter.js")) {
+      const testMode = String(metadata.engine).includes("teste");
+      setLoading(true);
+      setExecutionPhase("requesting");
+      const startTime = Date.now();
+      try {
+        const style = metadata.style && metadata.style !== "Realista" ? `, estilo ${metadata.style}` : "";
+        const url = await puterTxt2ImgUrl(`${prompt}${style}`, testMode);
+        const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+        setSessionHistory(prev => [{
+          id: crypto.randomUUID(),
+          timestamp: new Date().toLocaleTimeString(),
+          prompt,
+          status: "success" as const,
+          assetUrl: url,
+          metadata: { ...metadata, provider: "puter", duration: `${duration}s`, credits: 0, testMode },
+        }, ...prev].slice(0, 50));
+        setExecutionPhase("done");
+        toast.success(testMode ? "Imagem de teste gerada (Puter.js)" : "Imagem gerada via Puter.js");
+        setPrompt("");
+        setLoading(false);
+        onSuccess?.();
+        return;
+      } catch (e: any) {
+        setLoading(false);
+        setExecutionPhase("error");
+        notifyError(e, { endpoint: "puter.ai.txt2img", phase: "requesting" });
+        return;
+      }
+    }
+
     // Fluxo via Puter.js para Chat (Kimi, GPT-5.4 nano, Claude, Gemini, Grok...)
     if (toolKey === "chat" && isPuterModel(kimiModel)) {
+
       setLoading(true);
       setStreamingContent("");
       const startTime = Date.now();
