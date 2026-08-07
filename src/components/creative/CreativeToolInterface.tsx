@@ -740,8 +740,8 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
       return;
     }
 
-    // Fluxo do Kimi via Puter.js para Chat
-    if (toolKey === "chat" && kimiModel.includes("kimi")) {
+    // Fluxo via Puter.js para Chat (Kimi, GPT-5.4 nano, Claude, Gemini, Grok...)
+    if (toolKey === "chat" && isPuterModel(kimiModel)) {
       setLoading(true);
       setStreamingContent("");
       const startTime = Date.now();
@@ -755,20 +755,12 @@ export function CreativeToolInterface({ toolKey, onSuccess }: Props) {
           throw new Error("SISTEMA: Falha simulada para teste de fallback (DeepSeek)");
         }
 
-        const resp = await puter.ai.chat(prompt, { 
-          model: kimiModel,
-          temperature: temperature,
-          max_tokens: maxTokens,
-          stream: true 
-        });
+        const fullText = await puterChatStream(
+          prompt,
+          { model: kimiModel, temperature, max_tokens: maxTokens },
+          (text) => setStreamingContent(text),
+        );
 
-        let fullText = "";
-        for await (const part of resp) {
-          if (part?.text) {
-            fullText += part.text;
-            setStreamingContent(fullText);
-          }
-        }
 
         const endTime = Date.now();
         const duration = ((endTime - startTime) / 1000).toFixed(2);
