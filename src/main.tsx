@@ -21,39 +21,46 @@ try {
   throw e;
 }
 
-// Intercept fetch calls to mock the telemetry API endpoint
-const originalFetch = window.fetch;
-window.fetch = async (...args) => {
-  const [resource, config] = args;
-  const url = typeof resource === 'string' ? resource : resource instanceof URL ? resource.href : resource.url;
+// Telemetry mock: enabled only when VITE_ENABLE_PWA_TELEMETRY_MOCK is set to "true" in env.
+// This avoids globally overriding window.fetch by default and prevents unexpected side-effects.
+if (import.meta.env.VITE_ENABLE_PWA_TELEMETRY_MOCK === 'true') {
+  const originalFetch = window.fetch.bind(window);
+  window.fetch = async (...args: Parameters<typeof fetch>) => {
+    try {
+      const [resource, config] = args as [any, RequestInit | undefined];
+      const url = typeof resource === 'string' ? resource : resource instanceof URL ? resource.href : (resource as Request).url;
 
-  if (url.includes('/api/pwa/telemetry')) {
-    const { supabase } = await import("./integrations/supabase/client");
-    const { data: { session } } = await supabase.auth.getSession();
+      if (url.includes('/api/pwa/telemetry')) {
+        const { supabase } = await import("./integrations/supabase/client");
+        const { data: { session } } = await supabase.auth.getSession();
 
-    if (!session) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' }
-      });
+        if (!session) {
+          return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+
+        const events = getTelemetryEvents();
+
+        if (config?.method === 'DELETE') {
+          clearTelemetry();
+          return new Response(JSON.stringify({ success: true }), { status: 200 });
+        }
+
+        return new Response(JSON.stringify(events), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      return originalFetch(...args);
+    } catch (err) {
+      // If mock handler fails, fall back to original fetch to avoid breaking the app.
+      return (window.fetch as any)(...args);
     }
-
-    const events = getTelemetryEvents();
-    
-    if (config?.method === 'DELETE') {
-      clearTelemetry();
-      return new Response(JSON.stringify({ success: true }), { status: 200 });
-    }
-
-    return new Response(JSON.stringify(events), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
-  return originalFetch(...args);
-};
-
-
+  };
+}
 
 const MUTE_LS_KEY = 'kubo:pwa:mute_toasts';
 let ignorePwaToasts = localStorage.getItem(MUTE_LS_KEY) === 'true';
@@ -62,11 +69,11 @@ let ignorePwaToasts = localStorage.getItem(MUTE_LS_KEY) === 'true';
 if (typeof window !== 'undefined') {
   window.addEventListener('pwa:asset-fallback', (e: any) => {
     const { type, url } = e.detail;
-    
+
     // Telemetry update
     const category = type === 'image' ? (url?.endsWith('.svg') ? 'svg' : 'image') : (type === 'font' ? 'font' : 'other');
     saveTelemetryEvent({ type: category, url: url || 'unknown' });
-    
+
     console.log(`[PWA Telemetry] Fallback triggered: ${category}`, { url });
 
     if (ignorePwaToasts) return;
@@ -108,5 +115,3 @@ createRoot(document.getElementById("root")!).render(
     <App />
   </ErrorBoundary>
 );
-
-
