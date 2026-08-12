@@ -29,3 +29,7 @@ reports/
 
 # Rerun concurrency CI — local secrets
 .env.rerun-ci
+
+# Do not commit environment files with secrets
+.env
+.env.*.local
