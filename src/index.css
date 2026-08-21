@@ -1,28 +1,26 @@
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 0 0% 5%;
-    --foreground: 0 0% 90%;
+    --background: 225 8% 10%;
+    --foreground: 0 0% 95%;
 
-    --card: 0 0% 8%;
-    --card-foreground: 0 0% 90%;
+    --card: 225 7% 14%;
+    --card-foreground: 0 0% 95%;
 
-    --popover: 0 0% 8%;
-    --popover-foreground: 0 0% 90%;
+    --popover: 225 7% 14%;
+    --popover-foreground: 0 0% 95%;
 
     --primary: 43 80% 55%;
     --primary-foreground: 0 0% 5%;
 
-    --secondary: 0 0% 12%;
-    --secondary-foreground: 0 0% 75%;
+    --secondary: 225 7% 18%;
+    --secondary-foreground: 0 0% 82%;
 
-    --muted: 0 0% 14%;
-    --muted-foreground: 0 0% 50%;
+    --muted: 225 7% 20%;
+    --muted-foreground: 0 0% 66%;
 
     --accent: 43 30% 15%;
     --accent-foreground: 43 80% 65%;
@@ -30,21 +28,21 @@
     --destructive: 0 72% 50%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 0 0% 16%;
-    --input: 0 0% 16%;
+    --border: 225 6% 25%;
+    --input: 225 6% 25%;
     --ring: 43 80% 55%;
 
     --radius: 0.875rem;
 
     --hero-highlight: 43 80% 55%;
 
-    --sidebar-background: 0 0% 6%;
-    --sidebar-foreground: 0 0% 75%;
+    --sidebar-background: 225 8% 11%;
+    --sidebar-foreground: 0 0% 82%;
     --sidebar-primary: 43 80% 55%;
     --sidebar-primary-foreground: 0 0% 5%;
     --sidebar-accent: 43 30% 15%;
     --sidebar-accent-foreground: 43 80% 65%;
-    --sidebar-border: 0 0% 16%;
+    --sidebar-border: 225 6% 25%;
     --sidebar-ring: 43 80% 55%;
 
     /* Neon accents (Premium Dark UI layer — Skill Kubo VibeDev) */
