@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, forwardRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/integrations/supabase/client'
 import { lovable } from '@/integrations/lovable/index'
@@ -14,7 +14,7 @@ import logoImg from '@/assets/logo-kubovibe-3d.png'
 // is being fixed. Set back to true once the provider callback is restored.
 const SHOW_GOOGLE_LOGIN = false
 
-export default function AuthPage() {
+const AuthPage = forwardRef<HTMLDivElement, any>((props, ref) => {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const refCode = searchParams.get('ref') || ''
@@ -244,7 +244,7 @@ export default function AuthPage() {
   const inputClasses = "h-12 pl-11 rounded-xl bg-secondary/50 border-border/50 text-foreground placeholder:text-muted-foreground focus-visible:ring-primary/30 focus-visible:border-primary/50 transition-all duration-200"
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4 relative overflow-hidden">
+    <div ref={ref} className="min-h-screen bg-background flex items-center justify-center p-4 relative overflow-hidden">
       <div className="absolute inset-0 gradient-mesh pointer-events-none" />
       <div className="absolute inset-0 dot-pattern opacity-30 pointer-events-none" />
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-primary/[0.03] blur-3xl pointer-events-none" />

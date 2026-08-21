@@ -256,11 +256,8 @@ const App = forwardRef<HTMLDivElement, any>((props, ref) => {
       </div>
     </QueryClientProvider>
   );
-};
-
-
-
-
 });
+
+export default App;
 
 export default App;
