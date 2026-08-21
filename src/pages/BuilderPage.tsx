@@ -710,6 +710,9 @@ const BuilderPage = forwardRef<HTMLDivElement>((props, ref) => {
           setInput((prev) => `${prev}${prev ? "\n" : ""}[runway asset]: ${url}`)
         }}
       />
+      </div>
     </div>
   )
-}
+})
+
+export default BuilderPage
