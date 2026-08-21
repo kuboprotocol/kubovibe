@@ -445,7 +445,7 @@ const BuilderPage = forwardRef<HTMLDivElement, any>((props, ref) => {
   ]
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
+    <div ref={ref} className="h-screen w-screen flex flex-col bg-background overflow-hidden">
       {/* Toolbar */}
       <BuilderToolbar
         projectTitle={projectTitle}
