@@ -1,5 +1,5 @@
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, forwardRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Plus, FileText, Trash2, LogOut, Code, Pencil, UserCircle, Search, MoreHorizontal, Zap, Globe, BarChart3, CreditCard, Gift, Mail, BookOpen } from 'lucide-react'
 import { Input } from '@/components/ui/input'
