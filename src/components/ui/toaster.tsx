@@ -2,7 +2,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Toast, ToastClose, ToastDescription, ToastProvider, ToastTitle, ToastViewport } from "@/components/ui/toast";
 import { forwardRef } from "react";
 
-export const Toaster = forwardRef<HTMLDivElement, any>((props, ref) => {
+export const Toaster = forwardRef<HTMLOListElement, any>((props, ref) => {
   const { toasts } = useToast();
 
   return (
