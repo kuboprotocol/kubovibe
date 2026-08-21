@@ -38,7 +38,7 @@ function loadDevicePref(): { frame: DeviceFrame; landscape: boolean } {
   return { frame: 'desktop', landscape: false }
 }
 
-const BuilderPage = forwardRef<HTMLDivElement>((props, ref) => {
+const BuilderPage = forwardRef<HTMLDivElement, any>((props, ref) => {
   const navigate = useNavigate()
   const { projectId } = useParams<{ projectId?: string }>()
   const location = useLocation()

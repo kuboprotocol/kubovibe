@@ -26,7 +26,7 @@ interface Project {
   is_published: boolean
 }
 
-const DashboardPage = forwardRef<HTMLDivElement>((props, ref) => {
+const DashboardPage = forwardRef<HTMLDivElement, any>((props, ref) => {
 
 
   const navigate = useNavigate()
