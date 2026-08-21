@@ -26,7 +26,7 @@ interface Project {
   is_published: boolean
 }
 
-export default function DashboardPage() {
+const DashboardPage = forwardRef<HTMLDivElement>((props, ref) => {
 
 
   const navigate = useNavigate()
@@ -345,4 +345,6 @@ export default function DashboardPage() {
       </Dialog>
     </div>
   )
-}
+})
+
+export default DashboardPage
