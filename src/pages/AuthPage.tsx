@@ -511,4 +511,6 @@ const AuthPage = forwardRef<HTMLDivElement, any>((props, ref) => {
       </AnimatePresence>
     </div>
   )
-}
+})
+
+export default AuthPage
