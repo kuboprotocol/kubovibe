@@ -1,4 +1,5 @@
 import { Navigate, useLocation } from 'react-router-dom'
+import { forwardRef } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { Loader2, ShieldAlert } from 'lucide-react'
 
@@ -8,7 +9,7 @@ interface ProtectedRouteProps {
   requireRoles?: string[]
 }
 
-export default function ProtectedRoute({ children, requireRoles }: ProtectedRouteProps) {
+const ProtectedRoute = forwardRef<HTMLDivElement, ProtectedRouteProps>(({ children, requireRoles }, ref) => {
   const { user, loading, hasAnyRole } = useAuth()
   const location = useLocation()
 
@@ -38,5 +39,7 @@ export default function ProtectedRoute({ children, requireRoles }: ProtectedRout
     )
   }
 
-  return <>{children}</>
-}
+  return <div ref={ref}>{children}</div>
+})
+
+export default ProtectedRoute

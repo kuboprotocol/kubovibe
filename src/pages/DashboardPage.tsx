@@ -1,5 +1,5 @@
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, forwardRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Plus, FileText, Trash2, LogOut, Code, Pencil, UserCircle, Search, MoreHorizontal, Zap, Globe, BarChart3, CreditCard, Gift, Mail, BookOpen } from 'lucide-react'
 import { Input } from '@/components/ui/input'
@@ -26,7 +26,7 @@ interface Project {
   is_published: boolean
 }
 
-export default function DashboardPage() {
+const DashboardPage = forwardRef<HTMLDivElement, any>((props, ref) => {
 
 
   const navigate = useNavigate()
@@ -95,7 +95,7 @@ export default function DashboardPage() {
   const usagePercent = subscription ? Math.round((subscription.edits_used / subscription.edits_limit) * 100) : 0
 
   return (
-    <div className="min-h-screen bg-background relative">
+    <div ref={ref} className="min-h-screen bg-background relative">
       <div className="absolute inset-0 gradient-mesh pointer-events-none" />
       <div className="absolute inset-0 dot-pattern opacity-20 pointer-events-none" />
 
@@ -345,4 +345,6 @@ export default function DashboardPage() {
       </Dialog>
     </div>
   )
-}
+})
+
+export default DashboardPage

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo, forwardRef } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Send, Eye, Loader2, Copy, Check, Code, Film } from 'lucide-react'
@@ -38,7 +38,7 @@ function loadDevicePref(): { frame: DeviceFrame; landscape: boolean } {
   return { frame: 'desktop', landscape: false }
 }
 
-export default function BuilderPage() {
+const BuilderPage = forwardRef<HTMLDivElement, any>((props, ref) => {
   const navigate = useNavigate()
   const { projectId } = useParams<{ projectId?: string }>()
   const location = useLocation()
@@ -445,7 +445,7 @@ export default function BuilderPage() {
   ]
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
+    <div ref={ref} className="h-screen w-screen flex flex-col bg-background overflow-hidden">
       {/* Toolbar */}
       <BuilderToolbar
         projectTitle={projectTitle}
@@ -712,4 +712,6 @@ export default function BuilderPage() {
       />
     </div>
   )
-}
+})
+
+export default BuilderPage

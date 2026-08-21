@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import ProtectedRoute from "@/components/ProtectedRoute";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, forwardRef } from "react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import AdGate from "@/components/AdGate";
 
@@ -167,10 +167,11 @@ if (typeof window !== 'undefined') {
   });
 }
 
-const App = () => {
+const App = forwardRef<HTMLDivElement, any>((props, ref) => {
   return (
 
     <QueryClientProvider client={queryClient}>
+      <div ref={ref}>
       <TooltipProvider>
         <AuthProvider>
           <Toaster />
@@ -252,11 +253,9 @@ const App = () => {
 
       </AuthProvider>
     </TooltipProvider>
+      </div>
     </QueryClientProvider>
   );
-};
-
-
-
+});
 
 export default App;
