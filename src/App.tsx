@@ -63,6 +63,7 @@ const OrchestratorPage = lazy(() => import("./pages/OrchestratorPage"));
 const PwaTelemetryPage = lazy(() => import("./pages/PwaTelemetry"));
 const PwaExportJobDetailsPage = lazy(() => import("./pages/PwaExportJobDetails"));
 const DocsPage = lazy(() => import("./pages/DocsPage"));
+const VibeCodePage = lazy(() => import("./pages/VibeCodePage"));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -227,6 +228,7 @@ const App = forwardRef<HTMLDivElement, any>((props, ref) => {
                 <Route path="/game/ai" element={<ProtectedRoute><GameAiPage /></ProtectedRoute>} />
                 <Route path="/admin/skills" element={<ProtectedRoute requireRoles={["admin"]}><AdminSkillsPage /></ProtectedRoute>} />
                 <Route path="/domains" element={<ProtectedRoute><DomainsPage /></ProtectedRoute>} />
+                <Route path="/vibe-code" element={<ProtectedRoute><VibeCodePage /></ProtectedRoute>} />
                 
                 <Route path="/creative" element={<ProtectedRoute><CreativePage /></ProtectedRoute>} />
                 <Route path="/creative/investigation" element={<ProtectedRoute><ErrorBoundary resourceName="InvestigationPage"><InvestigationPage /></ErrorBoundary></ProtectedRoute>} />
