@@ -31,14 +31,13 @@ export function VibeConnectorPanel() {
       const { data } = await supabase.auth.getUser();
       if (!active || !data?.user) return;
       const { data: rows } = await supabase
-        .from("connector_credentials")
-        .select("provider")
-        .eq("user_id", data.user.id);
-      const providers = new Set((rows ?? []).map((r: { provider: string }) => r.provider));
+        .from("github_connections_safe")
+        .select("id")
+        .limit(1);
+      const githubConnected = (rows ?? []).length > 0;
+      if (!active) return;
       setConnectors((prev) =>
-        prev.map((c) =>
-          c.slug === "supabase" ? c : { ...c, connected: providers.has(c.slug) || c.connected },
-        ),
+        prev.map((c) => (c.slug === "github" ? { ...c, connected: githubConnected } : c)),
       );
     })();
     return () => {
