@@ -38,10 +38,10 @@ export function VibeDomainsPanel() {
           <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20 text-primary">
             <Search className="h-5 w-5" />
           </div>
-          <h3 className="font-semibold text-foreground">Buy Domain</h3>
-          <p className="mt-1 text-xs text-muted-foreground">Find and register a new custom domain for your project.</p>
+          <h3 className="font-semibold text-foreground">Comprar Domínio</h3>
+          <p className="mt-1 text-[10px] leading-tight text-muted-foreground">Encontre e registre um novo domínio customizado para o seu projeto.</p>
           <Button variant="ghost" className="mt-4 h-8 w-full justify-between text-xs font-medium">
-            Register now <ChevronRight className="h-3 w-3" />
+            Registrar agora <ChevronRight className="h-3 w-3" />
           </Button>
         </Card>
 
@@ -49,10 +49,10 @@ export function VibeDomainsPanel() {
           <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-white/5 text-foreground">
             <ArrowRightLeft className="h-5 w-5" />
           </div>
-          <h3 className="font-semibold text-foreground">Transfer In</h3>
-          <p className="mt-1 text-xs text-muted-foreground">Move an existing domain from another registrar to KUBO.</p>
+          <h3 className="font-semibold text-foreground">Transferir Domínio</h3>
+          <p className="mt-1 text-[10px] leading-tight text-muted-foreground">Mova um domínio existente de outro registrador para a KUBO.</p>
           <Button variant="ghost" className="mt-4 h-8 w-full justify-between text-xs font-medium">
-            Start transfer <ChevronRight className="h-3 w-3" />
+            Iniciar transferência <ChevronRight className="h-3 w-3" />
           </Button>
         </Card>
 
@@ -60,10 +60,10 @@ export function VibeDomainsPanel() {
           <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-white/5 text-foreground">
             <Link2 className="h-5 w-5" />
           </div>
-          <h3 className="font-semibold text-foreground">Connect Domain</h3>
-          <p className="mt-1 text-xs text-muted-foreground">Use a domain you already own by updating its DNS records.</p>
+          <h3 className="font-semibold text-foreground">Conectar Existente</h3>
+          <p className="mt-1 text-[10px] leading-tight text-muted-foreground">Use um domínio que você já possui apontando os recordes DNS.</p>
           <Button variant="ghost" className="mt-4 h-8 w-full justify-between text-xs font-medium">
-            Setup records <ChevronRight className="h-3 w-3" />
+            Configurar DNS <ChevronRight className="h-3 w-3" />
           </Button>
         </Card>
       </div>
