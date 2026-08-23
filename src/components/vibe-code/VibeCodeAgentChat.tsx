@@ -38,12 +38,9 @@ const STEP_ICON: Record<VibeStepKind, typeof Brain> = {
   commit: GitCommit,
   connector: Plug,
   message: MessageSquare,
-  error: AlertTriangle,
+  error: AlertCircle,
   done: CheckCircle2,
 };
-
-// Local alias for AlertTriangle if needed, but AlertCircle is fine
-const AlertTriangle = AlertCircle;
 
 function DiffView({ diff }: { diff: string }) {
   return (
