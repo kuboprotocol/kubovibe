@@ -252,45 +252,66 @@ export function VibeCodeAgentChat({ projectId }: { projectId?: string }) {
                   return (
                     <div
                       key={step.id}
-                      className="rounded-lg border border-border/50 bg-background/40 px-3 py-2"
+                      className="group relative rounded-xl border border-border/40 bg-card/40 px-3 py-3 transition-all hover:bg-card/60"
                     >
+                      {/* Left timeline line */}
+                      <div className="absolute -left-[17px] top-0 h-full w-[2px] bg-border/20 group-last:h-1/2" />
+                      <div className="absolute -left-[21px] top-4 h-2.5 w-2.5 rounded-full border-2 border-primary bg-background shadow-[0_0_8px_rgba(201,148,26,0.4)]" />
+
                       <div className="flex items-center gap-2">
                         {step.status === "running" ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                          <div className="relative">
+                            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                            <div className="absolute inset-0 animate-ping rounded-full bg-primary/20" />
+                          </div>
                         ) : (
                           <Icon
-                            className={`h-3.5 w-3.5 ${
-                              step.status === "failed" ? "text-destructive" : "text-primary"
+                            className={`h-4 w-4 ${
+                              step.status === "failed" ? "text-rose-500" : "text-primary"
                             }`}
                           />
                         )}
-                        <span className="text-sm">{step.title}</span>
+                        <span className="text-sm font-medium tracking-tight text-foreground/90">
+                          {step.title}
+                        </span>
+                        
                         {step.commitSha && (
-                          <Badge variant="outline" className="text-[10px] font-mono">
+                          <Badge variant="outline" className="h-4 rounded-md border-primary/20 bg-primary/5 px-1.5 text-[9px] font-mono text-primary uppercase">
                             {step.commitSha.slice(0, 7)}
                           </Badge>
                         )}
+                        
                         {step.reverted && (
-                          <Badge variant="secondary" className="text-[10px]">
+                          <Badge variant="secondary" className="h-4 rounded-md bg-rose-500/10 px-1.5 text-[9px] text-rose-500 uppercase">
                             reverted
                           </Badge>
                         )}
+                        
                         {step.commitSha && !step.reverted && (
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="ml-auto h-6 px-2 text-[11px]"
+                            className="ml-auto h-6 gap-1.5 px-2 text-[10px] text-muted-foreground hover:text-primary"
                             onClick={() => revertStep(step)}
                             disabled={running}
                           >
-                            <Undo2 className="mr-1 h-3 w-3" /> Undo
+                            <Undo2 className="h-3 w-3" /> Revert
                           </Button>
                         )}
                       </div>
+                      
                       {step.detail && (
-                        <p className="mt-1 pl-6 text-xs text-muted-foreground">{step.detail}</p>
+                        <div className="mt-2 flex items-start gap-2 rounded-lg bg-black/40 p-2 font-mono text-[10px] text-muted-foreground/80">
+                          <span className="text-primary/60 mt-0.5">$</span>
+                          <p className="leading-relaxed">{step.detail}</p>
+                        </div>
                       )}
-                      {step.diff && <DiffView diff={step.diff} />}
+                      
+                      {step.diff && (
+                        <div className="mt-3">
+                          <DiffView diff={step.diff} />
+                        </div>
+                      )}
                     </div>
                   );
                 })}
