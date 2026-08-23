@@ -216,22 +216,32 @@ export function VibeCodeAgentChat({ projectId }: { projectId?: string }) {
   };
 
   return (
-    <Card className="flex h-full flex-col bg-card/60 backdrop-blur border-border/60">
-      <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
-        <div>
-          <h2 className="text-sm font-semibold">Vibe Code Agent</h2>
-          <p className="text-xs text-muted-foreground">Prompt in, real commit out — step by step.</p>
-        </div>
+    <Card className="flex h-full flex-col overflow-hidden border-border/40 bg-[#080808]/80 backdrop-blur-xl transition-all">
+      <div className="flex items-center justify-between border-b border-border/40 bg-white/[0.02] px-4 py-3">
         <div className="flex items-center gap-2">
-          <Label htmlFor="auto-apply" className="text-xs text-muted-foreground">
-            Auto-commit
-          </Label>
-          <Switch id="auto-apply" checked={autoApply} onCheckedChange={setAutoApply} />
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary shadow-[0_0_10px_rgba(201,148,26,0.2)]">
+            <Bot className="h-4 w-4" />
+          </div>
+          <div>
+            <h2 className="text-xs font-bold uppercase tracking-widest text-foreground/90">Vibe Code Agent</h2>
+            <div className="flex items-center gap-1.5">
+              <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <p className="text-[10px] font-medium text-muted-foreground/80">Active in Branch: main</p>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 rounded-full bg-black/40 px-3 py-1 border border-border/20">
+            <Label htmlFor="auto-apply" className="text-[10px] font-bold uppercase tracking-tighter text-muted-foreground">
+              Auto-Commit
+            </Label>
+            <Switch id="auto-apply" checked={autoApply} onCheckedChange={setAutoApply} className="scale-75" />
+          </div>
         </div>
       </div>
 
-      <ScrollArea className="flex-1 px-4 py-4">
-        <div className="space-y-5">
+      <ScrollArea className="flex-1 px-4 py-6">
+        <div className="relative ml-4 space-y-6 border-l border-border/10 pl-6">
           {messages.length === 0 && (
             <p className="text-sm text-muted-foreground">
               Describe a change — the agent plans it, previews the diff, and commits it to your repository.
@@ -322,18 +332,28 @@ export function VibeCodeAgentChat({ projectId }: { projectId?: string }) {
       </ScrollArea>
 
       {pendingEdits.length > 0 && (
-        <div className="flex items-center justify-between border-t border-border/60 px-4 py-2">
-          <span className="text-xs text-muted-foreground">
-            {pendingEdits.length} file(s) previewed and ready to commit
-          </span>
-          <Button size="sm" onClick={applyPending} disabled={running}>
-            Apply changes
+        <div className="flex animate-in fade-in slide-in-from-bottom-2 items-center justify-between border-t border-border/40 bg-primary/5 px-4 py-3 backdrop-blur-md">
+          <div className="flex items-center gap-2">
+            <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/20 text-primary">
+              <Eye className="h-3 w-3" />
+            </div>
+            <span className="text-xs font-medium text-foreground/80">
+              {pendingEdits.length} staged change{pendingEdits.length > 1 ? 's' : ''} ready
+            </span>
+          </div>
+          <Button 
+            size="sm" 
+            onClick={applyPending} 
+            disabled={running}
+            className="h-8 gap-2 bg-primary px-4 text-xs font-bold uppercase text-primary-foreground shadow-lg shadow-primary/20 hover:scale-105 transition-transform"
+          >
+            Deploy Changes <Rocket className="h-3.5 w-3.5" />
           </Button>
         </div>
       )}
 
-      <div className="border-t border-border/60 p-3">
-        <div className="flex gap-2">
+      <div className="border-t border-border/40 bg-white/[0.01] p-4">
+        <div className="relative group">
           <Textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -343,14 +363,22 @@ export function VibeCodeAgentChat({ projectId }: { projectId?: string }) {
                 void send();
               }
             }}
-            placeholder="e.g. Add a dark hero section to the landing page"
-            className="min-h-[52px] resize-none text-sm"
+            placeholder="Ask Vibe Agent to build, fix or refactor..."
+            className="min-h-[60px] w-full resize-none border-border/20 bg-black/60 pl-3 pr-12 pt-3 text-xs font-medium placeholder:text-muted-foreground/40 focus:border-primary/50 focus:ring-primary/20 rounded-xl transition-all"
             disabled={running}
           />
-          <Button onClick={() => void send()} disabled={running || !input.trim()} className="h-[52px]">
+          <Button 
+            onClick={() => void send()} 
+            disabled={running || !input.trim()} 
+            size="icon"
+            className="absolute bottom-2.5 right-2.5 h-8 w-8 rounded-lg bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground transition-all shadow-[0_0_15px_rgba(201,148,26,0.1)]"
+          >
             {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
         </div>
+        <p className="mt-2 text-center text-[9px] font-medium tracking-tight text-muted-foreground/40 uppercase">
+          Agent executes real commits via GitHub API
+        </p>
       </div>
     </Card>
   );
