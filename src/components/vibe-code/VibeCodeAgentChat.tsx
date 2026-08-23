@@ -6,12 +6,15 @@ import {
   GitCommit,
   Loader2,
   Plug,
-  AlertTriangle,
+  AlertCircle,
   CheckCircle2,
   Send,
   Undo2,
   Eye,
   MessageSquare,
+  ChevronRight,
+  Bot,
+  Rocket,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,7 +38,7 @@ const STEP_ICON: Record<VibeStepKind, typeof Brain> = {
   commit: GitCommit,
   connector: Plug,
   message: MessageSquare,
-  error: AlertTriangle,
+  error: AlertCircle,
   done: CheckCircle2,
 };
 
@@ -77,7 +80,6 @@ export function VibeCodeAgentChat({ projectId }: { projectId?: string }) {
       prev.map((m) => {
         if (m.id !== messageId) return m;
         const steps = [...(m.steps ?? [])];
-        // Collapse a running step into its finished counterpart.
         const idx = steps.findIndex(
           (s) => s.status === "running" && s.kind === step.kind && s.title.split(" ").pop() === step.title.split(" ").pop(),
         );
@@ -216,22 +218,32 @@ export function VibeCodeAgentChat({ projectId }: { projectId?: string }) {
   };
 
   return (
-    <Card className="flex h-full flex-col bg-card/60 backdrop-blur border-border/60">
-      <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
-        <div>
-          <h2 className="text-sm font-semibold">Vibe Code Agent</h2>
-          <p className="text-xs text-muted-foreground">Prompt in, real commit out — step by step.</p>
-        </div>
+    <Card className="flex h-full flex-col overflow-hidden border-border/40 bg-[#080808]/80 backdrop-blur-xl transition-all">
+      <div className="flex items-center justify-between border-b border-border/40 bg-white/[0.02] px-4 py-3">
         <div className="flex items-center gap-2">
-          <Label htmlFor="auto-apply" className="text-xs text-muted-foreground">
-            Auto-commit
-          </Label>
-          <Switch id="auto-apply" checked={autoApply} onCheckedChange={setAutoApply} />
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary shadow-[0_0_10px_rgba(201,148,26,0.2)]">
+            <Bot className="h-4 w-4" />
+          </div>
+          <div>
+            <h2 className="text-xs font-bold uppercase tracking-widest text-foreground/90">Vibe Code Agent</h2>
+            <div className="flex items-center gap-1.5">
+              <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <p className="text-[10px] font-medium text-muted-foreground/80">Active in Branch: main</p>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 rounded-full bg-black/40 px-3 py-1 border border-border/20">
+            <Label htmlFor="auto-apply" className="text-[10px] font-bold uppercase tracking-tighter text-muted-foreground">
+              Auto-Commit
+            </Label>
+            <Switch id="auto-apply" checked={autoApply} onCheckedChange={setAutoApply} className="scale-75" />
+          </div>
         </div>
       </div>
 
-      <ScrollArea className="flex-1 px-4 py-4">
-        <div className="space-y-5">
+      <ScrollArea className="flex-1 px-4 py-6">
+        <div className="relative ml-4 space-y-6 border-l border-border/10 pl-6">
           {messages.length === 0 && (
             <p className="text-sm text-muted-foreground">
               Describe a change — the agent plans it, previews the diff, and commits it to your repository.
@@ -240,57 +252,76 @@ export function VibeCodeAgentChat({ projectId }: { projectId?: string }) {
 
           {messages.map((m) =>
             m.role === "user" ? (
-              <div key={m.id} className="flex justify-end">
-                <div className="max-w-[80%] rounded-xl bg-primary/10 border border-primary/20 px-3 py-2 text-sm">
+              <div key={m.id} className="flex justify-end pb-4">
+                <div className="max-w-[85%] rounded-2xl bg-primary/10 border border-primary/20 px-4 py-3 text-sm text-foreground shadow-lg shadow-primary/5">
                   {m.content}
                 </div>
               </div>
             ) : (
-              <div key={m.id} className="space-y-2">
+              <div key={m.id} className="space-y-6">
                 {(m.steps ?? []).map((step) => {
                   const Icon = STEP_ICON[step.kind] ?? Brain;
                   return (
                     <div
                       key={step.id}
-                      className="rounded-lg border border-border/50 bg-background/40 px-3 py-2"
+                      className="group relative rounded-xl border border-border/40 bg-card/40 px-3 py-3 transition-all hover:bg-card/60"
                     >
+                      <div className="absolute -left-[31px] top-4 h-2.5 w-2.5 rounded-full border-2 border-primary bg-background shadow-[0_0_8px_rgba(201,148,26,0.4)]" />
+
                       <div className="flex items-center gap-2">
                         {step.status === "running" ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                          <div className="relative">
+                            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                            <div className="absolute inset-0 animate-ping rounded-full bg-primary/20" />
+                          </div>
                         ) : (
                           <Icon
-                            className={`h-3.5 w-3.5 ${
-                              step.status === "failed" ? "text-destructive" : "text-primary"
+                            className={`h-4 w-4 ${
+                              step.status === "failed" ? "text-rose-500" : "text-primary"
                             }`}
                           />
                         )}
-                        <span className="text-sm">{step.title}</span>
+                        <span className="text-sm font-medium tracking-tight text-foreground/90">
+                          {step.title}
+                        </span>
+                        
                         {step.commitSha && (
-                          <Badge variant="outline" className="text-[10px] font-mono">
+                          <Badge variant="outline" className="h-4 rounded-md border-primary/20 bg-primary/5 px-1.5 text-[9px] font-mono text-primary uppercase">
                             {step.commitSha.slice(0, 7)}
                           </Badge>
                         )}
+                        
                         {step.reverted && (
-                          <Badge variant="secondary" className="text-[10px]">
+                          <Badge variant="secondary" className="h-4 rounded-md bg-rose-500/10 px-1.5 text-[9px] text-rose-500 uppercase">
                             reverted
                           </Badge>
                         )}
+                        
                         {step.commitSha && !step.reverted && (
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="ml-auto h-6 px-2 text-[11px]"
+                            className="ml-auto h-6 gap-1.5 px-2 text-[10px] text-muted-foreground hover:text-primary"
                             onClick={() => revertStep(step)}
                             disabled={running}
                           >
-                            <Undo2 className="mr-1 h-3 w-3" /> Undo
+                            <Undo2 className="h-3 w-3" /> Revert
                           </Button>
                         )}
                       </div>
+                      
                       {step.detail && (
-                        <p className="mt-1 pl-6 text-xs text-muted-foreground">{step.detail}</p>
+                        <div className="mt-2 flex items-start gap-2 rounded-lg bg-black/40 p-2 font-mono text-[10px] text-muted-foreground/80">
+                          <span className="text-primary/60 mt-0.5">$</span>
+                          <p className="leading-relaxed">{step.detail}</p>
+                        </div>
                       )}
-                      {step.diff && <DiffView diff={step.diff} />}
+                      
+                      {step.diff && (
+                        <div className="mt-3">
+                          <DiffView diff={step.diff} />
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -301,18 +332,28 @@ export function VibeCodeAgentChat({ projectId }: { projectId?: string }) {
       </ScrollArea>
 
       {pendingEdits.length > 0 && (
-        <div className="flex items-center justify-between border-t border-border/60 px-4 py-2">
-          <span className="text-xs text-muted-foreground">
-            {pendingEdits.length} file(s) previewed and ready to commit
-          </span>
-          <Button size="sm" onClick={applyPending} disabled={running}>
-            Apply changes
+        <div className="flex animate-in fade-in slide-in-from-bottom-2 items-center justify-between border-t border-border/40 bg-primary/5 px-4 py-3 backdrop-blur-md">
+          <div className="flex items-center gap-2">
+            <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/20 text-primary">
+              <Eye className="h-3 w-3" />
+            </div>
+            <span className="text-xs font-medium text-foreground/80">
+              {pendingEdits.length} staged change{pendingEdits.length > 1 ? 's' : ''} ready
+            </span>
+          </div>
+          <Button 
+            size="sm" 
+            onClick={applyPending} 
+            disabled={running}
+            className="h-8 gap-2 bg-primary px-4 text-xs font-bold uppercase text-primary-foreground shadow-lg shadow-primary/20 hover:scale-105 transition-transform"
+          >
+            Deploy Changes <Rocket className="h-3.5 w-3.5" />
           </Button>
         </div>
       )}
 
-      <div className="border-t border-border/60 p-3">
-        <div className="flex gap-2">
+      <div className="border-t border-border/40 bg-white/[0.01] p-4">
+        <div className="relative group">
           <Textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -322,14 +363,22 @@ export function VibeCodeAgentChat({ projectId }: { projectId?: string }) {
                 void send();
               }
             }}
-            placeholder="e.g. Add a dark hero section to the landing page"
-            className="min-h-[52px] resize-none text-sm"
+            placeholder="Ask Vibe Agent to build, fix or refactor..."
+            className="min-h-[60px] w-full resize-none border-border/20 bg-black/60 pl-3 pr-12 pt-3 text-xs font-medium placeholder:text-muted-foreground/40 focus:border-primary/50 focus:ring-primary/20 rounded-xl transition-all"
             disabled={running}
           />
-          <Button onClick={() => void send()} disabled={running || !input.trim()} className="h-[52px]">
+          <Button 
+            onClick={() => void send()} 
+            disabled={running || !input.trim()} 
+            size="icon"
+            className="absolute bottom-2.5 right-2.5 h-8 w-8 rounded-lg bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground transition-all shadow-[0_0_15px_rgba(201,148,26,0.1)]"
+          >
             {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
         </div>
+        <p className="mt-2 text-center text-[9px] font-medium tracking-tight text-muted-foreground/40 uppercase">
+          Agent executes real commits via GitHub API
+        </p>
       </div>
     </Card>
   );
