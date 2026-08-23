@@ -6,12 +6,15 @@ import {
   GitCommit,
   Loader2,
   Plug,
-  AlertTriangle,
+  AlertCircle,
   CheckCircle2,
   Send,
   Undo2,
   Eye,
   MessageSquare,
+  ChevronRight,
+  Bot,
+  Rocket,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -38,6 +41,9 @@ const STEP_ICON: Record<VibeStepKind, typeof Brain> = {
   error: AlertTriangle,
   done: CheckCircle2,
 };
+
+// Local alias for AlertTriangle if needed, but AlertCircle is fine
+const AlertTriangle = AlertCircle;
 
 function DiffView({ diff }: { diff: string }) {
   return (
@@ -77,7 +83,6 @@ export function VibeCodeAgentChat({ projectId }: { projectId?: string }) {
       prev.map((m) => {
         if (m.id !== messageId) return m;
         const steps = [...(m.steps ?? [])];
-        // Collapse a running step into its finished counterpart.
         const idx = steps.findIndex(
           (s) => s.status === "running" && s.kind === step.kind && s.title.split(" ").pop() === step.title.split(" ").pop(),
         );
@@ -250,13 +255,13 @@ export function VibeCodeAgentChat({ projectId }: { projectId?: string }) {
 
           {messages.map((m) =>
             m.role === "user" ? (
-              <div key={m.id} className="flex justify-end">
-                <div className="max-w-[80%] rounded-xl bg-primary/10 border border-primary/20 px-3 py-2 text-sm">
+              <div key={m.id} className="flex justify-end pb-4">
+                <div className="max-w-[85%] rounded-2xl bg-primary/10 border border-primary/20 px-4 py-3 text-sm text-foreground shadow-lg shadow-primary/5">
                   {m.content}
                 </div>
               </div>
             ) : (
-              <div key={m.id} className="space-y-2">
+              <div key={m.id} className="space-y-6">
                 {(m.steps ?? []).map((step) => {
                   const Icon = STEP_ICON[step.kind] ?? Brain;
                   return (
@@ -264,9 +269,7 @@ export function VibeCodeAgentChat({ projectId }: { projectId?: string }) {
                       key={step.id}
                       className="group relative rounded-xl border border-border/40 bg-card/40 px-3 py-3 transition-all hover:bg-card/60"
                     >
-                      {/* Left timeline line */}
-                      <div className="absolute -left-[17px] top-0 h-full w-[2px] bg-border/20 group-last:h-1/2" />
-                      <div className="absolute -left-[21px] top-4 h-2.5 w-2.5 rounded-full border-2 border-primary bg-background shadow-[0_0_8px_rgba(201,148,26,0.4)]" />
+                      <div className="absolute -left-[31px] top-4 h-2.5 w-2.5 rounded-full border-2 border-primary bg-background shadow-[0_0_8px_rgba(201,148,26,0.4)]" />
 
                       <div className="flex items-center gap-2">
                         {step.status === "running" ? (
