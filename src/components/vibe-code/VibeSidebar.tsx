@@ -5,7 +5,8 @@ import {
   Rocket, 
   Plug, 
   Settings,
-  ChevronRight
+  ChevronRight,
+  Code
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -51,19 +52,19 @@ export function VibeSidebar({ activeTab, onTabChange }: { activeTab: string; onT
       <nav className="flex w-full flex-1 flex-col items-center gap-4 px-3">
         <SidebarItem 
           icon={Bot} 
-          label="Agent" 
+          label="Agente" 
           active={activeTab === 'agent'} 
           onClick={() => onTabChange('agent')}
         />
         <SidebarItem 
           icon={Files} 
-          label="Files" 
+          label="Arquivos" 
           active={activeTab === 'files'} 
           onClick={() => onTabChange('files')}
         />
         <SidebarItem 
           icon={Globe} 
-          label="Domains" 
+          label="Domínios" 
           active={activeTab === 'domains'} 
           onClick={() => onTabChange('domains')}
         />
@@ -75,7 +76,7 @@ export function VibeSidebar({ activeTab, onTabChange }: { activeTab: string; onT
         />
         <SidebarItem 
           icon={Plug} 
-          label="Integrations" 
+          label="Integrações" 
           active={activeTab === 'integrations'} 
           onClick={() => onTabChange('integrations')}
         />
@@ -84,7 +85,7 @@ export function VibeSidebar({ activeTab, onTabChange }: { activeTab: string; onT
       <div className="mt-auto flex w-full flex-col items-center gap-4 px-3">
         <SidebarItem 
           icon={Settings} 
-          label="Settings" 
+          label="Config" 
           active={activeTab === 'settings'} 
           onClick={() => onTabChange('settings')}
         />

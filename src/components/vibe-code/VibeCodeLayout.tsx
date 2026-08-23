@@ -6,7 +6,11 @@ import {
   Settings, 
   Files,
   ArrowRight,
-  Code
+  Code,
+  Laptop,
+  Monitor,
+  Tablet,
+  Smartphone
 } from "lucide-react";
 import { VibeSidebar } from "./VibeSidebar";
 import { VibeTopBar } from "./VibeTopBar";
@@ -50,7 +54,7 @@ export default function VibeCodeLayout() {
           <div className="fixed bottom-0 left-0 z-50 flex h-16 w-full items-center justify-around border-t border-border/40 bg-card/60 backdrop-blur-xl px-2">
             <MobileNavItem 
               icon={Bot} 
-              label="Agent" 
+              label="Agente" 
               active={activeTab === 'agent'} 
               onClick={() => setActiveTab('agent')} 
             />
@@ -62,7 +66,7 @@ export default function VibeCodeLayout() {
             />
             <MobileNavItem 
               icon={Globe} 
-              label="Domains" 
+              label="Domínios" 
               active={activeTab === 'domains'} 
               onClick={() => setActiveTab('domains')} 
             />
@@ -98,8 +102,8 @@ function DesktopView({ activeTab, setActiveTab }: { activeTab: string; setActive
                    <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
                      <Rocket className="h-6 w-6" />
                    </div>
-                   <h3 className="text-sm font-medium">Ready for Preview</h3>
-                   <p className="text-xs text-muted-foreground mt-1">Prompt the agent to generate code.</p>
+                   <h3 className="text-sm font-medium text-foreground">Pronto para Preview</h3>
+                   <p className="text-xs text-muted-foreground mt-1">Interaja com o agente para gerar código.</p>
                  </div>
               </div>
             </TabsContent>
@@ -117,8 +121,8 @@ function DesktopView({ activeTab, setActiveTab }: { activeTab: string; setActive
   return (
     <div className="flex h-[calc(100vh-10rem)] items-center justify-center rounded-2xl border border-dashed border-border/60">
       <div className="text-center">
-        <h3 className="text-lg font-medium text-muted-foreground">Module under construction</h3>
-        <p className="text-sm text-muted-foreground/60">The {activeTab} section will be available soon.</p>
+        <h3 className="text-lg font-medium text-muted-foreground">Módulo em construção</h3>
+        <p className="text-sm text-muted-foreground/60">A seção de {activeTab} estará disponível em breve.</p>
       </div>
     </div>
   );
@@ -133,13 +137,13 @@ function MobileView({ activeTab }: { activeTab: string }) {
     case 'files':
       return (
         <div className="flex h-[calc(100vh-12rem)] items-center justify-center rounded-2xl border border-border/40 bg-card/20">
-          <p className="text-sm text-muted-foreground">Mobile Preview Mode</p>
+          <p className="text-sm text-muted-foreground">Modo Preview Mobile</p>
         </div>
       );
     default:
       return (
         <div className="py-20 text-center">
-          <p className="text-muted-foreground">Module coming to mobile soon.</p>
+          <p className="text-muted-foreground">Módulo mobile disponível em breve.</p>
         </div>
       );
   }
@@ -155,7 +159,7 @@ function MobileNavItem({ icon: Icon, label, active, onClick }: { icon: any; labe
       )}
     >
       <Icon className={cn("h-5 w-5", active && "animate-pulse")} />
-      <span className="text-[10px] font-medium">{label}</span>
+      <span className="text-[10px] font-medium uppercase tracking-tighter">{label}</span>
     </button>
   );
 }
