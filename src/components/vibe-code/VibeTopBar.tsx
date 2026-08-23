@@ -5,8 +5,12 @@ import { toast } from "sonner";
 
 export function VibeTopBar() {
   const handleDownload = () => {
-    toast.info("Preparing KUBO Vibe Desktop (Tauri Wrapper)...", {
-      description: "Available for macOS (Universal), Windows, and Linux.",
+    toast("KUBO Vibe Desktop & Mobile", {
+      description: "Select your platform: macOS (Universal), Windows (x64), iOS (App Store), or Android (APK).",
+      action: {
+        label: "View All Builds",
+        onClick: () => window.open('/docs/builds', '_blank'),
+      },
     });
   };
 
