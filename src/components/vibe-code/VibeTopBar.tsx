@@ -5,11 +5,11 @@ import { toast } from "sonner";
 
 export function VibeTopBar() {
   const handleDownload = () => {
-    toast("KUBO Vibe Desktop & Mobile", {
-      description: "Select your platform: macOS (Universal), Windows (x64), iOS (App Store), or Android (APK).",
+    toast("Download KUBO Vibe", {
+      description: "Available for Mac (M1/M2/Intel), iOS (iPhone/iPad), Windows and Android.",
       action: {
-        label: "View All Builds",
-        onClick: () => window.open('/docs/builds', '_blank'),
+        label: "Builds",
+        onClick: () => window.open('https://kubovibe.dev/downloads', '_blank'),
       },
     });
   };
