@@ -150,8 +150,8 @@ const TOOL_CONFIGS: Record<ToolKey, {
 };
 
 const TOOL_TO_FN: Record<string, string> = {
-  chat: "creative-chat",
-  nano_banana: "creative-image",
+  chat: "creative-router",
+  nano_banana: "creative-router",
   downloader: "creative-download",
   clips: "creative-clips",
   avatar: "creative-video",
