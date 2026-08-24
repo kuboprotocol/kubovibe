@@ -74,18 +74,16 @@ const TOOL_CONFIGS: Record<ToolKey, {
     placeholder: "Escreva um artigo sobre economia criativa...",
   },
   nano_banana: { 
-    title: "Nano Banana", 
-    description: "Criar e editar imagens impressionantes com IA.", 
+    title: "Imagens Premium", 
+    description: "Criação de imagens de alta qualidade (Pollinations/Gemini).", 
     cost: 1,
     promptLabel: "Descreva a imagem",
     placeholder: "Um astronauta andando a cavalo em Marte, estilo futurista...",
     options: [
       { key: "size", label: "Tamanho", type: "select", options: ["1024x1024", "1024x1792", "1792x1024"], default: "1024x1024" },
-      { key: "style", label: "Estilo Visual", type: "select", options: ["Realista", "Cyberpunk", "Anime", "Minimalista", "3D Render", "Óleo sobre tela"], default: "Realista" },
-      { key: "engine", label: "Motor", type: "select", options: ["Servidor (créditos)", "Puter.js (grátis)", "Puter.js (teste grátis)"], default: "Servidor (créditos)" }
+      { key: "engine", label: "Motor", type: "select", options: ["Padrão (Pollinations)", "Premium (Gemini)"], default: "Padrão (Pollinations)" }
     ]
   },
-
   downloader: { 
     title: "Downloader Universal", 
     description: "Baixe vídeos de qualquer rede social (YouTube, TikTok, Instagram).", 
@@ -121,8 +119,8 @@ const TOOL_CONFIGS: Record<ToolKey, {
     placeholder: "Crie um vídeo de 30 segundos sobre curiosidades do café...",
   },
   music: { 
-    title: "Kubo Music AI", 
-    description: "Gere músicas originais completas via Suno IA.", 
+    title: "MusKAI Music", 
+    description: "Criação de músicas profissionais via MusKAI.", 
     cost: 1,
     promptLabel: "Estilo e tema da música",
     placeholder: "Um lo-fi relaxante para estudar com batidas de jazz...",
