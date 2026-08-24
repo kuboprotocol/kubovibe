@@ -1,37 +1,61 @@
-I have analyzed the security posture of the application using the project's local verification scripts and the Supabase linter. While I couldn't directly access "Wiz" findings through an automated tool, I found several critical vulnerabilities in existing database functions that I will now resolve.
+# Plan - Implement Creative Panel with Fixed Cost AI Engine
 
-## Findings to Fix
+Transition the Creative Economy panel to a fixed-cost model using **Featherless.ai** as the primary engine for text/simple tasks, while maintaining **OpenRouter** for frontier quality models and **Sogni** for video/music via MusKAI.
 
-1.  **SECURITY DEFINER Hardening**: Several functions are missing the mandatory `SET search_path = public, pg_temp` attribute, which is a common PostgreSQL security vulnerability.
-    - Affected: `internal.is_kubo_admin`, `public.notify_creative_status_change`, and `public.get_creative_audit_logs`.
-2.  **SQL Injection Vulnerability**: The function `get_creative_audit_logs` accepts arbitrary table and column names, which could be exploited by an authenticated user to read sensitive data from other tables.
-3.  **Improper Access Control**: Trigger functions and utility functions marked as `SECURITY DEFINER` are callable by authenticated users without sufficient internal validation.
+## User Review Required
+
+> [!IMPORTANT]
+> - **API Keys**: I will need the `FEATHERLESS_API_KEY` to be added via `add_secret` before the edge functions can fully function.
+> - **MusKAI Pricing**: Credit costs for video are estimated at ~36 credits based on Sogni's Spark/API pricing. This will be finalized once the default video duration is confirmed.
+> - **Featherless Concurrency**: The Premium tier ($25) allows 4 concurrent requests. I will implement a queuing system in the edge function to handle overflows.
 
 ## Proposed Changes
 
-### Database Migrations
-- Update `internal.is_kubo_admin` to include a fixed `search_path`.
-- Update `public.notify_creative_status_change` (trigger function) to include a fixed `search_path` and ensure it only executes intended logic.
-- Completely refactor `public.get_creative_audit_logs`:
-    - Add fixed `search_path`.
-    - Implement a strict whitelist for the `p_table` parameter.
-    - Add a permission check to ensure users can only see logs they are authorized to access (either their own logs or if they are an admin).
-- Explicitly revoke `EXECUTE` on sensitive `SECURITY DEFINER` functions from `public` and `authenticated` roles where appropriate, or ensure they have robust internal checks.
+### Backend (Edge Functions)
+
+#### 1. New `creative-router` Function
+- **Provider Orchestration**: Centralized routing for all Creative Panel tasks.
+- **Featherless Integration**: Connect to `https://api.featherless.ai/v1` (OpenAI-compatible).
+- **Concurrency Management**: Simple memory-based queue (or brief sleep/retry) to respect Featherless request limits.
+- **Tier-based Routing**:
+    - **Free/Basic**: Featherless (Llama/Mistral) + Pollinations (Image).
+    - **Premium/Enterprise**: Featherless for volume + OpenRouter (Claude 3.5 Sonnet / GPT-4o) for complex requests.
+- **Safety**: Hard caps on output tokens (1500) and video duration (180s rejection).
+
+#### 2. Update Shared Helpers (`supabase/functions/_shared/creative.ts`)
+- Refactor `deductCredits` and `recordAsset` to work seamlessly with the new router.
+- Ensure the credit ledger remains agnostic to the underlying provider cost structure.
+
+### Frontend (Creative Panel)
+
+#### 1. UI Updates (`src/pages/CreativePage.tsx` & `src/components/creative/CreativeToolInterface.tsx`)
+- **Engine Selection**: Update the "Orchestrator" logic to prefer the new `creative-router`.
+- **Transparency**: Display credit costs to users before generation, especially for expensive tasks like video.
+- **Feature Cleanup**: Remove direct Puter.js calls where Featherless now takes over.
+- **Redirection**: Update "Create Video" and "Create Music" to redirect to the MusKAI external product as per the new strategy.
+
+#### 2. Specialized Tool Modules
+- **PDF & Docs**: Implement local utility modules for creation/conversion (no generative cost).
+- **Image/Video Editing**: Implement local processing (Canvas/FFmpeg-wasm where possible) for basic crops/cuts.
+
+### Infrastructure & Configuration
+- **Plan Config**: Update `src/lib/planConfig.ts` if needed to reflect the new daily credit allotments or tier access.
 
 ## Technical Details
 
-### Whitelisting in `get_creative_audit_logs`
-I will restrict the `p_table` argument to only allow:
-- `creative_export_audit_log`
-- `creative_audit_trail`
+- **Featherless Base URL**: `https://api.featherless.ai/v1`
+- **Models to use (Featherless)**: `meta-llama/llama-3.1-70b-instruct`, `mistralai/mistral-7b-instruct-v0.3`.
+- **MusKAI Redirects**: Use external URLs for specialized video/music generation.
+- **Error Handling**: Implement 429 (Too Many Requests) handling for Featherless concurrency limits with automatic fallback to OpenRouter for paid tiers.
 
-### Permission Enforcement
-I will add a check:
-```sql
-IF NOT internal.is_kubo_admin() THEN
-  -- For non-admins, ensure they only access their own records
-  -- (Validation logic depends on the specific table structure)
-END IF;
-```
+## Verification Plan
 
-I'll also update the `security_audit_logs` to record these hardening actions.
+### Automated Tests
+- **Smoke Tests**: Verify the `creative-router` can reach Featherless and OpenRouter.
+- **Credit Deductions**: Test that credits are deducted correctly even when the backend provider cost is "fixed".
+
+### Manual Verification
+- Test "Free" user experience (Featherless path).
+- Test "Pro" user experience (OpenRouter frontier path).
+- Verify redirects to MusKAI work correctly.
+- Check UI responsiveness when switching between tools.
