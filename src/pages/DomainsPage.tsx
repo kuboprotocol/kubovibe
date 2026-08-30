@@ -426,9 +426,9 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
       return;
     }
 
-    await supabase.from("kubo_domain_transfers").update({ last_notified_at: new Date().toISOString() }).eq("id", t.id);
     setResendingEmail(null);
-    toast.success(`Status email resent to ${recipient}`);
+    toast.success("Status email resent");
+
     onTransferred();
   };
 
