@@ -22,7 +22,13 @@ Deno.serve(async (req) => {
   const token = (req.headers.get('Authorization') ?? '').replace('Bearer ', '').trim()
   if (!token || token !== serviceKey) return json({ error: 'unauthorized' }, 401)
 
-  let payload: { referrerId?: string; referredName?: string; creditsEarned?: number }
+  let payload: {
+    referrerId?: string
+    referredName?: string
+    creditsEarned?: number
+    recipientEmail?: string
+    templateData?: { referredName?: string; creditsEarned?: number }
+  }
   try {
     payload = await req.json()
   } catch {
@@ -30,12 +36,18 @@ Deno.serve(async (req) => {
   }
 
   const referrerId = String(payload.referrerId ?? '')
-  if (!referrerId) return json({ error: 'invalid_referrer' }, 400)
+  const referredName = payload.referredName ?? payload.templateData?.referredName ?? ''
+  const creditsEarned = payload.creditsEarned ?? payload.templateData?.creditsEarned ?? 100
 
   const admin = createClient(supabaseUrl, serviceKey)
-  const { data: userData } = await admin.auth.admin.getUserById(referrerId)
-  const recipient = userData?.user?.email
+  let recipient = payload.recipientEmail ?? ''
+  if (!recipient) {
+    if (!referrerId) return json({ error: 'invalid_referrer' }, 400)
+    const { data: userData } = await admin.auth.admin.getUserById(referrerId)
+    recipient = userData?.user?.email ?? ''
+  }
   if (!recipient) return json({ error: 'no_recipient' }, 404)
+
 
   try {
     const result = await sendTemplateEmail('referral-notification', recipient, {
