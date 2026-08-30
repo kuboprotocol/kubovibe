@@ -1,6 +1,9 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders, sanitizeError } from "../_shared/cors.ts";
+import { sendTemplateEmail } from "../_shared/transactional-email-templates/send-email.ts";
+import { logEmailSend } from "../_shared/email-send-log.ts";
+
 
 const IONOS_API = "https://api.hosting.ionos.com/domains/v1";
 const MAX_RETRIES = 8;
