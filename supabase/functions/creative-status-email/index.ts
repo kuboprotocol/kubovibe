@@ -1,10 +1,17 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { EmailAPIError, sendLovableEmail } from "npm:@lovable.dev/email-js@0.1.0";
+import { logEmailSend } from "../_shared/email-send-log.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 );
+
+// Verified sender subdomain delegated to Lovable — never the root domain.
+const SENDER_DOMAIN = "notify.kubovibe.dev";
+const FROM_DOMAIN = "kubovibe.dev";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
