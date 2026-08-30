@@ -268,6 +268,60 @@ export type Database = {
         }
         Relationships: []
       }
+      cloud_sessions: {
+        Row: {
+          billed_minutes: number
+          container_ref: string
+          created_at: string
+          credits_spent: number
+          id: string
+          idle_timeout_seconds: number
+          last_activity_at: string
+          preview_url: string | null
+          project_id: string
+          started_at: string
+          status: string
+          terminal_url: string | null
+          terminated_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          billed_minutes?: number
+          container_ref: string
+          created_at?: string
+          credits_spent?: number
+          id?: string
+          idle_timeout_seconds?: number
+          last_activity_at?: string
+          preview_url?: string | null
+          project_id: string
+          started_at?: string
+          status?: string
+          terminal_url?: string | null
+          terminated_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          billed_minutes?: number
+          container_ref?: string
+          created_at?: string
+          credits_spent?: number
+          id?: string
+          idle_timeout_seconds?: number
+          last_activity_at?: string
+          preview_url?: string | null
+          project_id?: string
+          started_at?: string
+          status?: string
+          terminal_url?: string | null
+          terminated_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       connect_products: {
         Row: {
           connected_account_id: string
@@ -1701,6 +1755,36 @@ export type Database = {
           reseller_reference?: string
           resource_limits?: Json
           status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      mobile_devices: {
+        Row: {
+          apns_token: string
+          app_version: string | null
+          created_at: string
+          id: string
+          platform: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          apns_token: string
+          app_version?: string | null
+          created_at?: string
+          id?: string
+          platform?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          apns_token?: string
+          app_version?: string | null
+          created_at?: string
+          id?: string
+          platform?: string
           updated_at?: string
           user_id?: string
         }
