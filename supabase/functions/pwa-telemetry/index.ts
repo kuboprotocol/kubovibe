@@ -45,24 +45,58 @@ async function notifyAnomaly(supabase: any, anomalyData: any, userId: string) {
 }
 
 async function sendJobFailureEmail(admin: any, userId: string, jobId: string, errorMessage: string) {
+  const { data: u } = await admin.auth.admin.getUserById(userId);
+  const email = u?.user?.email;
+  if (!email) return;
+
+  const apiKey = Deno.env.get("LOVABLE_API_KEY");
+  if (!apiKey) {
+    console.error("LOVABLE_API_KEY is not configured; skipping failure email");
+    return;
+  }
+
+  const html = `<div style="font-family:sans-serif;padding:20px"><h2>Sua exportação falhou</h2><p>O job <code>${jobId}</code> falhou ao processar.</p><p><strong>Erro:</strong> ${String(errorMessage).slice(0, 500)}</p><p>Você pode reexecutar pela aba <strong>Jobs</strong> em PWA Telemetry.</p></div>`;
+  const text = `Sua exportação falhou. Job ${jobId}. Erro: ${String(errorMessage).slice(0, 500)}`;
+
   try {
-    const { data: u } = await admin.auth.admin.getUserById(userId);
-    const email = u?.user?.email;
-    if (!email) return;
-    await admin.rpc("enqueue_email", {
-      queue_name: "transactional_emails",
-      payload: {
+    await sendLovableEmail(
+      {
         to: email,
-        from: "Kubo Vibe <noreply@kubovibe.dev>",
+        from: `Kubo Vibe <noreply@${EMAIL_FROM_DOMAIN}>`,
+        sender_domain: EMAIL_SENDER_DOMAIN,
         subject: "Falha na exportação de telemetria PWA",
+        html,
+        text,
         purpose: "transactional",
-        html: `<div style="font-family:sans-serif;padding:20px"><h2>Sua exportação falhou</h2><p>O job <code>${jobId}</code> falhou ao processar.</p><p><strong>Erro:</strong> ${String(errorMessage).slice(0, 500)}</p><p>Você pode reexecutar pela aba <strong>Jobs</strong> em PWA Telemetry.</p></div>`,
+        label: "pwa_export_failure",
+        idempotency_key: `pwa-export-failure-${jobId}`,
       },
+      { apiKey, sendUrl: Deno.env.get("LOVABLE_SEND_URL") }
+    );
+    await logEmailSend(admin, {
+      templateName: "pwa_export_failure",
+      recipientEmail: email,
+      status: "sent",
     });
   } catch (e) {
-    console.error("Failed to send failure email:", e);
+    if (e instanceof EmailAPIError && e.code === "recipient_suppressed") {
+      await logEmailSend(admin, {
+        templateName: "pwa_export_failure",
+        recipientEmail: email,
+        status: "suppressed",
+      });
+      return;
+    }
+    await logEmailSend(admin, {
+      templateName: "pwa_export_failure",
+      recipientEmail: email,
+      status: "failed",
+      errorMessage: e instanceof Error ? e.message : String(e),
+    });
+    console.error("Failed to send failure email:", e instanceof Error ? e.message : String(e));
   }
 }
+
 
 function buildEventsQuery(admin: any, f: any) {
   let q = admin.from("pwa_telemetry_events").select("*");
