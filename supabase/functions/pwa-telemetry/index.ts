@@ -2,7 +2,14 @@
 // POST /pwa-telemetry { action: 'cancel', jobId: '...' }
 // Returns paginated telemetry events, aggregated session summary, and supports filtered export.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { EmailAPIError, sendLovableEmail } from "npm:@lovable.dev/email-js@0.1.0";
 import { validatePublicUrl } from "../_shared/security.ts";
+import { logEmailSend } from "../_shared/email-send-log.ts";
+
+// Verified sender subdomain delegated to Lovable — never the root domain.
+const EMAIL_SENDER_DOMAIN = "notify.kubovibe.dev";
+const EMAIL_FROM_DOMAIN = "kubovibe.dev";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
