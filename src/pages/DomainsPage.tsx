@@ -417,31 +417,15 @@ function TransferTab({ transfers, onTransferred }: { transfers: Transfer[]; onTr
     const left = cooldownLeft(t);
     if (left > 0) { toast.error(`Wait ${left}s before resending the email.`); return; }
     setResendingEmail(t.id);
-    const { data: userData } = await supabase.auth.getUser();
-    const recipient = t.notify_email || userData.user?.email;
-    if (!recipient) {
-      toast.error("No destination email found. Add a notification email to the transfer.");
-      setResendingEmail(null);
-      return;
-    }
-    const { error } = await supabase.functions.invoke("send-transactional-email", {
-      body: {
-        templateName: "domain-transfer-status",
-        recipientEmail: recipient,
-        idempotencyKey: `transfer-resend-${t.id}-${Date.now()}`,
-        templateData: {
-          domain: t.domain_name,
-          status: t.status,
-          message: t.status_message || undefined,
-          registrar: t.current_registrar || undefined,
-        },
-      },
+    const { error } = await supabase.functions.invoke("send-domain-transfer-status", {
+      body: { transferId: t.id },
     });
     if (error) {
       setResendingEmail(null);
       toast.error(error.message);
       return;
     }
+
     await supabase.from("kubo_domain_transfers").update({ last_notified_at: new Date().toISOString() }).eq("id", t.id);
     setResendingEmail(null);
     toast.success(`Status email resent to ${recipient}`);
