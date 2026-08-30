@@ -1,31 +1,25 @@
 project_id = "dlqmmubasyldcylhnqqd"
 
-[functions.rls-test-create-user]
-verify_jwt = false
-
-[functions.gmail-oauth-callback]
-verify_jwt = false
-
-[functions.gmail-sync-accounts]
-verify_jwt = false
-
-[functions.github-signin-initiate]
-verify_jwt = false
-
-[functions.github-signin-callback]
-verify_jwt = false
-
-[functions.deploy-webhook]
-verify_jwt = false
-
-[functions.deploy-healthcheck]
-verify_jwt = false
-
-[functions.runtime-error-beacon]
-verify_jwt = false
-
-[functions.deploy-smoke-test]
-verify_jwt = false
-
-[functions.api-health-check]
-verify_jwt = false
+[functions]
+  [functions.api-health-check]
+    verify_jwt = false
+  [functions.auth-email-hook]
+    verify_jwt = false
+  [functions.deploy-healthcheck]
+    verify_jwt = false
+  [functions.deploy-smoke-test]
+    verify_jwt = false
+  [functions.deploy-webhook]
+    verify_jwt = false
+  [functions.github-signin-callback]
+    verify_jwt = false
+  [functions.github-signin-initiate]
+    verify_jwt = false
+  [functions.gmail-oauth-callback]
+    verify_jwt = false
+  [functions.gmail-sync-accounts]
+    verify_jwt = false
+  [functions.rls-test-create-user]
+    verify_jwt = false
+  [functions.runtime-error-beacon]
+    verify_jwt = false
