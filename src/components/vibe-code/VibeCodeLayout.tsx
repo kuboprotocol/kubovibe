@@ -17,6 +17,7 @@ import { VibeTopBar } from "./VibeTopBar";
 import { VibeCodeAgentChat } from "./VibeCodeAgentChat";
 import { VibeConnectorPanel } from "./VibeConnectorPanel";
 import { VibeDomainsPanel } from "./VibeDomainsPanel";
+import { VibeCloudSessionPanel } from "./VibeCloudSessionPanel";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
@@ -118,6 +119,10 @@ function DesktopView({ activeTab, setActiveTab }: { activeTab: string; setActive
     return <VibeDomainsPanel />;
   }
 
+  if (activeTab === 'deploys') {
+    return <VibeCloudSessionPanel />;
+  }
+
   return (
     <div className="flex h-[calc(100vh-10rem)] items-center justify-center rounded-2xl border border-dashed border-border/60">
       <div className="text-center">
@@ -134,6 +139,8 @@ function MobileView({ activeTab }: { activeTab: string }) {
       return <VibeCodeAgentChat />;
     case 'domains':
       return <VibeDomainsPanel />;
+    case 'deploys':
+      return <VibeCloudSessionPanel />;
     case 'files':
       return (
         <div className="flex h-[calc(100vh-12rem)] items-center justify-center rounded-2xl border border-border/40 bg-card/20">
