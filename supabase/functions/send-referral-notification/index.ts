@@ -52,11 +52,12 @@ Deno.serve(async (req) => {
   try {
     const result = await sendTemplateEmail('referral-notification', recipient, {
       templateData: {
-        referredName: payload.referredName ?? '',
-        creditsEarned: payload.creditsEarned ?? 100,
+        referredName,
+        creditsEarned,
       },
-      idempotencyKey: `referral-${referrerId}-${payload.referredName ?? ''}`,
+      idempotencyKey: `referral-${referrerId || recipient}-${referredName}`,
     })
+
 
     await logEmailSend(admin, {
       templateName: 'referral-notification',
