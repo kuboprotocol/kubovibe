@@ -139,6 +139,8 @@ function MobileView({ activeTab }: { activeTab: string }) {
       return <VibeCodeAgentChat />;
     case 'domains':
       return <VibeDomainsPanel />;
+    case 'deploys':
+      return <VibeCloudSessionPanel />;
     case 'files':
       return (
         <div className="flex h-[calc(100vh-12rem)] items-center justify-center rounded-2xl border border-border/40 bg-card/20">
