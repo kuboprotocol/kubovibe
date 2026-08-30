@@ -575,9 +575,10 @@ testimonials and a waitlist form.`}</Pre>
         <H2>Email Infrastructure</H2>
         <P>
           Emails are sent through the verified subdomain <Code>notify.kubovibe.dev</Code>{' '}
-          using React Email templates and the shared <Code>send-transactional-email</Code>{' '}
-          edge function.
+          using React Email templates and managed delivery, with each feature sending its
+          own email from its own server function.
         </P>
+
         <H3>Triggers</H3>
         <UL>
           <li>Account: welcome, magic link, password reset, reauthentication.</li>
