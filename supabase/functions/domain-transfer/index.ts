@@ -70,15 +70,17 @@ function nextBackoff(retryCount: number): Date {
 async function notifyStatus(svc: any, t: any, status: string, message: string | null) {
   if (!t.notify_email || t.last_notified_status === status) return;
   try {
-    await svc.functions.invoke("send-transactional-email", {
-      body: {
-        templateName: "domain-transfer-status",
-        recipientEmail: t.notify_email,
-        idempotencyKey: `transfer-${t.id}-${status}`,
-        templateData: { domain: t.domain_name, status, message: message ?? "", registrar: t.current_registrar ?? "" },
-      },
+    const result = await sendTemplateEmail("domain-transfer-status", t.notify_email, {
+      templateData: { domain: t.domain_name, status, message: message ?? "", registrar: t.current_registrar ?? "" },
+      idempotencyKey: `transfer-${t.id}-${status}`,
+    });
+    await logEmailSend(svc, {
+      templateName: "domain-transfer-status",
+      recipientEmail: t.notify_email,
+      status: result.sent ? "sent" : "suppressed",
     });
     await svc.from("kubo_domain_transfers").update({ last_notified_status: status, last_notified_at: new Date().toISOString() }).eq("id", t.id);
+
   } catch (e) {
     await logConn(svc, t.user_id, "transfer.notify_error", "error", `Falha ao enviar email: ${(e as any)?.message ?? e}`, { transfer_id: t.id });
   }
