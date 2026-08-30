@@ -119,6 +119,10 @@ function DesktopView({ activeTab, setActiveTab }: { activeTab: string; setActive
     return <VibeDomainsPanel />;
   }
 
+  if (activeTab === 'deploys') {
+    return <VibeCloudSessionPanel />;
+  }
+
   return (
     <div className="flex h-[calc(100vh-10rem)] items-center justify-center rounded-2xl border border-dashed border-border/60">
       <div className="text-center">
