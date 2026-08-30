@@ -35,7 +35,6 @@ const ConnectorRenderPage = lazy(() => import("./pages/ConnectorRenderPage"));
 const ShortlinksPage = lazy(() => import("./pages/ShortlinksPage"));
 const LeaderboardPage = lazy(() => import("./pages/LeaderboardPage"));
 const PublicAppPage = lazy(() => import("./pages/PublicAppPage"));
-const UnsubscribePage = lazy(() => import("./pages/UnsubscribePage"));
 const EmailDashboardPage = lazy(() => import("./pages/EmailDashboardPage"));
 const PlanPage = lazy(() => import("./pages/PlanPage"));
 const SharedAuditPage = lazy(() => import("./pages/SharedAuditPage"));
@@ -217,7 +216,6 @@ const App = forwardRef<HTMLDivElement, any>((props, ref) => {
                 <Route path="/plan/:id" element={<ProtectedRoute><PlanPage /></ProtectedRoute>} />
                 <Route path="/app/:projectId" element={<PublicAppPage />} />
                 <Route path="/app/:projectId/:slug" element={<PublicAppPage />} />
-                <Route path="/unsubscribe" element={<UnsubscribePage />} />
                 <Route path="/game" element={<ProtectedRoute><GamePage /></ProtectedRoute>} />
                 <Route path="/game/editor" element={<ProtectedRoute><GameEditorPage /></ProtectedRoute>} />
                 <Route path="/game/retro" element={<ProtectedRoute><GameRetroPage /></ProtectedRoute>} />

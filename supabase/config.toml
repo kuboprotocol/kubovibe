@@ -23,3 +23,13 @@ project_id = "dlqmmubasyldcylhnqqd"
     verify_jwt = false
   [functions.runtime-error-beacon]
     verify_jwt = false
+  [functions.preview-transactional-email]
+    verify_jwt = false
+  [functions.handle-email-events]
+    verify_jwt = false
+  [functions.send-welcome-email]
+    verify_jwt = false
+  [functions.send-referral-notification]
+    verify_jwt = false
+  [functions.send-domain-transfer-status]
+    verify_jwt = true
