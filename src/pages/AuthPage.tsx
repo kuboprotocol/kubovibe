@@ -211,15 +211,11 @@ const AuthPage = forwardRef<HTMLDivElement, any>((props, ref) => {
         if (error) throw error
         toast.success('Account created successfully!')
 
-        // Send welcome email (fire-and-forget)
-        supabase.functions.invoke('send-transactional-email', {
-          body: {
-            templateName: 'welcome',
-            recipientEmail: email,
-            idempotencyKey: `welcome-${data.user?.id || email}`,
-            templateData: { name: displayName },
-          },
+        // Send welcome email (fire-and-forget; recipient resolved server-side)
+        supabase.functions.invoke('send-welcome-email', {
+          body: { userId: data.user?.id },
         }).catch(() => {})
+
 
         navigate(safeRedirect, { replace: true })
       }

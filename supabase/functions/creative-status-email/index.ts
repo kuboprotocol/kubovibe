@@ -1,10 +1,17 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { EmailAPIError, sendLovableEmail } from "npm:@lovable.dev/email-js@0.1.0";
+import { logEmailSend } from "../_shared/email-send-log.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 );
+
+// Verified sender subdomain delegated to Lovable — never the root domain.
+const SENDER_DOMAIN = "notify.kubovibe.dev";
+const FROM_DOMAIN = "kubovibe.dev";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -66,13 +73,8 @@ serve(async (req) => {
     const label = labels[status] || status;
     const investigateUrl = `${siteUrl}/creative/investigation?investigate=${asset_id}`;
 
-    await supabase.rpc("enqueue_email", {
-      queue_name: "auth_emails",
-      payload: {
-        to: profile.email,
-        from: `${orgName} <noreply@kubovibe.dev>`,
-        subject: subjects[status] || `Atualização: ${tool}`,
-        html: `
+    const subject = subjects[status] || `Atualização: ${tool}`;
+    const html = `
           <div style="font-family:sans-serif;max-width:600px;margin:0 auto;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden">
             <div style="background:${statusColor};padding:20px;text-align:center;color:white">
               ${logoUrl ? `<img src="${logoUrl}" alt="${orgName}" style="max-height:40px;margin-bottom:10px"><br>` : ""}
@@ -96,15 +98,56 @@ serve(async (req) => {
             <div style="background:#f3f4f6;padding:15px;text-align:center;font-size:12px;color:#6b7280">
               ${orgName} &copy; 2026 — Gerencie suas preferências em ${siteUrl}/creative/notifications
             </div>
-          </div>`,
-        text: `Execução ${tool} (${execution_id ?? asset_id}) atualizada para ${label}. ${reason ? `Motivo: ${reason}. ` : ""}${includeLink ? `Investigar: ${investigateUrl}` : ""}`,
-        purpose: "transactional",
-        label: "creative_status_update",
-        queued_at: new Date().toISOString(),
-      },
+          </div>`;
+    const text = `Execução ${tool} (${execution_id ?? asset_id}) atualizada para ${label}. ${reason ? `Motivo: ${reason}. ` : ""}${includeLink ? `Investigar: ${investigateUrl}` : ""}`;
+
+    const apiKey = Deno.env.get("LOVABLE_API_KEY");
+    if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured");
+
+    try {
+      await sendLovableEmail(
+        {
+          to: profile.email,
+          from: `${orgName} <noreply@${FROM_DOMAIN}>`,
+          sender_domain: SENDER_DOMAIN,
+          subject,
+          html,
+          text,
+          purpose: "transactional",
+          label: "creative_status_update",
+          idempotency_key: `creative-status-${execution_id ?? asset_id}-${status}`,
+        },
+        { apiKey, sendUrl: Deno.env.get("LOVABLE_SEND_URL") }
+      );
+    } catch (error) {
+      if (error instanceof EmailAPIError && error.code === "recipient_suppressed") {
+        await logEmailSend(supabase, {
+          templateName: "creative_status_update",
+          recipientEmail: profile.email,
+          status: "suppressed",
+        });
+        return new Response(JSON.stringify({ ok: false, reason: "recipient_suppressed" }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      await logEmailSend(supabase, {
+        templateName: "creative_status_update",
+        recipientEmail: profile.email,
+        status: "failed",
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+
+    await logEmailSend(supabase, {
+      templateName: "creative_status_update",
+      recipientEmail: profile.email,
+      status: "sent",
     });
 
     return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
   } catch (e) {
     console.error("[creative-status-email]", e);
     return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: corsHeaders });

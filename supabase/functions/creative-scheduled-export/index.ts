@@ -1,10 +1,17 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { EmailAPIError, sendLovableEmail } from "npm:@lovable.dev/email-js@0.1.0";
+import { logEmailSend } from "../_shared/email-send-log.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 );
+
+// Verified sender subdomain delegated to Lovable — never the root domain.
+const SENDER_DOMAIN = "notify.kubovibe.dev";
+const FROM_DOMAIN = "kubovibe.dev";
+
 
 serve(async (req) => {
   const { user_id, email, start_date, end_date } = await req.json();
@@ -43,14 +50,8 @@ serve(async (req) => {
 
     const { data: { publicUrl } } = supabase.storage.from("exports").getPublicUrl(fileName);
 
-    // Send email via RPC
-    await supabase.rpc("enqueue_email", {
-      queue_name: "auth_emails",
-      payload: {
-        to: email,
-        from: "Kubo Vibe <noreply@kubovibe.dev>",
-        subject: "Trilha de Auditoria Detalhada",
-        html: `
+    // Send email through Lovable's managed email API
+    const html = `
           <div style="font-family: sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
             <h2>Sua Trilha de Auditoria está pronta</h2>
             <p>O arquivo JSON contendo a trilha de auditoria detalhada para o período solicitado foi gerado com sucesso.</p>
@@ -60,10 +61,51 @@ serve(async (req) => {
             </div>
             <p style="font-size: 12px; color: #666; margin-top: 20px;">Este link expira em breve.</p>
           </div>
-        `,
-        purpose: "transactional"
+        `;
+    const text = `Sua trilha de auditoria está pronta (${data.length} itens). Baixe em: ${publicUrl}`;
+
+    const apiKey = Deno.env.get("LOVABLE_API_KEY");
+    if (!apiKey) throw new Error("LOVABLE_API_KEY is not configured");
+
+    try {
+      await sendLovableEmail(
+        {
+          to: email,
+          from: `Kubo Vibe <noreply@${FROM_DOMAIN}>`,
+          sender_domain: SENDER_DOMAIN,
+          subject: "Trilha de Auditoria Detalhada",
+          html,
+          text,
+          purpose: "transactional",
+          label: "creative_audit_export",
+          idempotency_key: `audit-export-${fileName}`,
+        },
+        { apiKey, sendUrl: Deno.env.get("LOVABLE_SEND_URL") }
+      );
+    } catch (error) {
+      if (error instanceof EmailAPIError && error.code === "recipient_suppressed") {
+        await logEmailSend(supabase, {
+          templateName: "creative_audit_export",
+          recipientEmail: email,
+          status: "suppressed",
+        });
+        return new Response("Export successful (recipient suppressed)", { status: 200 });
       }
+      await logEmailSend(supabase, {
+        templateName: "creative_audit_export",
+        recipientEmail: email,
+        status: "failed",
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+
+    await logEmailSend(supabase, {
+      templateName: "creative_audit_export",
+      recipientEmail: email,
+      status: "sent",
     });
+
 
     return new Response("Export successful", { status: 200 });
   } catch (err: any) {
