@@ -17,6 +17,7 @@ import { VibeTopBar } from "./VibeTopBar";
 import { VibeCodeAgentChat } from "./VibeCodeAgentChat";
 import { VibeConnectorPanel } from "./VibeConnectorPanel";
 import { VibeDomainsPanel } from "./VibeDomainsPanel";
+import { VibeCloudSessionPanel } from "./VibeCloudSessionPanel";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
