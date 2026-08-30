@@ -176,14 +176,28 @@ Deno.serve(async (req) => {
         }, user.email, `cloud_session:${session.id}:min:${elapsedMinutes}`);
 
         if (!charge.ok) {
-          // Grace window: warn the client, then terminate.
-          await admin.from("cloud_sessions").update({ status: "idle" }).eq("id", session.id);
+          // Grace window: warn once, then terminate on the next uncovered heartbeat.
+          const graceStartedMs = now - new Date(session.last_activity_at).getTime();
+          if (session.status === "idle" && graceStartedMs > GRACE_WINDOW_SECONDS * 1000) {
+            await destroyContainer(session.container_ref);
+            await admin.from("cloud_sessions").update({
+              status: "terminated",
+              terminated_at: new Date().toISOString(),
+            }).eq("id", session.id);
+            return json({ status: "terminated", reason: "insufficient_credits" }, 402);
+          }
+          if (session.status !== "idle") {
+            await admin.from("cloud_sessions")
+              .update({ status: "idle", last_activity_at: new Date().toISOString() })
+              .eq("id", session.id);
+          }
           return json({
             status: "grace",
             warning: "insufficient_credits",
             grace_seconds: GRACE_WINDOW_SECONDS,
           }, 402);
         }
+
 
         await admin.from("cloud_sessions").update({
           billed_minutes: elapsedMinutes,
