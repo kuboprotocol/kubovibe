@@ -191,6 +191,7 @@ const App = forwardRef<HTMLDivElement, any>((props, ref) => {
                 <Route path="/support" element={<SupportPage />} />
                 <Route path="/docs" element={<DocsPage />} />
                 <Route path="/reset-password" element={<ResetPasswordPage />} />
+                <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
                 
                 <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
                 <Route path="/builder" element={<ProtectedRoute><BuilderPage /></ProtectedRoute>} />
