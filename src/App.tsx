@@ -13,6 +13,7 @@ import AdGate from "@/components/AdGate";
 const Index = lazy(() => import("./pages/Index"));
 const AuthPage = lazy(() => import("./pages/AuthPage"));
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
+const OAuthConsent = lazy(() => import("./pages/OAuthConsent"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const BuilderPage = lazy(() => import("./pages/BuilderPage"));
 const CanvasPage = lazy(() => import("./pages/CanvasPage"));
