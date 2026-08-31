@@ -1,0 +1,174 @@
+{
+  "version": 1,
+  "sdk_version": "0.28.0",
+  "path": "/mcp",
+  "auth": {
+    "type": "oauth",
+    "issuer": "https://dlqmmubasyldcylhnqqd.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
+  },
+  "mcp": {
+    "server": {
+      "name": "kubo-vibe-dev",
+      "version": "0.1.0",
+      "title": "KUBO VIBE DEV"
+    },
+    "tools": [
+      {
+        "name": "list_projects",
+        "title": "List projects",
+        "description": "List the signed-in user's KUBO Vibe projects, newest first.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 10,
+              "description": "How many projects to return."
+            },
+            "publishedOnly": {
+              "type": "boolean",
+              "default": false,
+              "description": "Only return published projects."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_project",
+        "title": "Get project",
+        "description": "Fetch one of the signed-in user's projects by id, optionally including its generated code.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "projectId": {
+              "type": "string",
+              "format": "uuid",
+              "description": "The project id."
+            },
+            "includeCode": {
+              "type": "boolean",
+              "default": false,
+              "description": "Include the generated source code."
+            }
+          },
+          "required": [
+            "projectId"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "create_project",
+        "title": "Create project",
+        "description": "Create a new KUBO Vibe project for the signed-in user.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120,
+              "description": "Project title."
+            },
+            "description": {
+              "type": "string",
+              "maxLength": 500,
+              "description": "Optional short description."
+            }
+          },
+          "required": [
+            "title"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_agent_jobs",
+        "title": "List agent jobs",
+        "description": "List the signed-in user's recent AI agent jobs with status, credits charged and errors.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 10,
+              "description": "How many jobs to return."
+            },
+            "status": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Filter by status, e.g. pending, running, completed, failed."
+            },
+            "agentSlug": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Filter by agent slug."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "credit_summary",
+        "title": "Credit summary",
+        "description": "Return the signed-in user's latest credit balance and their most recent credit transactions.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 10,
+              "description": "How many transactions to return."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}
