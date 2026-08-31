@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react-swc';
 import { VitePWA } from 'vite-plugin-pwa';
 import { componentTagger } from 'lovable-tagger';
 import { envCheckPlugin } from './vite-plugins/env-check';
+import { mcpPlugin } from '@lovable.dev/mcp-js/stacks/supabase/vite';
 import path from 'path';
 
 export default defineConfig(({ command, mode }) => {
@@ -32,6 +33,7 @@ export default defineConfig(({ command, mode }) => {
     },
     plugins: [
       envCheckPlugin(),
+      mcpPlugin(),
       react({ devTarget: 'es2020' }),
       isDev && componentTagger(),
       VitePWA({

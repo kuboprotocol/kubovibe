@@ -13,6 +13,7 @@ import AdGate from "@/components/AdGate";
 const Index = lazy(() => import("./pages/Index"));
 const AuthPage = lazy(() => import("./pages/AuthPage"));
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
+const OAuthConsent = lazy(() => import("./pages/OAuthConsent"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const BuilderPage = lazy(() => import("./pages/BuilderPage"));
 const CanvasPage = lazy(() => import("./pages/CanvasPage"));
@@ -191,6 +192,7 @@ const App = forwardRef<HTMLDivElement, any>((props, ref) => {
                 <Route path="/support" element={<SupportPage />} />
                 <Route path="/docs" element={<DocsPage />} />
                 <Route path="/reset-password" element={<ResetPasswordPage />} />
+                <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
                 
                 <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
                 <Route path="/builder" element={<ProtectedRoute><BuilderPage /></ProtectedRoute>} />
