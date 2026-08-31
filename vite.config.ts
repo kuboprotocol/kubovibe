@@ -33,6 +33,7 @@ export default defineConfig(({ command, mode }) => {
     },
     plugins: [
       envCheckPlugin(),
+      mcpPlugin(),
       react({ devTarget: 'es2020' }),
       isDev && componentTagger(),
       VitePWA({
