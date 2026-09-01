@@ -82,7 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const hasAnyRole = (required: string[]) => required.some((r) => roles.includes(r))
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, isAdmin, roles, hasAnyRole, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, rolesLoading, isAdmin, roles, hasAnyRole, signOut }}>
       {children}
     </AuthContext.Provider>
   )
