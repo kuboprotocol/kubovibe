@@ -6,6 +6,8 @@ interface AuthContextType {
   user: User | null
   session: Session | null
   loading: boolean
+  /** True while the roles query is in flight; role-gated routes should wait on this. */
+  rolesLoading: boolean
   isAdmin: boolean
   roles: string[]
   hasAnyRole: (roles: string[]) => boolean
@@ -16,6 +18,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   session: null,
   loading: true,
+  rolesLoading: false,
   isAdmin: false,
   roles: [],
   hasAnyRole: () => false,
@@ -29,17 +32,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
   const [roles, setRoles] = useState<string[]>([])
+  const [rolesLoading, setRolesLoading] = useState(false)
 
   const loadRoles = async (userId: string | undefined) => {
     if (!userId) {
       setRoles([])
+      setRolesLoading(false)
       return
     }
-    const { data } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userId)
-    setRoles((data ?? []).map((r: any) => r.role))
+    setRolesLoading(true)
+    try {
+      const { data } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+      setRoles((data ?? []).map((r: { role: string }) => r.role))
+    } finally {
+      setRolesLoading(false)
+    }
   }
 
   useEffect(() => {
@@ -72,7 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const hasAnyRole = (required: string[]) => required.some((r) => roles.includes(r))
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, isAdmin, roles, hasAnyRole, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, rolesLoading, isAdmin, roles, hasAnyRole, signOut }}>
       {children}
     </AuthContext.Provider>
   )

@@ -10,10 +10,12 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute = forwardRef<HTMLDivElement, ProtectedRouteProps>(({ children, requireRoles }, ref) => {
-  const { user, loading, hasAnyRole } = useAuth()
+  const { user, loading, rolesLoading, hasAnyRole } = useAuth()
   const location = useLocation()
 
-  if (loading) {
+  // While the session or the roles query is in flight, keep the spinner —
+  // otherwise admins flash the "Access restricted" screen before roles arrive.
+  if (loading || (requireRoles && requireRoles.length > 0 && rolesLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
