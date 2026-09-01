@@ -32,17 +32,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
   const [roles, setRoles] = useState<string[]>([])
+  const [rolesLoading, setRolesLoading] = useState(false)
 
   const loadRoles = async (userId: string | undefined) => {
     if (!userId) {
       setRoles([])
+      setRolesLoading(false)
       return
     }
-    const { data } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userId)
-    setRoles((data ?? []).map((r: any) => r.role))
+    setRolesLoading(true)
+    try {
+      const { data } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+      setRoles((data ?? []).map((r: { role: string }) => r.role))
+    } finally {
+      setRolesLoading(false)
+    }
   }
 
   useEffect(() => {
