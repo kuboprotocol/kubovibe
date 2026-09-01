@@ -15,7 +15,7 @@ interface JobRow { id: string; user_id: string; agent_slug: string; status: stri
 interface AuditRow { id: string; actor_user_id: string | null; actor_role: string; action: string; resource_type: string; resource_id: string | null; success: boolean; error_message: string | null; created_at: string }
 
 export default function AdminPage() {
-  const { user, loading, isAdmin } = useAuth();
+  const { user, loading, rolesLoading, isAdmin } = useAuth();
   const [agents, setAgents] = useState<AgentRow[]>([]);
   const [jobs, setJobs] = useState<JobRow[]>([]);
   const [audits, setAudits] = useState<AuditRow[]>([]);
@@ -40,7 +40,7 @@ export default function AdminPage() {
     })();
   }, [isAdmin]);
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin" /></div>;
+  if (loading || rolesLoading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin" /></div>;
   if (!user) return <Navigate to="/auth" replace />;
   if (!isAdmin) return <Navigate to="/dashboard" replace />;
 
