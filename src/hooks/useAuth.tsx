@@ -6,6 +6,8 @@ interface AuthContextType {
   user: User | null
   session: Session | null
   loading: boolean
+  /** True while the roles query is in flight; role-gated routes should wait on this. */
+  rolesLoading: boolean
   isAdmin: boolean
   roles: string[]
   hasAnyRole: (roles: string[]) => boolean
@@ -16,6 +18,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   session: null,
   loading: true,
+  rolesLoading: false,
   isAdmin: false,
   roles: [],
   hasAnyRole: () => false,
