@@ -38,7 +38,7 @@ export function useDeviceRegistration() {
       const mod = (await import(/* @vite-ignore */ pluginId)) as {
         PushNotifications: {
           requestPermissions: () => Promise<{ receive: string }>;
-          addListener: (event: string, cb: (payload: never) => void) => void;
+          addListener: (event: string, cb: (payload: { value: string }) => void) => void;
           register: () => Promise<void>;
         };
       };
