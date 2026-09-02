@@ -33,10 +33,18 @@ export function useDeviceRegistration() {
     if (!isNativeApp()) return;
     setState("registering");
     try {
-      const { PushNotifications } = await import(
-        /* @vite-ignore */ "@capacitor/push-notifications"
-      );
+      // Resolved at runtime only — the plugin exists in the native shell build.
+      const pluginId = "@capacitor/push-notifications";
+      const mod = (await import(/* @vite-ignore */ pluginId)) as {
+        PushNotifications: {
+          requestPermissions: () => Promise<{ receive: string }>;
+          addListener: (event: string, cb: (payload: never) => void) => void;
+          register: () => Promise<void>;
+        };
+      };
+      const PushNotifications = mod.PushNotifications;
       const perm = await PushNotifications.requestPermissions();
+
       if (perm.receive !== "granted") {
         setState("denied");
         return;
