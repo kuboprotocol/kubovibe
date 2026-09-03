@@ -1,7 +1,7 @@
-import { useState } from "react";
-import { Cloud, Play, Square, Smartphone, Terminal, Timer, Coins } from "lucide-react";
+import { useEffect } from "react";
+import { Cloud, Play, Square, Smartphone, Terminal, Timer, Coins, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { useWorkspaceProject } from "@/hooks/useWorkspaceProject";
 import { Badge } from "@/components/ui/badge";
 import { useCloudSession } from "@/hooks/useCloudSession";
 import { cn } from "@/lib/utils";
@@ -15,7 +15,11 @@ const STATUS_STYLES: Record<string, string> = {
 
 export function VibeCloudSessionPanel() {
   const { session, sessions, loading, start, terminate } = useCloudSession();
-  const [projectId, setProjectId] = useState("");
+  const { projectId, projects, setProjectId, loadProjects, mobileLink } = useWorkspaceProject();
+
+  useEffect(() => {
+    void loadProjects();
+  }, [loadProjects]);
 
   return (
     <div className="space-y-6">
@@ -38,12 +42,18 @@ export function VibeCloudSessionPanel() {
         </div>
 
         <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-          <Input
+          <select
             value={projectId}
             onChange={(e) => setProjectId(e.target.value)}
-            placeholder="Project ID (UUID)"
-            className="sm:max-w-sm"
-          />
+            className="h-10 w-full rounded-md border border-border/60 bg-background/60 px-3 text-sm sm:max-w-sm"
+          >
+            {projects.length === 0 && <option value="">No projects yet</option>}
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.title}
+              </option>
+            ))}
+          </select>
           <Button onClick={() => start(projectId)} disabled={loading || !projectId || !!session}>
             <Play className="mr-2 h-4 w-4" /> Start session
           </Button>
@@ -52,6 +62,12 @@ export function VibeCloudSessionPanel() {
               <Square className="mr-2 h-4 w-4" /> Terminate
             </Button>
           )}
+          <Button variant="outline" asChild>
+            <a href={mobileLink} target="_blank" rel="noreferrer">
+              <Smartphone className="mr-2 h-4 w-4" /> Open in mobile app
+              <ExternalLink className="ml-2 h-3 w-3" />
+            </a>
+          </Button>
         </div>
       </header>
 
