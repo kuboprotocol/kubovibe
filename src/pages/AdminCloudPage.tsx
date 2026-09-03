@@ -317,7 +317,10 @@ export default function AdminCloudPage() {
               {filteredSessions.map((s) => (
                 <div key={s.id} className="grid gap-1 px-4 py-3 text-xs sm:grid-cols-[1fr_auto] sm:items-center">
                   <div className="min-w-0">
-                    <p className="truncate font-mono">{s.id}</p>
+                    <button className="truncate font-mono hover:text-primary" onClick={() => setOpenSession(s.id)}>
+                      {s.id}
+                    </button>
+
                     <p className="truncate text-muted-foreground">
                       user {s.user_id.slice(0, 8)} · project {s.project_id.slice(0, 8)} · {s.container_ref}
                     </p>
