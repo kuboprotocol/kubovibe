@@ -47,6 +47,7 @@ const GameMetaversePage = lazy(() => import("./pages/GameMetaversePage"));
 const GameSdkPage = lazy(() => import("./pages/GameSdkPage"));
 const GameVrPage = lazy(() => import("./pages/GameVrPage"));
 const GameAiPage = lazy(() => import("./pages/GameAiPage"));
+const AdminCloudPage = lazy(() => import("./pages/AdminCloudPage"));
 const AdminSkillsPage = lazy(() => import("./pages/AdminSkillsPage"));
 const DomainsPage = lazy(() => import("./pages/DomainsPage"));
 const CreativePage = lazy(() => import("./pages/CreativePage"));
