@@ -28,7 +28,7 @@ export default function AdminTeamsPage() {
     const [profiles, roles, projects, tx, sessions] = await Promise.all([
       supabase.from("profiles").select("id, display_name, created_at").order("created_at", { ascending: false }).limit(500),
       supabase.from("user_roles").select("user_id, role"),
-      supabase.from("projects").select("id, name, user_id").order("created_at", { ascending: false }).limit(2000),
+      supabase.from("projects").select("id, title, user_id").order("created_at", { ascending: false }).limit(2000),
       supabase.from("credit_transactions").select("user_id, delta, balance_after, created_at").order("created_at", { ascending: false }).limit(5000),
       supabase.from("cloud_sessions").select("user_id, status, billed_minutes"),
     ]);
@@ -39,7 +39,7 @@ export default function AdminTeamsPage() {
     const projectMap = new Map<string, { id: string; name: string }[]>();
     (projects.data ?? []).forEach((p) => {
       if (!p.user_id) return;
-      projectMap.set(p.user_id, [...(projectMap.get(p.user_id) ?? []), { id: p.id, name: p.name ?? "Untitled" }]);
+      projectMap.set(p.user_id, [...(projectMap.get(p.user_id) ?? []), { id: p.id, name: p.title ?? "Untitled" }]);
     });
 
     const balance = new Map<string, number>();
