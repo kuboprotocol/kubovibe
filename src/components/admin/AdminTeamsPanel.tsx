@@ -188,7 +188,7 @@ export default function AdminTeamsPanel() {
             )}
           </CardContent>
         </Card>
-      </div>
     </div>
+
   );
 }
