@@ -66,6 +66,7 @@ const PwaExportJobDetailsPage = lazy(() => import("./pages/PwaExportJobDetails")
 const DocsPage = lazy(() => import("./pages/DocsPage"));
 const VibeCodePage = lazy(() => import("./pages/VibeCodePage"));
 const MobileAgentPage = lazy(() => import("./pages/MobileAgentPage"));
+const AnywherePage = lazy(() => import("./pages/AnywherePage"));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -193,6 +194,7 @@ const App = forwardRef<HTMLDivElement, any>((props, ref) => {
                 <Route path="/pricing" element={<PricingPage />} />
                 <Route path="/support" element={<SupportPage />} />
                 <Route path="/docs" element={<DocsPage />} />
+                <Route path="/anywhere" element={<AnywherePage />} />
                 <Route path="/reset-password" element={<ResetPasswordPage />} />
                 <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
                 
