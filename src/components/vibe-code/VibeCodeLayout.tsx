@@ -18,12 +18,18 @@ import { VibeCodeAgentChat } from "./VibeCodeAgentChat";
 import { VibeConnectorPanel } from "./VibeConnectorPanel";
 import { VibeDomainsPanel } from "./VibeDomainsPanel";
 import { VibeCloudSessionPanel } from "./VibeCloudSessionPanel";
+import { useWorkspaceProject } from "@/hooks/useWorkspaceProject";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 export default function VibeCodeLayout() {
   const [activeTab, setActiveTab] = useState("agent");
   const [isMobile, setIsMobile] = useState(false);
+  const { projectId, loadProjects } = useWorkspaceProject();
+
+  useEffect(() => {
+    void loadProjects();
+  }, [loadProjects]);
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
@@ -43,9 +49,9 @@ export default function VibeCodeLayout() {
         <main className="flex-1 overflow-auto p-4 pb-20 md:p-6 md:pb-6">
           <div className="mx-auto max-w-7xl">
             {isMobile ? (
-              <MobileView activeTab={activeTab} />
+              <MobileView activeTab={activeTab} projectId={projectId} />
             ) : (
-              <DesktopView activeTab={activeTab} setActiveTab={setActiveTab} />
+              <DesktopView activeTab={activeTab} setActiveTab={setActiveTab} projectId={projectId} />
             )}
           </div>
         </main>
@@ -84,11 +90,11 @@ export default function VibeCodeLayout() {
   );
 }
 
-function DesktopView({ activeTab, setActiveTab }: { activeTab: string; setActiveTab: (t: string) => void }) {
+function DesktopView({ activeTab, projectId }: { activeTab: string; setActiveTab: (t: string) => void; projectId: string }) {
   if (activeTab === 'agent' || activeTab === 'files') {
     return (
       <div className="grid h-[calc(100vh-8rem)] gap-6 lg:grid-cols-[400px_1fr]">
-        <VibeCodeAgentChat />
+        <VibeCodeAgentChat projectId={projectId} />
         <div className="flex flex-col gap-6">
           <Tabs defaultValue="preview" className="flex-1">
             <TabsList className="bg-white/5 border border-white/10">
@@ -133,10 +139,10 @@ function DesktopView({ activeTab, setActiveTab }: { activeTab: string; setActive
   );
 }
 
-function MobileView({ activeTab }: { activeTab: string }) {
+function MobileView({ activeTab, projectId }: { activeTab: string; projectId: string }) {
   switch (activeTab) {
     case 'agent':
-      return <VibeCodeAgentChat />;
+      return <VibeCodeAgentChat projectId={projectId} />;
     case 'domains':
       return <VibeDomainsPanel />;
     case 'deploys':

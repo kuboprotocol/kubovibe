@@ -21,20 +21,15 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useCloudSession } from "@/hooks/useCloudSession";
 import { useGitRepo } from "@/hooks/useGitRepo";
 import { useDeviceRegistration } from "@/hooks/useDeviceRegistration";
 import { useSessionBuilds } from "@/hooks/useSessionBuilds";
+import { useWorkspaceProject } from "@/hooks/useWorkspaceProject";
 import { cn } from "@/lib/utils";
 
 type Tab = "session" | "files" | "terminal" | "preview";
-
-interface ProjectRow {
-  id: string;
-  title: string;
-}
 
 const TABS: Array<{ id: Tab; label: string; icon: typeof Cloud }> = [
   { id: "session", label: "Session", icon: Cloud },
@@ -57,29 +52,19 @@ export default function MobileAgentPage() {
   const device = useDeviceRegistration();
   const builds = useSessionBuilds(session?.id);
 
+  const workspace = useWorkspaceProject();
+  const { projectId, repo, branch, projects, setProjectId, setRepo, setBranch } = workspace;
+
   const [tab, setTab] = useState<Tab>("session");
-  const [projects, setProjects] = useState<ProjectRow[]>([]);
-  const [projectId, setProjectId] = useState("");
-  const [repo, setRepo] = useState("");
-  const [branch, setBranch] = useState("main");
   const [openPath, setOpenPath] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState("");
   const [commitMessage, setCommitMessage] = useState("chore: update from KUBO Mobile Agent");
   const [buildCommand, setBuildCommand] = useState("npm run build");
 
   useEffect(() => {
-    (async () => {
-      if (!user) return;
-      const { data } = await supabase
-        .from("projects")
-        .select("id,title")
-        .order("updated_at", { ascending: false })
-        .limit(20);
-      const rows = (data ?? []) as ProjectRow[];
-      setProjects(rows);
-      if (rows[0] && !projectId) setProjectId(rows[0].id);
-    })();
-  }, [user]);
+    if (!user) return;
+    void workspace.loadProjects();
+  }, [user, workspace.loadProjects]);
 
   useEffect(() => {
     void git.loadRepos();
