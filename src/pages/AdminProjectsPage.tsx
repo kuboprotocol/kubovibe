@@ -1,0 +1,238 @@
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { ArrowLeft, FolderKanban, Hammer, Loader2, RefreshCw, Rocket, Search, Sparkles } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
+
+interface BuildRow {
+  id: string;
+  project_id: string | null;
+  kind: string;
+  status: string;
+  credits_spent: number;
+  command: string | null;
+  created_at: string;
+}
+
+interface ProjectRow {
+  id: string;
+  title: string;
+  builds: number;
+  deploys: number;
+  failed: number;
+  buildCredits: number;
+  aiCredits: number;
+  total: number;
+  lastActivity: string | null;
+}
+
+const STATUS_STYLE: Record<string, string> = {
+  succeeded: "border-emerald-500/30 text-emerald-400",
+  running: "border-amber-500/30 text-amber-400",
+  queued: "border-border text-muted-foreground",
+  failed: "border-destructive/30 text-destructive",
+};
+
+export default function AdminProjectsPage() {
+  const [projects, setProjects] = useState<ProjectRow[]>([]);
+  const [builds, setBuilds] = useState<BuildRow[]>([]);
+  const [busy, setBusy] = useState(true);
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<string | null>(null);
+
+  const load = async () => {
+    setBusy(true);
+    const [projectsRes, buildsRes, txRes] = await Promise.all([
+      supabase.from("projects").select("id, title, updated_at").order("updated_at", { ascending: false }).limit(500),
+      supabase
+        .from("session_builds")
+        .select("id, project_id, kind, status, credits_spent, command, created_at")
+        .order("created_at", { ascending: false })
+        .limit(2000),
+      supabase.from("credit_transactions").select("delta, category, metadata, created_at").order("created_at", { ascending: false }).limit(5000),
+    ]);
+
+    const buildRows = (buildsRes.data ?? []) as BuildRow[];
+    setBuilds(buildRows);
+
+    const aiByProject = new Map<string, number>();
+    (txRes.data ?? []).forEach((t) => {
+      const meta = (t.metadata ?? {}) as Record<string, unknown>;
+      const pid = typeof meta.project_id === "string" ? meta.project_id : null;
+      if (!pid || Number(t.delta) >= 0) return;
+      aiByProject.set(pid, (aiByProject.get(pid) ?? 0) + Math.abs(Number(t.delta)));
+    });
+
+    const rows: ProjectRow[] = (projectsRes.data ?? []).map((p) => {
+      const own = buildRows.filter((b) => b.project_id === p.id);
+      const buildCredits = own.reduce((a, b) => a + Number(b.credits_spent ?? 0), 0);
+      const aiCredits = aiByProject.get(p.id) ?? 0;
+      return {
+        id: p.id,
+        title: p.title,
+        builds: own.filter((b) => b.kind === "build").length,
+        deploys: own.filter((b) => b.kind === "deploy").length,
+        failed: own.filter((b) => b.status === "failed").length,
+        buildCredits,
+        aiCredits,
+        total: buildCredits + aiCredits,
+        lastActivity: own[0]?.created_at ?? p.updated_at,
+      };
+    });
+
+    rows.sort((a, b) => b.total - a.total);
+    setProjects(rows);
+    setBusy(false);
+  };
+
+  useEffect(() => {
+    void load();
+  }, []);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return projects;
+    return projects.filter((p) => p.title.toLowerCase().includes(q) || p.id.includes(q));
+  }, [projects, search]);
+
+  const history = useMemo(() => (selected ? builds.filter((b) => b.project_id === selected) : []), [builds, selected]);
+
+  const totals = useMemo(
+    () => ({
+      builds: projects.reduce((a, p) => a + p.builds, 0),
+      deploys: projects.reduce((a, p) => a + p.deploys, 0),
+      credits: projects.reduce((a, p) => a + p.total, 0),
+    }),
+    [projects],
+  );
+
+  return (
+    <div className="min-h-screen bg-background p-4 md:p-8">
+      <div className="mx-auto max-w-6xl space-y-6">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Button asChild variant="ghost" size="icon">
+              <Link to="/admin" aria-label="Back to admin">
+                <ArrowLeft className="h-4 w-4" />
+              </Link>
+            </Button>
+            <div>
+              <h1 className="font-orbitron text-2xl font-bold">Projects</h1>
+              <p className="text-sm text-muted-foreground">Build history, deploys and AI billing per project — same credit ledger.</p>
+            </div>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => void load()} disabled={busy}>
+            {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+            Refresh
+          </Button>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-3">
+          {[
+            { label: "Builds", value: totals.builds, icon: Hammer },
+            { label: "Deploys", value: totals.deploys, icon: Rocket },
+            { label: "Credits billed", value: totals.credits.toFixed(1), icon: Sparkles },
+          ].map((c) => (
+            <Card key={c.label}>
+              <CardHeader className="pb-2">
+                <CardDescription className="flex items-center gap-2">
+                  <c.icon className="h-3.5 w-3.5" /> {c.label}
+                </CardDescription>
+                <CardTitle className="text-2xl">{c.value}</CardTitle>
+              </CardHeader>
+            </Card>
+          ))}
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <FolderKanban className="h-4 w-4" /> Cost by project
+            </CardTitle>
+            <div className="relative pt-2">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input className="pl-9" placeholder="Search project" value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+          </CardHeader>
+          <CardContent className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-left text-xs uppercase text-muted-foreground">
+                <tr>
+                  <th className="py-2">Project</th>
+                  <th className="text-right">Builds</th>
+                  <th className="text-right">Deploys</th>
+                  <th className="text-right">Failed</th>
+                  <th className="text-right">Build credits</th>
+                  <th className="text-right">AI credits</th>
+                  <th className="text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((p) => (
+                  <tr
+                    key={p.id}
+                    onClick={() => setSelected(selected === p.id ? null : p.id)}
+                    className={cn("cursor-pointer border-t border-border/60 hover:bg-muted/40", selected === p.id && "bg-muted/50")}
+                  >
+                    <td className="py-2">
+                      <div className="font-medium">{p.title}</div>
+                      <div className="font-mono text-[11px] text-muted-foreground">{p.id.slice(0, 8)}</div>
+                    </td>
+                    <td className="text-right">{p.builds}</td>
+                    <td className="text-right">{p.deploys}</td>
+                    <td className="text-right">{p.failed}</td>
+                    <td className="text-right">{p.buildCredits.toFixed(1)}</td>
+                    <td className="text-right">{p.aiCredits.toFixed(1)}</td>
+                    <td className="text-right font-semibold">{p.total.toFixed(1)}</td>
+                  </tr>
+                ))}
+                {!busy && filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-muted-foreground">
+                      No projects found.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+
+        {selected && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Action history</CardTitle>
+              <CardDescription>Every build and deploy charged to this project.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {history.length === 0 && <p className="text-sm text-muted-foreground">No actions recorded yet.</p>}
+              {history.map((b) => (
+                <div key={b.id} className="flex items-center justify-between gap-3 rounded-lg border border-border/60 p-3 text-sm">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-[10px] uppercase">
+                        {b.kind}
+                      </Badge>
+                      <Badge variant="outline" className={cn("text-[10px]", STATUS_STYLE[b.status] ?? "")}>
+                        {b.status}
+                      </Badge>
+                    </div>
+                    <p className="truncate font-mono text-[11px] text-muted-foreground">{b.command ?? "—"}</p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <div className="font-semibold">{Number(b.credits_spent ?? 0).toFixed(1)} cr</div>
+                    <div className="text-[11px] text-muted-foreground">{new Date(b.created_at).toLocaleString()}</div>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </div>
+  );
+}
