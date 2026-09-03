@@ -74,7 +74,7 @@ export default function AdminProjectsPage() {
         .order("created_at", { ascending: false })
         .limit(2000),
       supabase.from("credit_transactions").select("delta, category, metadata, created_at").order("created_at", { ascending: false }).limit(5000),
-      supabase.from("cloud_sessions").select("project_id, credits_spent, started_at").limit(2000),
+      supabase.from("cloud_sessions").select("project_id, credits_spent, billed_minutes, started_at").limit(2000),
     ]);
 
     const buildRows = (buildsRes.data ?? []) as BuildRow[];
