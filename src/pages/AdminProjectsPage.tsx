@@ -233,7 +233,19 @@ export default function AdminProjectsPage() {
           ))}
         </div>
 
+        <Tabs defaultValue="projects" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="projects">
+              <FolderKanban className="mr-2 h-4 w-4" /> By project
+            </TabsTrigger>
+            <TabsTrigger value="daily">
+              <CalendarDays className="mr-2 h-4 w-4" /> By day
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="projects" className="space-y-6">
         <Card>
+
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <FolderKanban className="h-4 w-4" /> Cost by project
