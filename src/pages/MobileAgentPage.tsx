@@ -15,6 +15,7 @@ import {
   Save,
   Hammer,
   Rocket,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -53,7 +54,7 @@ export default function MobileAgentPage() {
   const builds = useSessionBuilds(session?.id);
 
   const workspace = useWorkspaceProject();
-  const { projectId, repo, branch, projects, setProjectId, setRepo, setBranch } = workspace;
+  const { projectId, repo, branch, projects, setProjectId, setRepo, setBranch, setFile, desktopLink } = workspace;
 
   const [tab, setTab] = useState<Tab>("session");
   const [openPath, setOpenPath] = useState<string | null>(null);
@@ -90,6 +91,7 @@ export default function MobileAgentPage() {
     const file = await git.readFile(repo, branch, path);
     if (!file) return;
     setOpenPath(file.path);
+    setFile(file.path);
     setFileContent(file.content);
   };
 
@@ -103,12 +105,19 @@ export default function MobileAgentPage() {
               {device.native ? `${device.platform} · push ${device.state}` : "Web preview of the iOS client"}
             </p>
           </div>
-          <Badge
-            variant="outline"
-            className={cn("text-[10px] uppercase", STATUS_STYLES[session?.status ?? "terminated"])}
-          >
-            {session?.status ?? "offline"}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Button asChild size="sm" variant="outline" className="h-7 px-2 text-[10px]">
+              <a href={desktopLink} target="_blank" rel="noreferrer">
+                <ExternalLink className="mr-1 h-3 w-3" /> Vibe Code
+              </a>
+            </Button>
+            <Badge
+              variant="outline"
+              className={cn("text-[10px] uppercase", STATUS_STYLES[session?.status ?? "terminated"])}
+            >
+              {session?.status ?? "offline"}
+            </Badge>
+          </div>
         </div>
       </header>
 
