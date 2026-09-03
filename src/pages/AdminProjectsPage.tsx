@@ -335,6 +335,70 @@ export default function AdminProjectsPage() {
             </CardContent>
           </Card>
         )}
+          </TabsContent>
+
+          <TabsContent value="daily">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <CalendarDays className="h-4 w-4" /> Daily cost
+                </CardTitle>
+                <CardDescription className="flex items-center gap-2">
+                  <Timer className="h-3.5 w-3.5" /> Credits spent and container minutes per day, with a monthly projection from the last 30 days.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="text-left text-xs uppercase text-muted-foreground">
+                    <tr>
+                      <th className="py-2">Day</th>
+                      <th className="text-right">Container min</th>
+                      <th className="text-right">Container</th>
+                      <th className="text-right">Build</th>
+                      <th className="text-right">Deploy</th>
+                      <th className="text-right">AI</th>
+                      <th className="text-right">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {days.map((d) => (
+                      <tr key={d.day} className="border-t border-border/60">
+                        <td className="py-2 font-medium">{d.day}</td>
+                        <td className="text-right">{d.containerMinutes.toFixed(0)}</td>
+                        <td className="text-right">{d.containerCredits.toFixed(1)}</td>
+                        <td className="text-right">{d.buildCredits.toFixed(1)}</td>
+                        <td className="text-right">{d.deployCredits.toFixed(1)}</td>
+                        <td className="text-right">{d.aiCredits.toFixed(1)}</td>
+                        <td className="text-right font-semibold">{d.total.toFixed(1)}</td>
+                      </tr>
+                    ))}
+                    {!busy && days.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="py-8 text-center text-muted-foreground">
+                          No usage recorded yet.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                  {days.length > 0 && (
+                    <tfoot>
+                      <tr className="border-t border-border">
+                        <td className="py-2 font-semibold">Projected / month</td>
+                        <td className="text-right text-primary">{dailyProjection.minutes.toFixed(0)}</td>
+                        <td className="text-right text-primary">{dailyProjection.container.toFixed(1)}</td>
+                        <td className="text-right text-primary">{dailyProjection.build.toFixed(1)}</td>
+                        <td className="text-right text-primary">{dailyProjection.deploy.toFixed(1)}</td>
+                        <td className="text-right text-primary">{dailyProjection.ai.toFixed(1)}</td>
+                        <td className="text-right font-semibold text-primary">{dailyProjection.total.toFixed(1)}</td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+
       </div>
     </div>
   );
