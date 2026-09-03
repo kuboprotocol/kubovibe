@@ -184,7 +184,24 @@ export default function AdminProjectsPage() {
 
   const history = useMemo(() => (selected ? builds.filter((b) => b.project_id === selected) : []), [builds, selected]);
 
+  const dailyProjection = useMemo(() => {
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const recent = days.filter((d) => d.day >= since);
+    const span = Math.max(recent.length, 1);
+    const sum = (pick: (d: DayRow) => number) => recent.reduce((a, d) => a + pick(d), 0);
+    const factor = 30 / span;
+    return {
+      minutes: sum((d) => d.containerMinutes) * factor,
+      container: sum((d) => d.containerCredits) * factor,
+      build: sum((d) => d.buildCredits) * factor,
+      deploy: sum((d) => d.deployCredits) * factor,
+      ai: sum((d) => d.aiCredits) * factor,
+      total: sum((d) => d.total) * factor,
+    };
+  }, [days]);
+
   const totals = useMemo(
+
     () => ({
       builds: projects.reduce((a, p) => a + p.builds, 0),
       deploys: projects.reduce((a, p) => a + p.deploys, 0),
