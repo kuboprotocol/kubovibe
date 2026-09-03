@@ -509,7 +509,17 @@ export default function AdminCloudPage() {
           </TabsContent>
         </Tabs>
 
+        <AdminSessionWindow
+          session={sessions.find((s) => s.id === openSession) ?? null}
+          builds={builds}
+          projectTitle={titles[sessions.find((s) => s.id === openSession)?.project_id ?? ""]}
+          running={runningOn === openSession}
+          onClose={() => setOpenSession(null)}
+          onRun={(id, kind) => void runOnSession(id, kind)}
+        />
+
         <Dialog open={!!logBuild} onOpenChange={(open) => !open && setLogBuild(null)}>
+
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle className="font-mono text-sm">
