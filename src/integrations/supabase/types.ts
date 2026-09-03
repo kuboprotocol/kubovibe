@@ -2556,6 +2556,71 @@ export type Database = {
         }
         Relationships: []
       }
+      session_builds: {
+        Row: {
+          command: string | null
+          created_at: string
+          credits_spent: number
+          duration_ms: number | null
+          error_message: string | null
+          finished_at: string | null
+          id: string
+          kind: string
+          logs: string
+          preview_url: string | null
+          project_id: string | null
+          session_id: string
+          started_at: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          command?: string | null
+          created_at?: string
+          credits_spent?: number
+          duration_ms?: number | null
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          kind?: string
+          logs?: string
+          preview_url?: string | null
+          project_id?: string | null
+          session_id: string
+          started_at?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          command?: string | null
+          created_at?: string
+          credits_spent?: number
+          duration_ms?: number | null
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          kind?: string
+          logs?: string
+          preview_url?: string | null
+          project_id?: string | null
+          session_id?: string
+          started_at?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_builds_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "cloud_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shortlink_clicks: {
         Row: {
           clicked_at: string
