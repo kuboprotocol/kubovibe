@@ -436,6 +436,51 @@ testimonials and a waitlist form.`}</Pre>
     ),
   },
   {
+    id: 'anywhere',
+    title: 'KUBO Anywhere',
+    icon: Globe,
+    group: 'Platform',
+    content: (
+      <>
+        <H2>KUBO Anywhere</H2>
+        <P>
+          One workspace, two execution models. The project state (branch, open files, AI
+          conversation, Git history) lives in the backend, so nothing is ever trapped on a
+          single device — continuity between phone, tablet and desktop comes for free.
+        </P>
+        <H3>Mobile — the device never executes code</H3>
+        <P>
+          On iOS, iPadOS and Android the client only <em>commands</em> remote execution: a
+          native editor over a local copy of the files, a terminal client streaming an
+          ephemeral KUBO Cloud container, Git through the API (never a local binary), a live
+          preview rendered from the cloud build, and a push notification when a build or
+          deploy finishes. Android uses FCM where iOS uses APNs.
+        </P>
+        <H3>Desktop — KUBO Local Agent</H3>
+        <P>
+          On Windows, macOS and Linux a single signed background daemon runs everything on
+          your own hardware: real terminal, real local <Code>git</Code>, and a bridge
+          extension that works in both VS Code and Cursor. Access is granted per project
+          folder, never filesystem-wide.
+        </P>
+        <H3>Billing</H3>
+        <UL>
+          <li>
+            <strong>Mobile</strong> — per active container minute (1 credit/min, build 2,
+            deploy 4), charged on the same ledger.
+          </li>
+          <li>
+            <strong>Desktop</strong> — per AI action, exactly like Vibe Code on the web:
+            there is no container to host, so terminal commands and git operations are free.
+          </li>
+        </UL>
+        <P>
+          Full comparison and downloads live on the <Code>/anywhere</Code> page.
+        </P>
+      </>
+    ),
+  },
+  {
     id: 'credits',
     title: 'Credits & Plans',
     icon: CreditCard,
