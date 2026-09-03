@@ -98,25 +98,18 @@ export default function AdminTeamsPanel() {
   );
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8">
-      <div className="mx-auto max-w-6xl space-y-6">
+    <div className="space-y-6 pt-4">
         <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <Button asChild variant="ghost" size="icon">
-              <Link to="/admin" aria-label="Back to admin">
-                <ArrowLeft className="h-4 w-4" />
-              </Link>
-            </Button>
-            <div>
-              <h1 className="font-orbitron text-2xl font-bold">Teams</h1>
-              <p className="text-sm text-muted-foreground">Accounts, projects, credits and active cloud sessions.</p>
-            </div>
+          <div>
+            <h2 className="font-orbitron text-lg font-bold">Teams</h2>
+            <p className="text-sm text-muted-foreground">Accounts, projects, credits and active cloud sessions.</p>
           </div>
           <Button variant="outline" size="sm" onClick={() => void load()} disabled={busy}>
             {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
             Refresh
           </Button>
         </div>
+
 
         <div className="grid gap-4 sm:grid-cols-4">
           {[
