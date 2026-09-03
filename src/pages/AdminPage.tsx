@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import AdminTeamsPanel from "@/components/admin/AdminTeamsPanel";
 import { Input } from "@/components/ui/input";
 import { Loader2, Shield, Users, Bot, FileText, ArrowLeft, ScrollText } from "lucide-react";
 
@@ -70,6 +71,7 @@ export default function AdminPage() {
             <p className="text-muted-foreground mt-1">Operações, monitoramento e auditoria global.</p>
           </div>
           <div className="flex gap-2">
+            <Link to="/admin/teams"><Badge variant="outline" className="cursor-pointer">Teams</Badge></Link>
             <Link to="/admin/skills"><Badge variant="outline" className="cursor-pointer">Skills</Badge></Link>
             <Link to="/agents"><Badge variant="outline" className="cursor-pointer">Agents Hub</Badge></Link>
           </div>
@@ -90,6 +92,7 @@ export default function AdminPage() {
           <TabsList>
             <TabsTrigger value="jobs">Jobs ({filteredJobs.length})</TabsTrigger>
             <TabsTrigger value="agents">Agentes ({agents.length})</TabsTrigger>
+            <TabsTrigger value="teams">Teams</TabsTrigger>
             <TabsTrigger value="audits">Auditoria ({filteredAudits.length})</TabsTrigger>
           </TabsList>
 
@@ -138,6 +141,10 @@ export default function AdminPage() {
                 </Link>
               ))}
             </div>
+          </TabsContent>
+
+          <TabsContent value="teams">
+            <AdminTeamsPanel />
           </TabsContent>
 
           <TabsContent value="audits">
