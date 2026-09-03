@@ -6,6 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "sonner";
+
+const ROLES = ["user", "moderator", "admin"] as const;
 
 interface TeamRow {
   id: string;
@@ -16,6 +20,7 @@ interface TeamRow {
   spent: number;
   activeSessions: number;
   minutes: number;
+  byCategory: Record<string, number>;
 }
 
 export default function AdminTeamsPanel() {
@@ -29,7 +34,7 @@ export default function AdminTeamsPanel() {
       supabase.from("profiles").select("id, display_name, created_at").order("created_at", { ascending: false }).limit(500),
       supabase.from("user_roles").select("user_id, role"),
       supabase.from("projects").select("id, title, user_id").order("created_at", { ascending: false }).limit(2000),
-      supabase.from("credit_transactions").select("user_id, delta, balance_after, created_at").order("created_at", { ascending: false }).limit(5000),
+      supabase.from("credit_transactions").select("user_id, delta, balance_after, category, created_at").order("created_at", { ascending: false }).limit(5000),
       supabase.from("cloud_sessions").select("user_id, status, billed_minutes"),
     ]);
 
@@ -43,10 +48,18 @@ export default function AdminTeamsPanel() {
     });
 
     const balance = new Map<string, number>();
+    const byCategory = new Map<string, Record<string, number>>();
     const spent = new Map<string, number>();
     (tx.data ?? []).forEach((t) => {
       if (!balance.has(t.user_id)) balance.set(t.user_id, Number(t.balance_after ?? 0));
-      if (Number(t.delta) < 0) spent.set(t.user_id, (spent.get(t.user_id) ?? 0) + Math.abs(Number(t.delta)));
+      if (Number(t.delta) < 0) {
+        const amount = Math.abs(Number(t.delta));
+        spent.set(t.user_id, (spent.get(t.user_id) ?? 0) + amount);
+        const cat = t.category || "general";
+        const bucket = byCategory.get(t.user_id) ?? {};
+        bucket[cat] = (bucket[cat] ?? 0) + amount;
+        byCategory.set(t.user_id, bucket);
+      }
     });
 
     const active = new Map<string, number>();
@@ -66,9 +79,25 @@ export default function AdminTeamsPanel() {
         spent: spent.get(p.id) ?? 0,
         activeSessions: active.get(p.id) ?? 0,
         minutes: minutes.get(p.id) ?? 0,
+        byCategory: byCategory.get(p.id) ?? {},
       })),
     );
     setBusy(false);
+  };
+
+  const assignRole = async (userId: string, role: string) => {
+    const { error: delError } = await supabase.from("user_roles").delete().eq("user_id", userId);
+    if (delError) {
+      toast.error(delError.message);
+      return;
+    }
+    const { error } = await supabase.from("user_roles").insert({ user_id: userId, role });
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success(`Role updated to ${role}`);
+    setRows((prev) => prev.map((r) => (r.id === userId ? { ...r, roles: [role] } : r)));
   };
 
   useEffect(() => {
@@ -149,11 +178,18 @@ export default function AdminTeamsPanel() {
                     <div className="font-mono text-[11px] text-muted-foreground">{r.id.slice(0, 8)}</div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 text-xs">
-                    {r.roles.map((role) => (
-                      <Badge key={role} variant="outline" className="text-[10px]">
-                        {role}
-                      </Badge>
-                    ))}
+                    <Select value={r.roles[0] ?? "user"} onValueChange={(v) => void assignRole(r.id, v)}>
+                      <SelectTrigger className="h-7 w-[120px] text-[11px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ROLES.map((role) => (
+                          <SelectItem key={role} value={role} className="text-xs">
+                            {role}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <span className="text-muted-foreground">Balance</span>
                     <span className="font-semibold">{r.balance.toFixed(1)}</span>
                     <span className="text-muted-foreground">Spent</span>
@@ -167,6 +203,17 @@ export default function AdminTeamsPanel() {
                     )}
                   </div>
                 </div>
+                {Object.keys(r.byCategory).length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+                    {Object.entries(r.byCategory)
+                      .sort((a, b) => b[1] - a[1])
+                      .map(([cat, amount]) => (
+                        <span key={cat} className="rounded border border-border/60 px-2 py-0.5">
+                          {cat}: <span className="font-semibold text-foreground">{amount.toFixed(1)}</span>
+                        </span>
+                      ))}
+                  </div>
+                )}
                 <div className="mt-3 flex flex-wrap gap-1">
                   {r.projects.length === 0 ? (
                     <span className="text-xs text-muted-foreground">No projects</span>
