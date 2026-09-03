@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AdminSessionWindow } from "@/components/admin/AdminSessionWindow";
+
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -89,6 +91,8 @@ export default function AdminCloudPage() {
   const [command, setCommand] = useState("npm run build");
   const [logBuild, setLogBuild] = useState<BuildRow | null>(null);
   const [openProject, setOpenProject] = useState<string | null>(null);
+  const [openSession, setOpenSession] = useState<string | null>(null);
+
 
   const load = async () => {
     setBusy(true);
@@ -317,7 +321,10 @@ export default function AdminCloudPage() {
               {filteredSessions.map((s) => (
                 <div key={s.id} className="grid gap-1 px-4 py-3 text-xs sm:grid-cols-[1fr_auto] sm:items-center">
                   <div className="min-w-0">
-                    <p className="truncate font-mono">{s.id}</p>
+                    <button className="truncate font-mono hover:text-primary" onClick={() => setOpenSession(s.id)}>
+                      {s.id}
+                    </button>
+
                     <p className="truncate text-muted-foreground">
                       user {s.user_id.slice(0, 8)} · project {s.project_id.slice(0, 8)} · {s.container_ref}
                     </p>
@@ -502,7 +509,17 @@ export default function AdminCloudPage() {
           </TabsContent>
         </Tabs>
 
+        <AdminSessionWindow
+          session={sessions.find((s) => s.id === openSession) ?? null}
+          builds={builds}
+          projectTitle={titles[sessions.find((s) => s.id === openSession)?.project_id ?? ""]}
+          running={runningOn === openSession}
+          onClose={() => setOpenSession(null)}
+          onRun={(id, kind) => void runOnSession(id, kind)}
+        />
+
         <Dialog open={!!logBuild} onOpenChange={(open) => !open && setLogBuild(null)}>
+
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle className="font-mono text-sm">
