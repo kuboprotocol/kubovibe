@@ -133,6 +133,42 @@ export default function AdminProjectsPage() {
 
     rows.sort((a, b) => b.total - a.total);
     setProjects(rows);
+
+    const dayMap = new Map<string, DayRow>();
+    const touch = (iso: string) => {
+      const key = dayKey(iso);
+      let row = dayMap.get(key);
+      if (!row) {
+        row = { day: key, containerMinutes: 0, containerCredits: 0, buildCredits: 0, deployCredits: 0, aiCredits: 0, total: 0 };
+        dayMap.set(key, row);
+      }
+      return row;
+    };
+
+    (sessionsRes.data ?? []).forEach((s2) => {
+      const row = touch(s2.started_at);
+      row.containerMinutes += Number(s2.billed_minutes ?? 0);
+      row.containerCredits += Number(s2.credits_spent ?? 0);
+    });
+
+    buildRows.forEach((b) => {
+      const row = touch(b.created_at);
+      const credits = Number(b.credits_spent ?? 0);
+      if (b.kind === "deploy") row.deployCredits += credits;
+      else row.buildCredits += credits;
+    });
+
+    (txRes.data ?? []).forEach((t) => {
+      const delta = Number(t.delta);
+      if (delta >= 0) return;
+      touch(t.created_at).aiCredits += Math.abs(delta);
+    });
+
+    const dayRows = Array.from(dayMap.values())
+      .map((d) => ({ ...d, total: d.containerCredits + d.buildCredits + d.deployCredits + d.aiCredits }))
+      .sort((a, b) => (a.day < b.day ? 1 : -1));
+    setDays(dayRows);
+
     setBusy(false);
   };
 
