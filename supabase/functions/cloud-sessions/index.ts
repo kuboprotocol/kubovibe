@@ -138,14 +138,18 @@ Deno.serve(async (req) => {
     const sessionId = String((body as any).session_id ?? "");
     if (!sessionId) return json({ error: "session_id_required" }, 400);
 
-    const { data: session, error: loadError } = await admin
-      .from("cloud_sessions")
-      .select("*")
-      .eq("id", sessionId)
-      .eq("user_id", user.id)
-      .maybeSingle();
+    // Admins may operate on any session (admin cloud dashboard); everyone else is scoped to their own.
+    const { data: isAdminRow } = await admin.rpc("has_role", { _user_id: user.id, _role: "admin" });
+    const isAdmin = isAdminRow === true;
+
+    let sessionQuery = admin.from("cloud_sessions").select("*").eq("id", sessionId);
+    if (!isAdmin) sessionQuery = sessionQuery.eq("user_id", user.id);
+    const { data: session, error: loadError } = await sessionQuery.maybeSingle();
     if (loadError) throw loadError;
     if (!session) return json({ error: "session_not_found" }, 404);
+
+    // Cost always lands on the session owner's ledger, even when an admin triggers the run.
+    const billedUserId = session.user_id as string;
 
     // ---------- heartbeat (billing tick) ----------
     if (action === "heartbeat") {
@@ -240,10 +244,11 @@ Deno.serve(async (req) => {
       const command = String((body as any).command ?? (kind === "build" ? "npm run build" : "npm run deploy")).slice(0, 300);
 
       // Charge before running — no free compute.
-      const charge = await deductCredits(user.id, cost, "cloud_session", {
+      const charge = await deductCredits(billedUserId, cost, "cloud_session", {
         session_id: session.id,
         kind,
         command,
+        triggered_by: user.id,
       }, user.email, `cloud_session:${session.id}:${kind}:${Date.now()}`);
       if (!charge.ok) return json({ error: "insufficient_credits" }, 402);
 
@@ -251,7 +256,7 @@ Deno.serve(async (req) => {
         .from("session_builds")
         .insert({
           session_id: session.id,
-          user_id: user.id,
+          user_id: billedUserId,
           project_id: session.project_id,
           kind,
           status: "running",

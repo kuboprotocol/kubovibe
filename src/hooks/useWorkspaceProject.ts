@@ -10,6 +10,8 @@ export interface WorkspaceState {
   projectId: string;
   repo: string;
   branch: string;
+  /** Currently open file path, shared between the mobile client and the desktop editor. */
+  file: string;
 }
 
 export interface WorkspaceProjectRow {
@@ -19,7 +21,7 @@ export interface WorkspaceProjectRow {
 
 const STORAGE_KEY = "kubo:workspace:v1";
 const SYNC_EVENT = "kubo:workspace:changed";
-const DEFAULT_STATE: WorkspaceState = { projectId: "", repo: "", branch: "main" };
+const DEFAULT_STATE: WorkspaceState = { projectId: "", repo: "", branch: "main", file: "" };
 
 function readStored(): WorkspaceState {
   try {
@@ -30,6 +32,7 @@ function readStored(): WorkspaceState {
       projectId: parsed.projectId ?? "",
       repo: parsed.repo ?? "",
       branch: parsed.branch || "main",
+      file: parsed.file ?? "",
     };
   } catch {
     return DEFAULT_STATE;
@@ -43,9 +46,11 @@ function readFromUrl(): Partial<WorkspaceState> {
   const project = params.get("project");
   const repo = params.get("repo");
   const branch = params.get("branch");
+  const file = params.get("file");
   if (project) next.projectId = project;
   if (repo) next.repo = repo;
   if (branch) next.branch = branch;
+  if (file) next.file = file;
   return next;
 }
 
@@ -58,14 +63,24 @@ function persist(state: WorkspaceState) {
   window.dispatchEvent(new CustomEvent<WorkspaceState>(SYNC_EVENT, { detail: state }));
 }
 
-/** Deep link that opens the exact same workspace in the mobile client. */
-export function mobileWorkspaceLink(state: WorkspaceState): string {
+function workspaceQuery(state: WorkspaceState): string {
   const params = new URLSearchParams();
   if (state.projectId) params.set("project", state.projectId);
   if (state.repo) params.set("repo", state.repo);
   if (state.branch) params.set("branch", state.branch);
+  if (state.file) params.set("file", state.file);
   const query = params.toString();
-  return `/m${query ? `?${query}` : ""}`;
+  return query ? `?${query}` : "";
+}
+
+/** Deep link that opens the exact same workspace in the mobile client. */
+export function mobileWorkspaceLink(state: WorkspaceState): string {
+  return `/m${workspaceQuery(state)}`;
+}
+
+/** Deep link that opens the exact same project, branch and file in the desktop editor. */
+export function desktopWorkspaceLink(state: WorkspaceState): string {
+  return `/vibe-code${workspaceQuery(state)}`;
 }
 
 export function useWorkspaceProject() {
@@ -92,7 +107,12 @@ export function useWorkspaceProject() {
   const update = useCallback((patch: Partial<WorkspaceState>) => {
     setState((prev) => {
       const next = { ...prev, ...patch };
-      if (next.projectId === prev.projectId && next.repo === prev.repo && next.branch === prev.branch) {
+      if (
+        next.projectId === prev.projectId &&
+        next.repo === prev.repo &&
+        next.branch === prev.branch &&
+        next.file === prev.file
+      ) {
         return prev;
       }
       persist(next);
@@ -124,7 +144,9 @@ export function useWorkspaceProject() {
     setProjectId: (projectId: string) => update({ projectId }),
     setRepo: (repo: string) => update({ repo }),
     setBranch: (branch: string) => update({ branch }),
+    setFile: (file: string) => update({ file }),
     update,
     mobileLink: mobileWorkspaceLink(state),
+    desktopLink: desktopWorkspaceLink(state),
   };
 }

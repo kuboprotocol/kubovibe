@@ -81,3 +81,23 @@ Requirements that cannot be skipped:
 Because execution runs on the user's own hardware, there is no container to
 host, so billing reverts to per AI action. Desktop is materially cheaper to
 operate than mobile — that difference belongs in pricing decisions.
+
+## Windows/Linux daemon — implementation notes
+
+The desktop Local Agent is a native binary and therefore lives outside this web repository.
+Reference specification for the separate `kubo-agent` project:
+
+- **Core:** Rust daemon (low idle footprint), built on the Vertal CLI as the execution layer.
+  Watches the workspace folder, keeps a persistent WebSocket to KUBO Core AI, exposes a
+  loopback JSON-RPC API on `127.0.0.1` with a per-launch token.
+- **Permissions:** access is granted per project folder — never filesystem-wide. The daemon
+  refuses paths outside the folders the user explicitly registered.
+- **Code signing:** the Windows installer must be signed with an OV/EV certificate
+  (`signtool sign /fd SHA256 /tr <timestamp> ...`), otherwise SmartScreen/Defender flag it.
+  macOS builds need Developer ID signing plus notarization (`notarytool`).
+- **Editor bridge:** a single VS Code extension (also loads in Cursor, same extension API)
+  that surfaces the Vibe Code chat and applies AI suggestions to the open files through
+  `WorkspaceEdit`, with a diff preview before apply. The installer detects an existing
+  VS Code/Cursor install and offers one-click integration.
+- **Billing:** per AI action on the existing ledger (chat 1, edit 2, agent run 4). Terminal
+  and git are free because they run on the user's own hardware — see `src/lib/anywhereConfig.ts`.
