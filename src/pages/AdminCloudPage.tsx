@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AdminSessionWindow } from "@/components/admin/AdminSessionWindow";
+
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -89,6 +91,8 @@ export default function AdminCloudPage() {
   const [command, setCommand] = useState("npm run build");
   const [logBuild, setLogBuild] = useState<BuildRow | null>(null);
   const [openProject, setOpenProject] = useState<string | null>(null);
+  const [openSession, setOpenSession] = useState<string | null>(null);
+
 
   const load = async () => {
     setBusy(true);
