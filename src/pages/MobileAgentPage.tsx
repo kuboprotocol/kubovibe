@@ -21,7 +21,6 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useCloudSession } from "@/hooks/useCloudSession";
 import { useGitRepo } from "@/hooks/useGitRepo";
@@ -31,11 +30,6 @@ import { useWorkspaceProject } from "@/hooks/useWorkspaceProject";
 import { cn } from "@/lib/utils";
 
 type Tab = "session" | "files" | "terminal" | "preview";
-
-interface ProjectRow {
-  id: string;
-  title: string;
-}
 
 const TABS: Array<{ id: Tab; label: string; icon: typeof Cloud }> = [
   { id: "session", label: "Session", icon: Cloud },
