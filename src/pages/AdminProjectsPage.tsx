@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, FolderKanban, Hammer, Loader2, RefreshCw, Rocket, Search, Sparkles } from "lucide-react";
+import { ArrowLeft, CalendarDays, FolderKanban, Hammer, Loader2, RefreshCw, Rocket, Search, Sparkles, Timer } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
 interface BuildRow {
@@ -34,6 +35,16 @@ interface ProjectRow {
   lastActivity: string | null;
 }
 
+interface DayRow {
+  day: string;
+  containerMinutes: number;
+  containerCredits: number;
+  buildCredits: number;
+  deployCredits: number;
+  aiCredits: number;
+  total: number;
+}
+
 const STATUS_STYLE: Record<string, string> = {
   succeeded: "border-emerald-500/30 text-emerald-400",
   running: "border-amber-500/30 text-amber-400",
@@ -41,12 +52,16 @@ const STATUS_STYLE: Record<string, string> = {
   failed: "border-destructive/30 text-destructive",
 };
 
+const dayKey = (iso: string) => new Date(iso).toISOString().slice(0, 10);
+
 export default function AdminProjectsPage() {
   const [projects, setProjects] = useState<ProjectRow[]>([]);
   const [builds, setBuilds] = useState<BuildRow[]>([]);
+  const [days, setDays] = useState<DayRow[]>([]);
   const [busy, setBusy] = useState(true);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
+
 
   const load = async () => {
     setBusy(true);
