@@ -25,8 +25,12 @@ interface ProjectRow {
   deploys: number;
   failed: number;
   buildCredits: number;
+  deployCredits: number;
+  containerCredits: number;
   aiCredits: number;
   total: number;
+  last30: number;
+  projected: number;
   lastActivity: string | null;
 }
 
@@ -46,7 +50,8 @@ export default function AdminProjectsPage() {
 
   const load = async () => {
     setBusy(true);
-    const [projectsRes, buildsRes, txRes] = await Promise.all([
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const [projectsRes, buildsRes, txRes, sessionsRes] = await Promise.all([
       supabase.from("projects").select("id, title, updated_at").order("updated_at", { ascending: false }).limit(500),
       supabase
         .from("session_builds")
@@ -54,6 +59,7 @@ export default function AdminProjectsPage() {
         .order("created_at", { ascending: false })
         .limit(2000),
       supabase.from("credit_transactions").select("delta, category, metadata, created_at").order("created_at", { ascending: false }).limit(5000),
+      supabase.from("cloud_sessions").select("project_id, credits_spent, started_at").limit(2000),
     ]);
 
     const buildRows = (buildsRes.data ?? []) as BuildRow[];
@@ -67,10 +73,32 @@ export default function AdminProjectsPage() {
       aiByProject.set(pid, (aiByProject.get(pid) ?? 0) + Math.abs(Number(t.delta)));
     });
 
+    const aiLast30 = new Map<string, number>();
+    (txRes.data ?? []).forEach((t) => {
+      const meta = (t.metadata ?? {}) as Record<string, unknown>;
+      const pid = typeof meta.project_id === "string" ? meta.project_id : null;
+      if (!pid || Number(t.delta) >= 0 || t.created_at < since) return;
+      aiLast30.set(pid, (aiLast30.get(pid) ?? 0) + Math.abs(Number(t.delta)));
+    });
+
+    const containerByProject = new Map<string, number>();
+    const containerLast30 = new Map<string, number>();
+    (sessionsRes.data ?? []).forEach((s2) => {
+      const credits = Number(s2.credits_spent ?? 0);
+      containerByProject.set(s2.project_id, (containerByProject.get(s2.project_id) ?? 0) + credits);
+      if (s2.started_at >= since) containerLast30.set(s2.project_id, (containerLast30.get(s2.project_id) ?? 0) + credits);
+    });
+
     const rows: ProjectRow[] = (projectsRes.data ?? []).map((p) => {
       const own = buildRows.filter((b) => b.project_id === p.id);
-      const buildCredits = own.reduce((a, b) => a + Number(b.credits_spent ?? 0), 0);
+      const buildCredits = own.filter((b) => b.kind === "build").reduce((a, b) => a + Number(b.credits_spent ?? 0), 0);
+      const deployCredits = own.filter((b) => b.kind === "deploy").reduce((a, b) => a + Number(b.credits_spent ?? 0), 0);
+      const containerCredits = containerByProject.get(p.id) ?? 0;
       const aiCredits = aiByProject.get(p.id) ?? 0;
+      const actionsLast30 = own
+        .filter((b) => b.created_at >= since)
+        .reduce((a, b) => a + Number(b.credits_spent ?? 0), 0);
+      const last30 = actionsLast30 + (aiLast30.get(p.id) ?? 0) + (containerLast30.get(p.id) ?? 0);
       return {
         id: p.id,
         title: p.title,
@@ -78,8 +106,12 @@ export default function AdminProjectsPage() {
         deploys: own.filter((b) => b.kind === "deploy").length,
         failed: own.filter((b) => b.status === "failed").length,
         buildCredits,
+        deployCredits,
+        containerCredits,
         aiCredits,
-        total: buildCredits + aiCredits,
+        total: buildCredits + deployCredits + containerCredits + aiCredits,
+        last30,
+        projected: last30,
         lastActivity: own[0]?.created_at ?? p.updated_at,
       };
     });
@@ -106,6 +138,7 @@ export default function AdminProjectsPage() {
       builds: projects.reduce((a, p) => a + p.builds, 0),
       deploys: projects.reduce((a, p) => a + p.deploys, 0),
       credits: projects.reduce((a, p) => a + p.total, 0),
+      projected: projects.reduce((a, p) => a + p.projected, 0),
     }),
     [projects],
   );
@@ -122,7 +155,7 @@ export default function AdminProjectsPage() {
             </Button>
             <div>
               <h1 className="font-orbitron text-2xl font-bold">Projects</h1>
-              <p className="text-sm text-muted-foreground">Build history, deploys and AI billing per project — same credit ledger.</p>
+              <p className="text-sm text-muted-foreground">Container, build, deploy and AI credits per project, with a 30-day cost projection.</p>
             </div>
           </div>
           <Button variant="outline" size="sm" onClick={() => void load()} disabled={busy}>
@@ -131,11 +164,12 @@ export default function AdminProjectsPage() {
           </Button>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[
             { label: "Builds", value: totals.builds, icon: Hammer },
             { label: "Deploys", value: totals.deploys, icon: Rocket },
             { label: "Credits billed", value: totals.credits.toFixed(1), icon: Sparkles },
+            { label: "Projected / month", value: totals.projected.toFixed(1), icon: Sparkles },
           ].map((c) => (
             <Card key={c.label}>
               <CardHeader className="pb-2">
@@ -166,9 +200,12 @@ export default function AdminProjectsPage() {
                   <th className="text-right">Builds</th>
                   <th className="text-right">Deploys</th>
                   <th className="text-right">Failed</th>
-                  <th className="text-right">Build credits</th>
-                  <th className="text-right">AI credits</th>
+                  <th className="text-right">Container</th>
+                  <th className="text-right">Build</th>
+                  <th className="text-right">Deploy</th>
+                  <th className="text-right">AI</th>
                   <th className="text-right">Total</th>
+                  <th className="text-right">Projected / mo</th>
                 </tr>
               </thead>
               <tbody>
@@ -185,14 +222,17 @@ export default function AdminProjectsPage() {
                     <td className="text-right">{p.builds}</td>
                     <td className="text-right">{p.deploys}</td>
                     <td className="text-right">{p.failed}</td>
+                    <td className="text-right">{p.containerCredits.toFixed(1)}</td>
                     <td className="text-right">{p.buildCredits.toFixed(1)}</td>
+                    <td className="text-right">{p.deployCredits.toFixed(1)}</td>
                     <td className="text-right">{p.aiCredits.toFixed(1)}</td>
                     <td className="text-right font-semibold">{p.total.toFixed(1)}</td>
+                    <td className="text-right text-primary">{p.projected.toFixed(1)}</td>
                   </tr>
                 ))}
                 {!busy && filtered.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="py-8 text-center text-muted-foreground">
+                    <td colSpan={10} className="py-8 text-center text-muted-foreground">
                       No projects found.
                     </td>
                   </tr>
