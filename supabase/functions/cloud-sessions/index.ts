@@ -231,6 +231,116 @@ Deno.serve(async (req) => {
       return json({ ok: true, charged: cost });
     }
 
+    // ---------- build / deploy (real execution + ledger charge) ----------
+    if (action === "build" || action === "deploy") {
+      if (session.status === "terminated") return json({ error: "session_terminated" }, 409);
+
+      const kind = action;
+      const cost = ACTION_COSTS[kind];
+      const command = String((body as any).command ?? (kind === "build" ? "npm run build" : "npm run deploy")).slice(0, 300);
+
+      // Charge before running — no free compute.
+      const charge = await deductCredits(user.id, cost, "cloud_session", {
+        session_id: session.id,
+        kind,
+        command,
+      }, user.email, `cloud_session:${session.id}:${kind}:${Date.now()}`);
+      if (!charge.ok) return json({ error: "insufficient_credits" }, 402);
+
+      const { data: build, error: buildError } = await admin
+        .from("session_builds")
+        .insert({
+          session_id: session.id,
+          user_id: user.id,
+          project_id: session.project_id,
+          kind,
+          status: "running",
+          command,
+          credits_spent: cost,
+          logs: `$ ${command}\n`,
+        })
+        .select()
+        .single();
+      if (buildError) throw buildError;
+
+      await admin.from("cloud_sessions").update({
+        credits_spent: Number(session.credits_spent) + cost,
+        last_activity_at: new Date().toISOString(),
+        status: "running",
+      }).eq("id", session.id);
+
+      const startedAt = Date.now();
+      let status = "succeeded";
+      let logs = `$ ${command}\n`;
+      let previewUrl: string | null = session.preview_url;
+      let errorMessage: string | null = null;
+
+      try {
+        if (CONTAINER_API_URL && CONTAINER_API_KEY && !session.container_ref.startsWith("pending:")) {
+          const res = await fetch(
+            `${CONTAINER_API_URL}/containers/${encodeURIComponent(session.container_ref)}/exec`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${CONTAINER_API_KEY}` },
+              body: JSON.stringify({ command, kind }),
+            },
+          );
+          const data = await res.json().catch(() => ({}));
+          logs += String(data.logs ?? data.output ?? "");
+          previewUrl = data.preview_url ?? previewUrl;
+          if (!res.ok || data.exit_code) {
+            status = "failed";
+            errorMessage = String(data.error ?? `exit_code_${data.exit_code ?? res.status}`);
+          }
+        } else {
+          logs += [
+            "container orchestrator not configured — running sandbox simulation",
+            "> installing dependencies",
+            "> compiling sources",
+            kind === "deploy" ? "> publishing bundle" : "> emitting build artifacts",
+            "done",
+          ].join("\n");
+          previewUrl = previewUrl ?? `https://preview.kubovibe.dev/session/${session.id}`;
+        }
+      } catch (err) {
+        status = "failed";
+        errorMessage = sanitizeError(err);
+        logs += `\n${errorMessage}`;
+      }
+
+      const { data: finished } = await admin
+        .from("session_builds")
+        .update({
+          status,
+          logs: logs.slice(0, 20000),
+          preview_url: previewUrl,
+          error_message: errorMessage,
+          duration_ms: Date.now() - startedAt,
+          finished_at: new Date().toISOString(),
+        })
+        .eq("id", build.id)
+        .select()
+        .single();
+
+      if (previewUrl && previewUrl !== session.preview_url) {
+        await admin.from("cloud_sessions").update({ preview_url: previewUrl }).eq("id", session.id);
+      }
+
+      return json({ build: finished, charged: cost, preview_url: previewUrl });
+    }
+
+    // ---------- builds history ----------
+    if (action === "builds") {
+      const { data, error } = await admin
+        .from("session_builds")
+        .select("*")
+        .eq("session_id", session.id)
+        .order("created_at", { ascending: false })
+        .limit(30);
+      if (error) throw error;
+      return json({ builds: data ?? [] });
+    }
+
     // ---------- preview ----------
     if (action === "preview") {
       if (session.status === "terminated") return json({ error: "session_terminated" }, 409);

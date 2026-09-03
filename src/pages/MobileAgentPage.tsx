@@ -13,6 +13,8 @@ import {
   Loader2,
   RefreshCw,
   Save,
+  Hammer,
+  Rocket,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +26,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCloudSession } from "@/hooks/useCloudSession";
 import { useGitRepo } from "@/hooks/useGitRepo";
 import { useDeviceRegistration } from "@/hooks/useDeviceRegistration";
+import { useSessionBuilds } from "@/hooks/useSessionBuilds";
 import { cn } from "@/lib/utils";
 
 type Tab = "session" | "files" | "terminal" | "preview";
@@ -52,6 +55,7 @@ export default function MobileAgentPage() {
   const { session, loading: sessionLoading, start, terminate, refresh } = useCloudSession();
   const git = useGitRepo();
   const device = useDeviceRegistration();
+  const builds = useSessionBuilds(session?.id);
 
   const [tab, setTab] = useState<Tab>("session");
   const [projects, setProjects] = useState<ProjectRow[]>([]);
@@ -61,6 +65,7 @@ export default function MobileAgentPage() {
   const [openPath, setOpenPath] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState("");
   const [commitMessage, setCommitMessage] = useState("chore: update from KUBO Mobile Agent");
+  const [buildCommand, setBuildCommand] = useState("npm run build");
 
   useEffect(() => {
     (async () => {
@@ -92,6 +97,9 @@ export default function MobileAgentPage() {
     const mins = Math.max(1, Math.round((Date.now() - new Date(session.started_at).getTime()) / 60000));
     return `${mins} min`;
   }, [session]);
+
+  const lastBuild = builds.builds[0] ?? null;
+  const previewUrl = lastBuild?.preview_url ?? session?.preview_url ?? null;
 
   const openFile = async (path: string) => {
     const file = await git.readFile(repo, branch, path);
@@ -309,23 +317,95 @@ export default function MobileAgentPage() {
         )}
 
         {tab === "preview" && (
-          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+            <Card className="space-y-3 border-border/50 bg-card/60 p-4 backdrop-blur">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-sm font-semibold">
+                  <Hammer className="h-4 w-4 text-primary" /> Build &amp; deploy
+                </div>
+                <Badge variant="outline" className="text-[10px]">build 2 · deploy 4 credits</Badge>
+              </div>
+              <Input
+                value={buildCommand}
+                onChange={(e) => setBuildCommand(e.target.value)}
+                placeholder="npm run build"
+                className="font-mono text-xs"
+              />
+              <div className="flex gap-2">
+                <Button
+                  className="flex-1"
+                  disabled={!running || builds.running}
+                  onClick={() => builds.run("build", buildCommand)}
+                >
+                  {builds.running ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Hammer className="mr-2 h-4 w-4" />}
+                  Run build
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={!running || builds.running}
+                  onClick={() => builds.run("deploy")}
+                >
+                  <Rocket className="mr-2 h-4 w-4" /> Deploy
+                </Button>
+              </div>
+              {!running && (
+                <p className="text-xs text-muted-foreground">Open a session first — builds run inside the container.</p>
+              )}
+              {lastBuild && (
+                <div className="space-y-2 rounded-lg border border-border/40 bg-background/60 p-3">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="font-semibold uppercase">
+                      {lastBuild.kind} · {lastBuild.status}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {lastBuild.duration_ms ? `${Math.round(lastBuild.duration_ms / 100) / 10}s` : "—"} ·{" "}
+                      {lastBuild.credits_spent} cr
+                    </span>
+                  </div>
+                  <pre className="max-h-40 overflow-auto whitespace-pre-wrap font-mono text-[10px] text-muted-foreground">
+                    {lastBuild.logs}
+                  </pre>
+                </div>
+              )}
+            </Card>
+
             <Card className="space-y-3 border-border/50 bg-card/60 p-4 backdrop-blur">
               <div className="flex items-center gap-2 text-sm font-semibold">
                 <Eye className="h-4 w-4 text-primary" /> Live preview
               </div>
-              {session?.preview_url ? (
+              {previewUrl ? (
                 <iframe
                   title="Remote preview"
-                  src={session.preview_url}
+                  src={previewUrl}
                   className="h-[520px] w-full rounded-lg border border-border/50 bg-white"
                 />
               ) : (
                 <p className="text-xs text-muted-foreground">
-                  {running ? "Waiting for the container preview URL." : "Open a session to see the live preview."}
+                  {running ? "Run a build to publish the container preview." : "Open a session to see the live preview."}
                 </p>
               )}
             </Card>
+
+            {builds.builds.length > 1 && (
+              <Card className="divide-y divide-border/40 border-border/50 bg-card/60 backdrop-blur">
+                {builds.builds.map((b) => (
+                  <div key={b.id} className="flex items-center justify-between gap-2 px-4 py-2.5 text-[11px]">
+                    <span className="font-mono truncate">{b.command}</span>
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "text-[10px]",
+                        b.status === "succeeded"
+                          ? "border-emerald-500/30 text-emerald-400"
+                          : "border-destructive/30 text-destructive",
+                      )}
+                    >
+                      {b.status}
+                    </Badge>
+                  </div>
+                ))}
+              </Card>
+            )}
           </motion.div>
         )}
       </main>

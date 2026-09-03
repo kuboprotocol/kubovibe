@@ -47,6 +47,7 @@ const GameMetaversePage = lazy(() => import("./pages/GameMetaversePage"));
 const GameSdkPage = lazy(() => import("./pages/GameSdkPage"));
 const GameVrPage = lazy(() => import("./pages/GameVrPage"));
 const GameAiPage = lazy(() => import("./pages/GameAiPage"));
+const AdminCloudPage = lazy(() => import("./pages/AdminCloudPage"));
 const AdminSkillsPage = lazy(() => import("./pages/AdminSkillsPage"));
 const DomainsPage = lazy(() => import("./pages/DomainsPage"));
 const CreativePage = lazy(() => import("./pages/CreativePage"));
@@ -229,6 +230,7 @@ const App = forwardRef<HTMLDivElement, any>((props, ref) => {
                 <Route path="/game/sdk" element={<ProtectedRoute><GameSdkPage /></ProtectedRoute>} />
                 <Route path="/game/vr" element={<ProtectedRoute><GameVrPage /></ProtectedRoute>} />
                 <Route path="/game/ai" element={<ProtectedRoute><GameAiPage /></ProtectedRoute>} />
+                <Route path="/admin/cloud" element={<ProtectedRoute requireRoles={["admin"]}><AdminCloudPage /></ProtectedRoute>} />
                 <Route path="/admin/skills" element={<ProtectedRoute requireRoles={["admin"]}><AdminSkillsPage /></ProtectedRoute>} />
                 <Route path="/domains" element={<ProtectedRoute><DomainsPage /></ProtectedRoute>} />
                 <Route path="/vibe-code" element={<ProtectedRoute><VibeCodePage /></ProtectedRoute>} />
