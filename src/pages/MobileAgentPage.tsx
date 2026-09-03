@@ -13,6 +13,8 @@ import {
   Loader2,
   RefreshCw,
   Save,
+  Hammer,
+  Rocket,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +26,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCloudSession } from "@/hooks/useCloudSession";
 import { useGitRepo } from "@/hooks/useGitRepo";
 import { useDeviceRegistration } from "@/hooks/useDeviceRegistration";
+import { useSessionBuilds } from "@/hooks/useSessionBuilds";
 import { cn } from "@/lib/utils";
 
 type Tab = "session" | "files" | "terminal" | "preview";
@@ -52,6 +55,7 @@ export default function MobileAgentPage() {
   const { session, loading: sessionLoading, start, terminate, refresh } = useCloudSession();
   const git = useGitRepo();
   const device = useDeviceRegistration();
+  const builds = useSessionBuilds(session?.id);
 
   const [tab, setTab] = useState<Tab>("session");
   const [projects, setProjects] = useState<ProjectRow[]>([]);
@@ -61,6 +65,7 @@ export default function MobileAgentPage() {
   const [openPath, setOpenPath] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState("");
   const [commitMessage, setCommitMessage] = useState("chore: update from KUBO Mobile Agent");
+  const [buildCommand, setBuildCommand] = useState("npm run build");
 
   useEffect(() => {
     (async () => {
@@ -92,6 +97,9 @@ export default function MobileAgentPage() {
     const mins = Math.max(1, Math.round((Date.now() - new Date(session.started_at).getTime()) / 60000));
     return `${mins} min`;
   }, [session]);
+
+  const lastBuild = builds.builds[0] ?? null;
+  const previewUrl = lastBuild?.preview_url ?? session?.preview_url ?? null;
 
   const openFile = async (path: string) => {
     const file = await git.readFile(repo, branch, path);
