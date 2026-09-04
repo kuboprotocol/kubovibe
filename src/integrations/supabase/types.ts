@@ -3558,6 +3558,17 @@ export type Database = {
         }
         Returns: Json
       }
+      execute_atomic_credit_topup: {
+        Args: {
+          _amount: number
+          _category?: string
+          _idempotency_key?: string
+          _metadata?: Json
+          _reason: string
+          _user_id: string
+        }
+        Returns: Json
+      }
       execute_job_action: {
         Args: {
           p_action: string
