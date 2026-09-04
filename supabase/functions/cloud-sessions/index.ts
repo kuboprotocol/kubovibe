@@ -3,6 +3,13 @@
 // remote containers. The client is only a rich viewer (editor + chat + terminal + preview).
 import { corsHeaders } from "../_shared/cors.ts";
 import { getUser, supaAdmin, sanitizeError, deductCredits } from "../_shared/creative.ts";
+import { apnsConfigured, sendApnsToUser } from "../_shared/apns.ts";
+
+/** Human label for a native target, used in push alerts. */
+function archLabelFor(arch: string): string {
+  return arch.replace(/-/g, " ").toUpperCase();
+}
+
 
 const CREDITS_PER_MINUTE = 1;
 const ACTION_COSTS: Record<string, number> = { build: 2, deploy: 4 };
