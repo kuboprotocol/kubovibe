@@ -72,6 +72,7 @@ export default function AdminPage() {
           </div>
           <div className="flex gap-2">
             <Link to="/admin/teams"><Badge variant="outline" className="cursor-pointer">Teams</Badge></Link>
+            <Link to="/admin/builds"><Badge variant="outline" className="cursor-pointer">Builds</Badge></Link>
             <Link to="/admin/skills"><Badge variant="outline" className="cursor-pointer">Skills</Badge></Link>
             <Link to="/agents"><Badge variant="outline" className="cursor-pointer">Agents Hub</Badge></Link>
           </div>

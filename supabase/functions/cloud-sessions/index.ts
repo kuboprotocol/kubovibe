@@ -6,6 +6,28 @@ import { getUser, supaAdmin, sanitizeError, deductCredits } from "../_shared/cre
 
 const CREDITS_PER_MINUTE = 1;
 const ACTION_COSTS: Record<string, number> = { build: 2, deploy: 4 };
+
+/** Native compilation targets. Heavier toolchains (Xcode, MSVC, NDK) cost more. */
+const ARCH_MULTIPLIERS: Record<string, number> = {
+  "web": 1,
+  "ios-arm64": 2.5,
+  "ios-simulator-x64": 1.5,
+  "android-arm64": 2,
+  "android-x64": 1.5,
+  "macos-universal": 2.5,
+  "windows-x64": 2,
+  "linux-x64": 1.5,
+};
+const ARCH_PLATFORM: Record<string, string> = {
+  "web": "web",
+  "ios-arm64": "ios",
+  "ios-simulator-x64": "ios",
+  "android-arm64": "android",
+  "android-x64": "android",
+  "macos-universal": "macos",
+  "windows-x64": "windows",
+  "linux-x64": "linux",
+};
 const DEFAULT_IDLE_TIMEOUT = 900; // 15 min
 const GRACE_WINDOW_SECONDS = 60;
 
@@ -240,7 +262,10 @@ Deno.serve(async (req) => {
       if (session.status === "terminated") return json({ error: "session_terminated" }, 409);
 
       const kind = action;
-      const cost = ACTION_COSTS[kind];
+      const arch = String((body as any).arch ?? "web");
+      if (!(arch in ARCH_MULTIPLIERS)) return json({ error: "unknown_arch" }, 400);
+      const platform = ARCH_PLATFORM[arch];
+      const cost = Math.round(ACTION_COSTS[kind] * ARCH_MULTIPLIERS[arch] * 100) / 100;
       const command = String((body as any).command ?? (kind === "build" ? "npm run build" : "npm run deploy")).slice(0, 300);
 
       // Charge before running — no free compute.
@@ -248,8 +273,10 @@ Deno.serve(async (req) => {
         session_id: session.id,
         kind,
         command,
+        arch,
+        platform,
         triggered_by: user.id,
-      }, user.email, `cloud_session:${session.id}:${kind}:${Date.now()}`);
+      }, user.email, `cloud_session:${session.id}:${kind}:${arch}:${Date.now()}`);
       if (!charge.ok) return json({ error: "insufficient_credits" }, 402);
 
       const { data: build, error: buildError } = await admin
@@ -259,6 +286,8 @@ Deno.serve(async (req) => {
           user_id: billedUserId,
           project_id: session.project_id,
           kind,
+          arch,
+          platform,
           status: "running",
           command,
           credits_spent: cost,

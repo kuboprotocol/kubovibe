@@ -27,6 +27,7 @@ import { useCloudSession } from "@/hooks/useCloudSession";
 import { useGitRepo } from "@/hooks/useGitRepo";
 import { useDeviceRegistration } from "@/hooks/useDeviceRegistration";
 import { useSessionBuilds } from "@/hooks/useSessionBuilds";
+import { ARCH_TARGETS, estimateBuildCost } from "@/lib/buildTargets";
 import { useWorkspaceProject } from "@/hooks/useWorkspaceProject";
 import { cn } from "@/lib/utils";
 
@@ -52,6 +53,7 @@ export default function MobileAgentPage() {
   const git = useGitRepo();
   const device = useDeviceRegistration();
   const builds = useSessionBuilds(session?.id);
+  const [arch, setArch] = useState<string>("web");
 
   const workspace = useWorkspaceProject();
   const { projectId, repo, branch, projects, setProjectId, setRepo, setBranch, setFile, desktopLink } = workspace;
@@ -317,8 +319,22 @@ export default function MobileAgentPage() {
                 <div className="flex items-center gap-2 text-sm font-semibold">
                   <Hammer className="h-4 w-4 text-primary" /> Build &amp; deploy
                 </div>
-                <Badge variant="outline" className="text-[10px]">build 2 · deploy 4 credits</Badge>
+                <Badge variant="outline" className="text-[10px]">
+                  build {estimateBuildCost("build", arch)} · deploy {estimateBuildCost("deploy", arch)} credits
+                </Badge>
               </div>
+              <select
+                value={arch}
+                onChange={(e) => setArch(e.target.value)}
+                aria-label="Target architecture"
+                className="w-full rounded-md border border-border/60 bg-background/60 px-3 py-2 text-xs text-foreground"
+              >
+                {ARCH_TARGETS.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.label} (×{t.multiplier})
+                  </option>
+                ))}
+              </select>
               <Input
                 value={buildCommand}
                 onChange={(e) => setBuildCommand(e.target.value)}
@@ -329,7 +345,7 @@ export default function MobileAgentPage() {
                 <Button
                   className="flex-1"
                   disabled={!running || builds.running}
-                  onClick={() => builds.run("build", buildCommand)}
+                  onClick={() => builds.run("build", buildCommand, arch)}
                 >
                   {builds.running ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Hammer className="mr-2 h-4 w-4" />}
                   Run build
@@ -337,7 +353,7 @@ export default function MobileAgentPage() {
                 <Button
                   variant="outline"
                   disabled={!running || builds.running}
-                  onClick={() => builds.run("deploy")}
+                  onClick={() => builds.run("deploy", undefined, arch)}
                 >
                   <Rocket className="mr-2 h-4 w-4" /> Deploy
                 </Button>

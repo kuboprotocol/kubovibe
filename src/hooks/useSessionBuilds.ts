@@ -15,6 +15,8 @@ export interface SessionBuild {
   credits_spent: number;
   duration_ms: number | null;
   error_message: string | null;
+  arch: string;
+  platform: string;
   created_at: string;
   finished_at: string | null;
 }
@@ -38,12 +40,12 @@ export function useSessionBuilds(sessionId?: string | null) {
   }, [sessionId]);
 
   const run = useCallback(
-    async (kind: "build" | "deploy", command?: string) => {
+    async (kind: "build" | "deploy", command?: string, arch: string = "web") => {
       if (!sessionId) return null;
       setRunning(true);
       try {
         const { data, error } = await supabase.functions.invoke("cloud-sessions", {
-          body: { action: kind, session_id: sessionId, command },
+          body: { action: kind, session_id: sessionId, command, arch },
         });
         if (error) throw new Error(error.message);
         const payload = data as { error?: string; build?: SessionBuild };
