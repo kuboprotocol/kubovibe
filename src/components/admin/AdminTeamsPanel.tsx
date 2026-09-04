@@ -91,7 +91,37 @@ export default function AdminTeamsPanel() {
     setBusy(false);
   };
 
+  const createAccount = async () => {
+    if (!newEmail.trim()) {
+      toast.error("Informe um e-mail");
+      return;
+    }
+    setCreating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-create-user", {
+        body: {
+          email: newEmail.trim(),
+          display_name: newName.trim(),
+          role: newRole,
+          credits: Number(newCredits) || 0,
+        },
+      });
+      const payload = data as { temp_password?: string; error?: string } | null;
+      if (error || payload?.error) {
+        toast.error(payload?.error ?? error?.message ?? "Falha ao criar conta");
+        return;
+      }
+      toast.success(`Conta criada. Senha temporária: ${payload?.temp_password ?? "-"}`, { duration: 15000 });
+      setNewEmail("");
+      setNewName("");
+      await load();
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const assignRole = async (userId: string, role: string) => {
+
     const { error: delError } = await supabase.from("user_roles").delete().eq("user_id", userId);
     if (delError) {
       toast.error(delError.message);
