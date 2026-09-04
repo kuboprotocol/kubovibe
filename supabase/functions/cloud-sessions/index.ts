@@ -4,6 +4,12 @@
 import { corsHeaders } from "../_shared/cors.ts";
 import { getUser, supaAdmin, sanitizeError, deductCredits } from "../_shared/creative.ts";
 import { apnsConfigured, sendApnsToUser } from "../_shared/apns.ts";
+import {
+  orchestratorDriver,
+  provisionContainer,
+  execInContainer,
+  destroyContainer,
+} from "../_shared/orchestrator.ts";
 
 /** Human label for a native target, used in push alerts. */
 function archLabelFor(arch: string): string {
@@ -37,49 +43,6 @@ const ARCH_PLATFORM: Record<string, string> = {
 };
 const DEFAULT_IDLE_TIMEOUT = 900; // 15 min
 const GRACE_WINDOW_SECONDS = 60;
-
-const CONTAINER_API_URL = Deno.env.get("KUBO_CONTAINER_API_URL");
-const CONTAINER_API_KEY = Deno.env.get("KUBO_CONTAINER_API_KEY");
-
-type Provisioned = {
-  container_ref: string;
-  preview_url: string | null;
-  terminal_url: string | null;
-};
-
-/** Provision a remote container. Falls back to a reserved placeholder when the
- * container orchestrator is not configured yet, so the session lifecycle,
- * billing and client contract can be exercised end to end. */
-async function provisionContainer(sessionId: string, projectId: string, userId: string): Promise<Provisioned> {
-  if (CONTAINER_API_URL && CONTAINER_API_KEY) {
-    const res = await fetch(`${CONTAINER_API_URL}/containers`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${CONTAINER_API_KEY}` },
-      body: JSON.stringify({ session_id: sessionId, project_id: projectId, user_id: userId }),
-    });
-    if (!res.ok) throw new Error("container_provision_failed");
-    const data = await res.json();
-    return {
-      container_ref: String(data.container_ref ?? data.id),
-      preview_url: data.preview_url ?? null,
-      terminal_url: data.terminal_url ?? null,
-    };
-  }
-  return { container_ref: `pending:${sessionId}`, preview_url: null, terminal_url: null };
-}
-
-async function destroyContainer(containerRef: string) {
-  if (!CONTAINER_API_URL || !CONTAINER_API_KEY) return;
-  if (containerRef.startsWith("pending:")) return;
-  try {
-    await fetch(`${CONTAINER_API_URL}/containers/${encodeURIComponent(containerRef)}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${CONTAINER_API_KEY}` },
-    });
-  } catch (err) {
-    console.error("[cloud-sessions] destroy failed", err);
-  }
-}
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -317,31 +280,14 @@ Deno.serve(async (req) => {
       let errorMessage: string | null = null;
 
       try {
-        if (CONTAINER_API_URL && CONTAINER_API_KEY && !session.container_ref.startsWith("pending:")) {
-          const res = await fetch(
-            `${CONTAINER_API_URL}/containers/${encodeURIComponent(session.container_ref)}/exec`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json", Authorization: `Bearer ${CONTAINER_API_KEY}` },
-              body: JSON.stringify({ command, kind }),
-            },
-          );
-          const data = await res.json().catch(() => ({}));
-          logs += String(data.logs ?? data.output ?? "");
-          previewUrl = data.preview_url ?? previewUrl;
-          if (!res.ok || data.exit_code) {
-            status = "failed";
-            errorMessage = String(data.error ?? `exit_code_${data.exit_code ?? res.status}`);
-          }
-        } else {
-          logs += [
-            "container orchestrator not configured — running sandbox simulation",
-            "> installing dependencies",
-            "> compiling sources",
-            kind === "deploy" ? "> publishing bundle" : "> emitting build artifacts",
-            "done",
-          ].join("\n");
-          previewUrl = previewUrl ?? `https://preview.kubovibe.dev/session/${session.id}`;
+        const driver = orchestratorDriver();
+        if (!driver) throw new Error("orchestrator_not_configured");
+        const result = await execInContainer(session.container_ref, command, kind);
+        logs += result.logs;
+        previewUrl = result.preview_url ?? previewUrl;
+        if (result.exit_code !== 0) {
+          status = "failed";
+          errorMessage = `exit_code_${result.exit_code}`;
         }
       } catch (err) {
         status = "failed";
