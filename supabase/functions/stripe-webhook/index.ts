@@ -27,7 +27,37 @@ Deno.serve(async (req: Request) => {
       const userId = session.metadata?.supabase_user_id;
       const plan = session.metadata?.plan;
       const period = session.metadata?.period;
+
+      // Prepaid credit top-up: add balance to the buyer's ledger, exactly once.
+      if (session.metadata?.kind === "credit_topup") {
+        const orderId = session.metadata?.order_id;
+        const credits = Number(session.metadata?.credits ?? 0);
+        if (!userId || !orderId || !Number.isInteger(credits) || credits <= 0) {
+          return new Response("Missing topup metadata", { status: 400 });
+        }
+        const { error: topupError } = await supabase.rpc("execute_atomic_credit_topup", {
+          _user_id: userId,
+          _amount: credits,
+          _reason: "credit_purchase",
+          _category: "billing",
+          _metadata: { order_id: orderId, stripe_session_id: session.id },
+          _idempotency_key: `credit_order:${orderId}`,
+        });
+        await supabase.from("credit_orders").update({
+          status: topupError ? "failed" : "paid",
+          credited_at: topupError ? null : new Date().toISOString(),
+          metadata: topupError ? { error: topupError.message } : {},
+        }).eq("id", orderId);
+        if (topupError) {
+          console.error("credit topup failed:", topupError);
+          return new Response("Topup failed", { status: 500 });
+        }
+        console.log(`✅ Credit top-up: ${credits} credits for user ${userId}`);
+        return new Response(JSON.stringify({ received: true }), { headers: { "Content-Type": "application/json" } });
+      }
+
       if (!userId || !plan) return new Response("Missing metadata", { status: 400 });
+
 
       const now = new Date().toISOString();
       const { data: existingSub } = await supabase.from("subscriptions").select("id").eq("user_id", userId).maybeSingle();
