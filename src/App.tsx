@@ -50,6 +50,7 @@ const GameAiPage = lazy(() => import("./pages/GameAiPage"));
 const AdminCloudPage = lazy(() => import("./pages/AdminCloudPage"));
 const AdminAnywherePage = lazy(() => import("./pages/AdminAnywherePage"));
 const AdminProjectsPage = lazy(() => import("./pages/AdminProjectsPage"));
+const AdminBuildsPage = lazy(() => import("./pages/AdminBuildsPage"));
 const AdminUsersPage = lazy(() => import("./pages/AdminUsersPage"));
 const AdminTeamsPage = lazy(() => import("./pages/AdminTeamsPage"));
 const AdminSkillsPage = lazy(() => import("./pages/AdminSkillsPage"));
@@ -239,6 +240,7 @@ const App = forwardRef<HTMLDivElement, any>((props, ref) => {
                 <Route path="/admin/cloud" element={<ProtectedRoute requireRoles={["admin"]}><AdminCloudPage /></ProtectedRoute>} />
                 <Route path="/admin/anywhere" element={<ProtectedRoute requireRoles={["admin"]}><AdminAnywherePage /></ProtectedRoute>} />
                 <Route path="/admin/projects" element={<ProtectedRoute requireRoles={["admin"]}><AdminProjectsPage /></ProtectedRoute>} />
+                <Route path="/admin/builds" element={<ProtectedRoute requireRoles={["admin"]}><AdminBuildsPage /></ProtectedRoute>} />
                 <Route path="/admin/users" element={<ProtectedRoute requireRoles={["admin"]}><AdminUsersPage /></ProtectedRoute>} />
                 <Route path="/admin/teams" element={<ProtectedRoute requireRoles={["admin"]}><AdminTeamsPage /></ProtectedRoute>} />
                 <Route path="/admin/skills" element={<ProtectedRoute requireRoles={["admin"]}><AdminSkillsPage /></ProtectedRoute>} />
