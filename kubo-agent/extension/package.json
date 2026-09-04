@@ -1,0 +1,37 @@
+{
+  "name": "kubo-vibe",
+  "displayName": "KUBO Vibe",
+  "description": "Run KUBO Vibe agents on your own machine through the KUBO Local Agent daemon.",
+  "version": "0.1.0",
+  "publisher": "kuboprotocol",
+  "license": "MIT",
+  "engines": { "vscode": "^1.90.0" },
+  "categories": ["Other", "AI"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      { "command": "kubo.status", "title": "KUBO: Agent status" },
+      { "command": "kubo.chat", "title": "KUBO: Ask the agent (1 credit)" },
+      { "command": "kubo.edit", "title": "KUBO: Edit current file (2 credits)" },
+      { "command": "kubo.run", "title": "KUBO: Run agent task (4 credits)" },
+      { "command": "kubo.terminal", "title": "KUBO: Run command (free)" }
+    ],
+    "configuration": {
+      "title": "KUBO Vibe",
+      "properties": {
+        "kubo.agentPort": { "type": "number", "default": 43117, "description": "Local Agent daemon port." },
+        "kubo.projectId": { "type": "string", "default": "", "description": "KUBO project the credits are billed to." }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.90.0",
+    "@vscode/vsce": "^2.29.0",
+    "typescript": "^5.5.0"
+  }
+}
