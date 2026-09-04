@@ -9,7 +9,7 @@ import { createClient } from "npm:@supabase/supabase-js@^2";
 
 const ALLOWED_REDIRECT_ORIGINS = [
   "https://kubovibe.dev",
-  "https://kubovibe.dev",
+  "https://www.kubovibe.dev",
   "https://id-preview--5ce8b966-167f-4e5a-be1c-165ac92bd64e.lovable.app",
 ];
 
