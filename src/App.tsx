@@ -51,6 +51,7 @@ const AdminCloudPage = lazy(() => import("./pages/AdminCloudPage"));
 const AdminAnywherePage = lazy(() => import("./pages/AdminAnywherePage"));
 const AdminProjectsPage = lazy(() => import("./pages/AdminProjectsPage"));
 const AdminBuildsPage = lazy(() => import("./pages/AdminBuildsPage"));
+const AdminBillingPage = lazy(() => import("./pages/AdminBillingPage"));
 const AdminAgentPage = lazy(() => import("./pages/AdminAgentPage"));
 const AdminIosBuildPage = lazy(() => import("./pages/AdminIosBuildPage"));
 
@@ -244,6 +245,7 @@ const App = forwardRef<HTMLDivElement, any>((props, ref) => {
                 <Route path="/admin/anywhere" element={<ProtectedRoute requireRoles={["admin"]}><AdminAnywherePage /></ProtectedRoute>} />
                 <Route path="/admin/projects" element={<ProtectedRoute requireRoles={["admin"]}><AdminProjectsPage /></ProtectedRoute>} />
                 <Route path="/admin/builds" element={<ProtectedRoute requireRoles={["admin"]}><AdminBuildsPage /></ProtectedRoute>} />
+                <Route path="/admin/billing" element={<ProtectedRoute requireRoles={["admin"]}><AdminBillingPage /></ProtectedRoute>} />
                 <Route path="/admin/agent" element={<ProtectedRoute requireRoles={["admin"]}><AdminAgentPage /></ProtectedRoute>} />
                 <Route path="/admin/ios-build" element={<ProtectedRoute requireRoles={["admin"]}><AdminIosBuildPage /></ProtectedRoute>} />
 
