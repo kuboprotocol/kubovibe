@@ -2558,6 +2558,7 @@ export type Database = {
       }
       session_builds: {
         Row: {
+          arch: string
           command: string | null
           created_at: string
           credits_spent: number
@@ -2567,6 +2568,7 @@ export type Database = {
           id: string
           kind: string
           logs: string
+          platform: string
           preview_url: string | null
           project_id: string | null
           session_id: string
@@ -2576,6 +2578,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          arch?: string
           command?: string | null
           created_at?: string
           credits_spent?: number
@@ -2585,6 +2588,7 @@ export type Database = {
           id?: string
           kind?: string
           logs?: string
+          platform?: string
           preview_url?: string | null
           project_id?: string | null
           session_id: string
@@ -2594,6 +2598,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          arch?: string
           command?: string | null
           created_at?: string
           credits_spent?: number
@@ -2603,6 +2608,7 @@ export type Database = {
           id?: string
           kind?: string
           logs?: string
+          platform?: string
           preview_url?: string | null
           project_id?: string | null
           session_id?: string
