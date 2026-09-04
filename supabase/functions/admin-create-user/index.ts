@@ -55,8 +55,20 @@ Deno.serve(async (req) => {
     await admin.from("user_roles").upsert({ user_id: newUserId, role }, { onConflict: "user_id,role" });
 
     if (credits > 0) {
+      // Plan quota
       await admin.rpc("grant_credits", { p_user_id: newUserId, p_amount: credits });
+      // Real ledger entry so the admin panels show the same numbers
+      await admin.from("credit_transactions").insert({
+        user_id: newUserId,
+        delta: credits,
+        balance_after: credits,
+        reason: "admin_seed",
+        category: "admin_grant",
+        metadata: { created_by: callerId },
+        idempotency_key: `admin-seed-${newUserId}`,
+      });
     }
+
 
     return json({ user_id: newUserId, email, role, credits, temp_password: password });
   } catch (err) {
