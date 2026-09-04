@@ -10,7 +10,7 @@ const SCOPES = [
 
 const ORIGIN_ALLOWLIST = [
   'https://kubovibe.dev',
-  'https://kubovibe.lovable.app',
+  'https://kubovibe.dev',
   /^https:\/\/[a-z0-9-]+\.lovable\.app$/i,
   /^https:\/\/id-preview--[a-z0-9-]+\.lovable\.app$/i,
   /^http:\/\/localhost(:\d+)?$/i,

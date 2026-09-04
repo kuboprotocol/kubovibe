@@ -38,7 +38,7 @@ Deno.test('safeReturnPath: defaults non-internal paths to /dashboard', () => {
 Deno.test('isAllowedOrigin: accepts kubovibe + lovable + localhost; rejects others', () => {
   assert(isAllowedOrigin('https://kubovibe.dev'))
   assert(isAllowedOrigin('https://www.kubovibe.dev'))
-  assert(isAllowedOrigin('https://kubovibe.lovable.app'))
+  assert(isAllowedOrigin('https://kubovibe.dev'))
   assert(isAllowedOrigin('http://localhost:3000'))
   assertEquals(isAllowedOrigin('https://evil.com'), false)
 })

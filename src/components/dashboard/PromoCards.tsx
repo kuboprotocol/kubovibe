@@ -27,7 +27,7 @@ export function PromoCards() {
     fetchData()
   }, [user])
 
-  const referralLink = `https://kubovibe.lovable.app/auth?ref=${referralCode}`
+  const referralLink = `https://kubovibe.dev/auth?ref=${referralCode}`
 
   const handleCopy = async () => {
     try {

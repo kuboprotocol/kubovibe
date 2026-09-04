@@ -76,10 +76,10 @@ Deno.serve(async (req: Request) => {
     const accountLink = await stripeClient.accountLinks.create({
       account: account_id,
       type: "account_onboarding",
-      refresh_url: refresh_url || "https://kubovibe.lovable.app/connect",
+      refresh_url: refresh_url || "https://kubovibe.dev/connect",
       return_url:
         return_url ||
-        `https://kubovibe.lovable.app/connect?accountId=${account_id}`,
+        `https://kubovibe.dev/connect?accountId=${account_id}`,
     });
 
     return new Response(JSON.stringify({ url: accountLink.url }), {

@@ -1,1 +1,1 @@
-UPDATE public.projects SET is_published = true, published_url = 'https://kubovibe.lovable.app/app/9dc91ff1-a054-46d9-aa4c-50b0e35f6186/calculator', published_at = now() WHERE id = '9dc91ff1-a054-46d9-aa4c-50b0e35f6186';
+UPDATE public.projects SET is_published = true, published_url = 'https://kubovibe.dev/app/9dc91ff1-a054-46d9-aa4c-50b0e35f6186/calculator', published_at = now() WHERE id = '9dc91ff1-a054-46d9-aa4c-50b0e35f6186';
