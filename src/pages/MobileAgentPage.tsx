@@ -16,6 +16,7 @@ import {
   Hammer,
   Rocket,
   ExternalLink,
+  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,15 +30,17 @@ import { useDeviceRegistration } from "@/hooks/useDeviceRegistration";
 import { useSessionBuilds } from "@/hooks/useSessionBuilds";
 import { ARCH_TARGETS, estimateBuildCost } from "@/lib/buildTargets";
 import { useWorkspaceProject } from "@/hooks/useWorkspaceProject";
+import MobileTeamPanel from "@/components/mobile/MobileTeamPanel";
 import { cn } from "@/lib/utils";
 
-type Tab = "session" | "files" | "terminal" | "preview";
+type Tab = "session" | "files" | "terminal" | "preview" | "team";
 
 const TABS: Array<{ id: Tab; label: string; icon: typeof Cloud }> = [
   { id: "session", label: "Session", icon: Cloud },
   { id: "files", label: "Files", icon: FileCode2 },
   { id: "terminal", label: "Terminal", icon: Terminal },
   { id: "preview", label: "Preview", icon: Eye },
+  { id: "team", label: "Team", icon: Users },
 ];
 
 const STATUS_STYLES: Record<string, string> = {
@@ -309,6 +312,12 @@ export default function MobileAgentPage() {
                 <p>repo: {repo || "—"}@{branch}</p>
               </div>
             </Card>
+          </motion.div>
+        )}
+
+        {tab === "team" && (
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+            <MobileTeamPanel />
           </motion.div>
         )}
 
