@@ -360,7 +360,45 @@ Deno.serve(async (req) => {
         await admin.from("cloud_sessions").update({ preview_url: previewUrl }).eq("id", session.id);
       }
 
+      // Ring the phone: the user usually backgrounds the app during a native build.
+      try {
+        if (apnsConfigured()) {
+          const results = await sendApnsToUser(admin, billedUserId, {
+            title: status === "succeeded" ? `${kind} succeeded` : `${kind} failed`,
+            body: `${archLabelFor(arch)} · ${cost} credits · ${Math.round((Date.now() - startedAt) / 1000)}s`,
+            data: {
+              build_id: build.id,
+              session_id: session.id,
+              project_id: session.project_id,
+              arch,
+              status,
+              deeplink: `kubovibe://m?session=${session.id}&build=${build.id}`,
+            },
+            threadId: session.id,
+          }, { collapseId: `build-${build.id}` });
+
+          if (results.length) {
+            await admin.from("push_deliveries").insert(
+              results.map((r) => ({
+                user_id: billedUserId,
+                triggered_by: user.id,
+                kind: `${kind}_${status}`,
+                title: status === "succeeded" ? `${kind} succeeded` : `${kind} failed`,
+                body: `${arch} · ${cost} credits`,
+                status: r.ok ? "delivered" : "failed",
+                apns_id: r.apnsId,
+                error_reason: r.reason,
+                metadata: { build_id: build.id, session_id: session.id, http_status: r.status },
+              })),
+            );
+          }
+        }
+      } catch (pushErr) {
+        console.error("[cloud-sessions] push failed", pushErr);
+      }
+
       return json({ build: finished, charged: cost, preview_url: previewUrl });
+
     }
 
     // ---------- builds history ----------
