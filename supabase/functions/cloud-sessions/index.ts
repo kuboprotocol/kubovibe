@@ -6,6 +6,28 @@ import { getUser, supaAdmin, sanitizeError, deductCredits } from "../_shared/cre
 
 const CREDITS_PER_MINUTE = 1;
 const ACTION_COSTS: Record<string, number> = { build: 2, deploy: 4 };
+
+/** Native compilation targets. Heavier toolchains (Xcode, MSVC, NDK) cost more. */
+const ARCH_MULTIPLIERS: Record<string, number> = {
+  "web": 1,
+  "ios-arm64": 2.5,
+  "ios-simulator-x64": 1.5,
+  "android-arm64": 2,
+  "android-x64": 1.5,
+  "macos-universal": 2.5,
+  "windows-x64": 2,
+  "linux-x64": 1.5,
+};
+const ARCH_PLATFORM: Record<string, string> = {
+  "web": "web",
+  "ios-arm64": "ios",
+  "ios-simulator-x64": "ios",
+  "android-arm64": "android",
+  "android-x64": "android",
+  "macos-universal": "macos",
+  "windows-x64": "windows",
+  "linux-x64": "linux",
+};
 const DEFAULT_IDLE_TIMEOUT = 900; // 15 min
 const GRACE_WINDOW_SECONDS = 60;
 
