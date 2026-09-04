@@ -101,3 +101,34 @@ O botão **Vibe Code** no header abre o mesmo projeto, branch e arquivo em
 | `BadDeviceToken` | Token antigo — reinstale o app para reemitir e reenviar a `devices-register` |
 | Build cobra mas não roda | Sessão terminada (`session_terminated`) — abra uma nova em *Session* |
 | `insufficient_credits` | Saldo insuficiente para o custo × multiplicador da arquitetura |
+
+---
+
+## APNs push — end-to-end test (production, kubovibe.dev)
+
+The backend now signs its own APNs provider JWT (ES256) from four secrets:
+`APNS_KEY_P8`, `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_BUNDLE_ID`. Add them through the
+secure secrets form in the app — never paste them in chat.
+
+1. **Apple Developer → Keys → +** — enable *Apple Push Notifications service (APNs)*,
+   download the `.p8` **once**. Note the **Key ID** and, in Membership, the **Team ID**.
+2. Save the secrets: `APNS_KEY_P8` = the whole file including the
+   `-----BEGIN PRIVATE KEY-----` / `-----END PRIVATE KEY-----` lines,
+   `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_BUNDLE_ID` = `dev.kubovibe.app`.
+3. Build and install the app on the iPhone (steps above). On first launch accept the
+   notification prompt — the app registers its token via `devices-register`.
+4. Open `/admin/ios-build` in the panel. The badge must read **APNs ready · N device(s)**.
+5. Press **Test push** — the alert must ring on the iPhone within a couple of seconds,
+   and the row appears under **Push deliveries** with status `delivered`.
+6. Start a session, pick **iOS arm64 (device)** and press **Build**. When the build
+   finishes the backend pushes `build succeeded / failed` with the target, credits and
+   duration, deep-linking to `kubovibe://m?session=<id>&build=<id>`.
+
+Failure reasons come straight from Apple and are shown in the Push deliveries tab:
+
+| Reason | Meaning |
+| --- | --- |
+| `BadDeviceToken` | Token is from the other environment — the backend auto-retries sandbox, then drops the token. |
+| `Unregistered` | App removed from the device; the token is deleted automatically. |
+| `TopicDisallowed` | `APNS_BUNDLE_ID` does not match the app's bundle identifier. |
+| `InvalidProviderToken` | Wrong `.p8`, Key ID or Team ID. |
