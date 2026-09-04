@@ -1,68 +1,103 @@
-# KUBO Mobile Agent — iOS / iPadOS build
+# KUBO Mobile Agent — iOS / iPadOS, do Mac ao alerta no iPhone
 
-The native app is a Capacitor wrapper around the `/m` client. Container sessions,
-builds and deploys run remotely (KUBO Cloud), so the app is a rich client only.
+O app nativo é um wrapper Capacitor do cliente `/m`. Sessões, builds e deploys rodam
+remotamente (KUBO Cloud) — o binário é apenas um cliente rico, e todo consumo é
+debitado no mesmo ledger de créditos (`credit_transactions`).
 
-## 1. Export and install
+Pré-requisitos no Mac: macOS 14+, Xcode 15+ (com Command Line Tools),
+Node 20+, CocoaPods (`sudo gem install cocoapods`), conta Apple Developer.
+
+---
+
+## 1. Clonar e preparar o projeto
 
 ```bash
-# after "Export to GitHub" + git clone
+git clone <seu-repo-exportado> kubovibe && cd kubovibe
 npm install
 npm install @capacitor/push-notifications
-npx cap add ios
-npx cap update ios
 npm run build
+npx cap add ios
 npx cap sync ios
 npx cap open ios
 ```
 
-## 2. Xcode
+`npx cap add ios` só é necessário na primeira vez. Depois de qualquer alteração de
+código web: `npm run build && npx cap sync ios`.
 
-- Signing & Capabilities → select your Apple Team (free account works for device installs).
-- Add the **Push Notifications** capability (build notifications).
-- Select your iPhone/iPad as target and press Run to install.
+## 2. Xcode — assinatura e capacidades
 
-On device, trust the developer profile in
-Settings → General → VPN & Device Management.
+1. Abra `ios/App/App.xcworkspace` (não o `.xcodeproj`).
+2. Target **App** → *Signing & Capabilities*:
+   - marque *Automatically manage signing* e escolha seu **Team**;
+   - Bundle Identifier: `dev.kubovibe.app`;
+   - **+ Capability** → *Push Notifications*;
+   - **+ Capability** → *Background Modes* → marque *Remote notifications*.
+3. Conecte o iPhone via USB, confie no Mac, selecione o device como destino e **Run** (⌘R).
+4. No iPhone: Ajustes → Geral → VPN e Gerenciamento de Dispositivo → confie no perfil.
 
-## 3. Live reload during development
+Conta gratuita instala por 7 dias; conta paga/TestFlight para instalação duradoura.
 
-`capacitor.config.ts` points `server.url` at the hosted preview, so the installed
-app always loads the latest deploy without rebuilding. Remove the `server` block
-to ship a fully bundled binary for TestFlight/App Store.
+## 3. Chave APNs (.p8)
 
-## 4. Entry point
+No [Apple Developer portal](https://developer.apple.com/account/resources/authkeys/list):
 
-Native builds open `/m` automatically (`src/lib/nativeEntry.ts`). Deep links keep
-the workspace shared with the desktop Vibe Code UI:
+1. **Keys → +** → nome `KUBO APNs` → marque *Apple Push Notifications service (APNs)* → Continue → Register.
+2. Baixe o arquivo `AuthKey_XXXXXXXXXX.p8` (**download único**) e anote:
+   - **Key ID** (10 caracteres, no nome do arquivo);
+   - **Team ID** (canto superior direito da conta);
+   - **Bundle ID**: `dev.kubovibe.app`.
+
+Cadastre os quatro valores como secrets do backend — nunca cole no chat:
+`APNS_KEY_P8` (conteúdo completo do `.p8`, incluindo as linhas `BEGIN/END PRIVATE KEY`),
+`APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_BUNDLE_ID`.
+
+## 4. Registro do token no device
+
+Na primeira abertura o app pede permissão de notificação, recebe o token APNs e
+envia para a function `devices-register`, que grava em `mobile_devices`
+(`user_id`, `apns_token`, `platform='ios'`, `app_version`). Isso já está implementado em
+`src/hooks/useDeviceRegistration.ts` — em web ele fica inerte.
+
+Confira o registro no painel `/admin/anywhere` (lista de devices).
+
+> Build instalada pelo Xcode usa o ambiente **sandbox**
+> (`api.sandbox.push.apple.com`). TestFlight/App Store usam produção
+> (`api.push.apple.com`). O envio escolhe o host pelo campo `environment` do device.
+
+## 5. Disparar o build e ouvir o alerta
+
+1. No Mac (ou em qualquer browser), abra `/admin/cloud`, clique no ID de uma sessão
+   e use **Build**; ou abra o app no iPhone, aba *Preview*, escolha a arquitetura
+   (ex.: `iOS arm64 (device)` — custo ×2,5) e toque em **Run build**.
+2. O `cloud-sessions` cobra os créditos **antes** de executar, grava a linha em
+   `session_builds` (com `arch`, `platform`, `logs`, `duration_ms`, `credits_spent`)
+   e, ao finalizar, envia o push para os tokens do dono da sessão.
+3. Bloqueie o iPhone: o alerta "Build finished · iOS arm64" toca com som mesmo
+   com o app em background (Remote notifications).
+4. Toque na notificação → o app abre em `/m` na aba *Preview* com os logs da build.
+
+## 6. Conferir custo e tempo de compilação
+
+- `/admin/builds` — logs completos, tempo de compilação e **custo por arquitetura**
+  (multiplicador, créditos, tempo médio, falhas), com atualização em tempo real.
+- `/admin/projects` → aba **By day** — créditos diários por categoria e projeção mensal.
+
+## 7. Deep links e continuidade no desktop
 
 ```
-kubovibe://m?project=<uuid>&repo=<owner/repo>&branch=main
+kubovibe://m?project=<uuid>&repo=<owner/repo>&branch=main&file=src/App.tsx
 ```
 
-## APNs registration and "build finished" push
+O botão **Vibe Code** no header abre o mesmo projeto, branch e arquivo em
+`/vibe-code`, mantendo o workspace compartilhado com o agente local
+(`kubo-agent/`, Rust + extensão VS Code/Cursor).
 
-1. **Apple Developer portal** — enable the *Push Notifications* capability for
-   `dev.kubovibe.app` and create an APNs **Auth Key (.p8)**. Note the Key ID and Team ID.
-2. **Xcode** — after `npx cap add ios && npx cap sync ios`, open
-   `ios/App/App.xcworkspace`, select the App target → *Signing & Capabilities* → add
-   *Push Notifications* and *Background Modes → Remote notifications*.
-3. **Plugin** — `npm i @capacitor/push-notifications` before `npx cap sync`. The client
-   already calls it lazily in `src/hooks/useDeviceRegistration.ts`; on web it stays inert.
-4. **Token registration** — on first launch the app requests permission, receives the APNs
-   token and posts it to the `devices-register` function, which upserts into
-   `mobile_devices` (`user_id`, `apns_token`, `platform`, `app_version`).
-5. **Sending the push** — when `cloud-sessions` finishes a `build`/`deploy` it can look up
-   the owner's tokens in `mobile_devices` and send an APNs `alert` payload signed with the
-   `.p8` key (`APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_PRIVATE_KEY` secrets). This matters
-   because iOS suspends the app aggressively — the result must arrive even when it is
-   backgrounded.
-6. **Install on the iPhone** — connect the device, pick it as the run destination in Xcode
-   and press Run (a free Apple ID works for a 7-day provisioning profile; a paid account
-   or TestFlight is required for longer installs).
+## Troubleshooting
 
-## End-to-end check
-
-Open the app → *Session* tab → pick the project → **Open session** (charges 1 credit/min) →
-*Preview* tab → **Run build** (2 credits) → logs and preview appear → tap **Vibe Code** in
-the header to open the exact same project, branch and file on the desktop editor.
+| Sintoma | Causa provável |
+| --- | --- |
+| `No profiles for 'dev.kubovibe.app' were found` | Team não selecionado ou bundle ID diferente do registrado |
+| Push não chega | Device registrado em sandbox mas envio em produção (ou vice-versa) |
+| `BadDeviceToken` | Token antigo — reinstale o app para reemitir e reenviar a `devices-register` |
+| Build cobra mas não roda | Sessão terminada (`session_terminated`) — abra uma nova em *Session* |
+| `insufficient_credits` | Saldo insuficiente para o custo × multiplicador da arquitetura |
