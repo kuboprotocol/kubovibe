@@ -27,6 +27,12 @@ export default function AdminTeamsPanel() {
   const [rows, setRows] = useState<TeamRow[]>([]);
   const [busy, setBusy] = useState(true);
   const [search, setSearch] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [newName, setNewName] = useState("");
+  const [newRole, setNewRole] = useState<string>("user");
+  const [newCredits, setNewCredits] = useState("25");
+  const [creating, setCreating] = useState(false);
+
 
   const load = async () => {
     setBusy(true);
