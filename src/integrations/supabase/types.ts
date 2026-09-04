@@ -2087,6 +2087,48 @@ export type Database = {
         }
         Relationships: []
       }
+      push_deliveries: {
+        Row: {
+          apns_id: string | null
+          body: string
+          created_at: string
+          error_reason: string | null
+          id: string
+          kind: string
+          metadata: Json
+          status: string
+          title: string
+          triggered_by: string | null
+          user_id: string
+        }
+        Insert: {
+          apns_id?: string | null
+          body: string
+          created_at?: string
+          error_reason?: string | null
+          id?: string
+          kind?: string
+          metadata?: Json
+          status?: string
+          title: string
+          triggered_by?: string | null
+          user_id: string
+        }
+        Update: {
+          apns_id?: string | null
+          body?: string
+          created_at?: string
+          error_reason?: string | null
+          id?: string
+          kind?: string
+          metadata?: Json
+          status?: string
+          title?: string
+          triggered_by?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       pwa_telemetry_audit_logs: {
         Row: {
           action_type: string
