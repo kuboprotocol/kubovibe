@@ -176,7 +176,32 @@ export default function AdminTeamsPanel() {
         </div>
 
 
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Create test account</CardTitle>
+            <CardDescription>Creates a real account with role and starting credits, billed on the same ledger.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-5">
+            <Input placeholder="email@team.com" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
+            <Input placeholder="Display name" value={newName} onChange={(e) => setNewName(e.target.value)} />
+            <Select value={newRole} onValueChange={setNewRole}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {ROLES.map((role) => (
+                  <SelectItem key={role} value={role}>{role}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input type="number" min={0} placeholder="Credits" value={newCredits} onChange={(e) => setNewCredits(e.target.value)} />
+            <Button onClick={() => void createAccount()} disabled={creating}>
+              {creating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Create account
+            </Button>
+          </CardContent>
+        </Card>
+
         <div className="grid gap-4 sm:grid-cols-4">
+
           {[
             { label: "Accounts", value: totals.teams, icon: Building2 },
             { label: "Projects", value: totals.projects, icon: Building2 },
