@@ -51,6 +51,9 @@ const AdminCloudPage = lazy(() => import("./pages/AdminCloudPage"));
 const AdminAnywherePage = lazy(() => import("./pages/AdminAnywherePage"));
 const AdminProjectsPage = lazy(() => import("./pages/AdminProjectsPage"));
 const AdminBuildsPage = lazy(() => import("./pages/AdminBuildsPage"));
+const AdminAgentPage = lazy(() => import("./pages/AdminAgentPage"));
+const AdminIosBuildPage = lazy(() => import("./pages/AdminIosBuildPage"));
+
 const AdminUsersPage = lazy(() => import("./pages/AdminUsersPage"));
 const AdminTeamsPage = lazy(() => import("./pages/AdminTeamsPage"));
 const AdminSkillsPage = lazy(() => import("./pages/AdminSkillsPage"));
