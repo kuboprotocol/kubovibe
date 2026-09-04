@@ -423,7 +423,7 @@ const BuilderPage = forwardRef<HTMLDivElement, any>((props, ref) => {
     await saveProject(generatedCode, messages)
     const slug = projectTitle.replace(/[^a-z0-9]/gi, '-').toLowerCase().slice(0, 40)
     const pid = currentProjectId || 'draft'
-    const url = `https://kubovibe.lovable.app/app/${pid}/${slug}`
+    const url = `https://kubovibe.dev/app/${pid}/${slug}`
     const { error } = await supabase.from('projects').update({
       is_published: true,
       published_url: url,

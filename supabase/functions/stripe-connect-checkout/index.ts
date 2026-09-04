@@ -8,7 +8,7 @@ import Stripe from "npm:stripe@^18";
 import { createClient } from "npm:@supabase/supabase-js@^2";
 
 const ALLOWED_REDIRECT_ORIGINS = [
-  "https://kubovibe.lovable.app",
+  "https://kubovibe.dev",
   "https://kubovibe.dev",
   "https://id-preview--5ce8b966-167f-4e5a-be1c-165ac92bd64e.lovable.app",
 ];
@@ -112,9 +112,9 @@ Deno.serve(async (req: Request) => {
       mode: "payment",
       success_url:
         success_url ||
-        "https://kubovibe.lovable.app/connect?checkout=success&session_id={CHECKOUT_SESSION_ID}",
+        "https://kubovibe.dev/connect?checkout=success&session_id={CHECKOUT_SESSION_ID}",
       cancel_url:
-        cancel_url || "https://kubovibe.lovable.app/connect?checkout=cancelled",
+        cancel_url || "https://kubovibe.dev/connect?checkout=cancelled",
     });
 
     return new Response(JSON.stringify({ checkout_url: session.url }), {

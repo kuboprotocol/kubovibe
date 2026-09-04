@@ -32,7 +32,7 @@ const ReferralNotificationEmail = ({ referredName, creditsEarned = 100 }: Referr
         <Text style={text}>
           Continue compartilhando seu link para ganhar mais créditos.
         </Text>
-        <Button style={button} href="https://kubovibe.lovable.app/profile">
+        <Button style={button} href="https://kubovibe.dev/profile">
           Ver Minhas Indicações
         </Button>
         <Text style={footer}>Equipe {SITE_NAME}</Text>

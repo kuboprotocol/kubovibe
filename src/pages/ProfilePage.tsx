@@ -53,7 +53,7 @@ export default function ProfilePage() {
 
   const handleCopyReferral = async () => {
     try {
-      await navigator.clipboard.writeText(`https://kubovibe.lovable.app/auth?ref=${referralCode}`)
+      await navigator.clipboard.writeText(`https://kubovibe.dev/auth?ref=${referralCode}`)
       setCopied(true)
       toast.success('Link copiado!')
       setTimeout(() => setCopied(false), 2000)
@@ -296,7 +296,7 @@ export default function ProfilePage() {
                 <Label className="text-muted-foreground text-sm">Seu link de indicação</Label>
                 <div className="flex gap-2">
                   <Input
-                    value={`https://kubovibe.lovable.app/auth?ref=${referralCode}`}
+                    value={`https://kubovibe.dev/auth?ref=${referralCode}`}
                     readOnly
                     className="text-xs bg-muted/30"
                   />

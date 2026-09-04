@@ -72,8 +72,8 @@ Deno.serve(async (req: Request) => {
         quantity: 1,
       }],
       mode: "payment",
-      success_url: `https://kubovibe.lovable.app/pricing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `https://kubovibe.lovable.app/pricing?checkout=cancelled`,
+      success_url: `https://kubovibe.dev/pricing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `https://kubovibe.dev/pricing?checkout=cancelled`,
       client_reference_id: user.id,
       metadata: {
         user_id: user.id,

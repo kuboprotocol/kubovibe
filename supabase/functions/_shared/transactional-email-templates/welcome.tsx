@@ -26,7 +26,7 @@ const WelcomeEmail = ({ name }: WelcomeProps) => (
           Sua conta foi criada com sucesso. Agora você pode criar sites incríveis,
           ganhar créditos indicando amigos e muito mais.
         </Text>
-        <Button style={button} href="https://kubovibe.lovable.app/dashboard">
+        <Button style={button} href="https://kubovibe.dev/dashboard">
           Acessar Dashboard
         </Button>
         <Text style={footer}>Equipe {SITE_NAME}</Text>

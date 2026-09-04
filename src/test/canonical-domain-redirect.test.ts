@@ -22,7 +22,7 @@ function buildTarget(loc: { pathname: string; search: string; hash: string }) {
 describe('Canonical-domain redirect: lovable.app → kubovibe.dev', () => {
   describe('shouldRedirect()', () => {
     it.each([
-      ['kubovibe.lovable.app', true],
+      ['kubovibe.dev', true],
       ['lovable.app', true],
       ['foo.bar.lovable.app', true],
       ['LOVABLE.APP', true], // case-insensitive
@@ -119,8 +119,8 @@ describe('Canonical-domain redirect: lovable.app → kubovibe.dev', () => {
       }
     }
 
-    it('redirects kubovibe.lovable.app/foo?x=1#y → kubovibe.dev/foo?x=1#y', () => {
-      stubLocation('https://kubovibe.lovable.app/foo?x=1#y')
+    it('redirects kubovibe.dev/foo?x=1#y → kubovibe.dev/foo?x=1#y', () => {
+      stubLocation('https://kubovibe.dev/foo?x=1#y')
       runRedirect()
       expect(replaceMock).toHaveBeenCalledWith('https://kubovibe.dev/foo?x=1#y')
     })
@@ -145,7 +145,7 @@ describe('Canonical-domain redirect: lovable.app → kubovibe.dev', () => {
 
     it('preserves nested query + multi-segment hash on the public app URL', () => {
       stubLocation(
-        'https://kubovibe.lovable.app/app/proj-123/meu-app?ref=email&t=1#top',
+        'https://kubovibe.dev/app/proj-123/meu-app?ref=email&t=1#top',
       )
       runRedirect()
       expect(replaceMock).toHaveBeenCalledWith(

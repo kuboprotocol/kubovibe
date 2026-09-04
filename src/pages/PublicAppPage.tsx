@@ -89,7 +89,7 @@ export default function PublicAppPage() {
       )}
       {/* Badge */}
       <a
-        href="https://kubovibe.lovable.app"
+        href="https://kubovibe.dev"
         target="_blank"
         rel="noopener noreferrer"
         className="fixed bottom-4 right-4 z-50 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-background/90 backdrop-blur-sm border border-border/50 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200 text-xs font-medium text-muted-foreground hover:text-foreground group"

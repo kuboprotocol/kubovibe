@@ -3610,7 +3610,7 @@ Deno.test('HTTP integration: 405 method_not_allowed — CORS contract preserved 
     const ORIGINS: Array<{ label: string; value: string | null }> = [
       { label: 'sem Origin', value: null },
       { label: 'same-origin produção', value: 'https://app.kubovibe.dev' },
-      { label: 'same-origin lovable', value: 'https://kubovibe.lovable.app' },
+      { label: 'same-origin lovable', value: 'https://kubovibe.dev' },
       { label: 'cross-origin hostil', value: 'https://evil.example.com' },
       { label: 'cross-origin localhost dev', value: 'http://localhost:5173' },
       { label: 'Origin "null" (sandbox iframe / file://)', value: 'null' },
@@ -3925,7 +3925,7 @@ Deno.test('HTTP integration: 401/403 auth-rejection — uniform CORS contract ac
     const ORIGINS: Array<{ label: string; value: string | null }> = [
       { label: 'sem Origin',                      value: null },
       { label: 'same-origin produção',            value: 'https://app.kubovibe.dev' },
-      { label: 'same-origin lovable',             value: 'https://kubovibe.lovable.app' },
+      { label: 'same-origin lovable',             value: 'https://kubovibe.dev' },
       { label: 'cross-origin hostil',             value: 'https://evil.example.com' },
       { label: 'cross-origin localhost',          value: 'http://localhost:5173' },
       { label: 'Origin literal "null" (sandbox)', value: 'null' },
@@ -4295,7 +4295,7 @@ Deno.test('HTTP integration: 403 forbidden — uniform CORS contract across Orig
     const ORIGINS: Array<{ label: string; value: string | null }> = [
       { label: 'sem Origin',                      value: null },
       { label: 'same-origin produção',            value: 'https://app.kubovibe.dev' },
-      { label: 'same-origin lovable',             value: 'https://kubovibe.lovable.app' },
+      { label: 'same-origin lovable',             value: 'https://kubovibe.dev' },
       { label: 'cross-origin hostil',             value: 'https://evil.example.com' },
       { label: 'cross-origin localhost',          value: 'http://localhost:5173' },
       { label: 'Origin literal "null" (sandbox)', value: 'null' },
@@ -4606,7 +4606,7 @@ Deno.test('HTTP integration: OPTIONS WITH Origin — Access-Control-Request-Meth
     // Origens diversas — Allow-Methods deve ser idêntico para todas (handler não ramifica).
     const ORIGINS: Array<{ label: string; value: string }> = [
       { label: 'same-origin produção',     value: 'https://app.kubovibe.dev' },
-      { label: 'same-origin lovable',      value: 'https://kubovibe.lovable.app' },
+      { label: 'same-origin lovable',      value: 'https://kubovibe.dev' },
       { label: 'cross-origin hostil',      value: 'https://evil.example.com' },
       { label: 'localhost dev',            value: 'http://localhost:5173' },
       { label: 'Origin literal "null"',    value: 'null' },
@@ -4738,7 +4738,7 @@ Deno.test('HTTP integration: OPTIONS WITH Origin — Allow-Headers stays LITERAL
     // Origens diversas — Allow-Headers deve ser idêntico para todas.
     const ORIGINS: Array<{ label: string; value: string }> = [
       { label: 'same-origin produção',     value: 'https://app.kubovibe.dev' },
-      { label: 'same-origin lovable',      value: 'https://kubovibe.lovable.app' },
+      { label: 'same-origin lovable',      value: 'https://kubovibe.dev' },
       { label: 'cross-origin hostil',      value: 'https://evil.example.com' },
       { label: 'localhost dev',            value: 'http://localhost:5173' },
       { label: 'Origin literal "null"',    value: 'null' },
@@ -4934,7 +4934,7 @@ Deno.test('HTTP integration: OPTIONS preflight — Request-Method × Request-Hea
     const ORIGINS: Array<{ label: string; value: string | null }> = [
       { label: 'sem Origin',                value: null },
       { label: 'same-origin produção',      value: 'https://app.kubovibe.dev' },
-      { label: 'same-origin lovable',       value: 'https://kubovibe.lovable.app' },
+      { label: 'same-origin lovable',       value: 'https://kubovibe.dev' },
       { label: 'cross-origin hostil',       value: 'https://evil.example.com' },
       { label: 'localhost dev',             value: 'http://localhost:5173' },
       { label: 'Origin literal "null"',     value: 'null' },

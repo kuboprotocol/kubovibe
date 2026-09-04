@@ -61,7 +61,7 @@ Deno.serve(async (req: Request) => {
       },
       body: JSON.stringify({
         products: [product_id],
-        success_url: "https://kubovibe.lovable.app/pricing?checkout=success&checkout_id={CHECKOUT_ID}",
+        success_url: "https://kubovibe.dev/pricing?checkout=success&checkout_id={CHECKOUT_ID}",
         external_customer_id: user.id,
       }),
     });

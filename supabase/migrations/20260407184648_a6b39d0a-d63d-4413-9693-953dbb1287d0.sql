@@ -34,13 +34,13 @@ CREATE POLICY "Users can update own clicks" ON public.shortlink_clicks FOR UPDAT
 
 -- Seed some sample shortlinks
 INSERT INTO public.shortlinks (slug, title, destination_url, reward_credits, wait_seconds) VALUES
-  ('music1', '🎵 Discover New Music', 'https://kubovibe.lovable.app', 0.5, 8),
-  ('crypto1', '₿ Crypto News', 'https://kubovibe.lovable.app', 0.5, 8),
-  ('game1', '🎮 Gaming Tips', 'https://kubovibe.lovable.app', 0.5, 8),
-  ('tech1', '💻 Tech Trends', 'https://kubovibe.lovable.app', 0.5, 8),
-  ('art1', '🎨 Digital Art', 'https://kubovibe.lovable.app', 0.5, 8),
-  ('learn1', '📚 Learn Web3', 'https://kubovibe.lovable.app', 0.5, 8),
-  ('news1', '📰 Daily News', 'https://kubovibe.lovable.app', 0.5, 8),
-  ('sports1', '⚽ Sports Updates', 'https://kubovibe.lovable.app', 0.5, 8),
-  ('food1', '🍕 Food & Recipes', 'https://kubovibe.lovable.app', 0.5, 8),
-  ('travel1', '✈️ Travel Deals', 'https://kubovibe.lovable.app', 0.5, 8);
+  ('music1', '🎵 Discover New Music', 'https://kubovibe.dev', 0.5, 8),
+  ('crypto1', '₿ Crypto News', 'https://kubovibe.dev', 0.5, 8),
+  ('game1', '🎮 Gaming Tips', 'https://kubovibe.dev', 0.5, 8),
+  ('tech1', '💻 Tech Trends', 'https://kubovibe.dev', 0.5, 8),
+  ('art1', '🎨 Digital Art', 'https://kubovibe.dev', 0.5, 8),
+  ('learn1', '📚 Learn Web3', 'https://kubovibe.dev', 0.5, 8),
+  ('news1', '📰 Daily News', 'https://kubovibe.dev', 0.5, 8),
+  ('sports1', '⚽ Sports Updates', 'https://kubovibe.dev', 0.5, 8),
+  ('food1', '🍕 Food & Recipes', 'https://kubovibe.dev', 0.5, 8),
+  ('travel1', '✈️ Travel Deals', 'https://kubovibe.dev', 0.5, 8);
