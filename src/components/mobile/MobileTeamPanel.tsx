@@ -13,7 +13,7 @@ interface TeamSnapshot {
   minutes: number;
   activeSessions: number;
   projects: { id: string; name: string }[];
-  builds: { id: string; kind: string; status: string; credits: number; created_at: string }[];
+  builds: { id: string; kind: string; status: string; credits: number; arch: string; created_at: string }[];
 }
 
 const EMPTY: TeamSnapshot = {
@@ -49,7 +49,7 @@ export default function MobileTeamPanel() {
       supabase.from("cloud_sessions").select("status, billed_minutes"),
       supabase
         .from("session_builds")
-        .select("id, kind, status, credits, created_at")
+        .select("id, kind, status, credits_spent, arch, created_at")
         .order("created_at", { ascending: false })
         .limit(20),
     ]);
@@ -77,7 +77,8 @@ export default function MobileTeamPanel() {
         id: b.id,
         kind: b.kind,
         status: b.status,
-        credits: Number(b.credits ?? 0),
+        credits: Number(b.credits_spent ?? 0),
+        arch: b.arch,
         created_at: b.created_at,
       })),
     });
@@ -169,7 +170,7 @@ export default function MobileTeamPanel() {
             {data.builds.map((b) => (
               <div key={b.id} className="flex items-center justify-between gap-2 text-xs">
                 <span className="truncate text-muted-foreground">
-                  {new Date(b.created_at).toLocaleString()} · {b.kind}
+                  {new Date(b.created_at).toLocaleString()} · {b.kind} · {b.arch}
                 </span>
                 <div className="flex items-center gap-1">
                   <Badge variant="outline" className="text-[9px] uppercase">
