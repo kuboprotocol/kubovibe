@@ -27,6 +27,12 @@ export default function AdminTeamsPanel() {
   const [rows, setRows] = useState<TeamRow[]>([]);
   const [busy, setBusy] = useState(true);
   const [search, setSearch] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [newName, setNewName] = useState("");
+  const [newRole, setNewRole] = useState<string>("user");
+  const [newCredits, setNewCredits] = useState("25");
+  const [creating, setCreating] = useState(false);
+
 
   const load = async () => {
     setBusy(true);
@@ -85,7 +91,37 @@ export default function AdminTeamsPanel() {
     setBusy(false);
   };
 
+  const createAccount = async () => {
+    if (!newEmail.trim()) {
+      toast.error("Informe um e-mail");
+      return;
+    }
+    setCreating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-create-user", {
+        body: {
+          email: newEmail.trim(),
+          display_name: newName.trim(),
+          role: newRole,
+          credits: Number(newCredits) || 0,
+        },
+      });
+      const payload = data as { temp_password?: string; error?: string } | null;
+      if (error || payload?.error) {
+        toast.error(payload?.error ?? error?.message ?? "Falha ao criar conta");
+        return;
+      }
+      toast.success(`Conta criada. Senha temporária: ${payload?.temp_password ?? "-"}`, { duration: 15000 });
+      setNewEmail("");
+      setNewName("");
+      await load();
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const assignRole = async (userId: string, role: string) => {
+
     const { error: delError } = await supabase.from("user_roles").delete().eq("user_id", userId);
     if (delError) {
       toast.error(delError.message);
@@ -140,7 +176,32 @@ export default function AdminTeamsPanel() {
         </div>
 
 
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Create test account</CardTitle>
+            <CardDescription>Creates a real account with role and starting credits, billed on the same ledger.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-5">
+            <Input placeholder="email@team.com" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
+            <Input placeholder="Display name" value={newName} onChange={(e) => setNewName(e.target.value)} />
+            <Select value={newRole} onValueChange={setNewRole}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {ROLES.map((role) => (
+                  <SelectItem key={role} value={role}>{role}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input type="number" min={0} placeholder="Credits" value={newCredits} onChange={(e) => setNewCredits(e.target.value)} />
+            <Button onClick={() => void createAccount()} disabled={creating}>
+              {creating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Create account
+            </Button>
+          </CardContent>
+        </Card>
+
         <div className="grid gap-4 sm:grid-cols-4">
+
           {[
             { label: "Accounts", value: totals.teams, icon: Building2 },
             { label: "Projects", value: totals.projects, icon: Building2 },
