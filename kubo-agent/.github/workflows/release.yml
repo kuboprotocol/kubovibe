@@ -1,0 +1,50 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build daemon
+        working-directory: daemon
+        run: cargo build --release
+      - name: Restore signing certificate
+        if: ${{ secrets.KUBO_CERT_BASE64 != '' }}
+        shell: pwsh
+        run: |
+          [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\kubo.pfx", [Convert]::FromBase64String($env:CERT))
+          echo "KUBO_CERT_PATH=$env:RUNNER_TEMP\kubo.pfx" >> $env:GITHUB_ENV
+        env:
+          CERT: ${{ secrets.KUBO_CERT_BASE64 }}
+      - name: Sign
+        if: ${{ env.KUBO_CERT_PATH != '' }}
+        shell: pwsh
+        env:
+          KUBO_CERT_PASSWORD: ${{ secrets.KUBO_CERT_PASSWORD }}
+        run: pwsh scripts/sign-windows.ps1 -Binary daemon/target/release/kubo-agent.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kubo-agent-windows
+          path: daemon/target/release/kubo-agent.exe
+
+  extension:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - working-directory: extension
+        run: |
+          npm install
+          npm run compile
+          npx vsce package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kubo-vibe-vsix
+          path: extension/*.vsix
