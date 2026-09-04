@@ -268,6 +268,36 @@ export type Database = {
         }
         Relationships: []
       }
+      billing_settings: {
+        Row: {
+          currency: string
+          custom_amount_enabled: boolean
+          id: boolean
+          max_credits: number
+          min_credits: number
+          price_per_credit_cents: number
+          updated_at: string
+        }
+        Insert: {
+          currency?: string
+          custom_amount_enabled?: boolean
+          id?: boolean
+          max_credits?: number
+          min_credits?: number
+          price_per_credit_cents?: number
+          updated_at?: string
+        }
+        Update: {
+          currency?: string
+          custom_amount_enabled?: boolean
+          id?: boolean
+          max_credits?: number
+          min_credits?: number
+          price_per_credit_cents?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       cloud_sessions: {
         Row: {
           billed_minutes: number
@@ -1007,6 +1037,92 @@ export type Database = {
           timezone?: string | null
           updated_at?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      credit_orders: {
+        Row: {
+          amount_cents: number
+          created_at: string
+          credited_at: string | null
+          credits: number
+          currency: string
+          id: string
+          metadata: Json
+          package_id: string | null
+          status: string
+          stripe_session_id: string | null
+          user_id: string
+        }
+        Insert: {
+          amount_cents: number
+          created_at?: string
+          credited_at?: string | null
+          credits: number
+          currency?: string
+          id?: string
+          metadata?: Json
+          package_id?: string | null
+          status?: string
+          stripe_session_id?: string | null
+          user_id: string
+        }
+        Update: {
+          amount_cents?: number
+          created_at?: string
+          credited_at?: string | null
+          credits?: number
+          currency?: string
+          id?: string
+          metadata?: Json
+          package_id?: string | null
+          status?: string
+          stripe_session_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_orders_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "credit_packages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      credit_packages: {
+        Row: {
+          active: boolean
+          created_at: string
+          credits: number
+          currency: string
+          id: string
+          name: string
+          price_cents: number
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          credits: number
+          currency?: string
+          id?: string
+          name: string
+          price_cents: number
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          credits?: number
+          currency?: string
+          id?: string
+          name?: string
+          price_cents?: number
+          sort_order?: number
+          updated_at?: string
         }
         Relationships: []
       }
@@ -3432,6 +3548,17 @@ export type Database = {
         Returns: number
       }
       execute_atomic_credit_deduction: {
+        Args: {
+          _amount: number
+          _category?: string
+          _idempotency_key?: string
+          _metadata?: Json
+          _reason: string
+          _user_id: string
+        }
+        Returns: Json
+      }
+      execute_atomic_credit_topup: {
         Args: {
           _amount: number
           _category?: string
