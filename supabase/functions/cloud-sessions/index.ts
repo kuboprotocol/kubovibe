@@ -262,7 +262,10 @@ Deno.serve(async (req) => {
       if (session.status === "terminated") return json({ error: "session_terminated" }, 409);
 
       const kind = action;
-      const cost = ACTION_COSTS[kind];
+      const arch = String((body as any).arch ?? "web");
+      if (!(arch in ARCH_MULTIPLIERS)) return json({ error: "unknown_arch" }, 400);
+      const platform = ARCH_PLATFORM[arch];
+      const cost = Math.round(ACTION_COSTS[kind] * ARCH_MULTIPLIERS[arch] * 100) / 100;
       const command = String((body as any).command ?? (kind === "build" ? "npm run build" : "npm run deploy")).slice(0, 300);
 
       // Charge before running — no free compute.
@@ -270,8 +273,10 @@ Deno.serve(async (req) => {
         session_id: session.id,
         kind,
         command,
+        arch,
+        platform,
         triggered_by: user.id,
-      }, user.email, `cloud_session:${session.id}:${kind}:${Date.now()}`);
+      }, user.email, `cloud_session:${session.id}:${kind}:${arch}:${Date.now()}`);
       if (!charge.ok) return json({ error: "insufficient_credits" }, 402);
 
       const { data: build, error: buildError } = await admin
@@ -281,6 +286,8 @@ Deno.serve(async (req) => {
           user_id: billedUserId,
           project_id: session.project_id,
           kind,
+          arch,
+          platform,
           status: "running",
           command,
           credits_spent: cost,
