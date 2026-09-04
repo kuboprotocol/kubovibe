@@ -7,6 +7,7 @@ import { apnsConfigured, sendApnsToUser } from "../_shared/apns.ts";
 import {
   orchestratorDriver,
   provisionContainer,
+  type Provisioned,
   execInContainer,
   destroyContainer,
 } from "../_shared/orchestrator.ts";
@@ -63,6 +64,10 @@ Deno.serve(async (req) => {
     const action = String((body as any).action ?? (req.method === "GET" ? "list" : ""));
 
     // ---------- list ----------
+    if (action === "orchestrator") {
+      return json({ driver: orchestratorDriver() });
+    }
+
     if (action === "list") {
       const { data, error } = await admin
         .from("cloud_sessions")
@@ -236,6 +241,7 @@ Deno.serve(async (req) => {
       if (!(arch in ARCH_MULTIPLIERS)) return json({ error: "unknown_arch" }, 400);
       const platform = ARCH_PLATFORM[arch];
       const cost = Math.round(ACTION_COSTS[kind] * ARCH_MULTIPLIERS[arch] * 100) / 100;
+      if (!orchestratorDriver()) return json({ error: "orchestrator_not_configured" }, 503);
       const command = String((body as any).command ?? (kind === "build" ? "npm run build" : "npm run deploy")).slice(0, 300);
 
       // Charge before running — no free compute.
