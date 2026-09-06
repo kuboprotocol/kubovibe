@@ -42,9 +42,8 @@
     "setup:env:schema": "node scripts/validate-env-report.mjs",
     "prod:health": "node scripts/prod-health-check.mjs",
     "test:pr-comment": "node scripts/build-env-check-pr-comment.test.mjs",
-    "deploy:vercel": "vercel deploy --prod",
     "deploy:render": "npm run build && curl -X POST $RENDER_DEPLOY_HOOK",
-    "deploy:all": "bun run build && bun run deploy:vercel && bun run deploy:render"
+    "deploy:all": "bun run build && bun run deploy:render"
   },
   "dependencies": {
     "@babylonjs/core": "^7.0.0",
@@ -148,8 +147,8 @@
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react-swc": "^3.11.0",
-    "@vitest/coverage-istanbul": "^4.1.8",
-    "@vitest/coverage-v8": "^4.1.8",
+    "@vitest/coverage-istanbul": "^3.2.4",
+    "@vitest/coverage-v8": "^3.2.4",
     "autoprefixer": "^10.4.21",
     "eslint": "^9.32.0",
     "eslint-plugin-react-hooks": "^5.2.0",
