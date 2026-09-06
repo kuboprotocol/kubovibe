@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, RefreshCw, Coins, FolderGit2, Cloud, Hammer } from "lucide-react";
+import { Loader2, RefreshCw, Coins, FolderGit2, Cloud, Hammer, Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,8 @@ interface TeamSnapshot {
   spent: number;
   byCategory: Record<string, number>;
   minutes: number;
+  blocked: number;
+  pendingOrders: number;
   activeSessions: number;
   projects: { id: string; name: string }[];
   builds: { id: string; kind: string; status: string; credits: number; arch: string; created_at: string }[];
@@ -21,6 +23,8 @@ const EMPTY: TeamSnapshot = {
   spent: 0,
   byCategory: {},
   minutes: 0,
+  blocked: 0,
+  pendingOrders: 0,
   activeSessions: 0,
   projects: [],
   builds: [],
@@ -39,7 +43,7 @@ export default function MobileTeamPanel() {
   const load = useCallback(async () => {
     if (!user) return;
     setBusy(true);
-    const [projects, tx, sessions, builds] = await Promise.all([
+    const [projects, tx, sessions, builds, orders] = await Promise.all([
       supabase.from("projects").select("id, title, created_at").order("created_at", { ascending: false }).limit(50),
       supabase
         .from("credit_transactions")
@@ -52,7 +56,12 @@ export default function MobileTeamPanel() {
         .select("id, kind, status, credits_spent, arch, created_at")
         .order("created_at", { ascending: false })
         .limit(20),
+      supabase.from("credit_orders").select("credits, status").neq("status", "paid").limit(200),
     ]);
+
+    const pending = (orders.data ?? []).filter(
+      (o) => !["failed", "canceled", "cancelled"].includes(String(o.status)),
+    );
 
     const rows = tx.data ?? [];
     const byCategory: Record<string, number> = {};
@@ -71,6 +80,8 @@ export default function MobileTeamPanel() {
       spent,
       byCategory,
       minutes: (sessions.data ?? []).reduce((sum, s) => sum + Number(s.billed_minutes ?? 0), 0),
+      blocked: pending.reduce((sum, o) => sum + Number(o.credits ?? 0), 0),
+      pendingOrders: pending.length,
       activeSessions: (sessions.data ?? []).filter((s) => ["running", "starting", "idle"].includes(s.status)).length,
       projects: (projects.data ?? []).map((p) => ({ id: p.id, name: p.title ?? "Untitled" })),
       builds: (builds.data ?? []).map((b) => ({
@@ -113,6 +124,15 @@ export default function MobileTeamPanel() {
         <Card className="p-3">
           <p className="text-[10px] uppercase text-muted-foreground">Credits spent</p>
           <p className="font-orbitron text-lg">{data.spent}</p>
+        </Card>
+        <Card className="p-3">
+          <p className="flex items-center gap-1 text-[10px] uppercase text-muted-foreground">
+            <Lock className="h-3 w-3" /> Blocked (unpaid)
+          </p>
+          <p className="font-orbitron text-lg">{data.blocked}</p>
+          <p className="text-[10px] text-muted-foreground">
+            {data.pendingOrders} order{data.pendingOrders === 1 ? "" : "s"} awaiting payment
+          </p>
         </Card>
         <Card className="p-3">
           <p className="flex items-center gap-1 text-[10px] uppercase text-muted-foreground">

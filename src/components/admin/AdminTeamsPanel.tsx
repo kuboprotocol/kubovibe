@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Building2, Loader2, RefreshCw, Search, Zap } from "lucide-react";
+import { ArrowLeft, Building2, Loader2, Lock, RefreshCw, Search, Zap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +21,9 @@ interface TeamRow {
   activeSessions: number;
   minutes: number;
   byCategory: Record<string, number>;
+  /** Credits from orders that are not paid yet — not released to the ledger. */
+  blocked: number;
+  pendingOrders: number;
 }
 
 export default function AdminTeamsPanel() {
@@ -36,13 +39,23 @@ export default function AdminTeamsPanel() {
 
   const load = async () => {
     setBusy(true);
-    const [profiles, roles, projects, tx, sessions] = await Promise.all([
+    const [profiles, roles, projects, tx, sessions, orders] = await Promise.all([
       supabase.from("profiles").select("id, display_name, created_at").order("created_at", { ascending: false }).limit(500),
       supabase.from("user_roles").select("user_id, role"),
       supabase.from("projects").select("id, title, user_id").order("created_at", { ascending: false }).limit(2000),
       supabase.from("credit_transactions").select("user_id, delta, balance_after, category, created_at").order("created_at", { ascending: false }).limit(5000),
       supabase.from("cloud_sessions").select("user_id, status, billed_minutes"),
+      supabase.from("credit_orders").select("user_id, credits, status").neq("status", "paid").limit(2000),
     ]);
+
+    const blocked = new Map<string, { credits: number; count: number }>();
+    (orders.data ?? []).forEach((o) => {
+      if (o.status === "failed" || o.status === "canceled" || o.status === "cancelled") return;
+      const cur = blocked.get(o.user_id) ?? { credits: 0, count: 0 };
+      cur.credits += Number(o.credits ?? 0);
+      cur.count += 1;
+      blocked.set(o.user_id, cur);
+    });
 
     const roleMap = new Map<string, string[]>();
     (roles.data ?? []).forEach((r) => roleMap.set(r.user_id, [...(roleMap.get(r.user_id) ?? []), r.role]));
@@ -86,6 +99,8 @@ export default function AdminTeamsPanel() {
         activeSessions: active.get(p.id) ?? 0,
         minutes: minutes.get(p.id) ?? 0,
         byCategory: byCategory.get(p.id) ?? {},
+        blocked: blocked.get(p.id)?.credits ?? 0,
+        pendingOrders: blocked.get(p.id)?.count ?? 0,
       })),
     );
     setBusy(false);
@@ -158,6 +173,7 @@ export default function AdminTeamsPanel() {
       projects: rows.reduce((a, r) => a + r.projects.length, 0),
       active: rows.reduce((a, r) => a + r.activeSessions, 0),
       spent: rows.reduce((a, r) => a + r.spent, 0),
+      blocked: rows.reduce((a, r) => a + r.blocked, 0),
     }),
     [rows],
   );
@@ -200,13 +216,14 @@ export default function AdminTeamsPanel() {
           </CardContent>
         </Card>
 
-        <div className="grid gap-4 sm:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-5">
 
           {[
             { label: "Accounts", value: totals.teams, icon: Building2 },
             { label: "Projects", value: totals.projects, icon: Building2 },
             { label: "Active sessions", value: totals.active, icon: Zap },
             { label: "Credits spent", value: totals.spent.toFixed(1), icon: Zap },
+            { label: "Blocked (unpaid)", value: totals.blocked.toFixed(1), icon: Lock },
           ].map((c) => (
             <Card key={c.label}>
               <CardHeader className="pb-2">
@@ -253,6 +270,12 @@ export default function AdminTeamsPanel() {
                     </Select>
                     <span className="text-muted-foreground">Balance</span>
                     <span className="font-semibold">{r.balance.toFixed(1)}</span>
+                    {r.blocked > 0 ? (
+                      <Badge variant="outline" className="gap-1 border-amber-500/40 text-amber-400">
+                        <Lock className="h-3 w-3" />
+                        {r.blocked.toFixed(0)} blocked · {r.pendingOrders} unpaid
+                      </Badge>
+                    ) : null}
                     <span className="text-muted-foreground">Spent</span>
                     <span className="font-semibold">{r.spent.toFixed(1)}</span>
                     <span className="text-muted-foreground">Minutes</span>
