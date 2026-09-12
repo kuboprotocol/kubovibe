@@ -1,6 +1,8 @@
 // KUBO Vibe Code Agent — prompt -> plan -> real GitHub commits, streamed step by step (SSE).
+// DeepSeek-only (sem fallback Kimi/Puter/Groq), com roteador de complexidade,
+// cobrança de créditos em tempo real e checkpoints persistidos para rollback.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { callLlm } from "../_shared/llm.ts";
+import { callDeepSeek, classifyComplexity } from "../_shared/deepseekRouter.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,6 +11,8 @@ const corsHeaders = {
 };
 
 const GH_API = "https://api.github.com";
+
+const CREDIT_COST = { flash: 1, pro: 4 } as const;
 
 interface PlanAction {
   type: "read_file" | "edit_file" | "message";
@@ -85,7 +89,6 @@ async function writeFile(path: string, content: string, message: string) {
   return res.commit?.sha as string | undefined;
 }
 
-/** Revert a single commit by restoring each touched file to its parent state. */
 async function revertCommit(sha: string) {
   const { repo } = ghEnv();
   const commit = await gh(`/repos/${repo}/commits/${sha}`);
@@ -107,7 +110,6 @@ async function revertCommit(sha: string) {
   return files.map((f) => f.filename);
 }
 
-/** Minimal line-based unified diff (no external deps in Deno runtime). */
 function makeDiff(oldText: string, newText: string, path: string) {
   const a = oldText.split("\n");
   const b = newText.split("\n");
@@ -121,10 +123,10 @@ function makeDiff(oldText: string, newText: string, path: string) {
   return out.join("\n");
 }
 
-const SYSTEM = `You are the KUBO Vibe Code Agent. You turn a developer request into a concrete file-edit plan for a Vite + React + TypeScript + Tailwind repository.
-Reply with STRICT JSON only:
-{"summary":"short plan summary","actions":[{"type":"read_file","path":"src/..","reason":".."},{"type":"edit_file","path":"src/..","reason":"..","content":"FULL new file content"},{"type":"message","reason":"note to the user"}]}
-Rules: always give the FULL final file content for edit_file (never diffs or placeholders), keep code production-ready, no TODOs, use existing design tokens, English UI strings.`;
+const SYSTEM = `Você é o KUBO Vibe Code Agent, um engenheiro de software sênior (nível top 100) trabalhando num repositório Vite + React + TypeScript + Tailwind.
+Responda em JSON ESTRITO apenas:
+{"summary":"resumo curto do plano","actions":[{"type":"read_file","path":"src/..","reason":".."},{"type":"edit_file","path":"src/..","reason":"..","content":"CONTEÚDO COMPLETO do novo arquivo"},{"type":"message","reason":"nota para o usuário"}]}
+Regras: sempre dê o conteúdo FINAL COMPLETO do arquivo em edit_file (nunca diffs ou placeholders), código pronto para produção, zero TODO, zero catch vazio, reaproveite os design tokens existentes, nomeação precisa, avise quando algo depender de uma credencial ou decisão do usuário.`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -135,7 +137,6 @@ Deno.serve(async (req) => {
     });
   }
 
-  // Auth — always validate the JWT server side.
   const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
   if (!token) {
     return new Response(JSON.stringify({ error: "missing_authorization" }), {
@@ -155,12 +156,20 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
+  const userId = userRes.user.id;
+
+  const admin = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    { auth: { persistSession: false } },
+  );
 
   let body: {
     prompt?: string;
     mode?: "preview" | "apply";
     apply?: Array<{ path: string; content: string }>;
     revertSha?: string;
+    revertCheckpointId?: string;
   };
   try {
     body = await req.json();
@@ -180,36 +189,104 @@ Deno.serve(async (req) => {
           encoder.encode(`data: ${JSON.stringify({ id: `s${++seq}`, ...event })}\n\n`),
         );
 
+      const chargeCredits = async (amount: number, reason: string, metadata: Record<string, unknown>) => {
+        const { data, error } = await admin.rpc("execute_atomic_credit_deduction", {
+          _user_id: userId,
+          _amount: amount,
+          _reason: reason,
+          _category: "vibe_code_agent",
+          _metadata: metadata,
+          _idempotency_key: `vibe-${userId}-${crypto.randomUUID()}`,
+        });
+        if (error) throw new Error(error.message ?? "credit_deduction_failed");
+        const balanceAfter = (data as { balance_after?: number })?.balance_after;
+        send({ kind: "credits", status: "success", title: `-${amount} créditos`, creditsCharged: amount, balanceAfter });
+        return balanceAfter;
+      };
+
       try {
-        // 1) Per-step undo
-        if (body.revertSha) {
-          send({ kind: "commit", status: "running", title: `Reverting ${body.revertSha.slice(0, 7)}` });
-          const files = await revertCommit(body.revertSha);
+        const { repo } = ghEnv();
+
+        if (body.revertCheckpointId || body.revertSha) {
+          let sha = body.revertSha;
+          if (body.revertCheckpointId) {
+            const { data: cp, error } = await admin
+              .from("vibe_checkpoints")
+              .select("id, commit_sha")
+              .eq("id", body.revertCheckpointId)
+              .eq("user_id", userId)
+              .maybeSingle();
+            if (error || !cp) throw new Error("checkpoint_not_found");
+            sha = cp.commit_sha;
+          }
+          if (!sha) throw new Error("missing_sha_or_checkpoint");
+
+          send({ kind: "commit", status: "running", title: `Revertendo ${sha.slice(0, 7)}` });
+          const files = await revertCommit(sha);
           send({
             kind: "commit",
             status: "success",
-            title: `Reverted ${body.revertSha.slice(0, 7)}`,
+            title: `Revertido ${sha.slice(0, 7)}`,
             detail: files.join(", "),
           });
-          send({ kind: "done", status: "success", title: "Revert complete" });
+
+          if (body.revertCheckpointId) {
+            await admin.from("vibe_checkpoints").insert({
+              user_id: userId,
+              project_repo: repo,
+              commit_sha: sha,
+              parent_sha: null,
+              summary: `Revertido: checkpoint anterior`,
+              files_changed: files,
+              credits_spent: 0,
+              reverted_checkpoint_id: body.revertCheckpointId,
+            });
+          }
+
+          send({ kind: "done", status: "success", title: "Revert concluído" });
           controller.close();
           return;
         }
 
-        // 2) Apply a previously previewed set of edits
         if (body.apply?.length) {
+          const tier = classifyComplexity(body.apply.map((f) => f.path).join(" "));
+          const cost = CREDIT_COST[tier];
+          await chargeCredits(cost, "vibe_code_agent:apply", { tier, files: body.apply.length });
+
+          const committedFiles: string[] = [];
+          let lastSha: string | undefined;
           for (const file of body.apply) {
-            send({ kind: "commit", status: "running", title: `Committing ${file.path}`, path: file.path });
+            send({ kind: "commit", status: "running", title: `Commitando ${file.path}`, path: file.path });
             const sha = await writeFile(file.path, file.content, `vibe: update ${file.path}`);
+            lastSha = sha ?? lastSha;
+            committedFiles.push(file.path);
             send({
               kind: "commit",
               status: "success",
-              title: `Committed ${file.path}`,
+              title: `Commitado ${file.path}`,
               path: file.path,
               commitSha: sha,
             });
           }
-          send({ kind: "done", status: "success", title: "Changes applied" });
+
+          if (lastSha) {
+            const { data: checkpoint } = await admin
+              .from("vibe_checkpoints")
+              .insert({
+                user_id: userId,
+                project_repo: repo,
+                commit_sha: lastSha,
+                summary: `Aplicado: ${committedFiles.join(", ")}`,
+                files_changed: committedFiles,
+                credits_spent: cost,
+                model_used: tier,
+              })
+              .select("id")
+              .single();
+            send({ kind: "checkpoint", status: "success", title: "Checkpoint salvo", checkpointId: checkpoint?.id, commitSha: lastSha });
+          }
+
+          send({ kind: "done", status: "success", title: "Alterações aplicadas" });
           controller.close();
           return;
         }
@@ -218,23 +295,32 @@ Deno.serve(async (req) => {
         if (!prompt) throw new Error("prompt_required");
         const mode = body.mode === "apply" ? "apply" : "preview";
 
-        // 3) Reasoning
-        send({ kind: "thinking", status: "running", title: "Analyzing the request" });
-        const llm = await callLlm({
+        const tier = classifyComplexity(prompt);
+        const estimatedCost = CREDIT_COST[tier];
+        send({
+          kind: "estimate",
+          status: "success",
+          title: `Estimativa: ${estimatedCost} crédito(s) (modelo ${tier})`,
+          tier,
+          estimatedCost,
+        });
+
+        send({ kind: "thinking", status: "running", title: "Analisando o pedido" });
+        const llm = await callDeepSeek({
           messages: [
             { role: "system", content: SYSTEM },
             { role: "user", content: prompt },
           ],
           json: true,
-          prefer: "deepseek",
+          tier,
           max_tokens: 6000,
-          temperature: 0.3,
+          temperature: 0.2,
         });
         send({
           kind: "thinking",
           status: "success",
-          title: "Analysis complete",
-          detail: `${llm.provider} · ${llm.model}`,
+          title: "Análise concluída",
+          detail: `${llm.provider} · ${llm.model} (${llm.tier})`,
         });
 
         let plan: Plan;
@@ -248,33 +334,39 @@ Deno.serve(async (req) => {
         send({
           kind: "plan",
           status: "success",
-          title: plan.summary || "Plan ready",
-          detail: `${plan.actions?.length ?? 0} action(s)`,
+          title: plan.summary || "Plano pronto",
+          detail: `${plan.actions?.length ?? 0} ação(ões)`,
         });
 
-        // 4) Execute
+        if (mode === "apply") {
+          await chargeCredits(estimatedCost, "vibe_code_agent:direct_apply", { tier, prompt: prompt.slice(0, 200) });
+        }
+
+        const committedFiles: string[] = [];
+        let lastSha: string | undefined;
+
         for (const action of plan.actions ?? []) {
           if (action.type === "message") {
-            send({ kind: "message", status: "success", title: action.reason ?? "Note" });
+            send({ kind: "message", status: "success", title: action.reason ?? "Nota" });
             continue;
           }
           if (!action.path) continue;
 
           if (action.type === "read_file") {
-            send({ kind: "read_file", status: "running", title: `Reading ${action.path}`, path: action.path });
+            send({ kind: "read_file", status: "running", title: `Lendo ${action.path}`, path: action.path });
             const file = await readFile(action.path);
             send({
               kind: "read_file",
               status: "success",
-              title: `Read ${action.path}`,
+              title: `Lido ${action.path}`,
               path: action.path,
-              detail: `${file.content.split("\n").length} lines`,
+              detail: `${file.content.split("\n").length} linhas`,
             });
             continue;
           }
 
           if (action.type === "edit_file" && typeof action.content === "string") {
-            send({ kind: "edit_file", status: "running", title: `Editing ${action.path}`, path: action.path });
+            send({ kind: "edit_file", status: "running", title: `Editando ${action.path}`, path: action.path });
             const current = await readFile(action.path);
             const diff = makeDiff(current.content, action.content, action.path);
 
@@ -294,10 +386,12 @@ Deno.serve(async (req) => {
                 action.content,
                 `vibe: ${action.reason ?? `update ${action.path}`}`,
               );
+              lastSha = sha ?? lastSha;
+              committedFiles.push(action.path);
               send({
                 kind: "commit",
                 status: "success",
-                title: `Committed ${action.path}`,
+                title: `Commitado ${action.path}`,
                 path: action.path,
                 detail: action.reason,
                 diff,
@@ -307,20 +401,37 @@ Deno.serve(async (req) => {
           }
         }
 
+        if (mode === "apply" && lastSha) {
+          const { data: checkpoint } = await admin
+            .from("vibe_checkpoints")
+            .insert({
+              user_id: userId,
+              project_repo: repo,
+              commit_sha: lastSha,
+              summary: plan.summary || committedFiles.join(", "),
+              files_changed: committedFiles,
+              credits_spent: estimatedCost,
+              model_used: tier,
+            })
+            .select("id")
+            .single();
+          send({ kind: "checkpoint", status: "success", title: "Checkpoint salvo", checkpointId: checkpoint?.id, commitSha: lastSha });
+        }
+
         send({
           kind: "done",
           status: "success",
-          title: mode === "preview" ? "Preview ready — review and apply" : "All changes committed",
+          title: mode === "preview" ? "Preview pronto — revise e aplique" : "Todas as alterações commitadas",
         });
       } catch (err) {
         const message = err instanceof Error ? err.message : "internal_error";
         console.error("[vibe-code-agent]", message);
-        send({ kind: "error", status: "failed", title: "Agent stopped", detail: message });
+        send({ kind: "error", status: "failed", title: "Agente parou", detail: message });
       } finally {
         try {
           controller.close();
         } catch {
-          /* already closed */
+          /* já fechado */
         }
       }
     },

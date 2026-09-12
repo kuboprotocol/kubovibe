@@ -2,6 +2,7 @@ import { Download, Monitor, Laptop, Tablet, Smartphone, ExternalLink } from "luc
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { VibeCreditMeter } from "./VibeCreditMeter";
 
 export function VibeTopBar() {
   const handleDownload = () => {
@@ -28,6 +29,8 @@ export function VibeTopBar() {
       </div>
 
       <div className="flex items-center gap-3">
+        <VibeCreditMeter />
+
         <div className="hidden items-center gap-1 rounded-full border border-border/60 bg-background/40 p-1 md:flex">
           <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full text-muted-foreground">
             <Monitor className="h-3.5 w-3.5" />

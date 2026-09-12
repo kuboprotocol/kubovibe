@@ -18,6 +18,8 @@ import { VibeCodeAgentChat } from "./VibeCodeAgentChat";
 import { VibeConnectorPanel } from "./VibeConnectorPanel";
 import { VibeDomainsPanel } from "./VibeDomainsPanel";
 import { VibeCloudSessionPanel } from "./VibeCloudSessionPanel";
+import { VibeLivePreview } from "./VibeLivePreview";
+import { VibeCheckpointTimeline } from "./VibeCheckpointTimeline";
 import { useWorkspaceProject } from "@/hooks/useWorkspaceProject";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -93,30 +95,28 @@ export default function VibeCodeLayout() {
 function DesktopView({ activeTab, projectId }: { activeTab: string; setActiveTab: (t: string) => void; projectId: string }) {
   if (activeTab === 'agent' || activeTab === 'files') {
     return (
-      <div className="grid h-[calc(100vh-8rem)] gap-6 lg:grid-cols-[400px_1fr]">
+      <div className="grid h-[calc(100vh-8rem)] gap-6 lg:grid-cols-[400px_1fr_260px]">
         <VibeCodeAgentChat projectId={projectId} />
-        <div className="flex flex-col gap-6">
-          <Tabs defaultValue="preview" className="flex-1">
+        <div className="flex flex-col gap-6 min-w-0">
+          <Tabs defaultValue="preview" className="flex-1 flex flex-col">
             <TabsList className="bg-white/5 border border-white/10">
               <TabsTrigger value="preview">Live Preview</TabsTrigger>
               <TabsTrigger value="console">Console</TabsTrigger>
               <TabsTrigger value="network">Network</TabsTrigger>
             </TabsList>
-            <TabsContent value="preview" className="mt-4 flex-1 rounded-2xl border border-border/40 bg-card/20 backdrop-blur-sm relative overflow-hidden group">
-              <div className="absolute inset-0 bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:24px_24px]" />
-              <div className="flex h-full items-center justify-center">
-                 <div className="text-center">
-                   <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                     <Rocket className="h-6 w-6" />
-                   </div>
-                   <h3 className="text-sm font-medium text-foreground">Pronto para Preview</h3>
-                   <p className="text-xs text-muted-foreground mt-1">Interaja com o agente para gerar código.</p>
-                 </div>
-              </div>
+            <TabsContent value="preview" className="mt-4 flex-1 rounded-2xl border border-border/40 bg-card/20 backdrop-blur-sm relative overflow-hidden">
+              <VibeLivePreview />
+            </TabsContent>
+            <TabsContent value="console" className="mt-4 flex-1 rounded-2xl border border-dashed border-border/40 flex items-center justify-center">
+              <p className="text-xs text-muted-foreground/60">Console do sandbox em breve.</p>
+            </TabsContent>
+            <TabsContent value="network" className="mt-4 flex-1 rounded-2xl border border-dashed border-border/40 flex items-center justify-center">
+              <p className="text-xs text-muted-foreground/60">Aba de rede em breve.</p>
             </TabsContent>
           </Tabs>
           <VibeConnectorPanel />
         </div>
+        <VibeCheckpointTimeline projectRepo={undefined} />
       </div>
     );
   }
@@ -149,8 +149,8 @@ function MobileView({ activeTab, projectId }: { activeTab: string; projectId: st
       return <VibeCloudSessionPanel />;
     case 'files':
       return (
-        <div className="flex h-[calc(100vh-12rem)] items-center justify-center rounded-2xl border border-border/40 bg-card/20">
-          <p className="text-sm text-muted-foreground">Modo Preview Mobile</p>
+        <div className="h-[calc(100vh-12rem)] overflow-hidden rounded-2xl border border-border/40 bg-card/20">
+          <VibeLivePreview />
         </div>
       );
     default:

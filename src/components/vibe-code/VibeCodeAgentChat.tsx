@@ -15,6 +15,9 @@ import {
   ChevronRight,
   Bot,
   Rocket,
+  Zap,
+  BookmarkCheck,
+  Gauge,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,10 +35,13 @@ const AGENT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/vibe-code-a
 const STEP_ICON: Record<VibeStepKind, typeof Brain> = {
   thinking: Brain,
   plan: MessageSquare,
+  estimate: Gauge,
   read_file: FileCode2,
   edit_file: FileEdit,
   diff: Eye,
   commit: GitCommit,
+  checkpoint: BookmarkCheck,
+  credits: Zap,
   connector: Plug,
   message: MessageSquare,
   error: AlertCircle,
@@ -197,7 +203,7 @@ export function VibeCodeAgentChat({ projectId }: { projectId?: string }) {
   };
 
   const revertStep = async (step: VibeStep) => {
-    if (!step.commitSha || running) return;
+    if ((!step.commitSha && !step.checkpointId) || running) return;
     setRunning(true);
     const assistantId = crypto.randomUUID();
     setMessages((prev) => [
@@ -205,7 +211,10 @@ export function VibeCodeAgentChat({ projectId }: { projectId?: string }) {
       { id: assistantId, role: "assistant", content: "", steps: [], createdAt: Date.now() },
     ]);
     try {
-      await runStream({ revertSha: step.commitSha }, assistantId);
+      await runStream(
+        step.checkpointId ? { revertCheckpointId: step.checkpointId } : { revertSha: step.commitSha },
+        assistantId,
+      );
       setMessages((prev) =>
         prev.map((m) => ({
           ...m,
@@ -290,14 +299,27 @@ export function VibeCodeAgentChat({ projectId }: { projectId?: string }) {
                             {step.commitSha.slice(0, 7)}
                           </Badge>
                         )}
-                        
+
+                        {step.tier && (
+                          <Badge variant="outline" className="h-4 rounded-md border-border/30 px-1.5 text-[9px] uppercase text-muted-foreground/70">
+                            {step.tier}
+                          </Badge>
+                        )}
+
+                        {typeof step.creditsCharged === "number" && (
+                          <Badge variant="outline" className="h-4 rounded-md border-rose-500/20 bg-rose-500/5 px-1.5 text-[9px] font-mono text-rose-400">
+                            -{step.creditsCharged} cr.
+                            {typeof step.balanceAfter === "number" ? ` · saldo ${step.balanceAfter}` : ""}
+                          </Badge>
+                        )}
+
                         {step.reverted && (
                           <Badge variant="secondary" className="h-4 rounded-md bg-rose-500/10 px-1.5 text-[9px] text-rose-500 uppercase">
                             reverted
                           </Badge>
                         )}
                         
-                        {step.commitSha && !step.reverted && (
+                        {(step.commitSha || step.checkpointId) && !step.reverted && (
                           <Button
                             size="sm"
                             variant="ghost"
