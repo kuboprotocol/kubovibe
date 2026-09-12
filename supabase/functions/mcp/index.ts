@@ -205,7 +205,7 @@ var credit_summary_default = defineTool5({
 });
 
 // src/lib/mcp/index.ts
-var projectRef = "dlqmmubasyldcylhnqqd";
+var projectRef = "sccizjlpwezsgaxkclot";
 var mcp_default = defineMcp({
   name: "kubo-vibe-dev",
   title: "KUBO VIBE DEV",
