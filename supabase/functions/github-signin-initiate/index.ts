@@ -1,6 +1,10 @@
 // Public endpoint (verify_jwt = false): starts GitHub OAuth sign-in flow.
 // Secrets stay server-side. Returns { url } for the browser to redirect to.
-import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+};
 
 function b64url(bytes: Uint8Array) {
   return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
