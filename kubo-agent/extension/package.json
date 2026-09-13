@@ -12,6 +12,7 @@
   "contributes": {
     "commands": [
       { "command": "kubo.status", "title": "KUBO: Agent status" },
+      { "command": "kubo.pair", "title": "KUBO: Pair this workspace" },
       { "command": "kubo.chat", "title": "KUBO: Ask the agent (1 credit)" },
       { "command": "kubo.edit", "title": "KUBO: Edit current file (2 credits)" },
       { "command": "kubo.run", "title": "KUBO: Run agent task (4 credits)" },
