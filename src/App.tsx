@@ -116,7 +116,12 @@ if (typeof window !== 'undefined') {
     host.includes('lovableproject.com') ||
     host.includes('lovable.app') ||
     host === 'kubovibe.dev' ||
-    host === 'www.kubovibe.dev'
+    host === 'www.kubovibe.dev' ||
+    // Temporário: domínio de fallback no Railway, enquanto o certificado do
+    // kubovibe.dev está bloqueado por pendência de pagamento na conta Railway
+    // (ver histórico do projeto). Remover deste allowlist assim que o
+    // certificado do domínio próprio voltar a funcionar normalmente.
+    host.endsWith('.up.railway.app')
   ) {
     // Development, internal domains, or canonical domains - no redirect
     sessionStorage.removeItem(REDIRECT_KEY)
