@@ -16,6 +16,7 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion'
 import Navbar from '@/components/landing/Navbar'
+import { ContactDialog } from '@/components/pricing/ContactDialog'
 import { cn } from '@/lib/utils'
 
 type Period = 'monthly' | 'annual' | 'lifetime'
@@ -179,6 +180,7 @@ export default function PricingPage() {
   const { subscription } = useSubscription()
   const [period, setPeriod] = useState<Period>('monthly')
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null)
+  const [contactOpen, setContactOpen] = useState(false)
 
   const currentPlan = subscription?.plan
 
@@ -354,11 +356,13 @@ export default function PricingPage() {
                 </ul>
               </div>
               <div className="flex flex-col items-start gap-4 md:items-end">
-                <a href="mailto:contato@kuboprotocol.com" className="w-full md:w-auto">
-                  <Button size="lg" className="w-full bg-primary text-primary-foreground hover:bg-primary/90 md:w-auto">
-                    Falar com nossa equipe <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </a>
+                <Button
+                  size="lg"
+                  className="w-full bg-primary text-primary-foreground hover:bg-primary/90 md:w-auto"
+                  onClick={() => setContactOpen(true)}
+                >
+                  Falar com nossa equipe <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
                 <p className="text-xs text-muted-foreground">Resposta em até 24h úteis</p>
               </div>
             </div>
@@ -462,16 +466,22 @@ export default function PricingPage() {
           className="mt-20 text-center"
         >
           <p className="text-sm text-muted-foreground">
-            Tem dúvidas? Escreva para{' '}
-            <a href="mailto:contato@kuboprotocol.com" className="text-primary hover:underline">
-              contato@kuboprotocol.com
-            </a>{' '}
+            Tem dúvidas?{' '}
+            <button
+              type="button"
+              onClick={() => setContactOpen(true)}
+              className="text-primary hover:underline"
+            >
+              Fale com a gente
+            </button>{' '}
             — respondemos em até 24h.
           </p>
           {/* Sanity check: ensure PLAN_CONFIG keys used above still exist */}
           <span className="sr-only">{Object.keys(PLAN_CONFIG).join(',')}</span>
         </motion.section>
       </main>
+
+      <ContactDialog open={contactOpen} onOpenChange={setContactOpen} defaultReason="enterprise" />
     </div>
   )
 }
