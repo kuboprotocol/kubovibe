@@ -237,6 +237,22 @@ const AuthPage = forwardRef<HTMLDivElement, any>((props, ref) => {
 
   if (loading) return null
 
+  // Corrige o crash "Failed to execute 'insertBefore' on 'Node'": assim que o
+  // login funciona (e-mail ou GitHub), o useEffect acima dispara navigate()
+  // no mesmo instante em que a árvore <AnimatePresence>/<motion.div> abaixo
+  // ainda pode estar no meio de uma transição. O framer-motion manipula o DOM
+  // diretamente para animar; se o React Router desmonta a página nesse exato
+  // momento, as duas operações de DOM colidem. Solução: parar de renderizar a
+  // árvore animada assim que soubermos que vamos navegar, mostrando um estado
+  // simples e estático até a navegação de fato acontecer.
+  if (user && !wantsSignout) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </div>
+    )
+  }
+
   const inputClasses = "h-12 pl-11 rounded-xl bg-secondary/50 border-border/50 text-foreground placeholder:text-muted-foreground focus-visible:ring-primary/30 focus-visible:border-primary/50 transition-all duration-200"
 
   return (
