@@ -25,14 +25,43 @@ cloud usage automatically.
 
 ```text
 daemon/      Rust daemon (axum, localhost REST on port 43117)
-  src/main.rs      routes: /health, /run, /ai
+  src/main.rs      routes: /health, /onboard, /pair, /run, /ai
+  src/onboard.rs   detecta VS Code/Cursor/Trae e instala o .vsix sozinho
   src/ledger.rs    credit costs + edge function call
   src/runner.rs    local shell execution (PowerShell on Windows)
-  src/state.rs     config in %APPDATA%\kubo\agent.json
+  src/state.rs     config in ~/.kubovibe/agent.json (secret local + pairing)
 extension/   VS Code / Cursor extension (TypeScript)
 scripts/     sign-windows.ps1 (Authenticode, OV .pfx or EV token)
 .github/     release workflow: build, sign, package .vsix
 ```
+
+## Integração automática com o editor ("um clique")
+
+O instalador real (a construir: .msi assinado no Windows) deve, no primeiro
+run, copiar `kubo-agent.exe` e `kubo-vibe.vsix` para a mesma pasta e rodar:
+
+```powershell
+kubo-agent.exe --onboard
+```
+
+Isso detecta VS Code, Cursor e Trae (PATH + diretórios de instalação padrão
+de cada SO) e instala a extensão em cada um via `--install-extension`, sem
+nenhum passo manual. Nenhum editor encontrado não é erro — o app standalone
+continua funcionando normalmente.
+
+Com o daemon já rodando como serviço, a mesma detecção fica disponível via
+HTTP para uma UI de instalador mais rica:
+
+```
+GET  /onboard          -> lista editores encontrados (sem instalar nada)
+POST /onboard          -> detecta + instala em todos de uma vez
+     { "vsix_path": "C:\\caminho\\opcional\\kubo-vibe.vsix" }
+```
+
+Trae vem marcado como `best_effort: true` no resultado — o binário de CLI
+dele não é tão padronizado quanto o dos outros dois, então a detecção
+funciona quando ele expõe um `trae`/`trae.cmd` na instalação, mas isso não
+é garantido do mesmo jeito que VS Code/Cursor.
 
 ## Build on Windows
 

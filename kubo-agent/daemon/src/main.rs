@@ -12,6 +12,7 @@
 //! from disk, since it runs as the same OS user.
 
 mod ledger;
+mod onboard;
 mod runner;
 mod state;
 
@@ -76,6 +77,34 @@ fn check_secret(state: &AppState, headers: &HeaderMap) -> bool {
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt().with_env_filter("info").init();
 
+    // `kubo-agent --onboard [caminho/pra/extensao.vsix]` — modo usado pelo
+    // instalador logo após copiar os arquivos: detecta VS Code/Cursor/Trae
+    // e instala a extensão automaticamente, sem precisar do daemon rodando
+    // como serviço ainda. Imprime um resumo legível e sai.
+    let args: Vec<String> = std::env::args().collect();
+    if args.get(1).map(String::as_str) == Some("--onboard") {
+        let default_vsix = std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|d| d.join("kubo-vibe.vsix")))
+            .unwrap_or_else(|| std::path::PathBuf::from("kubo-vibe.vsix"));
+        let vsix_path = args.get(2).map(std::path::PathBuf::from).unwrap_or(default_vsix);
+
+        let editors = onboard::detect_editors();
+        if editors.is_empty() {
+            println!("Nenhum editor compatível encontrado (VS Code, Cursor ou Trae).");
+            println!("Isso não é um erro — o app standalone do KUBO Vibe continua funcionando normalmente.");
+            return Ok(());
+        }
+
+        println!("Editores encontrados: {}", editors.iter().map(|e| e.name).collect::<Vec<_>>().join(", "));
+        let (_, results) = onboard::onboard_all(&vsix_path);
+        for r in results {
+            let mark = if r.ok { "OK" } else { "FALHOU" };
+            println!("[{mark}] {}: {}", r.editor, r.detail);
+        }
+        return Ok(());
+    }
+
     let state = AppState::load(
         std::env::var("KUBO_API_BASE").unwrap_or_else(|_| DEFAULT_API_BASE.to_string()),
     )?;
@@ -86,6 +115,7 @@ async fn main() -> anyhow::Result<()> {
 
     let app = Router::new()
         .route("/health", get(health))
+        .route("/onboard", get(onboard_status).post(onboard_install))
         .route("/pair", post(pair))
         .route("/run", post(run))
         .route("/ai", post(ai))
@@ -101,6 +131,36 @@ async fn main() -> anyhow::Result<()> {
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;
     Ok(())
+}
+
+/// GET /onboard — lista editores compatíveis já detectados no PC, sem
+/// instalar nada ainda. É o que a UI do instalador chama pra mostrar
+/// "Encontramos VS Code e Cursor — quer integrar?" antes do clique.
+/// Sem autenticação por secret de propósito: é só leitura, não expõe nada
+/// sensível, e roda antes de existir qualquer pareamento.
+async fn onboard_status() -> Json<serde_json::Value> {
+    let editors = onboard::detect_editors();
+    Json(serde_json::json!({ "editors": editors }))
+}
+
+#[derive(Deserialize)]
+struct OnboardInstallRequest {
+    /// Caminho para o .vsix da extensão; se omitido, procura
+    /// `kubo-vibe.vsix` ao lado do executável do daemon (é onde o
+    /// instalador real deixa ele).
+    vsix_path: Option<String>,
+}
+
+/// POST /onboard — dispara a instalação de fato ("Integrar com um clique").
+async fn onboard_install(Json(req): Json<OnboardInstallRequest>) -> Json<serde_json::Value> {
+    let default_vsix = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|d| d.join("kubo-vibe.vsix")))
+        .unwrap_or_else(|| std::path::PathBuf::from("kubo-vibe.vsix"));
+    let vsix_path = req.vsix_path.map(std::path::PathBuf::from).unwrap_or(default_vsix);
+
+    let (editors, results) = onboard::onboard_all(&vsix_path);
+    Json(serde_json::json!({ "editors": editors, "results": results }))
 }
 
 /// Unauthenticated on purpose — the extension needs to know the daemon is
