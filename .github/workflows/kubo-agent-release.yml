@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - name: Build daemon
-        working-directory: daemon
+        working-directory: kubo-agent/daemon
         run: cargo build --release
       - name: Restore signing certificate
         if: ${{ secrets.KUBO_CERT_BASE64 != '' }}
@@ -27,14 +27,14 @@ jobs:
         shell: pwsh
         env:
           KUBO_CERT_PASSWORD: ${{ secrets.KUBO_CERT_PASSWORD }}
-        run: pwsh scripts/sign-windows.ps1 -Binary daemon/target/release/kubo-agent.exe
+        run: pwsh kubo-agent/scripts/sign-windows.ps1 -Binary kubo-agent/daemon/target/release/kubo-agent.exe
       - name: Rename for release
         shell: pwsh
-        run: Copy-Item daemon/target/release/kubo-agent.exe daemon/target/release/kubo-vibe-windows.exe
+        run: Copy-Item kubo-agent/daemon/target/release/kubo-agent.exe kubo-agent/daemon/target/release/kubo-vibe-windows.exe
       - uses: actions/upload-artifact@v4
         with:
           name: kubo-agent-windows
-          path: daemon/target/release/kubo-vibe-windows.exe
+          path: kubo-agent/daemon/target/release/kubo-vibe-windows.exe
 
   extension:
     runs-on: ubuntu-latest
@@ -42,7 +42,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: "20" }
-      - working-directory: extension
+      - working-directory: kubo-agent/extension
         run: |
           npm install
           npm run compile
@@ -50,7 +50,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: kubo-vibe-vsix
-          path: extension/*.vsix
+          path: kubo-agent/extension/*.vsix
 
   # Publica os dois artefatos como uma GitHub Release pública, com URL
   # estável (não expira como artifact de workflow) — é isso que a página
