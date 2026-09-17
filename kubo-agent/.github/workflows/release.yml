@@ -28,10 +28,13 @@ jobs:
         env:
           KUBO_CERT_PASSWORD: ${{ secrets.KUBO_CERT_PASSWORD }}
         run: pwsh scripts/sign-windows.ps1 -Binary daemon/target/release/kubo-agent.exe
+      - name: Rename for release
+        shell: pwsh
+        run: Copy-Item daemon/target/release/kubo-agent.exe daemon/target/release/kubo-vibe-windows.exe
       - uses: actions/upload-artifact@v4
         with:
           name: kubo-agent-windows
-          path: daemon/target/release/kubo-agent.exe
+          path: daemon/target/release/kubo-vibe-windows.exe
 
   extension:
     runs-on: ubuntu-latest
@@ -48,3 +51,27 @@ jobs:
         with:
           name: kubo-vibe-vsix
           path: extension/*.vsix
+
+  # Publica os dois artefatos como uma GitHub Release pública, com URL
+  # estável (não expira como artifact de workflow) — é isso que a página
+  # "Baixe nosso app" do site aponta para o Windows.
+  publish-release:
+    needs: [windows, extension]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('nightly-{0}', github.run_number) }}
+          name: KUBO Local Agent ${{ github.ref_type == 'tag' && github.ref_name || format('build #{0}', github.run_number) }}
+          draft: false
+          prerelease: ${{ github.ref_type != 'tag' }}
+          files: |
+            dist/kubo-agent-windows/kubo-vibe-windows.exe
+            dist/kubo-vibe-vsix/*.vsix
+
