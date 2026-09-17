@@ -5,6 +5,7 @@
   "version": "0.1.0",
   "publisher": "kuboprotocol",
   "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/kuboprotocol/kubovibe.git", "directory": "kubo-agent/extension" },
   "engines": { "vscode": "^1.90.0" },
   "categories": ["Other", "AI"],
   "activationEvents": ["onStartupFinished"],
@@ -31,6 +32,7 @@
     "package": "vsce package"
   },
   "devDependencies": {
+    "@types/node": "^20.14.0",
     "@types/vscode": "^1.90.0",
     "@vscode/vsce": "^2.29.0",
     "typescript": "^5.5.0"
