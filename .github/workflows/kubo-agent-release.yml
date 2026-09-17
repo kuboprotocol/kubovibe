@@ -8,6 +8,8 @@ on:
 jobs:
   windows:
     runs-on: windows-latest
+    env:
+      KUBO_CERT_BASE64: ${{ secrets.KUBO_CERT_BASE64 }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -15,13 +17,11 @@ jobs:
         working-directory: kubo-agent/daemon
         run: cargo build --release
       - name: Restore signing certificate
-        if: ${{ secrets.KUBO_CERT_BASE64 != '' }}
+        if: ${{ env.KUBO_CERT_BASE64 != '' }}
         shell: pwsh
         run: |
-          [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\kubo.pfx", [Convert]::FromBase64String($env:CERT))
+          [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\kubo.pfx", [Convert]::FromBase64String($env:KUBO_CERT_BASE64))
           echo "KUBO_CERT_PATH=$env:RUNNER_TEMP\kubo.pfx" >> $env:GITHUB_ENV
-        env:
-          CERT: ${{ secrets.KUBO_CERT_BASE64 }}
       - name: Sign
         if: ${{ env.KUBO_CERT_PATH != '' }}
         shell: pwsh
@@ -67,8 +67,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('nightly-{0}', github.run_number) }}
-          name: KUBO Local Agent ${{ github.ref_type == 'tag' && github.ref_name || format('build #{0}', github.run_number) }}
+          tag_name: "${{ github.ref_type == 'tag' && github.ref_name || format('nightly-{0}', github.run_number) }}"
+          name: "KUBO Local Agent ${{ github.ref_type == 'tag' && github.ref_name || format('build no.{0}', github.run_number) }}"
           draft: false
           prerelease: ${{ github.ref_type != 'tag' }}
           files: |
