@@ -51,6 +51,11 @@ const BuilderPage = forwardRef<HTMLDivElement, any>((props, ref) => {
   const [isLoading, setIsLoading] = useState(false)
   const [generatedCode, setGeneratedCode] = useState('')
   const [activeTab, setActiveTab] = useState<'preview' | 'code'>('preview')
+  // Layout mobile: chat e preview ocupam a tela inteira, um de cada vez,
+  // trocados por uma barra de abas embaixo — o layout desktop (lado a
+  // lado) continua igual, sem nenhuma mudança de comportamento acima do
+  // breakpoint md.
+  const [mobileView, setMobileView] = useState<'chat' | 'preview'>('chat')
   const [copied, setCopied] = useState(false)
   const [projectTitle, setProjectTitle] = useState('Untitled Project')
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(projectId || null)
@@ -471,10 +476,10 @@ const BuilderPage = forwardRef<HTMLDivElement, any>((props, ref) => {
       />
 
       {/* Main content */}
-      <div className="flex min-h-0 min-w-0 flex-1">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col md:flex-row">
         {/* Chat panel */}
         <div
-          className={`relative flex w-[min(380px,42vw)] min-w-[300px] shrink-0 flex-col border-r border-border/50 bg-card/50 backdrop-blur-sm transition-colors ${isDragging ? 'bg-primary/5' : ''}`}
+          className={`relative w-full min-w-0 shrink-0 flex-col border-r border-border/50 bg-card/50 backdrop-blur-sm transition-colors md:flex md:w-[min(380px,42vw)] md:min-w-[300px] ${isDragging ? 'bg-primary/5' : ''} ${mobileView === 'chat' ? 'flex' : 'hidden'}`}
           onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true) }}
           onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false) }}
           onDrop={(e) => {
@@ -618,7 +623,7 @@ const BuilderPage = forwardRef<HTMLDivElement, any>((props, ref) => {
         </div>
 
         {/* Preview / Code panel */}
-        <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden bg-muted">
+        <div className={`relative min-h-0 min-w-0 flex-1 overflow-hidden bg-muted md:flex ${mobileView === 'preview' ? 'flex' : 'hidden'}`}>
           <AnimatePresence mode="wait">
             {activeTab === 'preview' ? (
               <motion.div key="preview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 flex h-full w-full min-h-0 min-w-0 overflow-hidden">
@@ -689,6 +694,24 @@ const BuilderPage = forwardRef<HTMLDivElement, any>((props, ref) => {
             />
           )}
         </div>
+      </div>
+
+      {/* Barra de abas mobile — some no desktop (md:hidden) */}
+      <div className="flex shrink-0 border-t border-border/50 bg-card/80 backdrop-blur-sm md:hidden">
+        <button
+          type="button"
+          onClick={() => setMobileView('chat')}
+          className={`flex-1 py-3 text-sm font-medium transition-colors ${mobileView === 'chat' ? 'text-primary border-t-2 border-primary' : 'text-muted-foreground'}`}
+        >
+          Chat
+        </button>
+        <button
+          type="button"
+          onClick={() => setMobileView('preview')}
+          className={`flex-1 py-3 text-sm font-medium transition-colors ${mobileView === 'preview' ? 'text-primary border-t-2 border-primary' : 'text-muted-foreground'}`}
+        >
+          Preview
+        </button>
       </div>
 
       <AnimatePresence>

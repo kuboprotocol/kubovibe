@@ -112,7 +112,7 @@ export default function BuilderToolbar({
         <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} className="h-8 w-8 text-muted-foreground hover:text-foreground rounded-lg">
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <img src={logoImg} alt="KUBO VIBE" className="h-5" />
+        <img src={logoImg} alt="KUBO VIBE" className="hidden h-5 sm:block" />
 
         {/* Tabs: Preview / Code */}
         <div className="flex items-center gap-0.5 bg-secondary/60 rounded-lg p-0.5 ml-2">
@@ -164,8 +164,8 @@ export default function BuilderToolbar({
         </DropdownMenu>
       </div>
 
-      {/* Center: Device frames + Path + Refresh */}
-      <div className="flex items-center gap-3">
+      {/* Center: Device frames + Path + Refresh — oculto no mobile (redundante num dispositivo que já é mobile) */}
+      <div className="hidden items-center gap-3 md:flex">
         <div className="flex items-center gap-0.5 bg-secondary/60 rounded-lg p-0.5">
           {devices.map(({ frame, icon: Icon, label }) => (
             <button
@@ -232,7 +232,7 @@ export default function BuilderToolbar({
           onClick={handleShare}
         >
           {shareCopied ? <Check className="h-3.5 w-3.5" /> : <Share2 className="h-3.5 w-3.5" />}
-          Share
+          <span className="hidden sm:inline">Share</span>
         </Button>
 
         {hasCode && (
@@ -252,7 +252,7 @@ export default function BuilderToolbar({
         <Button
           variant="ghost"
           size="sm"
-          className="h-8 text-xs rounded-lg gap-1.5"
+          className="hidden h-8 text-xs rounded-lg gap-1.5 sm:flex"
           onClick={handleOpenInNewTab}
           disabled={!hasCode}
         >
