@@ -26,7 +26,7 @@ cloud usage automatically.
 ```text
 daemon/      Rust daemon (axum, localhost REST on port 43117)
   src/main.rs      routes: /health, /onboard, /pair, /run, /ai
-  src/onboard.rs   detecta VS Code/Cursor/Trae e instala o .vsix sozinho
+  src/onboard.rs   detecta VS Code/Cursor/Trae/Antigravity e instala o .vsix sozinho
   src/ledger.rs    credit costs + edge function call
   src/runner.rs    local shell execution (PowerShell on Windows)
   src/state.rs     config in ~/.kubovibe/agent.json (secret local + pairing)
@@ -44,7 +44,7 @@ run, copiar `kubo-agent.exe` e `kubo-vibe.vsix` para a mesma pasta e rodar:
 kubo-agent.exe --onboard
 ```
 
-Isso detecta VS Code, Cursor e Trae (PATH + diretórios de instalação padrão
+Isso detecta VS Code, Cursor, Trae e Antigravity (PATH + diretórios de instalação padrão
 de cada SO) e instala a extensão em cada um via `--install-extension`, sem
 nenhum passo manual. Nenhum editor encontrado não é erro — o app standalone
 continua funcionando normalmente.
@@ -58,7 +58,7 @@ POST /onboard          -> detecta + instala em todos de uma vez
      { "vsix_path": "C:\\caminho\\opcional\\kubo-vibe.vsix" }
 ```
 
-Trae vem marcado como `best_effort: true` no resultado — o binário de CLI
+Trae e Antigravity vêm marcados como `best_effort: true` no resultado — o binário de CLI
 dele não é tão padronizado quanto o dos outros dois, então a detecção
 funciona quando ele expõe um `trae`/`trae.cmd` na instalação, mas isso não
 é garantido do mesmo jeito que VS Code/Cursor.

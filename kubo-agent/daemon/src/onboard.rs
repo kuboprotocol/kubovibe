@@ -18,6 +18,7 @@ pub enum EditorKind {
     VsCode,
     Cursor,
     Trae,
+    Antigravity,
 }
 
 impl EditorKind {
@@ -26,14 +27,14 @@ impl EditorKind {
             EditorKind::VsCode => "VS Code",
             EditorKind::Cursor => "Cursor",
             EditorKind::Trae => "Trae",
+            EditorKind::Antigravity => "Antigravity",
         }
     }
 
-    /// Trae's CLI shim isn't as consistently documented/installed as the
-    /// other two — auto-install is attempted, but never presented as a
-    /// guarantee the way VS Code/Cursor are.
+    /// Trae e Antigravity têm CLI menos padronizada que VS Code/Cursor —
+    /// auto-instalação é tentada, mas nunca prometida como garantia.
     fn best_effort(self) -> bool {
-        matches!(self, EditorKind::Trae)
+        matches!(self, EditorKind::Trae | EditorKind::Antigravity)
     }
 }
 
@@ -77,6 +78,13 @@ fn candidate_names(kind: EditorKind) -> &'static [&'static str] {
                 &["trae"]
             }
         }
+        EditorKind::Antigravity => {
+            if cfg!(target_os = "windows") {
+                &["antigravity.cmd", "antigravity.exe"]
+            } else {
+                &["antigravity"]
+            }
+        }
     }
 }
 
@@ -94,6 +102,7 @@ fn known_install_dirs(kind: EditorKind) -> Vec<PathBuf> {
                 EditorKind::VsCode => dirs.push(local.join("Programs\\Microsoft VS Code\\bin")),
                 EditorKind::Cursor => dirs.push(local.join("Programs\\cursor\\resources\\app\\bin")),
                 EditorKind::Trae => dirs.push(local.join("Programs\\Trae\\bin")),
+                EditorKind::Antigravity => dirs.push(local.join("Programs\\Antigravity\\bin")),
             }
         }
         if let Some(pf) = std::env::var_os("ProgramFiles") {
@@ -102,6 +111,7 @@ fn known_install_dirs(kind: EditorKind) -> Vec<PathBuf> {
                 EditorKind::VsCode => dirs.push(pf.join("Microsoft VS Code\\bin")),
                 EditorKind::Cursor => dirs.push(pf.join("cursor\\resources\\app\\bin")),
                 EditorKind::Trae => dirs.push(pf.join("Trae\\bin")),
+                EditorKind::Antigravity => dirs.push(pf.join("Antigravity\\bin")),
             }
         }
     } else if cfg!(target_os = "macos") {
@@ -113,6 +123,9 @@ fn known_install_dirs(kind: EditorKind) -> Vec<PathBuf> {
                 dirs.push(PathBuf::from("/Applications/Cursor.app/Contents/Resources/app/bin"))
             }
             EditorKind::Trae => dirs.push(PathBuf::from("/Applications/Trae.app/Contents/Resources/app/bin")),
+            EditorKind::Antigravity => {
+                dirs.push(PathBuf::from("/Applications/Antigravity.app/Contents/Resources/app/bin"))
+            }
         }
         if let Some(home) = &home {
             match kind {
@@ -123,6 +136,9 @@ fn known_install_dirs(kind: EditorKind) -> Vec<PathBuf> {
                     dirs.push(home.join("Applications/Cursor.app/Contents/Resources/app/bin"))
                 }
                 EditorKind::Trae => dirs.push(home.join("Applications/Trae.app/Contents/Resources/app/bin")),
+                EditorKind::Antigravity => {
+                    dirs.push(home.join("Applications/Antigravity.app/Contents/Resources/app/bin"))
+                }
             }
         }
     } else {
@@ -181,7 +197,7 @@ fn detect_one(kind: EditorKind) -> Option<DetectedEditor> {
 /// Trae — mas todos que forem encontrados são retornados, não só o primeiro
 /// (o dev pode ter mais de um instalado e usar os dois).
 pub fn detect_editors() -> Vec<DetectedEditor> {
-    [EditorKind::VsCode, EditorKind::Cursor, EditorKind::Trae]
+    [EditorKind::VsCode, EditorKind::Cursor, EditorKind::Trae, EditorKind::Antigravity]
         .into_iter()
         .filter_map(detect_one)
         .collect()
