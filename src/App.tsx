@@ -22,6 +22,7 @@ const TermsPage = lazy(() => import("./pages/TermsPage"));
 const PrivacyPage = lazy(() => import("./pages/PrivacyPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const PricingPage = lazy(() => import("./pages/PricingPage"));
+const DownloadPage = lazy(() => import("./pages/DownloadPage"));
 const SupportPage = lazy(() => import("./pages/SupportPage"));
 const ConnectPage = lazy(() => import("./pages/ConnectPage"));
 const ConnectorsHubPage = lazy(() => import("./pages/ConnectorsHubPage"));
@@ -206,6 +207,7 @@ const App = forwardRef<HTMLDivElement, any>((props, ref) => {
                 <Route path="/privacy" element={<PrivacyPage />} />
                 <Route path="/auth" element={<AuthPage />} />
                 <Route path="/pricing" element={<PricingPage />} />
+                <Route path="/download" element={<DownloadPage />} />
                 <Route path="/support" element={<SupportPage />} />
                 <Route path="/docs" element={<DocsPage />} />
                 <Route path="/anywhere" element={<AnywherePage />} />

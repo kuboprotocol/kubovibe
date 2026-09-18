@@ -13,7 +13,7 @@ export default function Navbar() {
         </Link>
 
         <div className="hidden md:flex items-center gap-1">
-          {['Home', 'Pricing', 'Docs', 'Shortlinks', 'Support'].map((item) => (
+          {['Home', 'Download', 'Pricing', 'Docs', 'Shortlinks', 'Support'].map((item) => (
             <Button
               key={item}
               variant="ghost"
