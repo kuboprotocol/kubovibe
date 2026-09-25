@@ -2,6 +2,19 @@
 // To take ownership, delete this banner line; the plugin then leaves the file alone.
 // supabase function: mcp
 // Bundled from src/lib/mcp/index.ts by @lovable.dev/mcp-js.
+// src/config/brand.ts
+var BRAND = {
+  /** Nome do produto exibido na interface. */
+  appName: "Vertal Vibe Dev",
+  /** Versão em caixa alta usada no logotipo e em títulos de destaque. */
+  wordmark: "VERTAL VIBE DEV",
+  /** Nome curto (PWA, espaços apertados). */
+  shortName: "Vertal",
+  /** Empresa responsável (termos, privacidade, copyright). */
+  company: "KUBO Protocol"
+};
+var APP_NAME = BRAND.appName;
+
 // src/lib/mcp/index.ts
 import { auth, defineMcp } from "npm:@lovable.dev/mcp-js@0.28.0";
 
@@ -64,7 +77,7 @@ function supabaseForUser(ctx) {
 var list_projects_default = defineTool({
   name: "list_projects",
   title: "List projects",
-  description: "List the signed-in user's KUBO Vibe projects, newest first.",
+  description: `List the signed-in user's ${APP_NAME} projects, newest first.`,
   inputSchema: {
     limit: z.number().int().min(1).max(50).default(10).describe("How many projects to return."),
     publishedOnly: z.boolean().default(false).describe("Only return published projects.")
@@ -120,7 +133,7 @@ import { z as z3 } from "npm:zod@^3.25.76";
 var create_project_default = defineTool3({
   name: "create_project",
   title: "Create project",
-  description: "Create a new KUBO Vibe project for the signed-in user.",
+  description: `Create a new ${APP_NAME} project for the signed-in user.`,
   inputSchema: {
     title: z3.string().trim().min(1).max(120).describe("Project title."),
     description: z3.string().trim().max(500).optional().describe("Optional short description.")
@@ -208,9 +221,9 @@ var credit_summary_default = defineTool5({
 var projectRef = "sccizjlpwezsgaxkclot";
 var mcp_default = defineMcp({
   name: "kubo-vibe-dev",
-  title: "KUBO VIBE DEV",
+  title: APP_NAME,
   version: "0.1.0",
-  instructions: "Tools for KUBO VIBE DEV, an AI platform for generating web and Web3 apps. Use `list_projects` and `get_project` to inspect the user's projects, `create_project` to start a new one, `list_agent_jobs` to check AI agent runs, and `credit_summary` for credit balance and usage. All tools act as the signed-in user.",
+  instructions: "Tools for " + APP_NAME + ", an AI platform for generating web and Web3 apps. Use `list_projects` and `get_project` to inspect the user's projects, `create_project` to start a new one, `list_agent_jobs` to check AI agent runs, and `credit_summary` for credit balance and usage. All tools act as the signed-in user.",
   auth: auth.oauth.issuer({
     issuer: `https://${projectRef}.supabase.co/auth/v1`,
     acceptedAudiences: "authenticated"
