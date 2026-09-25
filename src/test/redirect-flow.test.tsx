@@ -133,7 +133,7 @@ describe('Redirect flow: /connectors/github → /auth → /connectors/github', (
     // Banner mentions the protected destination path
     const banner = await screen.findByRole('status')
     expect(banner).toHaveTextContent('/connectors/github')
-    expect(banner).toHaveTextContent(/Conectores/i)
+    expect(banner).toHaveTextContent(/Connectors/i)
   })
 
   it('returns to /connectors/github after successful login', async () => {
