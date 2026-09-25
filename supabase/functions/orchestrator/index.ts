@@ -1,7 +1,8 @@
 // Orquestrador Camada 2 — interpreta prompt do usuário e devolve um plano
-// estruturado (intent + capacidades + stack + tarefas) usando tool-calling
-// no Lovable AI Gateway. Persiste em `orchestration_plans` para auditoria.
+// estruturado (intent + capacidades + stack + tarefas) via DeepSeek (JSON
+// mode). Persiste em `orchestration_plans` para auditoria.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import { callDeepSeek } from '../_shared/deepseekRouter.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -24,7 +25,15 @@ Regras:
   DB Postgres+RLS, Web3 Solidity+OpenZeppelin em testnet (Sepolia).
 - NUNCA exponha jargão técnico ao usuário final — só ao executor.
 
-Retorne APENAS via a ferramenta build_plan.`
+Retorne APENAS um objeto JSON válido, sem markdown, sem texto antes ou depois,
+com EXATAMENTE este formato:
+{
+  "intent": "web2_app" | "web3_app" | "hybrid",
+  "capabilities": string[] (apenas dentre: auth, database, payments, storage, realtime, wallet, smart_contract, token_mint, nft, on_chain_tx, ai_inference, notifications),
+  "stack": { "frontend": string, "backend": string, "database": string, "web3"?: string },
+  "tasks": [ { "id": string, "layer": 1 | 2 | 3, "title": string, "depends_on": string[] } ] (mínimo 1 item),
+  "user_summary": string (resumo em 1-2 frases para o usuário leigo, sem jargão)
+}`
 
 type Plan = {
   intent: 'web2_app' | 'web3_app' | 'hybrid'
@@ -34,71 +43,13 @@ type Plan = {
   user_summary: string
 }
 
-const TOOL = {
-  type: 'function',
-  function: {
-    name: 'build_plan',
-    description: 'Devolve o plano de execução para o pedido do usuário.',
-    parameters: {
-      type: 'object',
-      properties: {
-        intent: { type: 'string', enum: ['web2_app', 'web3_app', 'hybrid'] },
-        capabilities: {
-          type: 'array',
-          items: {
-            type: 'string',
-            enum: [
-              'auth', 'database', 'payments', 'storage', 'realtime',
-              'wallet', 'smart_contract', 'token_mint', 'nft', 'on_chain_tx',
-              'ai_inference', 'notifications',
-            ],
-          },
-        },
-        stack: {
-          type: 'object',
-          properties: {
-            frontend: { type: 'string' },
-            backend: { type: 'string' },
-            database: { type: 'string' },
-            web3: { type: 'string' },
-          },
-          required: ['frontend', 'backend', 'database'],
-          additionalProperties: false,
-        },
-        tasks: {
-          type: 'array',
-          minItems: 1,
-          items: {
-            type: 'object',
-            properties: {
-              id: { type: 'string' },
-              layer: { type: 'integer', enum: [1, 2, 3] },
-              title: { type: 'string' },
-              depends_on: { type: 'array', items: { type: 'string' } },
-            },
-            required: ['id', 'layer', 'title', 'depends_on'],
-            additionalProperties: false,
-          },
-        },
-        user_summary: {
-          type: 'string',
-          description: 'Resumo em 1-2 frases para o usuário leigo, sem jargão.',
-        },
-      },
-      required: ['intent', 'capabilities', 'stack', 'tasks', 'user_summary'],
-      additionalProperties: false,
-    },
-  },
-} as const
-
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders })
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY')
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
     const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!
-    if (!LOVABLE_API_KEY) throw new Error('LOVABLE_API_KEY is not configured')
+    if (!Deno.env.get('DEEPSEEK_API_KEY')) throw new Error('DEEPSEEK_API_KEY is not configured')
 
     // Auth: validar JWT do chamador (RLS exige user_id real).
     const authHeader = req.headers.get('Authorization') ?? ''
@@ -122,59 +73,36 @@ Deno.serve(async (req) => {
       )
     }
 
-    const model = String(body.model ?? 'google/gemini-3-flash-preview')
-
-    const aiResp = await fetch(
-      'https://ai.gateway.lovable.dev/v1/chat/completions',
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: 'system', content: SYSTEM_PROMPT },
-            { role: 'user', content: prompt },
-          ],
-          tools: [TOOL],
-          tool_choice: { type: 'function', function: { name: 'build_plan' } },
-        }),
-      },
-    )
-
-    if (aiResp.status === 429) {
-      return new Response(JSON.stringify({ error: 'rate_limited' }), {
-        status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    // Planejamento é uma tarefa que se beneficia de mais raciocínio — força
+    // tier "pro" independente do heurístico de complexidade de texto.
+    let deepSeekResult
+    try {
+      deepSeekResult = await callDeepSeek({
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: prompt },
+        ],
+        tier: 'pro',
+        json: true,
+        max_tokens: 2000,
       })
-    }
-    if (aiResp.status === 402) {
-      return new Response(JSON.stringify({ error: 'payment_required' }), {
-        status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-    if (!aiResp.ok) {
-      const t = await aiResp.text()
-      console.error('AI gateway error', aiResp.status, t)
-      return new Response(JSON.stringify({ error: 'ai_gateway_error' }), {
-        status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'deepseek_error'
+      console.error('DeepSeek error', msg)
+      const status = msg.startsWith('deepseek_429') ? 429
+        : msg.startsWith('deepseek_402') ? 402
+        : 502
+      return new Response(JSON.stringify({ error: status === 502 ? 'ai_gateway_error' : msg }), {
+        status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    const aiJson = await aiResp.json()
-    const call = aiJson?.choices?.[0]?.message?.tool_calls?.[0]
-    if (!call?.function?.arguments) {
-      console.error('No tool call in response', JSON.stringify(aiJson).slice(0, 500))
-      return new Response(JSON.stringify({ error: 'no_plan_generated' }), {
-        status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
+    const model = deepSeekResult.model
 
     let plan: Plan
-    try { plan = JSON.parse(call.function.arguments) }
+    try { plan = JSON.parse(deepSeekResult.content) }
     catch (e) {
-      console.error('Plan JSON parse failed', e)
+      console.error('Plan JSON parse failed', e, deepSeekResult.content?.slice(0, 500))
       return new Response(JSON.stringify({ error: 'invalid_plan_json' }), {
         status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })

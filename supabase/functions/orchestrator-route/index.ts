@@ -1,18 +1,17 @@
 // Orquestrador inteligente: classifica a intenção do usuário e roteia para o
-// agente correto. Híbrido: regras explícitas primeiro, IA (Gemini) como fallback.
+// agente correto. Híbrido: regras explícitas primeiro, IA (DeepSeek) como fallback.
 // Suporta dois modos:
 //   { mode: "classify", prompt }              -> retorna { agent, confidence, source, reason }
 //   { mode: "execute",  prompt, input? }      -> classifica + executa via agent-route
 import { corsHeaders } from "../_shared/agentRuntime.ts";
+import { callDeepSeek } from "../_shared/deepseekRouter.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
-const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 const FUNCTIONS_URL = `${SUPABASE_URL}/functions/v1`;
 
-// Regras explícitas (palavras-chave -> slug)
 const RULES: Array<{ slug: string; patterns: RegExp[] }> = [
   { slug: "video-downloader", patterns: [/baix(ar|e).*v[ií]deo/i, /download.*video/i, /youtube\.com|youtu\.be|tiktok\.com|instagram\.com/i] },
   { slug: "opusclip", patterns: [/opus\s*clip/i, /cort(ar|e).*v[ií]deo/i, /clip(es|s)/i, /viral.*video/i] },
@@ -49,22 +48,16 @@ function classifyByRules(prompt: string): ClassifyOutcome | null {
 }
 
 async function classifyByAI(prompt: string, slugs: string[]): Promise<ClassifyOutcome | null> {
-  if (!LOVABLE_API_KEY) return null;
+  if (!Deno.env.get("DEEPSEEK_API_KEY")) return null;
   const sys = `Você é o roteador do KUBO Creative Studio. Dado um pedido do usuário em PT-BR, escolha EXATAMENTE UM agente da lista a seguir. Responda APENAS em JSON: {"agent":"<slug>","reason":"<curta justificativa>"}.\nAgentes disponíveis: ${slugs.join(", ")}.`;
   try {
-    const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [{ role: "system", content: sys }, { role: "user", content: prompt }],
-        response_format: { type: "json_object" },
-      }),
+    const result = await callDeepSeek({
+      messages: [{ role: "system", content: sys }, { role: "user", content: prompt }],
+      tier: "flash",
+      json: true,
+      max_tokens: 200,
     });
-    if (!r.ok) return null;
-    const j = await r.json();
-    const text = j?.choices?.[0]?.message?.content ?? "";
-    const parsed = JSON.parse(text);
+    const parsed = JSON.parse(result.content);
     if (parsed?.agent && slugs.includes(parsed.agent)) {
       return { agent: parsed.agent, confidence: 0.75, source: "ai", reason: parsed.reason ?? "ai_classified" };
     }
@@ -89,7 +82,6 @@ Deno.serve(async (req) => {
     });
   }
 
-  // valida JWT
   const userClient = createClient(SUPABASE_URL, ANON_KEY, {
     global: { headers: { Authorization: auth } },
     auth: { persistSession: false },
@@ -118,7 +110,6 @@ Deno.serve(async (req) => {
 
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
 
-  // Idempotency check
   const idempotencyKey = req.headers.get("x-idempotency-key") || body.input?.idempotency_key;
   if (idempotencyKey) {
     const { data: existingJob } = await admin
@@ -126,20 +117,19 @@ Deno.serve(async (req) => {
       .select("status, result")
       .eq("idempotency_key", idempotencyKey)
       .maybeSingle();
-    
+
     if (existingJob && (existingJob.status === "completed" || existingJob.status === "processing")) {
-      return new Response(JSON.stringify({ 
-        ok: true, 
-        status: existingJob.status, 
+      return new Response(JSON.stringify({
+        ok: true,
+        status: existingJob.status,
         result: existingJob.result,
-        cached: true 
+        cached: true
       }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
   }
 
-  // Load config (disabled agents/categories)
   const { data: configRows } = await admin.from("orchestrator_config").select("key, value");
   const disabledAgents = (configRows?.find(r => r.key === 'disabled_agents')?.value as string[]) || [];
   const disabledCategories = (configRows?.find(r => r.key === 'disabled_categories')?.value as string[]) || [];
@@ -148,40 +138,39 @@ Deno.serve(async (req) => {
     .from("agent_registry")
     .select("slug, name, category, edge_function, credit_cost, status")
     .neq("status", "disabled");
-  
-  const filteredRegistry = (registry ?? []).filter(r => 
-    !disabledAgents.includes(r.slug) && 
+
+  const filteredRegistry = (registry ?? []).filter(r =>
+    !disabledAgents.includes(r.slug) &&
     !disabledCategories.includes(r.category)
   );
-  
+
   const activeSlugs = filteredRegistry.map((r) => r.slug as string);
 
-  // 1) regras
+  const correlationId = req.headers.get("x-correlation-id") || `corr-${crypto.randomUUID()}`;
+  const requestId = req.headers.get("x-request-id") ?? crypto.randomUUID();
+
   let outcome = classifyByRules(prompt);
-  // 2) IA fallback
   if (!outcome || !activeSlugs.includes(outcome.agent)) {
     outcome = await classifyByAI(prompt, activeSlugs);
   }
-  // 3) fallback final: chat-agent
   if (!outcome || !activeSlugs.includes(outcome.agent)) {
     outcome = { agent: "chat-agent", confidence: 0.3, source: "fallback", reason: "no_match_or_disabled" };
   }
 
-
-  // log de roteamento (best-effort)
   try {
-    await admin.from("orchestration_plans").insert({
+    await admin.from("orchestrator_routing_log").insert({
       user_id: userId,
       prompt,
-      intent: outcome.agent,
-      model: outcome.source === "ai" ? "google/gemini-3-flash-preview" : "rule-engine",
-      capabilities: [outcome.agent],
-      tasks: [{ agent: outcome.agent, source: outcome.source, reason: outcome.reason }],
-      stack: { confidence: outcome.confidence, mode },
+      agent: outcome.agent,
+      confidence: outcome.confidence,
+      source: outcome.source,
+      reason: outcome.reason,
+      mode,
       correlation_id: correlationId,
+      request_id: requestId,
     });
   } catch (e) {
-    console.error("[orchestrator] plan_log_failed", e);
+    console.error("[orchestrator] routing_log_failed", e);
   }
 
   if (mode === "classify") {
@@ -190,14 +179,10 @@ Deno.serve(async (req) => {
     });
   }
 
-  // executa via agent-route (mantém débito atômico + audit trail do runtime existente)
-  // retry logic
   let upstreamResponse;
   let lastError;
   const maxRetries = mode === "execute" ? 3 : 1;
-  const correlationId = req.headers.get("x-correlation-id") || `corr-${crypto.randomUUID()}`;
-  const requestId = req.headers.get("x-request-id") ?? crypto.randomUUID();
-  
+
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       if (attempt > 0) {
@@ -205,17 +190,18 @@ Deno.serve(async (req) => {
         await new Promise(resolve => setTimeout(resolve, backoff));
       }
 
-      // Log attempt
-      await admin.from("job_audit_logs").insert({
-        action: "attempt",
-        correlation_id: correlationId,
-        details: { 
-          attempt: attempt + 1, 
-          max_retries: maxRetries,
-          timestamp: new Date().toISOString(),
-          backoff_ms: attempt > 0 ? Math.pow(2, attempt) * 1000 : 0
-        }
-      });
+      try {
+        await admin.from("job_audit_logs").insert({
+          action: "attempt",
+          correlation_id: correlationId,
+          details: {
+            attempt: attempt + 1,
+            max_retries: maxRetries,
+            timestamp: new Date().toISOString(),
+            backoff_ms: attempt > 0 ? Math.pow(2, attempt) * 1000 : 0
+          }
+        });
+      } catch { /* best-effort */ }
 
       upstreamResponse = await fetch(`${FUNCTIONS_URL}/agent-route`, {
         method: "POST",
@@ -233,40 +219,42 @@ Deno.serve(async (req) => {
       });
 
       if (upstreamResponse.ok) {
-        // Log success
-        await admin.from("job_audit_logs").insert({
-          action: "attempt_success",
-          correlation_id: correlationId,
-          details: { attempt: attempt + 1, timestamp: new Date().toISOString() }
-        });
+        try {
+          await admin.from("job_audit_logs").insert({
+            action: "attempt_success",
+            correlation_id: correlationId,
+            details: { attempt: attempt + 1, timestamp: new Date().toISOString() }
+          });
+        } catch { /* best-effort */ }
         break;
       }
-      
+
       const errText = await upstreamResponse.text();
       lastError = `Attempt ${attempt + 1} failed: ${errText}`;
-      
-      // Log failure
-      await admin.from("job_audit_logs").insert({
-        action: "attempt_failed",
-        correlation_id: correlationId,
-        details: { 
-          attempt: attempt + 1, 
-          error: errText, 
-          timestamp: new Date().toISOString(),
-          next_retry_in: attempt + 1 < maxRetries ? `${Math.pow(2, attempt + 1)}s` : "none"
-        }
-      });
+
+      try {
+        await admin.from("job_audit_logs").insert({
+          action: "attempt_failed",
+          correlation_id: correlationId,
+          details: {
+            attempt: attempt + 1,
+            error: errText,
+            timestamp: new Date().toISOString(),
+            next_retry_in: attempt + 1 < maxRetries ? `${Math.pow(2, attempt + 1)}s` : "none"
+          }
+        });
+      } catch { /* best-effort */ }
 
     } catch (e) {
-      lastError = `Attempt ${attempt + 1} exception: ${e.message}`;
+      lastError = `Attempt ${attempt + 1} exception: ${e instanceof Error ? e.message : String(e)}`;
     }
   }
 
   if (!upstreamResponse || !upstreamResponse.ok) {
-    return new Response(JSON.stringify({ 
-      ok: false, 
-      routing: outcome, 
-      error: lastError || "upstream_failed" 
+    return new Response(JSON.stringify({
+      ok: false,
+      routing: outcome,
+      error: lastError || "upstream_failed"
     }), {
       status: upstreamResponse?.status || 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -281,5 +269,4 @@ Deno.serve(async (req) => {
     status: 200,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
-
 });
