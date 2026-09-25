@@ -40,9 +40,8 @@ test.describe('Creative Economy Panel E2E', () => {
     await expect(page).toHaveURL(/\/dashboard/);
   });
 
-  test('idempotency and atomic credits', async ({ page }) => {
-    // This would typically involve mocking the API or checking DB state
-    // For now, we'll implement the logic in the components to ensure it's handled
+  // Idempotência e débito atômico de créditos: cobertos em
+  // e2e/creative-idempotency.spec.ts.
 
   test('export filenames and timezone formatting', async ({ page }) => {
     await page.goto('/creative');
