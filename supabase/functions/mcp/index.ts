@@ -11,9 +11,21 @@ var BRAND = {
   /** Nome curto (PWA, espaços apertados). */
   shortName: "Vertal",
   /** Empresa responsável (termos, privacidade, copyright). */
-  company: "KUBO Protocol"
+  company: "KUBO Protocol",
+  /** Domínio definitivo da marca. */
+  domain: "vertal.dev",
+  /** Domínio anterior; passa a redirecionar para `domain` quando a troca liga. */
+  legacyDomain: "kubovibe.dev",
+  /**
+   * Liga a troca de domínio. Só vire para `true` depois que vertal.dev e
+   * www.vertal.dev estiverem verificados e com SSL no Railway: a partir daí
+   * kubovibe.dev redireciona para vertal.dev e todo o SEO (canonical,
+   * og:url, sitemap) aponta para o domínio novo. Virar antes derruba o site.
+   */
+  primaryDomainLive: false
 };
 var APP_NAME = BRAND.appName;
+var SITE_ORIGIN = `https://${BRAND.primaryDomainLive ? BRAND.domain : BRAND.legacyDomain}`;
 
 // src/lib/mcp/index.ts
 import { auth, defineMcp } from "npm:@lovable.dev/mcp-js@0.28.0";
