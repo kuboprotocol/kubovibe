@@ -2,7 +2,6 @@
 // Generates many randomized WGSL variants and asserts:
 //   - DANGEROUS variants are ALWAYS blocked (403) with the expected rule firing
 //   - SAFE variants are ALWAYS allowed (200) with zero violations
-import "https://deno.land/std@0.224.0/dotenv/load.ts";
 import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { callSanitizer, userTest } from "./test_auth.ts";
 

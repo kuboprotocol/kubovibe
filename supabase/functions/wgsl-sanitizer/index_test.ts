@@ -4,7 +4,6 @@
 //   [fragment] → fragment-stage shaders
 //   [compute]  → compute-stage shaders
 //   [shared]   → stage-agnostic checks (validation, CORS, size limits, cross-stage rules)
-import "https://deno.land/std@0.224.0/dotenv/load.ts";
 import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { ENDPOINT, SUPABASE_ANON_KEY, callSanitizer, userTest } from "./test_auth.ts";
 

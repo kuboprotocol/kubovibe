@@ -9,6 +9,14 @@
 // (reported as "ignored" by `deno test`, never silently passed), mirroring
 // the e2e/ specs.
 
+import { loadSync } from "https://deno.land/std@0.224.0/dotenv/mod.ts";
+
+// Load the committed .env (public Supabase URL + publishable key). Not
+// dotenv/load.ts: that one also enforces every key in .env.example, and the
+// example lists secrets (e.g. VITE_RLS_TEST_SECRET) these tests never use.
+// Variables already set in the environment keep precedence.
+loadSync({ export: true, examplePath: null });
+
 export const SUPABASE_URL = Deno.env.get("VITE_SUPABASE_URL") ?? "";
 export const SUPABASE_ANON_KEY = Deno.env.get("VITE_SUPABASE_PUBLISHABLE_KEY") ?? "";
 export const ENDPOINT = `${SUPABASE_URL}/functions/v1/wgsl-sanitizer`;
