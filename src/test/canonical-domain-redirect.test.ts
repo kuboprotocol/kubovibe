@@ -40,6 +40,32 @@ describe('Canonical-domain redirect → kubovibe.dev', () => {
     })
   })
 
+  describe('troca de domínio ligada (BRAND.primaryDomainLive = true)', () => {
+    it.each([
+      ['kubovibe.dev'],            // domínio antigo passa a redirecionar
+      ['www.kubovibe.dev'],
+      ['app.vertal.dev'],
+    ])('redirects when host = %s', (host) => {
+      expect(shouldRedirect(host, true)).toBe(true)
+    })
+
+    it.each([
+      ['vertal.dev'],
+      ['www.vertal.dev'],
+      ['localhost'],
+      ['kubo-vibe-dev-production.up.railway.app'],
+    ])('does NOT redirect when host = %s', (host) => {
+      expect(shouldRedirect(host, true)).toBe(false)
+    })
+
+    it('manda para vertal.dev preservando caminho, query e hash', () => {
+      expect(buildTarget(
+        { pathname: '/pricing', search: '?ref=x', hash: '#pro' },
+        'https://vertal.dev',
+      )).toBe('https://vertal.dev/pricing?ref=x#pro')
+    })
+  })
+
   describe('buildTarget()', () => {
     it('preserves path, query and hash exactly', () => {
       const url = buildTarget({
