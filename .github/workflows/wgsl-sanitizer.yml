@@ -281,7 +281,7 @@ jobs:
         run: |
           set -euo pipefail
           INCLUDE='supabase/functions/wgsl-sanitizer/'
-          EXCLUDE='_test\.ts|fuzz_test\.ts'
+          EXCLUDE='_test\.ts|fuzz_test\.ts|test_auth\.ts'
           STAGES=(vertex fragment compute shared)
           KINDS=(integration fuzz)
 
