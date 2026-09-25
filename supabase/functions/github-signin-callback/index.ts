@@ -55,12 +55,13 @@ function logEvent(event: string, data: Record<string, unknown> = {}) {
 }
 
 // Allowlist of safe app origins for post-OAuth redirects
-const ALLOWED_HOSTS = ['kubovibe.dev', 'kubovibe.dev', 'localhost', '127.0.0.1']
+const ALLOWED_HOSTS = ['kubovibe.dev', 'vertal.dev', 'localhost', '127.0.0.1']
 function isAllowedOrigin(origin: string): boolean {
   try {
     const u = new URL(origin)
     if (ALLOWED_HOSTS.includes(u.hostname)) return true
     if (u.hostname.endsWith('.kubovibe.dev')) return true
+    if (u.hostname.endsWith('.vertal.dev')) return true
     if (u.hostname.endsWith('.lovable.app')) return true
     return false
   } catch { return false }

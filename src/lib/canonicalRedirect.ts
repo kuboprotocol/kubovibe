@@ -16,6 +16,11 @@ export function isAllowedHost(host: string): boolean {
     host.includes('lovable.app') ||
     host === 'kubovibe.dev' ||
     host === 'www.kubovibe.dev' ||
+    // Novo domínio da marca (Vertal Vibe Dev). Serve o app sem redirecionar
+    // enquanto kubovibe.dev segue como canônico; a troca do canônico vem
+    // depois que o DNS/SSL de vertal.dev estiver ativo no Railway.
+    host === 'vertal.dev' ||
+    host === 'www.vertal.dev' ||
     // Temporário: domínio de fallback no Railway, enquanto o certificado do
     // kubovibe.dev está bloqueado por pendência de pagamento na conta Railway
     // (ver histórico do projeto). Remover deste allowlist assim que o

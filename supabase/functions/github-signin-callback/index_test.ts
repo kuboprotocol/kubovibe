@@ -35,12 +35,14 @@ Deno.test('safeReturnPath: defaults non-internal paths to /dashboard', () => {
   assertEquals(safeReturnPath('/random-unlisted'), '/dashboard')
 })
 
-Deno.test('isAllowedOrigin: accepts kubovibe + lovable + localhost; rejects others', () => {
+Deno.test('isAllowedOrigin: accepts kubovibe + vertal + lovable + localhost; rejects others', () => {
   assert(isAllowedOrigin('https://kubovibe.dev'))
   assert(isAllowedOrigin('https://www.kubovibe.dev'))
-  assert(isAllowedOrigin('https://kubovibe.dev'))
+  assert(isAllowedOrigin('https://vertal.dev'))
+  assert(isAllowedOrigin('https://www.vertal.dev'))
   assert(isAllowedOrigin('http://localhost:3000'))
   assertEquals(isAllowedOrigin('https://evil.com'), false)
+  assertEquals(isAllowedOrigin('https://vertal.dev.evil.com'), false)
 })
 
 Deno.test('callback: missing code+state redirects with missing_code_or_state', async () => {

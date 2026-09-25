@@ -18,6 +18,8 @@ describe('Canonical-domain redirect → kubovibe.dev', () => {
       ['kubovibe.com.br'],
       ['app.kubovibe.dev'],        // só o apex e o www são canônicos
       ['kubovibe.onrender.com'],
+      ['app.vertal.dev'],          // só o apex e o www do vertal.dev são liberados
+      ['vertal.dev.evil.com'],
     ])('redirects when host = %s', (host) => {
       expect(shouldRedirect(host)).toBe(true)
     })
@@ -25,6 +27,8 @@ describe('Canonical-domain redirect → kubovibe.dev', () => {
     it.each([
       ['kubovibe.dev'],                           // canônico
       ['www.kubovibe.dev'],
+      ['vertal.dev'],                             // novo domínio da marca
+      ['www.vertal.dev'],
       ['localhost'],
       ['127.0.0.1'],
       ['id-preview--abc123.lovable.app'],         // sandbox preview
