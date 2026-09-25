@@ -33,3 +33,5 @@ project_id = "sccizjlpwezsgaxkclot"
     verify_jwt = false
   [functions.send-domain-transfer-status]
     verify_jwt = true
+  [functions.local-agent-usage]
+    verify_jwt = false

@@ -92,3 +92,16 @@ pub async fn charge(
 
     Ok(res)
 }
+
+/// Saldo atual + últimos gastos do agent local, via GET na mesma edge
+/// function (`local-agent-usage`).
+pub async fn balance(api_base: &str, access_token: &str) -> Result<serde_json::Value> {
+    let res = reqwest::Client::new()
+        .get(format!("{api_base}/functions/v1/local-agent-usage"))
+        .bearer_auth(access_token)
+        .send()
+        .await?
+        .json::<serde_json::Value>()
+        .await?;
+    Ok(res)
+}

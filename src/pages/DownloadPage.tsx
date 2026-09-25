@@ -1,28 +1,27 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Monitor, Apple, Smartphone, Download as DownloadIcon, ExternalLink, Clock } from 'lucide-react'
+import { Monitor, Apple, Smartphone, Terminal, Download as DownloadIcon, ExternalLink, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import Navbar from '@/components/landing/Navbar'
+import LocalAgentTokens from '@/components/download/LocalAgentTokens'
+import {
+  FALLBACK_DOWNLOADS,
+  RELEASES_PAGE_URL,
+  fetchAgentDownloads,
+  type AgentPlatform,
+  type ResolvedDownloads,
+} from '@/lib/agentReleases'
 
-type Platform = 'windows' | 'mac' | 'ios' | 'android'
-
-/**
- * URL pública e estável da última release do KUBO Local Agent (GitHub
- * Releases — não é um artifact de workflow, esses expiram). Atualizar aqui
- * quando publicarmos uma tag estável (v1.0.0 etc.) em vez do "nightly-N".
- */
-const WINDOWS_DOWNLOAD_URL =
-  'https://github.com/kuboprotocol/kubovibe/releases/download/nightly-4/kubo-vibe-windows.exe'
-const RELEASES_PAGE_URL = 'https://github.com/kuboprotocol/kubovibe/releases'
+type Platform = AgentPlatform | 'ios' | 'android'
 
 interface PlatformCard {
   id: Platform
   name: string
   icon: typeof Monitor
-  status: 'available' | 'soon'
   detail: string
-  downloadUrl?: string
+  /** Comando de primeira execução, mostrado quando o download existe. */
+  install?: string
 }
 
 const PLATFORMS: PlatformCard[] = [
@@ -30,29 +29,32 @@ const PLATFORMS: PlatformCard[] = [
     id: 'windows',
     name: 'Windows',
     icon: Monitor,
-    status: 'available',
     detail: 'KUBO Local Agent — detecta e integra com VS Code, Cursor, Trae e Antigravity automaticamente.',
-    downloadUrl: WINDOWS_DOWNLOAD_URL,
   },
   {
     id: 'mac',
     name: 'macOS',
     icon: Apple,
-    status: 'soon',
-    detail: 'Com integração Xcode, Swift e iOS Simulator. Em construção.',
+    detail: 'Binário universal (Apple Silicon + Intel). Mesma integração com VS Code, Cursor, Trae e Antigravity.',
+    install: 'tar -xzf kubo-vibe-macos.tar.gz && xattr -d com.apple.quarantine kubo-agent; ./kubo-agent',
+  },
+  {
+    id: 'linux',
+    name: 'Linux',
+    icon: Terminal,
+    detail: 'Binário x86_64 para Ubuntu, Debian, Fedora e derivados.',
+    install: 'tar -xzf kubo-vibe-linux-x64.tar.gz && ./kubo-agent',
   },
   {
     id: 'ios',
     name: 'iOS / iPadOS',
     icon: Smartphone,
-    status: 'soon',
     detail: 'Workspace remoto na nuvem KUBO, sincronizado em tempo real.',
   },
   {
     id: 'android',
     name: 'Android',
     icon: Smartphone,
-    status: 'soon',
     detail: 'Mesma experiência do app web, otimizada para toque.',
   },
 ]
@@ -64,14 +66,19 @@ function detectPlatform(): Platform | null {
   if (ua.includes('android')) return 'android'
   if (ua.includes('iphone') || ua.includes('ipad')) return 'ios'
   if (ua.includes('mac')) return 'mac'
+  if (ua.includes('linux') || ua.includes('x11')) return 'linux'
   return null
 }
 
 export default function DownloadPage() {
   const [detected, setDetected] = useState<Platform | null>(null)
+  const [downloads, setDownloads] = useState<ResolvedDownloads>({ urls: FALLBACK_DOWNLOADS, version: null })
 
   useEffect(() => {
     setDetected(detectPlatform())
+    const controller = new AbortController()
+    fetchAgentDownloads(controller.signal).then(setDownloads).catch(() => {})
+    return () => controller.abort()
   }, [])
 
   return (
@@ -99,6 +106,7 @@ export default function DownloadPage() {
           {PLATFORMS.map((platform, i) => {
             const Icon = platform.icon
             const isDetected = detected === platform.id
+            const downloadUrl = downloads.urls[platform.id as AgentPlatform]
             return (
               <motion.div
                 key={platform.id}
@@ -124,7 +132,7 @@ export default function DownloadPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <h3 className="text-lg font-semibold text-foreground">{platform.name}</h3>
-                      {platform.status === 'soon' && (
+                      {!downloadUrl && (
                         <Badge variant="outline" className="gap-1 text-[10px] text-muted-foreground">
                           <Clock className="h-3 w-3" /> Em breve
                         </Badge>
@@ -133,9 +141,9 @@ export default function DownloadPage() {
                     <p className="mt-1 text-sm text-muted-foreground">{platform.detail}</p>
 
                     <div className="mt-4">
-                      {platform.status === 'available' && platform.downloadUrl ? (
+                      {downloadUrl ? (
                         <Button asChild className="rounded-xl">
-                          <a href={platform.downloadUrl} target="_blank" rel="noreferrer noopener">
+                          <a href={downloadUrl} target="_blank" rel="noreferrer noopener">
                             <DownloadIcon className="h-4 w-4 mr-2" />
                             Baixar para {platform.name}
                           </a>
@@ -145,6 +153,11 @@ export default function DownloadPage() {
                           Em breve
                         </Button>
                       )}
+                      {downloadUrl && platform.install && (
+                        <code className="mt-3 block overflow-x-auto whitespace-nowrap rounded-lg bg-secondary/60 px-3 py-2 text-xs text-muted-foreground">
+                          {platform.install}
+                        </code>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -153,6 +166,8 @@ export default function DownloadPage() {
           })}
         </div>
 
+        <LocalAgentTokens />
+
         <motion.div
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
@@ -160,10 +175,12 @@ export default function DownloadPage() {
           className="mt-10 rounded-2xl border border-amber-500/20 bg-amber-500/5 p-5 text-sm text-muted-foreground"
         >
           <p>
-            <strong className="text-foreground">Sobre o build do Windows:</strong> ainda não está assinado
-            digitalmente. O Windows SmartScreen pode avisar "O Windows protegeu seu PC" ao abrir — clique em{' '}
-            <strong className="text-foreground">"Mais informações" → "Executar assim mesmo"</strong>. Isso é
-            esperado num build recente sem certificado de assinatura, não é malware.
+            <strong className="text-foreground">Sobre os builds:</strong> ainda não estão assinados
+            digitalmente. No Windows, o SmartScreen pode avisar "O Windows protegeu seu PC" — clique em{' '}
+            <strong className="text-foreground">"Mais informações" → "Executar assim mesmo"</strong>. No macOS,
+            o Gatekeeper bloqueia binários baixados sem notarização — o comando{' '}
+            <code className="text-foreground">xattr -d com.apple.quarantine</code> acima libera a execução.
+            Isso é esperado num build recente sem certificado, não é malware.
           </p>
         </motion.div>
 
@@ -174,7 +191,8 @@ export default function DownloadPage() {
             rel="noreferrer noopener"
             className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
-            Ver todas as versões no GitHub <ExternalLink className="h-3.5 w-3.5" />
+            {downloads.version ? `Versão ${downloads.version} · ` : ''}Ver todas as versões no GitHub{' '}
+            <ExternalLink className="h-3.5 w-3.5" />
           </a>
         </div>
       </main>

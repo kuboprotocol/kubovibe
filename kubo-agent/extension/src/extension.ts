@@ -43,7 +43,7 @@ function projectId(): string | undefined {
   return vscode.workspace.getConfiguration("kubo").get<string>("projectId") || readConfig()?.project_id || undefined;
 }
 
-async function call(path: string, body: unknown): Promise<any> {
+async function call(path: string, body?: unknown, method: "GET" | "POST" = "POST"): Promise<any> {
   const secret = readConfig()?.local_secret;
   if (!secret) {
     throw new Error(
@@ -51,11 +51,49 @@ async function call(path: string, body: unknown): Promise<any> {
     );
   }
   const res = await fetch(`${baseUrl()}${path}`, {
-    method: "POST",
+    method,
     headers: { "Content-Type": "application/json", "X-Kubo-Secret": secret },
-    body: JSON.stringify(body),
+    body: method === "POST" ? JSON.stringify(body ?? {}) : undefined,
   });
   return res.json();
+}
+
+let statusItem: vscode.StatusBarItem | undefined;
+
+/** Atualiza a barra de status com o saldo do Vibe Bank (best-effort). */
+async function refreshBalance() {
+  if (!statusItem) return;
+  try {
+    const out = await call("/balance", undefined, "GET");
+    statusItem.text = out.ok && out.balance != null ? `$(pulse) KUBO \u00b7 ${out.balance} cr` : "$(pulse) KUBO";
+  } catch {
+    statusItem.text = "$(pulse) KUBO";
+  }
+}
+
+async function updateAgent() {
+  try {
+    const check = await call("/update", undefined, "GET");
+    if (!check.ok) throw new Error(check.error ?? "update check failed");
+    if (!check.update?.available) {
+      vscode.window.showInformationMessage(
+        check.update?.current
+          ? `KUBO Local Agent is up to date (${check.update.current}).`
+          : "This KUBO Local Agent is a local build \u2014 auto-update is disabled.",
+      );
+      return;
+    }
+    const choice = await vscode.window.showInformationMessage(
+      `KUBO Local Agent ${check.update.latest} is available (current: ${check.update.current}). Update now?`,
+      "Update",
+    );
+    if (choice !== "Update") return;
+    const out = await call("/update/apply");
+    if (!out.ok) throw new Error(out.error ?? "update failed");
+    vscode.window.showInformationMessage(`KUBO Local Agent updated to ${out.update?.latest}. Restarting\u2026`);
+  } catch (err) {
+    vscode.window.showErrorMessage(`KUBO: ${err instanceof Error ? err.message : String(err)}`);
+  }
 }
 
 async function aiAction(action: Action, prompt?: string) {
@@ -68,6 +106,7 @@ async function aiAction(action: Action, prompt?: string) {
     vscode.window.showInformationMessage(
       `KUBO: ${COST[action]} credit(s) charged. Balance: ${out.balance_after ?? "\u2014"}`,
     );
+    refreshBalance();
   } catch (err) {
     vscode.window.showErrorMessage(`KUBO: ${err instanceof Error ? err.message : String(err)}`);
   }
@@ -109,7 +148,8 @@ async function pairWorkspace() {
   const workspace = folders[0].uri.fsPath;
 
   const accessToken = await vscode.window.showInputBox({
-    prompt: "Paste your KUBO access token (Settings \u2192 Developer \u2192 Local Agent Token on kubovibe.dev)",
+    prompt: "Paste your Local Agent token (generate one at kubovibe.dev/download \u2192 \u201cGerar token do Local Agent\u201d)",
+    placeHolder: "kubo_la_\u2026",
     password: true,
     ignoreFocusOut: true,
   });
@@ -131,6 +171,7 @@ async function pairWorkspace() {
   const data = await res.json();
   if (data.ok) {
     vscode.window.showInformationMessage(`KUBO: paired to ${workspace}`);
+    refreshBalance();
   } else {
     vscode.window.showErrorMessage(`KUBO: pairing failed \u2014 ${data.error ?? "unknown error"}`);
   }
@@ -142,6 +183,8 @@ export function activate(context: vscode.ExtensionContext) {
   status.command = "kubo.status";
   status.show();
   context.subscriptions.push(status);
+  statusItem = status;
+  refreshBalance();
 
   context.subscriptions.push(
     vscode.commands.registerCommand("kubo.status", async () => {
@@ -149,7 +192,7 @@ export function activate(context: vscode.ExtensionContext) {
         const res = await fetch(`${baseUrl()}/health`);
         const data = await res.json();
         vscode.window.showInformationMessage(
-          `KUBO Local Agent v${data.version} \u2014 workspace: ${data.workspace ?? "not linked"} \u2014 paired: ${data.paired ? "yes" : "no"}`,
+          `KUBO Local Agent v${data.version}${data.release ? ` (${data.release})` : ""} \u2014 workspace: ${data.workspace ?? "not linked"} \u2014 paired: ${data.paired ? "yes" : "no"}`,
         );
       } catch {
         vscode.window.showErrorMessage("KUBO Local Agent is not running.");
@@ -157,6 +200,8 @@ export function activate(context: vscode.ExtensionContext) {
     }),
 
     vscode.commands.registerCommand("kubo.pair", () => pairWorkspace()),
+
+    vscode.commands.registerCommand("kubo.update", () => updateAgent()),
 
     vscode.commands.registerCommand("kubo.chat", async () => {
       const prompt = await vscode.window.showInputBox({ prompt: "Ask the KUBO agent (1 credit)" });

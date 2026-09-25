@@ -5,6 +5,11 @@ on:
     tags: ["v*"]
   workflow_dispatch:
 
+# Mesma expressão usada no tag_name da release: o binário sabe qual release
+# o produziu e o auto-update do daemon compara com a mais recente.
+env:
+  KUBO_RELEASE_TAG: "${{ github.ref_type == 'tag' && github.ref_name || format('nightly-{0}', github.run_number) }}"
+
 jobs:
   windows:
     runs-on: windows-latest
@@ -36,6 +41,99 @@ jobs:
           name: kubo-agent-windows
           path: kubo-agent/daemon/target/release/kubo-vibe-windows.exe
 
+  # macOS: binário universal (Apple Silicon + Intel) via lipo. Publicado de
+  # duas formas: .tar.gz (download pelo site — preserva o chmod +x) e o
+  # binário cru `kubo-agent-macos` (usado pelo auto-update do daemon).
+  #
+  # Assinatura + notarização rodam só se os secrets da Apple existirem
+  # (APPLE_CERT_BASE64, APPLE_CERT_PASSWORD, APPLE_SIGNING_IDENTITY,
+  # APPLE_ID, APPLE_TEAM_ID, APPLE_APP_PASSWORD). Sem eles o build sai sem
+  # assinatura, como hoje — nada quebra.
+  macos:
+    runs-on: macos-14
+    env:
+      APPLE_CERT_BASE64: ${{ secrets.APPLE_CERT_BASE64 }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - name: Build daemon (arm64 + x86_64)
+        working-directory: kubo-agent/daemon
+        run: |
+          cargo build --release --target aarch64-apple-darwin
+          cargo build --release --target x86_64-apple-darwin
+      - name: Universal binary
+        working-directory: kubo-agent/daemon
+        run: |
+          mkdir -p dist
+          lipo -create -output dist/kubo-agent \
+            target/aarch64-apple-darwin/release/kubo-agent \
+            target/x86_64-apple-darwin/release/kubo-agent
+          chmod +x dist/kubo-agent
+      - name: Sign (Developer ID)
+        if: ${{ env.APPLE_CERT_BASE64 != '' }}
+        working-directory: kubo-agent/daemon
+        env:
+          APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/kubo.keychain-db"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          echo "$APPLE_CERT_BASE64" | base64 --decode > "$RUNNER_TEMP/kubo.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/kubo.p12" -P "$APPLE_CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          codesign --force --options runtime --timestamp --sign "$APPLE_SIGNING_IDENTITY" dist/kubo-agent
+          codesign --verify --verbose dist/kubo-agent
+      - name: Notarize
+        if: ${{ env.APPLE_CERT_BASE64 != '' }}
+        working-directory: kubo-agent/daemon
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          # Binário solto não aceita "staple"; a notarização fica registrada
+          # na Apple e o Gatekeeper confere online na primeira execução.
+          ditto -c -k --keepParent dist/kubo-agent "$RUNNER_TEMP/kubo-agent.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/kubo-agent.zip" \
+            --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD" --wait
+      - name: Package
+        working-directory: kubo-agent/daemon
+        run: |
+          tar -C dist -czf kubo-vibe-macos.tar.gz kubo-agent
+          cp dist/kubo-agent kubo-agent-macos
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kubo-agent-macos
+          path: |
+            kubo-agent/daemon/kubo-vibe-macos.tar.gz
+            kubo-agent/daemon/kubo-agent-macos
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build daemon
+        working-directory: kubo-agent/daemon
+        run: cargo build --release
+      - name: Package
+        working-directory: kubo-agent/daemon
+        run: |
+          tar -C target/release -czf kubo-vibe-linux-x64.tar.gz kubo-agent
+          cp target/release/kubo-agent kubo-agent-linux-x64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kubo-agent-linux
+          path: |
+            kubo-agent/daemon/kubo-vibe-linux-x64.tar.gz
+            kubo-agent/daemon/kubo-agent-linux-x64
+
   extension:
     runs-on: ubuntu-latest
     steps:
@@ -52,11 +150,11 @@ jobs:
           name: kubo-vibe-vsix
           path: kubo-agent/extension/*.vsix
 
-  # Publica os dois artefatos como uma GitHub Release pública, com URL
+  # Publica todos os artefatos como uma GitHub Release pública, com URL
   # estável (não expira como artifact de workflow) — é isso que a página
-  # "Baixe nosso app" do site aponta para o Windows.
+  # "Baixe nosso app" do site resolve em runtime (via API de releases).
   publish-release:
-    needs: [windows, extension]
+    needs: [windows, macos, linux, extension]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -67,11 +165,15 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: "${{ github.ref_type == 'tag' && github.ref_name || format('nightly-{0}', github.run_number) }}"
+          tag_name: ${{ env.KUBO_RELEASE_TAG }}
           name: "KUBO Local Agent ${{ github.ref_type == 'tag' && github.ref_name || format('build no.{0}', github.run_number) }}"
           draft: false
           prerelease: ${{ github.ref_type != 'tag' }}
           files: |
             dist/kubo-agent-windows/kubo-vibe-windows.exe
+            dist/kubo-agent-macos/kubo-vibe-macos.tar.gz
+            dist/kubo-agent-linux/kubo-vibe-linux-x64.tar.gz
+            dist/kubo-agent-macos/kubo-agent-macos
+            dist/kubo-agent-linux/kubo-agent-linux-x64
             dist/kubo-vibe-vsix/*.vsix
 

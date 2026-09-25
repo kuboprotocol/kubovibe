@@ -17,8 +17,12 @@ ledger (`credit_transactions`) that the cloud sessions and the admin panels use.
 | Git operation    | 0       |
 
 The daemon never touches the database. It calls the `local-agent-usage` edge
-function with the signed-in user's access token, which performs the atomic
-deduction — so `/admin/projects` and `/admin/teams` show local usage next to
+function with the user's **Local Agent token** (`kubo_la_...`, generated at
+kubovibe.dev/download and pasted into "KUBO: Pair this workspace"), which performs
+the atomic deduction. These tokens don't expire (only revoked), unlike the
+Supabase session JWT (~1h) the daemon used before; the JWT still works for
+agents paired the old way. `GET /balance` returns the current Vibe Bank
+balance, shown in the editor status bar — so `/admin/projects` and `/admin/teams` show local usage next to
 cloud usage automatically.
 
 ## Layout
@@ -85,7 +89,30 @@ code --install-extension kubo-vibe-0.1.0.vsix
 Then set `kubo.projectId` in VS Code settings to the KUBO project the credits
 should be billed to.
 
+## Auto-update
+
+Release builds embed their release tag (`KUBO_RELEASE_TAG`). `GET /update`
+compares it with the newest agent release on GitHub (tags `v*`/`nightly-*`);
+`POST /update/apply` downloads the raw binary for the platform, swaps it in
+place and restarts the daemon. In the editor: "KUBO: Update Local Agent".
+Local builds (`cargo build`) have no tag and never self-update.
+
 ## Code signing
+
+### macOS (Developer ID + notarization)
+
+The release workflow signs and notarizes the universal binary when these
+repository secrets exist (otherwise it ships unsigned, as before):
+
+| Secret | Value |
+|---|---|
+| `APPLE_CERT_BASE64` | "Developer ID Application" certificate exported as `.p12`, base64 |
+| `APPLE_CERT_PASSWORD` | password of that `.p12` |
+| `APPLE_SIGNING_IDENTITY` | e.g. `Developer ID Application: KUBO PROTOCOL (TEAMID)` |
+| `APPLE_ID` / `APPLE_TEAM_ID` | Apple Developer account e-mail and team id |
+| `APPLE_APP_PASSWORD` | app-specific password from appleid.apple.com |
+
+### Windows
 
 - **OV certificate**: export as `.pfx`, set `KUBO_CERT_PATH` and
   `KUBO_CERT_PASSWORD`, run the script. SmartScreen reputation builds over time.
