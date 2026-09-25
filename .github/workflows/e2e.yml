@@ -77,9 +77,10 @@ jobs:
         env:
           TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
           TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
-          VITE_SUPABASE_PROJECT_ID: ${{ secrets.VITE_SUPABASE_PROJECT_ID }}
+          # VITE_SUPABASE_* are public (publishable key) and come from the
+          # committed .env. They used to be mapped from secrets here; with the
+          # secrets unset they arrived as empty strings, which take precedence
+          # over .env in Vite, and the app never connected to Supabase.
         run: |
           echo "::group::[${JOB_LABEL}] playwright test (main suite)"
           npx playwright test --project=chromium --grep-invert "(hash preservation across cached 301|fuzz #)" || (echo "E2E Failure Logs:" && npx playwright show-report --reporter=list && exit 1)
