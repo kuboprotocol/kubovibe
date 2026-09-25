@@ -412,8 +412,8 @@ jobs:
             [ -n "${SEEDS_URL}" ]        && echo "- [🌱 \`seeds.json\`](${SEEDS_URL})"
             [ -n "${FAILURES_URL}" ]     && echo "- [💥 \`failures.json\`](${FAILURES_URL})"
             [ -n "${LOG_URL}" ]          && echo "- [📜 \`fuzz-${CATEGORY_ID}.log\`](${LOG_URL})"
-            [ -n "${FC_SEEDS_URL}" ]     && echo "- [🌱 \`fc-seeds.json\` (fast-check)](${FC_SEEDS_URL})"
-            [ -n "${FC_FAILURES_URL}" ]  && echo "- [💥 \`fc-failures.json\` (fast-check minimized)](${FC_FAILURES_URL})"
+            # fc-seeds/fc-failures are listed only in the "🎯 fast-check direct
+            # downloads" block (next step): the verifier requires exactly 1 bullet each.
             echo "- [🔗 Workflow run page](${RUN_URL})"
           } >> "${{ steps.summary.outputs.summary_file }}"
 
@@ -449,12 +449,17 @@ jobs:
           } >> "${SUMMARY_FILE}"
 
           # Re-emit the augmented summary into the GitHub Actions UI panel.
+          # $GITHUB_STEP_SUMMARY is a different file for every step, so the mirror
+          # is also kept in reports/ for the verify step. if/fi instead of
+          # `[ ] && echo` as the last command: with `bash -e` an empty URL (the
+          # normal case when no failures exist) would fail the step.
+          MIRROR_FILE="reports/step-summary-fc-${CATEGORY_ID}.md"
           {
             echo ""
             echo "### 🎯 fast-check direct downloads (${FC_HEADER_LABEL})"
-            [ -n "${FC_SEEDS_URL}" ]    && echo "- [fc-seeds.json](${FC_SEEDS_URL})"
-            [ -n "${FC_FAILURES_URL}" ] && echo "- [fc-failures.json](${FC_FAILURES_URL})"
-          } >> "$GITHUB_STEP_SUMMARY"
+            if [ -n "${FC_SEEDS_URL}" ]; then echo "- [fc-seeds.json](${FC_SEEDS_URL})"; fi
+            if [ -n "${FC_FAILURES_URL}" ]; then echo "- [fc-failures.json](${FC_FAILURES_URL})"; fi
+          } | tee -a "$GITHUB_STEP_SUMMARY" > "${MIRROR_FILE}"
 
       # Self-test: assert the append step actually injected the inline
       # fc-seeds.json / fc-failures.json links into summary-<category>.md
@@ -497,30 +502,32 @@ jobs:
           FC_HEADER_LABEL: ${{ matrix.id == 'request-method' && 'Access-Control-Request-Method' || 'Access-Control-Request-Headers' }}
         run: |
           set -euo pipefail
-          [ -n "${GITHUB_STEP_SUMMARY:-}" ] && [ -f "${GITHUB_STEP_SUMMARY}" ] || {
-            echo "::warning::GITHUB_STEP_SUMMARY unavailable; skipping mirror check"
-            exit 0
+          # $GITHUB_STEP_SUMMARY is per-step: check the copy the append step left.
+          MIRROR_FILE="reports/step-summary-fc-${CATEGORY_ID}.md"
+          [ -f "${MIRROR_FILE}" ] || {
+            echo "::error title=GITHUB_STEP_SUMMARY mirror violation::${MIRROR_FILE} not produced by the append step"
+            exit 1
           }
 
           fail_mirror() {
             echo "::error title=GITHUB_STEP_SUMMARY mirror violation::$1"
             echo "----- BEGIN GITHUB_STEP_SUMMARY fc-* lines -----"
-            { grep -n -B 1 -A 1 -F "fc-seeds.json"    "${GITHUB_STEP_SUMMARY}" || true
+            { grep -n -B 1 -A 1 -F "fc-seeds.json"    "${MIRROR_FILE}" || true
               echo "---"
-              grep -n -B 1 -A 1 -F "fc-failures.json" "${GITHUB_STEP_SUMMARY}" || true
+              grep -n -B 1 -A 1 -F "fc-failures.json" "${MIRROR_FILE}" || true
             } | sed 's/^/  /'
             echo "----- END GITHUB_STEP_SUMMARY fc-* lines -----"
             exit 1
           }
 
-          grep -Fq "🎯 fast-check direct downloads (${FC_HEADER_LABEL})" "${GITHUB_STEP_SUMMARY}" \
+          grep -Fq "🎯 fast-check direct downloads (${FC_HEADER_LABEL})" "${MIRROR_FILE}" \
             || fail_mirror "Missing fast-check section for ${FC_HEADER_LABEL}"
           if [ "${STAGED_FC_SEEDS:-0}" = "1" ]; then
-            grep -Fq "[fc-seeds.json](${FC_SEEDS_URL})" "${GITHUB_STEP_SUMMARY}" \
+            grep -Fq "[fc-seeds.json](${FC_SEEDS_URL})" "${MIRROR_FILE}" \
               || fail_mirror "Missing inline fc-seeds.json link (${FC_SEEDS_URL})"
           fi
           if [ "${STAGED_FC_FAILURES:-0}" = "1" ]; then
-            grep -Fq "[fc-failures.json](${FC_FAILURES_URL})" "${GITHUB_STEP_SUMMARY}" \
+            grep -Fq "[fc-failures.json](${FC_FAILURES_URL})" "${MIRROR_FILE}" \
               || fail_mirror "Missing inline fc-failures.json link (${FC_FAILURES_URL})"
           fi
 
@@ -658,15 +665,24 @@ jobs:
           # GitHub artifact URLs typically respond with 302 → CDN. We follow
           # zero redirects on the HEAD so we can inspect the Location header
           # ourselves; --max-time guards against hanging.
+          # The github.com/…/artifacts/<id> page ignores Bearer tokens
+          # (logged_in=no → 307 → 404), so resolve the same artifact id through
+          # the REST API, which does accept GITHUB_TOKEN.
+          ARTIFACT_ID="${SUMMARY_URL##*/}"
+          case "${ARTIFACT_ID}" in
+            ''|*[!0-9]*) fail "Could not extract a numeric artifact id from SUMMARY_URL (${SUMMARY_URL})" ;;
+          esac
+          API_ARTIFACT_URL="https://api.github.com/repos/${GH_REPO}/actions/artifacts/${ARTIFACT_ID}"
           : > /tmp/summary_head.txt
           HTTP_STATUS=$(curl -sS -L -o /tmp/summary_body.txt \
             -D /tmp/summary_head.txt \
             -w '%{http_code}' \
             --max-time 30 \
             -H "Authorization: Bearer ${GH_TOKEN}" \
-            -H "Accept: */*" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
             -H "User-Agent: preflight-fuzz-summary-verifier" \
-            -I "${SUMMARY_URL}" || true)
+            -I "${API_ARTIFACT_URL}" || true)
 
           case "${HTTP_STATUS}" in
             2*|3*) echo "HEAD ${SUMMARY_URL} → HTTP ${HTTP_STATUS}" ;;

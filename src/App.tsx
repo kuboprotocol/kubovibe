@@ -8,6 +8,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import { lazy, Suspense, forwardRef } from "react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import AdGate from "@/components/AdGate";
+import { shouldRedirect, buildTarget } from "@/lib/canonicalRedirect";
 
 // Lazy loading all pages
 const Index = lazy(() => import("./pages/Index"));
@@ -101,9 +102,6 @@ const queryClient = new QueryClient({
 // Redirect logic moved to a separate safety check to prevent loops
 if (typeof window !== 'undefined') {
   const host = window.location.hostname
-  const searchParams = new URLSearchParams(window.location.search)
-  const isLovableApp = /(^|\.)lovable\.app$/i.test(host)
-  
   // Track redirect history in sessionStorage to catch client-side loops
   const REDIRECT_KEY = 'vibe_redirect_count'
   const redirectCount = parseInt(sessionStorage.getItem(REDIRECT_KEY) || '0', 10)
@@ -111,24 +109,12 @@ if (typeof window !== 'undefined') {
   if (redirectCount > 3) {
     console.error('Redirect loop detected. Stopping redirects.')
     sessionStorage.removeItem(REDIRECT_KEY)
-  } else if (
-    host === 'localhost' || 
-    host === '127.0.0.1' || 
-    host.includes('lovableproject.com') ||
-    host.includes('lovable.app') ||
-    host === 'kubovibe.dev' ||
-    host === 'www.kubovibe.dev' ||
-    // Temporário: domínio de fallback no Railway, enquanto o certificado do
-    // kubovibe.dev está bloqueado por pendência de pagamento na conta Railway
-    // (ver histórico do projeto). Remover deste allowlist assim que o
-    // certificado do domínio próprio voltar a funcionar normalmente.
-    host.endsWith('.up.railway.app')
-  ) {
+  } else if (!shouldRedirect(host)) {
     // Development, internal domains, or canonical domains - no redirect
     sessionStorage.removeItem(REDIRECT_KEY)
   } else {
     sessionStorage.setItem(REDIRECT_KEY, (redirectCount + 1).toString())
-    const target = `https://kubovibe.dev${window.location.pathname}${window.location.search}${window.location.hash}`
+    const target = buildTarget(window.location)
     window.location.replace(target)
   }
 }
