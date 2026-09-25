@@ -4,6 +4,7 @@ import { Monitor, Apple, Smartphone, Terminal, Download as DownloadIcon, Externa
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import Navbar from '@/components/landing/Navbar'
+import LocalAgentTokens from '@/components/download/LocalAgentTokens'
 import {
   FALLBACK_DOWNLOADS,
   RELEASES_PAGE_URL,
@@ -164,6 +165,8 @@ export default function DownloadPage() {
             )
           })}
         </div>
+
+        <LocalAgentTokens />
 
         <motion.div
           initial={{ opacity: 0 }}

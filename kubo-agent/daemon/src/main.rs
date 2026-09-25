@@ -15,6 +15,7 @@ mod ledger;
 mod onboard;
 mod runner;
 mod state;
+mod update;
 
 use axum::{
     extract::State,
@@ -35,6 +36,8 @@ const DEFAULT_PORT: u16 = 43117;
 struct Health {
     ok: bool,
     version: &'static str,
+    /// Tag da release (ex.: `nightly-7`) — `None` em builds locais.
+    release: Option<&'static str>,
     workspace: Option<String>,
     paired: bool,
 }
@@ -105,6 +108,8 @@ async fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
+    update::cleanup_leftovers();
+
     let state = AppState::load(
         std::env::var("KUBO_API_BASE").unwrap_or_else(|_| DEFAULT_API_BASE.to_string()),
     )?;
@@ -119,7 +124,24 @@ async fn main() -> anyhow::Result<()> {
         .route("/pair", post(pair))
         .route("/run", post(run))
         .route("/ai", post(ai))
+        .route("/balance", get(balance))
+        .route("/update", get(update_check))
+        .route("/update/apply", post(update_apply))
         .with_state(state);
+
+    // Checagem passiva no boot: só avisa no log, nunca troca o binário sem
+    // o usuário pedir (POST /update/apply, disparado pela extensão).
+    tokio::spawn(async {
+        match update::check().await {
+            Ok(info) if info.available => tracing::info!(
+                "nova versão do KUBO Local Agent disponível: {:?} (atual: {:?})",
+                info.latest,
+                info.current
+            ),
+            Ok(_) => {}
+            Err(err) => tracing::debug!("checagem de atualização falhou: {err}"),
+        }
+    });
 
     let port: u16 = std::env::var("KUBO_AGENT_PORT")
         .ok()
@@ -128,9 +150,26 @@ async fn main() -> anyhow::Result<()> {
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
     tracing::info!("kubo-agent listening on http://{addr}");
 
-    let listener = tokio::net::TcpListener::bind(addr).await?;
+    let listener = bind_with_retry(addr).await?;
     axum::serve(listener, app).await?;
     Ok(())
+}
+
+/// Logo após um auto-update, o processo novo sobe enquanto o antigo ainda
+/// está liberando a porta — tenta de novo por alguns segundos em vez de
+/// morrer com "address in use".
+async fn bind_with_retry(addr: SocketAddr) -> anyhow::Result<tokio::net::TcpListener> {
+    let mut last_err = None;
+    for _ in 0..20 {
+        match tokio::net::TcpListener::bind(addr).await {
+            Ok(l) => return Ok(l),
+            Err(err) => {
+                last_err = Some(err);
+                tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+            }
+        }
+    }
+    Err(last_err.map(Into::into).unwrap_or_else(|| anyhow::anyhow!("bind failed")))
 }
 
 /// GET /onboard — lista editores compatíveis já detectados no PC, sem
@@ -169,6 +208,7 @@ async fn health(State(state): State<AppState>) -> Json<Health> {
     Json(Health {
         ok: true,
         version: env!("CARGO_PKG_VERSION"),
+        release: update::current_tag(),
         workspace: state.workspace_path(),
         paired: !state.access_token().is_empty(),
     })
@@ -255,5 +295,58 @@ async fn ai(
             "error": res.error.unwrap_or_else(|| "insufficient credits".into())
         }))),
         Err(err) => (StatusCode::BAD_GATEWAY, Json(serde_json::json!({ "ok": false, "error": err.to_string() }))),
+    }
+}
+
+/// GET /balance — saldo atual no Vibe Bank + últimos gastos do agent local.
+async fn balance(State(state): State<AppState>, headers: HeaderMap) -> (StatusCode, Json<serde_json::Value>) {
+    if !check_secret(&state, &headers) {
+        return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({ "ok": false, "error": "invalid_secret" })));
+    }
+    match ledger::balance(&state.api_base, &state.access_token()).await {
+        Ok(v) => (StatusCode::OK, Json(v)),
+        Err(err) => (StatusCode::BAD_GATEWAY, Json(serde_json::json!({ "ok": false, "error": err.to_string() }))),
+    }
+}
+
+/// GET /update — há versão nova publicada no GitHub?
+async fn update_check(State(state): State<AppState>, headers: HeaderMap) -> (StatusCode, Json<serde_json::Value>) {
+    if !check_secret(&state, &headers) {
+        return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({ "ok": false, "error": "invalid_secret" })));
+    }
+    match update::check().await {
+        Ok(info) => (StatusCode::OK, Json(serde_json::json!({ "ok": true, "update": info }))),
+        Err(err) => (StatusCode::BAD_GATEWAY, Json(serde_json::json!({ "ok": false, "error": err.to_string() }))),
+    }
+}
+
+/// POST /update/apply — baixa, troca o executável e reinicia o daemon com o
+/// binário novo. Exige o secret: trocar o executável é tão sensível quanto
+/// rodar um comando.
+async fn update_apply(State(state): State<AppState>, headers: HeaderMap) -> (StatusCode, Json<serde_json::Value>) {
+    if !check_secret(&state, &headers) {
+        return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({ "ok": false, "error": "invalid_secret" })));
+    }
+    let info = match update::check().await {
+        Ok(info) if info.available => info,
+        Ok(info) => return (StatusCode::OK, Json(serde_json::json!({ "ok": true, "updated": false, "update": info }))),
+        Err(err) => return (StatusCode::BAD_GATEWAY, Json(serde_json::json!({ "ok": false, "error": err.to_string() }))),
+    };
+
+    match update::apply(&info).await {
+        Ok(exe) => {
+            state.audit("self_update", &serde_json::json!({ "from": info.current, "to": info.latest }));
+            // Responde primeiro, depois sobe o binário novo e encerra este.
+            tokio::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+                let args: Vec<String> = std::env::args().skip(1).collect();
+                if let Err(err) = std::process::Command::new(&exe).args(args).spawn() {
+                    tracing::error!("atualizado, mas falhou ao reiniciar: {err} — reinicie o agent manualmente");
+                }
+                std::process::exit(0);
+            });
+            (StatusCode::OK, Json(serde_json::json!({ "ok": true, "updated": true, "update": info })))
+        }
+        Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "ok": false, "error": err.to_string() }))),
     }
 }
