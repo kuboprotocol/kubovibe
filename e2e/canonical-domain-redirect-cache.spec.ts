@@ -1,4 +1,4 @@
-import { test, expect, type Route } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import http from 'node:http'
 import type { AddressInfo } from 'node:net'
 
@@ -112,7 +112,7 @@ function startEdge(): Promise<{ url: string; close: () => Promise<void>; hits: H
 }
 
 test.describe('Canonical-domain redirect — 301 + Cache-Control + browser cache', () => {
-  test('returns 301 with long-lived Cache-Control and is reused from cache', async ({ browser }) => {
+  test('returns 301 with long-lived Cache-Control and is reused from cache', async ({ browser, browserName }) => {
     const edge = await startEdge()
     // Single context so the in-memory HTTP cache persists between navigations.
     const context = await browser.newContext()
@@ -172,7 +172,17 @@ test.describe('Canonical-domain redirect — 301 + Cache-Control + browser cache
     // no validators) means caching is broken.
     const hits = redirHits()
     expect(hits.length, `at most one extra revalidation allowed; hits: ${JSON.stringify(hits)}`).toBeLessThanOrEqual(2)
-    if (hits.length === 2) {
+    if (hits.length === 2 && browserName === 'webkit' && !(hits[1].ifNoneMatch || hits[1].ifModifiedSince)) {
+      // O WebKit do Playwright (contexto efêmero) não serve redirects de
+      // navegação a partir do cache HTTP e refaz o GET sem validadores. Isso
+      // é limitação do engine, não do edge: exigimos então que a resposta
+      // repetida continue sendo o mesmo 301 com o contrato de cache completo.
+      const second = hits[1]
+      expect(second.status, 'WebKit re-GET must still get the 301').toBe(301)
+      expect(headerCI(second.responseHeaders, 'Cache-Control')).toBe(CACHE_CONTROL)
+      expect(headerCI(second.responseHeaders, 'ETag')).toBe(ETAG)
+      expect(headerCI(second.responseHeaders, 'Last-Modified')).toBe(LAST_MODIFIED)
+    } else if (hits.length === 2) {
       const second = hits[1]
       expect(
         Boolean(second.ifNoneMatch || second.ifModifiedSince),
@@ -298,17 +308,18 @@ test.describe('Canonical-domain redirect — 301 + Cache-Control + browser cache
 
   test('Cache-Control header value matches production contract', async ({ page }) => {
     // Locks the exact directive set we ship in vercel.json / render.yaml.
+    // Usa o edge HTTP real (e não route.fulfill com 301, que o WebKit não
+    // suporta) para capturar o Cache-Control da resposta 301 de verdade.
+    const edge = await startEdge()
     let captured: string | undefined
-    await page.route(/^https:\/\/([^/]+\.)?lovable\.app\//, (route: Route) => {
-      const headers = { Location: 'https://kubovibe.dev/', 'Cache-Control': CACHE_CONTROL }
-      captured = headers['Cache-Control']
-      return route.fulfill({ status: 301, headers })
+    page.on('response', (r) => {
+      if (r.url().startsWith(`${edge.url}/redir/`) && r.status() === 301) {
+        captured = r.headers()['cache-control']
+      }
     })
-    await page.route('https://kubovibe.dev/**', (route: Route) =>
-      route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><html></html>' }),
-    )
 
-    await page.goto('https://kubovibe.lovable.app/', { waitUntil: 'domcontentloaded' }).catch(() => {})
+    await page.goto(`${edge.url}/redir/`, { waitUntil: 'domcontentloaded' })
+    await edge.close()
 
     expect(captured).toBeDefined()
     expect(captured).toMatch(/\bpublic\b/)
@@ -350,9 +361,15 @@ test.describe('Canonical-domain redirect — 301 + Cache-Control + browser cache
       const target = `${edge.url}/redir/page?x=1${hc.navHash}`
       const dest = `${edge.url}/dest/page?x=1${hc.expectHash}`
 
+      // Hash vazio: pela WHATWG URL um fragmento vazio serializa como "#"
+      // (WebKit mantém "…?x=1#"), enquanto o Chromium o descarta. As duas
+      // formas são o mesmo destino; location.hash continua sendo ''.
+      const sameDest = (u: string) =>
+        u === dest || (hc.expectHash === '' && u === `${dest}#`)
+
       // 1st navigation — hash must reattach after the 301.
       await page.goto(target, { waitUntil: 'domcontentloaded' })
-      expect(page.url(), 'first nav url').toBe(dest)
+      expect(sameDest(page.url()), `first nav url: ${page.url()}`).toBe(true)
       expect(await page.evaluate(() => window.location.hash)).toBe(hc.expectHash)
       // Server must NEVER receive the fragment (RFC 3986 §3.5).
       expect(edge.hits.every((h) => !h.url.includes('#'))).toBe(true)
@@ -361,7 +378,7 @@ test.describe('Canonical-domain redirect — 301 + Cache-Control + browser cache
       // a 304 revalidation, the browser must still reattach the hash.
       await page.goto('about:blank')
       await page.goto(target, { waitUntil: 'domcontentloaded' })
-      expect(page.url(), 'second nav url').toBe(dest)
+      expect(sameDest(page.url()), `second nav url: ${page.url()}`).toBe(true)
       expect(await page.evaluate(() => window.location.hash)).toBe(hc.expectHash)
       expect(edge.hits.every((h) => !h.url.includes('#'))).toBe(true)
 

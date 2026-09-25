@@ -1,6 +1,12 @@
 import { test, expect } from '@playwright/test';
+import { HAS_TEST_CREDENTIALS, NEEDS_LOGIN_REASON, login } from './helpers/auth';
 
 test.describe('Creative Economy Panel E2E', () => {
+  test.skip(!HAS_TEST_CREDENTIALS, NEEDS_LOGIN_REASON);
+  test.beforeEach(async ({ page }) => {
+    await login(page);
+  });
+
   test('navigation and full flow: Selection -> Configuration -> Execution', async ({ page }) => {
     await page.goto('/creative');
     

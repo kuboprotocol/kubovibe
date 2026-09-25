@@ -49,7 +49,7 @@ test.describe('GitHub login UI', () => {
     await page.goto('/auth?auth_error=invalid_state&auth_req_id=req-xyz-123')
 
     await expect(page.getByText(/session expired/i)).toBeVisible()
-    await expect(page.getByText(/Reference ID: req-xyz-123/)).toBeVisible()
+    await expect(page.getByText('Reference ID: req-xyz-123', { exact: true })).toBeVisible()
 
     // a11y: sonner toast container should announce updates via aria-live
     const liveRegion = page.locator('[aria-live]').first()
