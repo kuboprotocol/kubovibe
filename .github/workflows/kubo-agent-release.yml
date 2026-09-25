@@ -36,6 +36,51 @@ jobs:
           name: kubo-agent-windows
           path: kubo-agent/daemon/target/release/kubo-vibe-windows.exe
 
+  # macOS: binário universal (Apple Silicon + Intel) via lipo. Empacotado em
+  # .tar.gz para preservar o bit de execução (download direto pelo navegador
+  # perde o chmod +x).
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - name: Build daemon (arm64 + x86_64)
+        working-directory: kubo-agent/daemon
+        run: |
+          cargo build --release --target aarch64-apple-darwin
+          cargo build --release --target x86_64-apple-darwin
+      - name: Universal binary + package
+        working-directory: kubo-agent/daemon
+        run: |
+          mkdir -p dist
+          lipo -create -output dist/kubo-agent \
+            target/aarch64-apple-darwin/release/kubo-agent \
+            target/x86_64-apple-darwin/release/kubo-agent
+          chmod +x dist/kubo-agent
+          tar -C dist -czf kubo-vibe-macos.tar.gz kubo-agent
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kubo-agent-macos
+          path: kubo-agent/daemon/kubo-vibe-macos.tar.gz
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build daemon
+        working-directory: kubo-agent/daemon
+        run: cargo build --release
+      - name: Package
+        working-directory: kubo-agent/daemon
+        run: tar -C target/release -czf kubo-vibe-linux-x64.tar.gz kubo-agent
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kubo-agent-linux
+          path: kubo-agent/daemon/kubo-vibe-linux-x64.tar.gz
+
   extension:
     runs-on: ubuntu-latest
     steps:
@@ -52,11 +97,11 @@ jobs:
           name: kubo-vibe-vsix
           path: kubo-agent/extension/*.vsix
 
-  # Publica os dois artefatos como uma GitHub Release pública, com URL
+  # Publica todos os artefatos como uma GitHub Release pública, com URL
   # estável (não expira como artifact de workflow) — é isso que a página
-  # "Baixe nosso app" do site aponta para o Windows.
+  # "Baixe nosso app" do site resolve em runtime (via API de releases).
   publish-release:
-    needs: [windows, extension]
+    needs: [windows, macos, linux, extension]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -73,5 +118,7 @@ jobs:
           prerelease: ${{ github.ref_type != 'tag' }}
           files: |
             dist/kubo-agent-windows/kubo-vibe-windows.exe
+            dist/kubo-agent-macos/kubo-vibe-macos.tar.gz
+            dist/kubo-agent-linux/kubo-vibe-linux-x64.tar.gz
             dist/kubo-vibe-vsix/*.vsix
 
