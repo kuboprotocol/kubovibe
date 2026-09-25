@@ -337,11 +337,29 @@ jobs:
             exit 0
           fi
 
+          # The integration/fuzz tests call the *deployed* function over HTTP,
+          # so the profiles usually contain no line of index.ts (only test
+          # files, which are excluded). `deno coverage` then exits with "No
+          # covered files included in the report" — report that plainly
+          # instead of failing the job.
+          if ! deno coverage coverage/combined --include="$INCLUDE" --exclude="$EXCLUDE" --lcov --output=coverage.lcov 2> coverage-error.txt; then
+            if grep -q "No covered files" coverage-error.txt; then
+              {
+                echo "## WGSL Sanitizer — Coverage Report"
+                echo ""
+                echo "_No local line coverage: the tests exercise the deployed \`wgsl-sanitizer\` edge function over HTTP, so its source never runs inside the test process. Pass/fail per stage comes from the matrix jobs._"
+              } | tee coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
+              : > coverage.lcov
+              : > coverage-detailed.txt
+              exit 0
+            fi
+            cat coverage-error.txt >&2
+            exit 1
+          fi
+
           echo "::group::Detailed coverage"
           deno coverage coverage/combined --include="$INCLUDE" --exclude="$EXCLUDE" | tee coverage-detailed.txt
           echo "::endgroup::"
-
-          deno coverage coverage/combined --include="$INCLUDE" --exclude="$EXCLUDE" --lcov --output=coverage.lcov
 
           LF=$(grep -E '^LF:' coverage.lcov | awk -F: '{s+=$2} END {print s+0}')
           LH=$(grep -E '^LH:' coverage.lcov | awk -F: '{s+=$2} END {print s+0}')
