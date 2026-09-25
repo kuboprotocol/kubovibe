@@ -1,0 +1,17 @@
+// Hospedagem do site na Cloudflare (Workers com static assets).
+//
+// Workers Builds (painel da Cloudflare → Workers → vertaldev → Settings → Build):
+//   Build command:  npm run build:cloudflare
+//   Deploy command: npx wrangler deploy
+// O `name` precisa ser igual ao nome do Worker no painel.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "vertaldev",
+  "compatibility_date": "2026-09-25",
+  "assets": {
+    "directory": "./dist",
+    // SPA: rotas do React Router (/pricing, /alternativas/…) devolvem o
+    // index.html em vez de 404.
+    "not_found_handling": "single-page-application"
+  }
+}

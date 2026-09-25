@@ -1,0 +1,18 @@
+# Headers dos arquivos estáticos na Cloudflare (Workers static assets).
+
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: SAMEORIGIN
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(self), payment=()
+  Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+
+# Arquivos com hash no nome: cache de 1 ano.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Service worker e manifesto PWA nunca podem ficar presos em cache.
+/sw.js
+  Cache-Control: no-cache
+/manifest.webmanifest
+  Cache-Control: no-cache
