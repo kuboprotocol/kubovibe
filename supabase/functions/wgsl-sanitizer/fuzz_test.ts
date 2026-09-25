@@ -2,12 +2,9 @@
 // Generates many randomized WGSL variants and asserts:
 //   - DANGEROUS variants are ALWAYS blocked (403) with the expected rule firing
 //   - SAFE variants are ALWAYS allowed (200) with zero violations
-import "https://deno.land/std@0.224.0/dotenv/load.ts";
 import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { callSanitizer, userTest } from "./test_auth.ts";
 
-const SUPABASE_URL = Deno.env.get("VITE_SUPABASE_URL")!;
-const SUPABASE_ANON_KEY = Deno.env.get("VITE_SUPABASE_PUBLISHABLE_KEY")!;
-const ENDPOINT = `${SUPABASE_URL}/functions/v1/wgsl-sanitizer`;
 
 // Deterministic PRNG (mulberry32) so failures are reproducible.
 function rng(seed: number) {
@@ -24,19 +21,6 @@ const pick = <T,>(rand: () => number, arr: T[]): T => arr[Math.floor(rand() * ar
 const randInt = (rand: () => number, min: number, max: number) =>
   Math.floor(rand() * (max - min + 1)) + min;
 
-async function callSanitizer(body: unknown) {
-  const res = await fetch(ENDPOINT, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-      apikey: SUPABASE_ANON_KEY,
-    },
-    body: JSON.stringify(body),
-  });
-  const json = await res.json();
-  return { status: res.status, json } as { status: number; json: any };
-}
 
 // ---------- Safe shader generators, grouped per pipeline stage ----------
 type Builder = (rand: () => number) => string;
@@ -245,44 +229,44 @@ async function fuzzDangerous(
 // =====================================================================
 // [vertex]
 // =====================================================================
-Deno.test("[vertex] FUZZ: safe vertex shader variants are always allowed", async () => {
+userTest("[vertex] FUZZ: safe vertex shader variants are always allowed", async () => {
   await fuzzSafe("vertex", VERTEX_SAFE_BUILDERS, BASE_SEED ^ 0x11111111);
 });
 
-Deno.test("[vertex] FUZZ: dangerous patterns in vertex stage are always blocked", async () => {
+userTest("[vertex] FUZZ: dangerous patterns in vertex stage are always blocked", async () => {
   await fuzzDangerous("vertex", SHARED_DANGEROUS_BUILDERS, BASE_SEED ^ 0x22222222);
 });
 
 // =====================================================================
 // [fragment]
 // =====================================================================
-Deno.test("[fragment] FUZZ: safe fragment shader variants are always allowed", async () => {
+userTest("[fragment] FUZZ: safe fragment shader variants are always allowed", async () => {
   await fuzzSafe("fragment", FRAGMENT_SAFE_BUILDERS, BASE_SEED ^ 0x33333333);
 });
 
-Deno.test("[fragment] FUZZ: dangerous patterns in fragment stage are always blocked", async () => {
+userTest("[fragment] FUZZ: dangerous patterns in fragment stage are always blocked", async () => {
   await fuzzDangerous("fragment", SHARED_DANGEROUS_BUILDERS, BASE_SEED ^ 0x44444444);
 });
 
 // =====================================================================
 // [compute]
 // =====================================================================
-Deno.test("[compute] FUZZ: safe compute shader variants are always allowed", async () => {
+userTest("[compute] FUZZ: safe compute shader variants are always allowed", async () => {
   await fuzzSafe("compute", COMPUTE_SAFE_BUILDERS, BASE_SEED ^ 0x55555555);
 });
 
-Deno.test("[compute] FUZZ: dangerous compute-specific patterns are always blocked", async () => {
+userTest("[compute] FUZZ: dangerous compute-specific patterns are always blocked", async () => {
   await fuzzDangerous("compute", COMPUTE_DANGEROUS_BUILDERS, BASE_SEED ^ 0x66666666);
 });
 
-Deno.test("[compute] FUZZ: shared dangerous patterns in compute stage are blocked", async () => {
+userTest("[compute] FUZZ: shared dangerous patterns in compute stage are blocked", async () => {
   await fuzzDangerous("compute", SHARED_DANGEROUS_BUILDERS, BASE_SEED ^ 0x77777777);
 });
 
 // =====================================================================
 // [shared] — cross-stage payload embedding
 // =====================================================================
-Deno.test("[shared] FUZZ: dangerous payloads embedded in larger safe-looking shaders are still blocked", async () => {
+userTest("[shared] FUZZ: dangerous payloads embedded in larger safe-looking shaders are still blocked", async () => {
   const rand = rng(BASE_SEED ^ 0x12345678);
   const ALL_SAFE = [...VERTEX_SAFE_BUILDERS, ...FRAGMENT_SAFE_BUILDERS, ...COMPUTE_SAFE_BUILDERS];
   const ALL_DANGEROUS = [...SHARED_DANGEROUS_BUILDERS, ...COMPUTE_DANGEROUS_BUILDERS];

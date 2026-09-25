@@ -40,9 +40,18 @@ jobs:
             experimental: true
     continue-on-error: ${{ matrix.experimental == true }}
     env:
-      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+      # VITE_SUPABASE_URL / _PUBLISHABLE_KEY are public and loaded from the
+      # committed .env by std/dotenv in the tests. Mapping them from unset
+      # secrets exported empty strings, which dotenv does not override.
       DENO_DIR: ${{ github.workspace }}/.deno-cache
+      # The repo root package.json makes Deno 2 resolve npm: specifiers from a
+      # node_modules/ that this job never installs.
+      DENO_NO_PACKAGE_JSON: "1"
+      # Test account for the user-scoped tests (the function requires a
+      # signed-in user). Unset → those tests are reported as "ignored"; the
+      # CORS and 401 auth-guard tests still run.
+      TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
+      TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
@@ -145,9 +154,18 @@ jobs:
             experimental: true
     continue-on-error: ${{ matrix.experimental == true }}
     env:
-      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+      # VITE_SUPABASE_URL / _PUBLISHABLE_KEY are public and loaded from the
+      # committed .env by std/dotenv in the tests. Mapping them from unset
+      # secrets exported empty strings, which dotenv does not override.
       DENO_DIR: ${{ github.workspace }}/.deno-cache
+      # The repo root package.json makes Deno 2 resolve npm: specifiers from a
+      # node_modules/ that this job never installs.
+      DENO_NO_PACKAGE_JSON: "1"
+      # Test account for the user-scoped tests (the function requires a
+      # signed-in user). Unset → those tests are reported as "ignored"; the
+      # CORS and 401 auth-guard tests still run.
+      TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
+      TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
@@ -263,7 +281,7 @@ jobs:
         run: |
           set -euo pipefail
           INCLUDE='supabase/functions/wgsl-sanitizer/'
-          EXCLUDE='_test\.ts|fuzz_test\.ts'
+          EXCLUDE='_test\.ts|fuzz_test\.ts|test_auth\.ts'
           STAGES=(vertex fragment compute shared)
           KINDS=(integration fuzz)
 
@@ -319,11 +337,29 @@ jobs:
             exit 0
           fi
 
+          # The integration/fuzz tests call the *deployed* function over HTTP,
+          # so the profiles usually contain no line of index.ts (only test
+          # files, which are excluded). `deno coverage` then exits with "No
+          # covered files included in the report" — report that plainly
+          # instead of failing the job.
+          if ! deno coverage coverage/combined --include="$INCLUDE" --exclude="$EXCLUDE" --lcov --output=coverage.lcov 2> coverage-error.txt; then
+            if grep -q "No covered files" coverage-error.txt; then
+              {
+                echo "## WGSL Sanitizer — Coverage Report"
+                echo ""
+                echo "_No local line coverage: the tests exercise the deployed \`wgsl-sanitizer\` edge function over HTTP, so its source never runs inside the test process. Pass/fail per stage comes from the matrix jobs._"
+              } | tee coverage-summary.md >> "$GITHUB_STEP_SUMMARY"
+              : > coverage.lcov
+              : > coverage-detailed.txt
+              exit 0
+            fi
+            cat coverage-error.txt >&2
+            exit 1
+          fi
+
           echo "::group::Detailed coverage"
           deno coverage coverage/combined --include="$INCLUDE" --exclude="$EXCLUDE" | tee coverage-detailed.txt
           echo "::endgroup::"
-
-          deno coverage coverage/combined --include="$INCLUDE" --exclude="$EXCLUDE" --lcov --output=coverage.lcov
 
           LF=$(grep -E '^LF:' coverage.lcov | awk -F: '{s+=$2} END {print s+0}')
           LH=$(grep -E '^LH:' coverage.lcov | awk -F: '{s+=$2} END {print s+0}')
