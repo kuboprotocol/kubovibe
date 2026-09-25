@@ -4,6 +4,18 @@
 // and the Sign Out loading + confirmation toast.
 import { test, expect, type Route } from '@playwright/test'
 
+/**
+ * Aciona um botão de ação de toast (sonner) pelo teclado. Os toasts animam e
+ * se empilham, e o toast da frente intercepta o clique de ponteiro; focar e
+ * pressionar Enter aciona o mesmo handler sem depender da posição na tela.
+ */
+async function pressToastAction(page: import('@playwright/test').Page, name: RegExp) {
+  const btn = page.getByRole('button', { name })
+  await expect(btn).toBeVisible()
+  await btn.focus()
+  await page.keyboard.press('Enter')
+}
+
 const INITIATE_URL_RE = /\/functions\/v1\/github-signin-initiate/
 
 test.describe('GitHub login UI', () => {
@@ -60,7 +72,7 @@ test.describe('GitHub login UI', () => {
 
     // "Copy ID" button copies the reference ID to the clipboard
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
-    await page.getByRole('button', { name: /copy id/i }).click()
+    await pressToastAction(page, /copy id/i)
     const clip = await page.evaluate(() => navigator.clipboard.readText())
     expect(clip).toBe('req-xyz-123')
 
@@ -84,7 +96,7 @@ test.describe('GitHub login UI', () => {
     await page.route('about:blank', (route) => route.fulfill({ status: 200, body: '' }))
 
     await page.goto('/auth?redirect=/connectors/github&auth_error=invalid_state&auth_req_id=r-1')
-    await page.getByRole('button', { name: /try again/i }).click()
+    await pressToastAction(page, /try again/i)
     await expect.poll(() => initiateCalls).toBeGreaterThanOrEqual(1)
     expect(lastBody).toContain('"returnUrl":"/connectors/github"')
   })
@@ -126,7 +138,7 @@ test.describe('GitHub login UI', () => {
 
     // Unknown prefix and protocol-relative should both fall back to /dashboard
     await page.goto('/auth?redirect=//evil.com&auth_error=invalid_state&auth_req_id=r-redir-1')
-    await page.getByRole('button', { name: /try again/i }).click()
+    await pressToastAction(page, /try again/i)
     await expect.poll(() => capturedBody).toContain('"returnUrl":"/dashboard"')
   })
 
