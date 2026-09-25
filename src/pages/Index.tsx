@@ -1,3 +1,4 @@
+import { APP_NAME } from '@/config/brand'
 import { lazy, Suspense } from "react";
 import Navbar from "@/components/landing/Navbar";
 import { Button } from "@/components/ui/button";
@@ -98,7 +99,7 @@ Mobile: some o rail e vira uma barra de abas embaixo (Agente / Preview / Domíni
                     Ready to build something amazing?
                   </h1>
                   <p className="text-primary-foreground/70 mb-8 max-w-md mx-auto relative z-10">
-                    Join thousands of creators launching apps every day with KUBO VIBE.
+                    Join thousands of creators launching apps every day with {APP_NAME}.
                   </p>
                   <Button
                     size="lg"
@@ -121,7 +122,7 @@ Mobile: some o rail e vira uma barra de abas embaixo (Agente / Preview / Domíni
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col md:flex-row items-start justify-between gap-10 mb-10">
             <div className="space-y-3">
-              <p className="text-sm font-semibold text-foreground tracking-wide">KUBO VIBE</p>
+              <p className="text-sm font-semibold text-foreground tracking-wide">{APP_NAME}</p>
               <p className="text-xs text-muted-foreground leading-relaxed max-w-xs">
                 A product by KUBO PROTOCOL
                 <br />

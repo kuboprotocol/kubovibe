@@ -1,15 +1,16 @@
+import { APP_NAME } from '@/config/brand'
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronDown } from 'lucide-react'
 
 const faqs = [
   {
-    q: 'What is KUBO VIBE?',
-    a: 'KUBO VIBE is a platform that lets you create professional apps, websites, e-commerce stores, and tools using AI — no coding required.',
+    q: `What is ${APP_NAME}?`,
+    a: `${APP_NAME} is a platform that lets you create professional apps, websites, e-commerce stores, and tools using AI — no coding required.`,
   },
   {
     q: 'Does it work for any type of business?',
-    a: 'Yes! Whether you run a restaurant, consulting firm, e-commerce store, or anything else, KUBO VIBE adapts to your needs.',
+    a: `Yes! Whether you run a restaurant, consulting firm, e-commerce store, or anything else, ${APP_NAME} adapts to your needs.`,
   },
   {
     q: "What if I don't know exactly what I want?",
@@ -17,7 +18,7 @@ const faqs = [
   },
   {
     q: 'Do I need technical knowledge?',
-    a: 'Not at all. KUBO VIBE is designed to be used by anyone. Just describe what you want in plain language.',
+    a: `Not at all. ${APP_NAME} is designed to be used by anyone. Just describe what you want in plain language.`,
   },
   {
     q: 'Can I edit what is created?',

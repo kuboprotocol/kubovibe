@@ -1,6 +1,7 @@
+import { APP_NAME } from '@/config/brand'
+import AnimatedLogo from '@/components/branding/AnimatedLogo'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import AnimatedLogo from '@/components/branding/AnimatedLogo'
 
 export default function Navbar() {
   const navigate = useNavigate()
@@ -8,7 +9,7 @@ export default function Navbar() {
   return (
     <nav className="sticky top-0 z-50 glass glass-border">
       <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-        <Link to="/" aria-label="KUBO VIBE" className="flex items-center gap-3 group">
+        <Link to="/" aria-label={APP_NAME} className="flex items-center gap-3 group">
           <AnimatedLogo size={18} className="group-hover:scale-105 transition-transform" />
         </Link>
 

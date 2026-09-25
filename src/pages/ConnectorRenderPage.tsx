@@ -1,3 +1,4 @@
+import { APP_NAME } from '@/config/brand'
 import { useEffect, useMemo, useState } from 'react'
 
 import { Link } from 'react-router-dom'
@@ -174,7 +175,7 @@ export default function ConnectorRenderPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <title>Render Connector — KUBO Vibe</title>
+      <title>{`Render Connector — ${APP_NAME}`}</title>
       <div className="container max-w-7xl mx-auto px-4 py-6">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">

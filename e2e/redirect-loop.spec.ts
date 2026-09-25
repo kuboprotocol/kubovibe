@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { APP_NAME } from '../src/config/brand';
 
 /**
  * Test to detect redirect loops in the preview environment.
@@ -60,7 +61,7 @@ test('should detect and prevent redirect loops on preview domains', async ({ pag
     await expect(appContent.first()).toBeVisible({ timeout: 15000 });
     
     // Check that we are not stuck in the black screen / loader indefinitely
-    const loader = page.getByText('Carregando Kubo Vibe...');
+    const loader = page.getByText(`Loading ${APP_NAME}...`);
     if (await loader.isVisible()) {
       await expect(loader).not.toBeVisible({ timeout: 15000 });
     }

@@ -1,3 +1,4 @@
+import { APP_NAME } from '@/config/brand'
 import { Download, Monitor, Laptop, Tablet, Smartphone, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -6,7 +7,7 @@ import { VibeCreditMeter } from "./VibeCreditMeter";
 
 export function VibeTopBar() {
   const handleDownload = () => {
-    toast("Download KUBO Vibe", {
+    toast(`Download ${APP_NAME}`, {
       description: "Available for Mac (M1/M2/Intel), iOS (iPhone/iPad), Windows and Android.",
       action: {
         label: "Builds",

@@ -1,3 +1,4 @@
+import { APP_NAME } from '@/config/brand'
 import { useEffect, useRef } from 'react'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/hooks/useAuth'
@@ -20,7 +21,7 @@ export function useDailyCredits() {
         })
         if (error || !data?.credited) return
         if (data.type === 'signup') {
-          toast.success(`🎉 Welcome to KUBO Vibe! You got ${data.credits_granted} credits to get started!`, {
+          toast.success(`🎉 Welcome to ${APP_NAME}! You got ${data.credits_granted} credits to get started!`, {
             duration: 6000,
             description: 'Complete daily shortlinks to earn more credits.',
           })

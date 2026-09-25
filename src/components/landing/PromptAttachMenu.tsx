@@ -1,3 +1,4 @@
+import { APP_NAME } from '@/config/brand'
 import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -165,7 +166,7 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
 
   const openExternalNow = (target: ExternalTarget) => {
     window.open(target.url, '_blank', 'noopener,noreferrer')
-    toast.warning(`Redirecionado para ${target.label} — fora do KUBO VIBE`)
+    toast.warning(`Redirecionado para ${target.label} — fora do ${APP_NAME}`)
   }
 
   const requestExternalConfirmation = (target: ExternalTarget) => {
@@ -429,7 +430,7 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
               <div className="mt-2 pt-2 border-t border-border/30 px-3 py-1.5">
                 <div className="flex items-center gap-1.5">
                   <Layers className="h-3 w-3 text-primary/50" />
-                  <span className="text-[10px] text-muted-foreground/50">Powered by KUBO VIBE</span>
+                  <span className="text-[10px] text-muted-foreground/50">Powered by {APP_NAME}</span>
                 </div>
               </div>
             </>
@@ -453,7 +454,7 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
                 <ShieldAlert className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
                 <div className="text-[11px] leading-relaxed text-muted-foreground">
                   <p className="font-semibold text-destructive/90 mb-0.5">Você será redirecionado</p>
-                  <p>Páginas externas e conectores próprios <strong>não são assegurados</strong> pelo KUBO VIBE. Use por sua conta e risco.</p>
+                  <p>Páginas externas e conectores próprios <strong>não são assegurados</strong> pelo {APP_NAME}. Use por sua conta e risco.</p>
                 </div>
               </div>
 
@@ -626,10 +627,10 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
               <div className="mx-2 p-3 rounded-lg border border-destructive/30 bg-destructive/5 flex gap-2">
                 <ShieldAlert className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
                 <div className="text-[11px] leading-relaxed text-muted-foreground">
-                  <p className="font-semibold text-destructive/90 mb-1">Você está deixando o KUBO VIBE</p>
+                  <p className="font-semibold text-destructive/90 mb-1">Você está deixando o {APP_NAME}</p>
                   <p>
                     Vamos abrir <strong>{externalTarget.url.replace('https://', '')}</strong> em uma nova aba.
-                    Esse domínio é de terceiros e <strong>não é assegurado</strong> pelo KUBO VIBE — credenciais,
+                    Esse domínio é de terceiros e <strong>não é assegurado</strong> pelo {APP_NAME} — credenciais,
                     dados e tráfego ficam por conta do provedor externo.
                   </p>
                 </div>
@@ -768,7 +769,7 @@ export default function PromptAttachMenu({ onAttachFile, onScreenshot, onAddRefe
             <div className="mb-3 p-2.5 rounded-lg border border-destructive/30 bg-destructive/5 flex gap-2">
               <ShieldAlert className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
               <p className="text-[11px] text-muted-foreground leading-relaxed">
-                Conectores personalizados são salvos <strong>apenas no seu navegador</strong> e <strong>não são auditados</strong> pelo KUBO VIBE.
+                Conectores personalizados são salvos <strong>apenas no seu navegador</strong> e <strong>não são auditados</strong> pelo {APP_NAME}.
               </p>
             </div>
 

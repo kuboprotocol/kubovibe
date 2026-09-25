@@ -1,3 +1,4 @@
+import AnimatedLogo from '@/components/branding/AnimatedLogo'
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
@@ -10,7 +11,6 @@ import { useAuth } from '@/hooks/useAuth'
 import { useAvatarUrl } from '@/hooks/useAvatarUrl'
 import { toast } from 'sonner'
 import { motion } from 'framer-motion'
-import logoImg from '@/assets/logo-kubovibe-3d.png'
 
 export default function ProfilePage() {
   const navigate = useNavigate()
@@ -154,7 +154,7 @@ export default function ProfilePage() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex items-center gap-2">
-            <img src={logoImg} alt="KUBO VIBE" className="h-6" />
+            <AnimatedLogo size={15} />
             <h1 className="text-xl font-bold text-foreground font-display">Meu Perfil</h1>
           </div>
         </div>

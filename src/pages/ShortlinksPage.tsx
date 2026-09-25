@@ -1,3 +1,4 @@
+import AnimatedLogo from '@/components/branding/AnimatedLogo'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
@@ -7,7 +8,6 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
 import { toast } from 'sonner'
-import logoImg from '@/assets/logo-kubovibe-3d.png'
 import StreakCard from '@/components/shortlinks/StreakCard'
 import BadgesCard from '@/components/shortlinks/BadgesCard'
 import TerraNativeBanner from '@/components/shortlinks/TerraNativeBanner'
@@ -197,7 +197,7 @@ export default function ShortlinksPage() {
             <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} className="rounded-xl">
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <img src={logoImg} alt="KUBO VIBE" className="h-8" />
+            <AnimatedLogo size={20} />
           </div>
           <div className="flex items-center gap-2 text-sm">
             <Zap className="h-4 w-4 text-primary" />

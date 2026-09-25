@@ -1,3 +1,4 @@
+import { APP_NAME } from '@/config/brand'
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '@/integrations/supabase/client'
@@ -103,7 +104,7 @@ export default function OAuthConsent() {
           <>
             <h1 className="text-xl font-semibold mb-2">Connect {clientName}</h1>
             <p className="text-sm text-muted-foreground mb-6">
-              {clientName} is requesting access to KUBO VIBE DEV on your behalf. It will be able to
+              {clientName} is requesting access to {APP_NAME} on your behalf. It will be able to
               read and create your projects, view agent jobs and credit usage as you.
             </p>
             <div className="flex gap-3">

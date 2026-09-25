@@ -1,3 +1,4 @@
+import AnimatedLogo from '@/components/branding/AnimatedLogo'
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
@@ -14,7 +15,6 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
 import { toast } from 'sonner'
-import logoImg from '@/assets/logo-kubovibe-3d.png'
 
 export type DeviceFrame = 'desktop' | 'tablet' | 'mobile'
 
@@ -112,7 +112,7 @@ export default function BuilderToolbar({
         <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} className="h-8 w-8 text-muted-foreground hover:text-foreground rounded-lg">
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <img src={logoImg} alt="KUBO VIBE" className="hidden h-5 sm:block" />
+        <AnimatedLogo size={12} className="hidden sm:block" />
 
         {/* Tabs: Preview / Code */}
         <div className="flex items-center gap-0.5 bg-secondary/60 rounded-lg p-0.5 ml-2">

@@ -1,3 +1,5 @@
+import { APP_NAME } from '@/config/brand'
+import AnimatedLogo from '@/components/branding/AnimatedLogo'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -17,7 +19,6 @@ import {
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
 import { toast } from 'sonner'
-import logoImg from '@/assets/logo-kubovibe-3d.png'
 
 /* ───────── Expanded FAQ ───────── */
 const faqCategories = [
@@ -25,12 +26,12 @@ const faqCategories = [
     category: 'General',
     items: [
       {
-        q: 'What is KUBO VIBE?',
-        a: 'KUBO VIBE is an AI-powered application builder that lets you create professional apps, websites, games, and tools — no coding required. Just describe what you want in plain language.',
+        q: `What is ${APP_NAME}?`,
+        a: `${APP_NAME} is an AI-powered application builder that lets you create professional apps, websites, games, and tools — no coding required. Just describe what you want in plain language.`,
       },
       {
         q: 'Does it work for any type of business?',
-        a: 'Yes! Whether you run a restaurant, consulting firm, e-commerce store, or anything else, KUBO VIBE adapts to your needs and generates tailored solutions.',
+        a: `Yes! Whether you run a restaurant, consulting firm, e-commerce store, or anything else, ${APP_NAME} adapts to your needs and generates tailored solutions.`,
       },
       {
         q: "What if I don't know exactly what I want?",
@@ -64,7 +65,7 @@ const faqCategories = [
     items: [
       {
         q: 'Do I need technical knowledge?',
-        a: 'Not at all. KUBO VIBE is designed to be used by anyone. Just describe what you want in plain language and the AI handles the rest.',
+        a: `Not at all. ${APP_NAME} is designed to be used by anyone. Just describe what you want in plain language and the AI handles the rest.`,
       },
       {
         q: 'Can I edit what is created?',
@@ -200,7 +201,7 @@ export default function SupportPage() {
           <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="rounded-xl">
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <img src={logoImg} alt="KUBO VIBE" className="h-7" />
+          <AnimatedLogo size={17} />
         </div>
       </header>
 

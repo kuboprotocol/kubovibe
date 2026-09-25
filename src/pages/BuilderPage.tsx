@@ -1,3 +1,4 @@
+import AnimatedLogo from '@/components/branding/AnimatedLogo'
 import { useState, useRef, useEffect, useCallback, useMemo, forwardRef } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
@@ -18,7 +19,6 @@ import FilePreview from '@/components/builder/FilePreview'
 import KuboFlowSelector, { autoDetectMode, type KuboFlowMode } from '@/components/builder/KuboFlowSelector'
 import { uploadFile, validateFile, getAllAllowedTypes, type UploadedFile } from '@/lib/fileUpload'
 import { Progress } from '@/components/ui/progress'
-import logoImg from '@/assets/logo-kubovibe-3d.png'
 import { subscribePreviewLogs, type PreviewLogEntry } from '@/lib/iframePreview'
 import PreviewAuditPanel from '@/components/builder/PreviewAuditPanel'
 import PreviewFrame from '@/components/builder/PreviewFrame'
@@ -499,7 +499,7 @@ const BuilderPage = forwardRef<HTMLDivElement, any>((props, ref) => {
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {messages.length === 0 && (
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center text-center pt-12 px-4">
-                <img src={logoImg} alt="KUBO VIBE" className="h-12 mb-4" />
+                <AnimatedLogo size={28} className="mb-4" />
                 <h3 className="font-display font-bold text-foreground text-lg mb-2">What do you want to build?</h3>
                 <p className="text-sm text-muted-foreground mb-6">Describe your app and I'll generate it instantly.</p>
                 <div className="w-full space-y-2">

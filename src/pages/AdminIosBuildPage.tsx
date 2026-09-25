@@ -1,3 +1,4 @@
+import { APP_NAME } from '@/config/brand'
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -199,7 +200,7 @@ export default function AdminIosBuildPage() {
       const { data, error } = await supabase.functions.invoke("push-notify", {
         body: {
           kind: "test",
-          title: "KUBO Vibe",
+          title: APP_NAME,
           body: "Test alert — your iPhone is wired to the build pipeline.",
           data: { deeplink: "kubovibe://m" },
         },

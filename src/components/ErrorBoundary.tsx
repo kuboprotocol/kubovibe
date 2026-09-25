@@ -1,3 +1,4 @@
+import { APP_NAME } from '@/config/brand'
 import React, { Component, ErrorInfo, ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -249,7 +250,7 @@ export class ErrorBoundary extends Component<Props, State> {
   private buildReport = (): string => {
     const { error, errorInfo } = this.state;
     const lines = [
-      "KUBO VIBE — Error Report",
+      `${APP_NAME} — Error Report`,
       `When: ${new Date().toISOString()}`,
       `Route: ${window.location.pathname}${window.location.search}`,
       `User agent: ${navigator.userAgent}`,
@@ -290,7 +291,7 @@ export class ErrorBoundary extends Component<Props, State> {
       void this.submitReport(this.state.error, this.state.errorInfo);
       return;
     }
-    const subject = encodeURIComponent(`[KUBO VIBE] Crash em ${this.props.resourceName ?? "App"}`);
+    const subject = encodeURIComponent(`[${APP_NAME}] Crash em ${this.props.resourceName ?? "App"}`);
     const body = encodeURIComponent(this.buildReport().slice(0, 1800));
     window.location.href = `mailto:support@kubovibe.dev?subject=${subject}&body=${body}`;
   };
