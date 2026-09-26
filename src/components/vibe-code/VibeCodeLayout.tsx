@@ -10,7 +10,8 @@ import {
   Laptop,
   Monitor,
   Tablet,
-  Smartphone
+  Smartphone,
+  Activity
 } from "lucide-react";
 import { VibeSidebar } from "./VibeSidebar";
 import { VibeTopBar } from "./VibeTopBar";
@@ -20,6 +21,7 @@ import { VibeDomainsPanel } from "./VibeDomainsPanel";
 import { VibeCloudSessionPanel } from "./VibeCloudSessionPanel";
 import { VibeLivePreview } from "./VibeLivePreview";
 import { VibeCheckpointTimeline } from "./VibeCheckpointTimeline";
+import { VibeAgentActivityPanel } from "./VibeAgentActivityPanel";
 import { useWorkspaceProject } from "@/hooks/useWorkspaceProject";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -85,6 +87,12 @@ export default function VibeCodeLayout() {
               active={activeTab === 'deploys'} 
               onClick={() => setActiveTab('deploys')} 
             />
+            <MobileNavItem 
+              icon={Activity} 
+              label="Atividade" 
+              active={activeTab === 'activity'} 
+              onClick={() => setActiveTab('activity')} 
+            />
           </div>
         )}
       </div>
@@ -129,6 +137,10 @@ function DesktopView({ activeTab, projectId }: { activeTab: string; setActiveTab
     return <VibeCloudSessionPanel />;
   }
 
+  if (activeTab === 'activity') {
+    return <VibeAgentActivityPanel />;
+  }
+
   return (
     <div className="flex h-[calc(100vh-10rem)] items-center justify-center rounded-2xl border border-dashed border-border/60">
       <div className="text-center">
@@ -147,6 +159,8 @@ function MobileView({ activeTab, projectId }: { activeTab: string; projectId: st
       return <VibeDomainsPanel />;
     case 'deploys':
       return <VibeCloudSessionPanel />;
+    case 'activity':
+      return <VibeAgentActivityPanel />;
     case 'files':
       return (
         <div className="h-[calc(100vh-12rem)] overflow-hidden rounded-2xl border border-border/40 bg-card/20">
