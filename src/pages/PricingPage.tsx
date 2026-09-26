@@ -22,12 +22,13 @@ import { cn } from '@/lib/utils'
 
 type Period = 'monthly' | 'annual' | 'lifetime'
 
-const ESSENTIALS = ['free', 'starter', 'pro', 'premium_1', 'premium_2']
-const BUSINESS = ['business_1', 'business_2', 'business_3', 'business_4', 'business_5', 'business_6', 'business_7']
+// Planos à venda: somente até US$ 49,99/mês. Premium 2 e Business 1–7
+// continuam em PLAN_CONFIG para quem já assina, mas não são mais vendidos.
+const ESSENTIALS = ['free', 'starter', 'pro', 'premium_1']
 
 const BADGES: Record<string, { label: string; tone: 'popular' | 'value' }> = {
   pro: { label: '⭐ Mais Popular', tone: 'popular' },
-  business_2: { label: '🔥 Melhor Custo-Benefício', tone: 'value' },
+  premium_1: { label: '🔥 Melhor Custo-Benefício', tone: 'value' },
 }
 
 function priceFor(monthly: number, period: Period): { display: string; suffix: string } {
@@ -277,7 +278,7 @@ export default function PricingPage() {
             <Zap className="h-5 w-5 text-primary" />
             <h2 className="font-display text-2xl font-bold">Planos Essenciais</h2>
           </div>
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {ESSENTIALS.map((plan) => (
               <PlanCard
                 key={plan}
@@ -292,36 +293,7 @@ export default function PricingPage() {
           </div>
         </motion.section>
 
-        {/* Grupo 2 — Business */}
-        <motion.section
-          variants={containerAnim}
-          initial="hidden"
-          whileInView="show"
-          viewport={{ once: true, margin: '-80px' }}
-          className="mt-20"
-        >
-          <div className="mb-8 flex items-center gap-3">
-            <Crown className="h-5 w-5 text-primary" />
-            <h2 className="font-display text-2xl font-bold">Planos Business</h2>
-            <Badge variant="outline" className="border-primary/30 text-primary">Parceria KUBO</Badge>
-          </div>
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {BUSINESS.map((plan) => (
-              <PlanCard
-                key={plan}
-                plan={plan}
-                period={period}
-                currentPlan={currentPlan}
-                loadingPlan={loadingPlan}
-                onCheckout={handleStripeCheckout}
-                onFree={() => {}}
-                variant="gold"
-              />
-            ))}
-          </div>
-        </motion.section>
-
-        {/* Grupo 3 — Enterprise */}
+        {/* Grupo 2 — Enterprise */}
         <motion.section
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -388,16 +360,16 @@ export default function PricingPage() {
                   <th className="p-4 text-left font-semibold">Feature</th>
                   <th className="p-4 text-center font-semibold">Free</th>
                   <th className="p-4 text-center font-semibold text-primary">Pro</th>
-                  <th className="p-4 text-center font-semibold">Business 1</th>
+                  <th className="p-4 text-center font-semibold">Premium 1</th>
                   <th className="p-4 text-center font-semibold text-primary">Enterprise</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/40">
                 {[
-                  ['Créditos/dia', '5 (1x)', '5', '12', '1.200'],
+                  ['Créditos/dia', '5 (1x)', '5', '5', '1.200'],
                   ['Shortlinks/dia', '10', '10', '10', '10'],
-                  ['Anúncios', '6h', '24h', 'Sem', 'Sem'],
-                  ['Suporte', '—', 'Email', 'Prioritário', 'Dedicado'],
+                  ['Anúncios', '6h', '24h', '1x por semana', 'Sem'],
+                  ['Suporte', '—', 'Email', 'Email', 'Dedicado'],
                   ['API', '—', '—', '—', '✓'],
                 ].map((row) => (
                   <tr key={row[0]}>
@@ -444,9 +416,9 @@ export default function PricingPage() {
                 </AccordionContent>
               </AccordionItem>
               <AccordionItem value="q4">
-                <AccordionTrigger className="px-4 text-left">O que é o Acordo de Parceria Business?</AccordionTrigger>
+                <AccordionTrigger className="px-4 text-left">O que é o Acordo de Parceria Enterprise?</AccordionTrigger>
                 <AccordionContent className="px-4 text-muted-foreground">
-                  Nos planos Business e Enterprise, assinamos um acordo de parceria KUBO que garante suporte prioritário, SLA, integrações customizadas e coexpansão de casos de uso.
+                  No plano Enterprise, assinamos um acordo de parceria KUBO que garante suporte prioritário, SLA, integrações customizadas e coexpansão de casos de uso.
                 </AccordionContent>
               </AccordionItem>
               <AccordionItem value="q5">
