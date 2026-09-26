@@ -57,3 +57,10 @@ CREATE INDEX IF NOT EXISTS ai_gateway_cache_expires_idx
 
 ALTER TABLE public.ai_gateway_cache ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.ai_gateway_cache FROM anon, authenticated;
+
+-- Painel Agent Activity recebe novas execuções em tempo real (RLS aplica).
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'ai_gateway_runs') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.ai_gateway_runs;
+  END IF;
+END $$;
