@@ -10,6 +10,13 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "vertaldev",
   "compatibility_date": "2026-09-25",
+  // Rotas com `/*`: sem o curinga a rota só casa com a página inicial e
+  // /pricing, /alternativas etc. não chegam ao Worker. O deploy recria as
+  // rotas a partir daqui, então não dependem do painel.
+  "routes": [
+    { "pattern": "vertal.dev/*", "zone_name": "vertal.dev" },
+    { "pattern": "www.vertal.dev/*", "zone_name": "vertal.dev" }
+  ],
   "assets": {
     "directory": "./dist",
     // SPA: rotas do React Router (/pricing, /alternativas/…) devolvem o
