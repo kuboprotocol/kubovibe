@@ -1,6 +1,12 @@
 import { test, expect } from '@playwright/test';
+import { HAS_TEST_CREDENTIALS, NEEDS_LOGIN_REASON, login } from './helpers/auth';
 
 test.describe('Creative Panel Idempotency & State', () => {
+  test.skip(!HAS_TEST_CREDENTIALS, NEEDS_LOGIN_REASON);
+  test.beforeEach(async ({ page }) => {
+    await login(page);
+  });
+
   test('should handle repeated retries idempotently', async ({ page }) => {
     // Note: This test assumes mock or dev environment where we can trigger failures
     await page.goto('/creative');

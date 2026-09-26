@@ -1,6 +1,12 @@
 import { test, expect } from "@playwright/test";
+import { HAS_TEST_CREDENTIALS, NEEDS_LOGIN_REASON, login } from "./helpers/auth";
 
 test.describe("Creative Panel CI Automation", () => {
+  test.skip(!HAS_TEST_CREDENTIALS, NEEDS_LOGIN_REASON);
+  test.beforeEach(async ({ page }) => {
+    await login(page);
+  });
+
   test("Notification and Idempotency Batch Validation", async ({ page }) => {
     // This test is meant to be run in CI. 
     // It validates that status changes trigger notifications and idempotency works.

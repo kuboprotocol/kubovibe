@@ -4,7 +4,7 @@ import { assertEquals, assert } from "https://deno.land/std@0.224.0/assert/mod.t
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
-const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+const DEEPSEEK_API_KEY = Deno.env.get("DEEPSEEK_API_KEY");
 
 Deno.test("orchestrator rejects unauthenticated requests", async () => {
   if (!SUPABASE_URL) return;
@@ -35,7 +35,7 @@ Deno.test("orchestrator rule classifier matches keywords", () => {
 });
 
 Deno.test("orchestrator propagates correlation_id to agent calls", async () => {
-  if (!SUPABASE_URL || !LOVABLE_API_KEY) return;
+  if (!SUPABASE_URL || !DEEPSEEK_API_KEY) return;
   
   const testCorrelationId = `test-corr-${crypto.randomUUID()}`;
   

@@ -1,3 +1,4 @@
+import { APP_NAME } from '@/config/brand'
 import { useEffect, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/integrations/supabase/client'
@@ -34,7 +35,7 @@ export default function PublicAppPage() {
       } else {
         setHtml(data.generated_code)
         const appName = (data.title || '').trim()
-        document.title = appName ? `${appName} · Kubo Vibe` : 'Kubo Vibe App'
+        document.title = appName ? `${appName} · ${APP_NAME}` : `${APP_NAME} App`
       }
       setLoading(false)
     }
@@ -95,7 +96,7 @@ export default function PublicAppPage() {
         className="fixed bottom-4 right-4 z-50 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-background/90 backdrop-blur-sm border border-border/50 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200 text-xs font-medium text-muted-foreground hover:text-foreground group"
       >
         <span className="inline-block w-2 h-2 rounded-full bg-primary group-hover:animate-pulse" />
-        Built with <span className="font-semibold text-foreground">Kubo Vibe</span>
+        Built with <span className="font-semibold text-foreground">{APP_NAME}</span>
       </a>
     </div>
   )

@@ -1,7 +1,8 @@
+import { APP_NAME } from '@/config/brand'
+import AnimatedLogo from '@/components/branding/AnimatedLogo'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft } from 'lucide-react'
-import logoImg from '@/assets/logo-kubovibe-3d.png'
 
 export default function PrivacyPage() {
   const navigate = useNavigate()
@@ -13,7 +14,7 @@ export default function PrivacyPage() {
           <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="rounded-xl">
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <img src={logoImg} alt="KUBO VIBE" className="h-7" />
+          <AnimatedLogo size={17} />
         </div>
       </header>
 
@@ -25,7 +26,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-xl font-display font-semibold text-foreground mb-3">1. Introduction</h2>
             <p className="text-muted-foreground">
-              KUBO VIBE, operated by KUBO PROTOCOL ("we", "us", "our"), is committed to protecting your privacy. This Privacy Policy explains how we collect, use, store, and share your personal information when you use our AI-powered application builder platform.
+              {APP_NAME}, operated by KUBO PROTOCOL ("we", "us", "our"), is committed to protecting your privacy. This Privacy Policy explains how we collect, use, store, and share your personal information when you use our AI-powered application builder platform.
             </p>
           </section>
 
@@ -71,7 +72,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-xl font-display font-semibold text-foreground mb-3">4. AI Processing</h2>
             <p className="text-muted-foreground">
-              When you use KUBO VIBE's builder, your prompts are sent to AI language models to generate code. These prompts may be processed by third-party AI providers. We do not use your prompts to train AI models. Your project data and generated code remain private and are not shared with other users.
+              When you use {APP_NAME}'s builder, your prompts are sent to AI language models to generate code. These prompts may be processed by third-party AI providers. We do not use your prompts to train AI models. Your project data and generated code remain private and are not shared with other users.
             </p>
           </section>
 
@@ -88,7 +89,7 @@ export default function PrivacyPage() {
             <ul className="list-disc list-inside space-y-2 text-muted-foreground">
               <li><strong>Service Providers:</strong> Third-party services that help us operate the Platform (hosting, AI processing, analytics).</li>
               <li><strong>Legal Requirements:</strong> When required by law, court order, or governmental authority.</li>
-              <li><strong>Safety:</strong> To protect the rights, property, or safety of KUBO VIBE, our users, or the public.</li>
+              <li><strong>Safety:</strong> To protect the rights, property, or safety of {APP_NAME}, our users, or the public.</li>
               <li><strong>Business Transfers:</strong> In connection with a merger, acquisition, or sale of assets.</li>
             </ul>
           </section>
@@ -123,7 +124,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-xl font-display font-semibold text-foreground mb-3">10. Children's Privacy</h2>
             <p className="text-muted-foreground">
-              KUBO VIBE is not intended for children under 13 years of age. We do not knowingly collect personal information from children. If we become aware that we have collected data from a child under 13, we will take steps to delete it promptly.
+              {APP_NAME} is not intended for children under 13 years of age. We do not knowingly collect personal information from children. If we become aware that we have collected data from a child under 13, we will take steps to delete it promptly.
             </p>
           </section>
 

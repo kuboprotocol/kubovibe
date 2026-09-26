@@ -1,3 +1,4 @@
+import { APP_NAME } from '@/config/brand'
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -23,6 +24,7 @@ const TermsPage = lazy(() => import("./pages/TermsPage"));
 const PrivacyPage = lazy(() => import("./pages/PrivacyPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const PricingPage = lazy(() => import("./pages/PricingPage"));
+const AlternativesPage = lazy(() => import("./pages/AlternativesPage"));
 const DownloadPage = lazy(() => import("./pages/DownloadPage"));
 const SupportPage = lazy(() => import("./pages/SupportPage"));
 const ConnectPage = lazy(() => import("./pages/ConnectPage"));
@@ -84,7 +86,7 @@ const PageLoader = () => (
   <div className="flex items-center justify-center min-h-screen bg-background">
     <div className="flex flex-col items-center gap-4">
       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      <p className="text-sm text-muted-foreground animate-pulse">Loading Kubo Vibe...</p>
+      <p className="text-sm text-muted-foreground animate-pulse">Loading {APP_NAME}...</p>
     </div>
   </div>
 );
@@ -193,6 +195,8 @@ const App = forwardRef<HTMLDivElement, any>((props, ref) => {
                 <Route path="/privacy" element={<PrivacyPage />} />
                 <Route path="/auth" element={<AuthPage />} />
                 <Route path="/pricing" element={<PricingPage />} />
+                <Route path="/alternativas" element={<AlternativesPage />} />
+                <Route path="/alternativas/:slug" element={<AlternativesPage />} />
                 <Route path="/download" element={<DownloadPage />} />
                 <Route path="/support" element={<SupportPage />} />
                 <Route path="/docs" element={<DocsPage />} />

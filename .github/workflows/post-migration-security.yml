@@ -55,12 +55,32 @@ jobs:
           set -euo pipefail
           echo "🔍 Verificando padrões proibidos em supabase/migrations/**"
 
+          # Migrations históricas já aplicadas e auditadas contra o banco de
+          # produção (2026-09-25): as funções SECURITY DEFINER sem search_path
+          # destes arquivos foram removidas ou recriadas com search_path fixo
+          # por migrations posteriores, e a tabela performance_metrics (criada
+          # sem RLS) não existe mais. Migrations novas continuam verificadas.
+          AUDITED_LEGACY=(
+            20260607200736_72ecd9d0-461b-451a-a99a-e58dd594fd2e.sql
+            20260607202210_93725712-6bcf-4558-82a0-794784deeece.sql
+            20260607210209_2d3b9a65-9ac7-40a2-89a1-3eba312b890b.sql
+            20260608031423_ef00b636-502e-4443-b8f8-89e436308a81.sql
+            20260608151215_bf0b0faf-cf06-4da4-9031-3e0368e44588.sql
+            20260608161731_0d069cd4-c253-43e9-91f1-3b5d66f8e190.sql
+            20260611233127_0652d94d-5262-4fbc-8e6d-ba94f0a68395.sql
+          )
+          is_audited() {
+            local b; b=$(basename "$1")
+            [[ "$b" < "20260607000000" ]] && return 0
+            local a; for a in "${AUDITED_LEGACY[@]}"; do [[ "$b" == "$a" ]] && return 0; done
+            return 1
+          }
+
           # CREATE TABLE em public sem GRANT na mesma migration
           bad=0
           for f in $(git ls-files 'supabase/migrations/*.sql'); do
             # Skip static lint for legacy migrations manually audited and fixed in the DB
-            basename_f=$(basename "$f")
-            if [[ "$basename_f" < "20260607000000" ]]; then
+            if is_audited "$f"; then
               continue
             fi
 
@@ -79,8 +99,7 @@ jobs:
           # SECURITY DEFINER sem search_path fixo
           for f in $(git ls-files 'supabase/migrations/*.sql'); do
             # Skip static lint for legacy migrations manually audited and fixed in the DB
-            basename_f=$(basename "$f")
-            if [[ "$basename_f" < "20260607000000" ]]; then
+            if is_audited "$f"; then
               continue
             fi
 
@@ -97,9 +116,19 @@ jobs:
             bad=1
           fi
 
-          # Modificações em schemas reservados
-          if git ls-files 'supabase/migrations/*.sql' \
-            | xargs -r grep -liE '(create|alter|drop)[[:space:]]+(table|function|schema|view|trigger|index)[[:space:]]+[^;]*(auth|storage|realtime|vault|supabase_functions)\.'; then
+          # Modificações em schemas reservados: o OBJETO ALVO do comando está
+          # em auth/storage/realtime/vault/supabase_functions. Referências como
+          # "REFERENCES auth.users(id)" numa tabela public não contam.
+          # Exceção: habilitar RLS em realtime.messages (Realtime Authorization,
+          # recomendado pela Supabase).
+          reserved=$(git ls-files 'supabase/migrations/*.sql' \
+            | xargs -r grep -iHnE '(create|alter|drop)[[:space:]]+(or[[:space:]]+replace[[:space:]]+)?(table|function|schema|view|trigger|index)[[:space:]]+(if[[:space:]]+(not[[:space:]]+)?exists[[:space:]]+)?"?(auth|storage|realtime|vault|supabase_functions)"?\.' \
+            | grep -viE 'alter[[:space:]]+table[[:space:]]+realtime\.messages[[:space:]]+enable[[:space:]]+row[[:space:]]+level[[:space:]]+security' || true)
+          # Triggers anexados a tabelas de schemas reservados também contam.
+          reserved+=$(git ls-files 'supabase/migrations/*.sql' \
+            | xargs -r grep -iHnE 'create[[:space:]]+(or[[:space:]]+replace[[:space:]]+)?trigger[[:space:]][^;]*[[:space:]]on[[:space:]]+"?(auth|storage|realtime|vault|supabase_functions)"?\.' || true)
+          if [ -n "$reserved" ]; then
+            echo "$reserved"
             echo "❌ Migration toca schema reservado (auth/storage/realtime/vault/supabase_functions)"
             bad=1
           fi

@@ -1,3 +1,5 @@
+import { APP_NAME } from '@/config/brand'
+import AnimatedLogo from '@/components/branding/AnimatedLogo'
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
@@ -5,7 +7,6 @@ import { ArrowLeft, Trophy, Flame, Crown, Medal } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/integrations/supabase/client'
-import logoImg from '@/assets/logo-kubovibe-3d.png'
 
 interface LeaderboardEntry {
   user_id: string
@@ -86,7 +87,7 @@ export default function LeaderboardPage() {
             <Button variant="ghost" size="icon" onClick={() => navigate('/shortlinks')} className="rounded-xl">
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <img src={logoImg} alt="KUBO VIBE" className="h-8" />
+            <AnimatedLogo size={20} />
           </div>
           <div className="flex items-center gap-2 text-sm">
             <Trophy className="h-4 w-4 text-primary" />
@@ -102,7 +103,7 @@ export default function LeaderboardPage() {
             <Trophy className="h-8 w-8 text-primary" />
           </div>
           <h1 className="font-display font-bold text-2xl text-foreground">🏆 Streak Leaderboard</h1>
-          <p className="text-muted-foreground text-sm mt-1">The longest streaks in the Kubo Vibe community</p>
+          <p className="text-muted-foreground text-sm mt-1">The longest streaks in the {APP_NAME} community</p>
           {userRank && (
             <p className="text-primary text-sm font-bold mt-2">
               Your rank: #{userRank}

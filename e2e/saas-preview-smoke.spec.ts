@@ -57,7 +57,7 @@ test.describe('SaaS preview smoke', () => {
     const bodyText = await frame.locator('body').evaluate((el) => el.textContent?.trim() ?? '')
     expect(bodyText.length).toBeGreaterThan(5)
 
-    // "Built with Kubo Vibe" badge should be present on public apps.
+    // "Built with <APP_NAME>" badge should be present on public apps.
     await expect(page.getByText('Built with')).toBeVisible()
   })
 

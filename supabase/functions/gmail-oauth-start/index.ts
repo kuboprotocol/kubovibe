@@ -14,7 +14,9 @@ const SCOPES = [
 
 const ORIGIN_ALLOWLIST = [
   'https://kubovibe.dev',
-  'https://kubovibe.dev',
+  'https://www.kubovibe.dev',
+  'https://vertal.dev',
+  'https://www.vertal.dev',
   /^https:\/\/[a-z0-9-]+\.lovable\.app$/i,
   /^https:\/\/id-preview--[a-z0-9-]+\.lovable\.app$/i,
   /^http:\/\/localhost(:\d+)?$/i,

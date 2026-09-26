@@ -1,3 +1,4 @@
+import { APP_NAME } from '@/config/brand'
 import { defineTool } from "@lovable.dev/mcp-js";
 import { z } from "zod";
 import { supabaseForUser } from "../supabase";
@@ -5,7 +6,7 @@ import { supabaseForUser } from "../supabase";
 export default defineTool({
   name: "list_projects",
   title: "List projects",
-  description: "List the signed-in user's KUBO Vibe projects, newest first.",
+  description: `List the signed-in user's ${APP_NAME} projects, newest first.`,
   inputSchema: {
     limit: z.number().int().min(1).max(50).default(10).describe("How many projects to return."),
     publishedOnly: z.boolean().default(false).describe("Only return published projects."),

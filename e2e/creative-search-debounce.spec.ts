@@ -1,6 +1,12 @@
 import { test, expect } from '@playwright/test';
+import { HAS_TEST_CREDENTIALS, NEEDS_LOGIN_REASON, login } from './helpers/auth';
 
 test.describe('Creative Panel Search and Debounce', () => {
+  test.skip(!HAS_TEST_CREDENTIALS, NEEDS_LOGIN_REASON);
+  test.beforeEach(async ({ page }) => {
+    await login(page);
+  });
+
   test.beforeEach(async ({ page }) => {
     // Basic setup - assume we are logged in or mock it
     // For real E2E we might need a test user

@@ -1,3 +1,5 @@
+import { APP_NAME } from '@/config/brand'
+import AnimatedLogo from '@/components/branding/AnimatedLogo'
 import { useState, useMemo, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
@@ -22,7 +24,6 @@ import {
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import logoImg from '@/assets/logo-kubovibe-3d.png'
 
 interface DocSection {
   id: string
@@ -93,9 +94,9 @@ const sections: DocSection[] = [
     group: 'Getting Started',
     content: (
       <>
-        <H2>Welcome to Kubo Vibe Dev</H2>
+        <H2>Welcome to {APP_NAME}</H2>
         <P>
-          Kubo Vibe Dev is an AI-first SaaS platform that turns plain-language ideas into
+          {APP_NAME} is an AI-first SaaS platform that turns plain-language ideas into
           production-ready web applications, Web3 tools, creative media and full 3D experiences.
           The platform combines a multi-agent code generator, a creative studio, a Web3
           connector layer, a procedural game engine and a credit-based economy in a single
@@ -169,7 +170,7 @@ testimonials and a waitlist form.`}</Pre>
       <>
         <H2>Architecture</H2>
         <P>
-          Kubo Vibe is a modern hybrid stack designed for scale, real-time collaboration
+          {APP_NAME} is a modern hybrid stack designed for scale, real-time collaboration
           and AI-native development.
         </P>
         <H3>Frontend</H3>
@@ -214,7 +215,7 @@ testimonials and a waitlist form.`}</Pre>
       <>
         <H2>The Builder</H2>
         <P>
-          The Builder at <Code>/builder</Code> is the heart of Kubo Vibe. It combines a
+          The Builder at <Code>/builder</Code> is the heart of {APP_NAME}. It combines a
           prompt input, a streaming AI chat, a Preview / Code toggle and a toolbar with
           publish, share and version controls.
         </P>
@@ -631,7 +632,7 @@ testimonials and a waitlist form.`}</Pre>
           <li>Domain transfer: status updates and auth codes.</li>
         </UL>
         <Callout type="warn">
-          Kubo Vibe does not support marketing emails or bulk campaigns. All sends are
+          {APP_NAME} does not support marketing emails or bulk campaigns. All sends are
           recipient-triggered and respect the unsubscribe registry.
         </Callout>
       </>
@@ -767,11 +768,7 @@ export default function DocsPage() {
       <header className="sticky top-0 z-50 glass glass-border">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-3 group">
-            <img
-              src={logoImg}
-              alt="KUBO VIBE"
-              className="h-7 group-hover:scale-105 transition-transform"
-            />
+            <AnimatedLogo size={17} className="group-hover:scale-105 transition-transform" />
             <span className="text-sm font-display font-semibold text-foreground hidden sm:inline">
               Documentation
             </span>

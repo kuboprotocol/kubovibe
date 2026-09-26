@@ -1,3 +1,4 @@
+import { APP_NAME } from '@/config/brand'
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
@@ -46,7 +47,7 @@ export default function ConnectorWeb3Page() {
             </div>
             <div>
               <h1 className="text-xl font-bold font-display">{provider.label} · Web3 RPC</h1>
-              <p className="text-xs text-muted-foreground">Setup multi-network · KUBO Vibe Dev</p>
+              <p className="text-xs text-muted-foreground">Setup multi-network · {APP_NAME}</p>
             </div>
           </div>
         </div>

@@ -1,6 +1,12 @@
 import { test, expect } from '@playwright/test';
+import { HAS_TEST_CREDENTIALS, NEEDS_ADMIN_REASON, login } from './helpers/auth';
 
 test.describe('Orchestrator Deep Linking and Search', () => {
+  test.skip(!HAS_TEST_CREDENTIALS, NEEDS_ADMIN_REASON);
+  test.beforeEach(async ({ page }) => {
+    await login(page);
+  });
+
   test('should open specific job and event via URL parameters', async ({ page }) => {
     // We'll use a known ID format or wait for data to load
     await page.goto('/orchestrator');

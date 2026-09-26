@@ -1,6 +1,12 @@
 import { test, expect } from '@playwright/test';
+import { HAS_TEST_CREDENTIALS, NEEDS_ADMIN_REASON, login } from './helpers/auth';
 
 test.describe('Orchestrator Performance Auditing and PDF Export', () => {
+  test.skip(!HAS_TEST_CREDENTIALS, NEEDS_ADMIN_REASON);
+  test.beforeEach(async ({ page }) => {
+    await login(page);
+  });
+
   test('should filter timeline and export PDF with correct filename', async ({ page }) => {
     // Navigate to orchestrator
     await page.goto('/orchestrator');

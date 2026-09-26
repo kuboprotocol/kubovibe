@@ -1,3 +1,4 @@
+import { APP_NAME } from '@/config/brand'
 import { defineTool } from "@lovable.dev/mcp-js";
 import { z } from "zod";
 import { supabaseForUser } from "../supabase";
@@ -5,7 +6,7 @@ import { supabaseForUser } from "../supabase";
 export default defineTool({
   name: "create_project",
   title: "Create project",
-  description: "Create a new KUBO Vibe project for the signed-in user.",
+  description: `Create a new ${APP_NAME} project for the signed-in user.`,
   inputSchema: {
     title: z.string().trim().min(1).max(120).describe("Project title."),
     description: z.string().trim().max(500).optional().describe("Optional short description."),

@@ -1,3 +1,5 @@
+import { APP_NAME } from '@/config/brand'
+import AnimatedLogo from '@/components/branding/AnimatedLogo'
 import { useState, useEffect, forwardRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/integrations/supabase/client'
@@ -8,7 +10,6 @@ import { Loader2, Mail, Lock, User, ArrowRight, KeyRound, ShieldAlert, Github } 
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/useAuth'
 import { motion, AnimatePresence } from 'framer-motion'
-import logoImg from '@/assets/logo-kubovibe-3d.png'
 
 // Temporary flag to hide Google sign-in while the OAuth 404 (redirect URI)
 // is being fixed. Set back to true once the provider callback is restored.
@@ -315,13 +316,13 @@ const AuthPage = forwardRef<HTMLDivElement, any>((props, ref) => {
             <div className="glass glass-border rounded-3xl p-8 shadow-gold">
               <div className="text-center mb-8">
                 <div className="flex justify-center mb-5">
-                  <img src={logoImg} alt="KUBO VIBE" className="h-12" />
+                  <AnimatedLogo size={28} />
                 </div>
                 <h1 className="text-2xl font-display font-bold text-foreground">
                   {isLogin ? 'Welcome back' : 'Create your account'}
                 </h1>
                 <p className="text-sm text-muted-foreground mt-2">
-                  {isLogin ? 'Access your projects on KUBO VIBE' : 'Start building amazing apps'}
+                  {isLogin ? `Access your projects on ${APP_NAME}` : 'Start building amazing apps'}
                 </p>
               </div>
 

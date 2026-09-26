@@ -28,8 +28,8 @@ Deno.serve(async (req) => {
       try { 
         if (stateRow.return_url) {
           const u = new URL(stateRow.return_url)
-          // Security: Only allow redirects to kubovibe.dev and its subdomains, or localhost for dev
-          const allowedHost = u.hostname === 'kubovibe.dev' || u.hostname.endsWith('.kubovibe.dev') || u.hostname === 'localhost'
+          // Security: Only allow redirects to kubovibe.dev / vertal.dev and their subdomains, or localhost for dev
+          const allowedHost = u.hostname === 'kubovibe.dev' || u.hostname.endsWith('.kubovibe.dev') || u.hostname === 'vertal.dev' || u.hostname.endsWith('.vertal.dev') || u.hostname === 'localhost'
           if (allowedHost) {
             appBaseUrl = u.origin 
           } else {

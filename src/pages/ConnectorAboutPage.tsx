@@ -1,3 +1,4 @@
+import { APP_NAME } from '@/config/brand'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
@@ -193,7 +194,7 @@ export default function ConnectorAboutPage({ navLockMs = DEFAULT_NAV_LOCK_MS }: 
             <div className="min-w-0">
               <h1 className="text-xl font-bold font-display truncate">{connector.name}</h1>
               <p className="text-xs text-muted-foreground truncate">
-                Connector details · KUBO Vibe Dev
+                Connector details · {APP_NAME}
               </p>
             </div>
           </div>

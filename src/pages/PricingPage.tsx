@@ -1,3 +1,4 @@
+import { APP_NAME } from '@/config/brand'
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
@@ -425,7 +426,7 @@ export default function PricingPage() {
           <div className="mx-auto max-w-3xl rounded-2xl border border-border/60 bg-card/40 p-2 backdrop-blur-xl">
             <Accordion type="single" collapsible className="w-full">
               <AccordionItem value="q1">
-                <AccordionTrigger className="px-4 text-left">O que são créditos na KUBO Vibe?</AccordionTrigger>
+                <AccordionTrigger className="px-4 text-left">O que são créditos na {APP_NAME}?</AccordionTrigger>
                 <AccordionContent className="px-4 text-muted-foreground">
                   Créditos são a moeda interna que alimenta gerações de IA, deploys e ações premium. Cada plano oferece um volume diário, e você pode acumular créditos extras completando shortlinks e convidando amigos.
                 </AccordionContent>

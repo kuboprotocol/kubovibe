@@ -1,4 +1,5 @@
 import { CSSProperties } from 'react'
+import { BRAND } from '@/config/brand'
 
 interface AnimatedLogoProps {
   size?: number // height in px for the text
@@ -6,7 +7,7 @@ interface AnimatedLogoProps {
 }
 
 /**
- * AnimatedLogo — "KUBO VIBE" with a 3D metallic gold cube orbiting the text,
+ * AnimatedLogo — wordmark da marca (BRAND.wordmark) with a 3D metallic gold cube orbiting the text,
  * spinning in 3D like a rotating planet. Pure CSS 3D, GPU-accelerated.
  */
 export default function AnimatedLogo({ size = 32, className = '' }: AnimatedLogoProps) {
@@ -110,7 +111,7 @@ export default function AnimatedLogo({ size = 32, className = '' }: AnimatedLogo
         className="font-display font-bold tracking-[0.18em] text-foreground select-none whitespace-nowrap"
         style={{ fontSize: size, lineHeight: 1 }}
       >
-        KUBO&nbsp;VIBE
+        {BRAND.wordmark}
       </span>
 
       {/* Orbiting cube layer */}

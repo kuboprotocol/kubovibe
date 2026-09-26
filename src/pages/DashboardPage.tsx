@@ -1,3 +1,4 @@
+import AnimatedLogo from '@/components/branding/AnimatedLogo'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useState, useEffect, forwardRef } from 'react'
 import { Button } from '@/components/ui/button'
@@ -13,7 +14,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Progress } from '@/components/ui/progress'
 import { PromoCards } from '@/components/dashboard/PromoCards'
-import logoImg from '@/assets/logo-kubovibe-3d.png'
 import CreditLedger from '@/components/CreditLedger'
 import { Gamepad2, Sparkles, Palette } from 'lucide-react'
 
@@ -102,7 +102,7 @@ const DashboardPage = forwardRef<HTMLDivElement, any>((props, ref) => {
       <header className="sticky top-0 z-50 glass glass-border">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src={logoImg} alt="KUBO VIBE" className="h-7" />
+            <AnimatedLogo size={17} />
           </div>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" onClick={() => navigate('/docs')} className="rounded-xl gap-2 text-muted-foreground hover:text-foreground">

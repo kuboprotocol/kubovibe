@@ -18,6 +18,8 @@ describe('Canonical-domain redirect → kubovibe.dev', () => {
       ['kubovibe.com.br'],
       ['app.kubovibe.dev'],        // só o apex e o www são canônicos
       ['kubovibe.onrender.com'],
+      ['app.vertal.dev'],          // só o apex e o www do vertal.dev são liberados
+      ['vertal.dev.evil.com'],
     ])('redirects when host = %s', (host) => {
       expect(shouldRedirect(host)).toBe(true)
     })
@@ -25,6 +27,8 @@ describe('Canonical-domain redirect → kubovibe.dev', () => {
     it.each([
       ['kubovibe.dev'],                           // canônico
       ['www.kubovibe.dev'],
+      ['vertal.dev'],                             // novo domínio da marca
+      ['www.vertal.dev'],
       ['localhost'],
       ['127.0.0.1'],
       ['id-preview--abc123.lovable.app'],         // sandbox preview
@@ -33,6 +37,32 @@ describe('Canonical-domain redirect → kubovibe.dev', () => {
       ['kubo-vibe-dev-production.up.railway.app'], // fallback do Railway
     ])('does NOT redirect when host = %s', (host) => {
       expect(shouldRedirect(host)).toBe(false)
+    })
+  })
+
+  describe('troca de domínio ligada (BRAND.primaryDomainLive = true)', () => {
+    it.each([
+      ['kubovibe.dev'],            // domínio antigo passa a redirecionar
+      ['www.kubovibe.dev'],
+      ['app.vertal.dev'],
+    ])('redirects when host = %s', (host) => {
+      expect(shouldRedirect(host, true)).toBe(true)
+    })
+
+    it.each([
+      ['vertal.dev'],
+      ['www.vertal.dev'],
+      ['localhost'],
+      ['kubo-vibe-dev-production.up.railway.app'],
+    ])('does NOT redirect when host = %s', (host) => {
+      expect(shouldRedirect(host, true)).toBe(false)
+    })
+
+    it('manda para vertal.dev preservando caminho, query e hash', () => {
+      expect(buildTarget(
+        { pathname: '/pricing', search: '?ref=x', hash: '#pro' },
+        'https://vertal.dev',
+      )).toBe('https://vertal.dev/pricing?ref=x#pro')
     })
   })
 

@@ -1,3 +1,4 @@
+import { APP_NAME } from '@/config/brand'
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
@@ -151,7 +152,7 @@ export default function ConnectorSetupPage() {
             </div>
             <div>
               <h1 className="text-xl font-bold font-display">Connect {connector.name}</h1>
-              <p className="text-xs text-muted-foreground">Internal setup · KUBO Vibe Dev</p>
+              <p className="text-xs text-muted-foreground">Internal setup · {APP_NAME}</p>
             </div>
           </div>
         </div>

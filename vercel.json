@@ -24,6 +24,14 @@
     {
       "source": "/:path*",
       "has": [
+        { "type": "host", "value": "(?:.*\\.)?lovable\\.app" }
+      ],
+      "destination": "https://kubovibe.dev/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/:path*",
+      "has": [
         { "type": "host", "value": "(?:preview|staging|lovable)\\..*" }
       ],
       "destination": "https://kubovibe.dev/:path*",

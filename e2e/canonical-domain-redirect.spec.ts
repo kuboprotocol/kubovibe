@@ -9,9 +9,15 @@ import { test, expect, type Route } from '@playwright/test'
  * production rules in `vercel.json` and `render.yaml` are configured to
  * produce. The assertions then prove that:
  *   (a) the browser follows the 301,
- *   (b) path + query are preserved by the server,
- *   (c) the URL fragment (hash) — which is never sent to servers — is
- *       still re-attached client-side by the user agent.
+ *   (b) path + query are preserved by the server (asserted on the request the
+ *       browser issues to kubovibe.dev after the 301).
+ *
+ * Playwright does not route the request that follows a fulfilled 301, so it
+ * goes to the real network; we therefore assert on that request's URL instead
+ * of waiting for the real site to load (deterministic, no dependency on
+ * production being up). Hash re-attachment after a 301 — the fragment is
+ * never sent to servers — is covered with a real local HTTP edge in
+ * canonical-domain-redirect-cache.spec.ts ("hash preservation" matrix).
  *
  * Bonus: we also exercise the JS fallback in src/App.tsx by serving a tiny
  * HTML at the lovable.app host that contains the same `window.location.replace`
@@ -83,6 +89,22 @@ async function installEdgeRedirect(page: import('@playwright/test').Page) {
   })
 }
 
+/** Navigates to `source` and returns the URL the browser requests after the 301. */
+async function followedRedirectUrl(page: import('@playwright/test').Page, source: string): Promise<string> {
+  const followed = page.waitForRequest(
+    (r) => r.redirectedFrom() !== null && r.url().startsWith('https://kubovibe.dev/'),
+    { timeout: 15_000 },
+  )
+  await page.goto(source, { waitUntil: 'commit' }).catch(() => {})
+  return (await followed).url()
+}
+
+/** Requests never carry the fragment (RFC 3986 §3.5). */
+function withoutHash(url: string): string {
+  const i = url.indexOf('#')
+  return i === -1 ? url : url.slice(0, i)
+}
+
 test.describe('Canonical-domain redirect: *.lovable.app → kubovibe.dev (headless)', () => {
   for (const c of CASES) {
     test(`preserves path/query/hash — ${c.label}`, async ({ page }) => {
@@ -97,21 +119,19 @@ test.describe('Canonical-domain redirect: *.lovable.app → kubovibe.dev (headle
         })
       })
 
-      // domcontentloaded is enough — we only care about the navigation URL,
-      // not whether the (mocked) destination body fully renders. HSTS/cert
-      // interstitials on the fake https://kubovibe.dev origin can block
-      // 'load' but the URL is set as soon as the 301 is followed.
-      await page.goto(c.source, { waitUntil: 'domcontentloaded' }).catch(() => {})
+      const followed = await followedRedirectUrl(page, c.source)
 
-      expect(page.url(), `response chain: ${JSON.stringify(responses, null, 2)}`)
-        .toBe(c.expected)
+      expect(followed, `response chain: ${JSON.stringify(responses, null, 2)}`)
+        .toBe(withoutHash(c.expected))
+      const hop = responses.find((r) => r.status === 301)
+      expect(hop?.location, 'Location must carry path + query').toBe(withoutHash(c.expected))
     })
   }
 
   test('encoded characters in path & query are preserved verbatim', async ({ page }) => {
     await installEdgeRedirect(page)
-    await page.goto('https://kubovibe.lovable.app/app/My%20Project?q=hello%20world&x=%26', { waitUntil: 'domcontentloaded' }).catch(() => {})
-    expect(page.url()).toBe('https://kubovibe.dev/app/My%20Project?q=hello%20world&x=%26')
+    const followed = await followedRedirectUrl(page, 'https://kubovibe.lovable.app/app/My%20Project?q=hello%20world&x=%26')
+    expect(followed).toBe('https://kubovibe.dev/app/My%20Project?q=hello%20world&x=%26')
   })
 
   test('301 status is emitted (not 302) — locks SEO-correct behaviour', async ({ page }) => {
@@ -130,8 +150,8 @@ test.describe('Canonical-domain redirect: *.lovable.app → kubovibe.dev (headle
     // id-preview lives ONLY in the client-side fallback (src/App.tsx) so
     // live-preview iframes inside the Lovable editor don't bounce themselves.
     await installEdgeRedirect(page)
-    await page.goto('https://id-preview--abc123.lovable.app/builder', { waitUntil: 'domcontentloaded' }).catch(() => {})
-    expect(page.url()).toBe('https://kubovibe.dev/builder')
+    const followed = await followedRedirectUrl(page, 'https://id-preview--abc123.lovable.app/builder')
+    expect(followed).toBe('https://kubovibe.dev/builder')
   })
 
   test('client-side fallback: window.location.replace fires when edge is bypassed', async ({ page }) => {

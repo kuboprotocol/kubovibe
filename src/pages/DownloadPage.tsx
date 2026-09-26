@@ -1,3 +1,4 @@
+import { APP_NAME } from '@/config/brand'
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Monitor, Apple, Smartphone, Terminal, Download as DownloadIcon, ExternalLink, Clock } from 'lucide-react'
@@ -95,10 +96,10 @@ export default function DownloadPage() {
             KUBO Local Agent
           </Badge>
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-foreground">
-            Leve o KUBO Vibe para sua máquina
+            Leve o {APP_NAME} para sua máquina
           </h1>
           <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
-            Execução local de verdade, integrada ao editor que você já usa — sem sair do KUBO Vibe.
+            Execução local de verdade, integrada ao editor que você já usa — sem sair do {APP_NAME}.
           </p>
         </motion.div>
 
