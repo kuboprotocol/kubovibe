@@ -8,18 +8,14 @@ const corsHeaders = {
 
 const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, { apiVersion: "2024-06-20" });
 
+// Somente planos até US$ 49,99/mês estão à venda. Premium 2 e Business 1–7
+// saíram da venda: pedidos desses planos caem em "Unknown plan" (400).
+// Assinaturas já existentes continuam valendo (stripe-webhook e planConfig
+// ainda conhecem esses planos).
 const PLAN_PRICES: Record<string, { monthly: number; annual: number; lifetime: number; name: string }> = {
   starter:    { monthly: 499,   annual: 4790,   lifetime: 2994,   name: "KUBO Vibe — Starter"    },
   pro:        { monthly: 1999,  annual: 19190,  lifetime: 11994,  name: "KUBO Vibe — Pro"        },
   premium_1:  { monthly: 4999,  annual: 47990,  lifetime: 29994,  name: "KUBO Vibe — Premium 1"  },
-  premium_2:  { monthly: 7999,  annual: 76790,  lifetime: 47994,  name: "KUBO Vibe — Premium 2"  },
-  business_1: { monthly: 9999,  annual: 95990,  lifetime: 59994,  name: "KUBO Vibe — Business 1" },
-  business_2: { monthly: 19999, annual: 191990, lifetime: 119994, name: "KUBO Vibe — Business 2" },
-  business_3: { monthly: 29999, annual: 287990, lifetime: 179994, name: "KUBO Vibe — Business 3" },
-  business_4: { monthly: 39999, annual: 383990, lifetime: 239994, name: "KUBO Vibe — Business 4" },
-  business_5: { monthly: 49999, annual: 479990, lifetime: 299994, name: "KUBO Vibe — Business 5" },
-  business_6: { monthly: 59999, annual: 575990, lifetime: 359994, name: "KUBO Vibe — Business 6" },
-  business_7: { monthly: 69999, annual: 671990, lifetime: 419994, name: "KUBO Vibe — Business 7" },
 };
 
 Deno.serve(async (req: Request) => {
