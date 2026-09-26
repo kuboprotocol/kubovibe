@@ -23,6 +23,14 @@ if (process.env.SKIP_SMOKE === "1") {
   process.exit(0);
 }
 
+// Cloudflare Workers Builds define WORKERS_CI=1. O container de build não
+// tem Chromium e baixaria ~150 MB só para o smoke test; o deploy já é
+// coberto pelo CI do GitHub (Playwright), então pulamos aqui.
+if (process.env.WORKERS_CI === "1") {
+  console.log("⏭️  WORKERS_CI=1 (Cloudflare Workers Builds) — skipping smoke test");
+  process.exit(0);
+}
+
 const TARGET_URL = process.env.SMOKE_URL || null;
 const DIST = join(process.cwd(), "dist");
 

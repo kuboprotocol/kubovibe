@@ -1,7 +1,9 @@
 // Hospedagem do site na Cloudflare (Workers com static assets).
 //
 // Workers Builds (painel da Cloudflare → Workers → vertaldev → Settings → Build):
-//   Build command:  npm run build:cloudflare
+//   Build command:  npm run build   (o smoke test com Chromium é pulado quando
+//                                    WORKERS_CI=1; `npm run build:cloudflare`
+//                                    também funciona)
 //   Deploy command: npx wrangler deploy
 // O `name` precisa ser igual ao nome do Worker no painel.
 {
